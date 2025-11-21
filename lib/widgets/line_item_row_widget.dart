@@ -54,18 +54,51 @@ class LineItemRowWidget extends StatelessWidget {
               },
             ),
             const SizedBox(height: 8),
+            TextField(
+              decoration: const InputDecoration(
+                labelText: 'Item Code / Reference (optional)',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              controller: TextEditingController(text: item.referenceCode ?? ''),
+              onChanged: (value) {
+                onChanged(item.copyWith(referenceCode: value));
+              },
+            ),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     decoration: const InputDecoration(
-                      labelText: 'Unit',
+                      labelText: 'Quantity',
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     controller: TextEditingController(text: item.unit),
                     onChanged: (value) {
                       onChanged(item.copyWith(unit: value));
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(
+                      labelText: 'Unit Type',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    value: item.unitType,
+                    items: const [
+                      DropdownMenuItem(value: 'LOT', child: Text('LOT')),
+                      DropdownMenuItem(value: 'EA', child: Text('EA')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        onChanged(item.copyWith(unitType: value));
+                      }
                     },
                   ),
                 ),

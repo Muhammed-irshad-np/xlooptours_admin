@@ -41,6 +41,8 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
     _lineItems.add(LineItemModel(
       description: '',
       unit: '',
+      unitType: 'LOT',
+      referenceCode: '',
       subtotalAmount: 0.0,
       discountRate: 3.0,
       totalAmount: 0.0,
@@ -85,6 +87,8 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       _lineItems.add(LineItemModel(
         description: '',
         unit: '',
+        unitType: 'LOT',
+        referenceCode: '',
         subtotalAmount: 0.0,
         discountRate: 3.0,
         totalAmount: 0.0,
@@ -104,6 +108,12 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
     });
   }
 
+  List<LineItemModel> _getActiveLineItems() {
+    return _lineItems
+        .where((item) => item.subtotalAmount > 0)
+        .toList();
+  }
+
   InvoiceModel _buildInvoice() {
     return InvoiceModel(
       date: _selectedDate,
@@ -111,7 +121,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       contractReference: _contractRefController.text.trim(),
       paymentTerms: _paymentTermsController.text.trim(),
       customer: _selectedCustomer,
-      lineItems: _lineItems.where((item) => item.description.isNotEmpty).toList(),
+      lineItems: _getActiveLineItems(),
     );
   }
 
@@ -130,7 +140,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       return;
     }
 
-    final validItems = _lineItems.where((item) => item.description.isNotEmpty).toList();
+    final validItems = _getActiveLineItems();
     if (validItems.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please add at least one line item')),
