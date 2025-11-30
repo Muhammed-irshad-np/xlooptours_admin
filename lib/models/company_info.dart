@@ -3,7 +3,7 @@ class CompanyInfo {
   static const String companyNameEn = 'X L O O P';
   static const String companyNameEn2 = 'TOURS W.L.L';
   static const String companyNameAr = 'اكس لوب';
-  static const String companyNameAr2 = 'ت ورس ذ.م.م';
+  static const String companyNameAr2 = 'ت ورس ذ.ل.ل';
   // Registration
   static const String crNumber = 'C.R 160615-1';
 
