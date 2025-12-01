@@ -4,6 +4,7 @@ import '../models/invoice_model.dart';
 import '../services/database_service.dart';
 import 'pdf_preview_screen.dart';
 import '../widgets/responsive_layout.dart';
+import 'invoice_form_screen.dart';
 
 class InvoiceListScreen extends StatefulWidget {
   const InvoiceListScreen({super.key});
@@ -46,13 +47,6 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   }
 
   Future<void> _openInvoice(InvoiceModel invoice) async {
-    // Debug: Check if line items are loaded
-    print('Opening invoice: ${invoice.invoiceNumber}');
-    print('Line items count: ${invoice.lineItems.length}');
-    for (var item in invoice.lineItems) {
-      print('  - ${item.description}: ${item.subtotalAmount}');
-    }
-
     // Navigate to PDF preview
     Navigator.push(
       context,
@@ -60,6 +54,17 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         builder: (context) => PDFPreviewScreen(invoice: invoice),
       ),
     );
+  }
+
+  Future<void> _editInvoice(InvoiceModel invoice) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            InvoiceFormScreen(invoiceToEdit: invoice), // Pass invoice to edit
+      ),
+    );
+    _loadInvoices(); // Reload list after edit
   }
 
   Future<void> _deleteInvoice(InvoiceModel invoice) async {
@@ -232,95 +237,67 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     NumberFormat currencyFormat,
     DateFormat dateFormat,
   ) {
-    return Dismissible(
-      key: Key(invoice.id ?? invoice.invoiceNumber),
-      direction: DismissDirection.endToStart,
-      background: Container(
-        alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
-        margin: const EdgeInsets.only(bottom: 12),
-        decoration: BoxDecoration(
-          color: Colors.red,
-          borderRadius: BorderRadius.circular(12),
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        title: Text(
+          invoice.invoiceNumber,
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
-        child: const Icon(Icons.delete, color: Colors.white, size: 32),
-      ),
-      confirmDismiss: (direction) async {
-        return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Delete Invoice'),
-            content: Text(
-              'Are you sure you want to delete invoice ${invoice.invoiceNumber}?',
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text(
+              '${dateFormat.format(invoice.date)} • ${invoice.customer?.companyName ?? "Unknown Customer"}',
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+            Text(
+              currencyFormat.format(invoice.grandTotal),
+              style: TextStyle(
+                color: Theme.of(context).primaryColor,
+                fontWeight: FontWeight.w600,
               ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Delete'),
-              ),
-            ],
-          ),
-        );
-      },
-      onDismissed: (direction) async {
-        if (invoice.id != null) {
-          try {
-            await DatabaseService.instance.deleteInvoice(invoice.id!);
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('${invoice.invoiceNumber} deleted'),
-                  action: SnackBarAction(
-                    label: 'Undo',
-                    onPressed: () {
-                      // Reload to show the invoice again
-                      _loadInvoices();
-                    },
+            ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PopupMenuButton<String>(
+              onSelected: (value) {
+                if (value == 'edit') {
+                  _editInvoice(invoice);
+                } else if (value == 'delete') {
+                  _deleteInvoice(invoice);
+                }
+              },
+              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+                const PopupMenuItem<String>(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 20),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
                   ),
                 ),
-              );
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text('Error: $e')));
-              _loadInvoices(); // Reload to restore the list
-            }
-          }
-        }
-      },
-      child: Card(
-        margin: const EdgeInsets.only(bottom: 12),
-        child: ListTile(
-          title: Text(
-            invoice.invoiceNumber,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              Text(
-                '${dateFormat.format(invoice.date)} • ${invoice.customer?.companyName ?? "Unknown Customer"}',
-              ),
-              Text(
-                currencyFormat.format(invoice.grandTotal),
-                style: TextStyle(
-                  color: Theme.of(context).primaryColor,
-                  fontWeight: FontWeight.w600,
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, color: Colors.red, size: 20),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-          onTap: () => _openInvoice(invoice),
+              ],
+            ),
+            const Icon(Icons.arrow_forward_ios, size: 16),
+          ],
         ),
+        onTap: () => _openInvoice(invoice),
       ),
     );
   }

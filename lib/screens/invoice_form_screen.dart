@@ -12,7 +12,9 @@ import 'pdf_preview_screen.dart';
 import '../widgets/responsive_layout.dart';
 
 class InvoiceFormScreen extends StatefulWidget {
-  const InvoiceFormScreen({super.key});
+  final InvoiceModel? invoiceToEdit;
+
+  const InvoiceFormScreen({super.key, this.invoiceToEdit});
 
   @override
   State<InvoiceFormScreen> createState() => _InvoiceFormScreenState();
@@ -40,19 +42,38 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   @override
   void initState() {
     super.initState();
-    _selectedPaymentTermsOption = _paymentTermsOptions.first;
-    _paymentTermsController.text = _selectedPaymentTermsOption;
-    // Add one empty line item by default
-    _lineItems.add(
-      LineItemModel(
-        description: '',
-        unit: '',
-        unitType: 'LOT',
-        referenceCode: '',
-        subtotalAmount: 0.0,
-        totalAmount: 0.0,
-      ),
-    );
+    if (widget.invoiceToEdit != null) {
+      final invoice = widget.invoiceToEdit!;
+      _selectedDate = invoice.date;
+      _contractRefController.text = invoice.contractReference;
+      _taxRateController.text = invoice.taxRate.toString();
+      _discountController.text = invoice.discount.toString();
+      _selectedCustomer = invoice.customer;
+      _lineItems = List.from(invoice.lineItems);
+
+      if (_paymentTermsOptions.contains(invoice.paymentTerms)) {
+        _selectedPaymentTermsOption = invoice.paymentTerms;
+        _paymentTermsController.text = invoice.paymentTerms;
+        _useCustomPaymentTerms = false;
+      } else {
+        _useCustomPaymentTerms = true;
+        _paymentTermsController.text = invoice.paymentTerms;
+      }
+    } else {
+      _selectedPaymentTermsOption = _paymentTermsOptions.first;
+      _paymentTermsController.text = _selectedPaymentTermsOption;
+      // Add one empty line item by default
+      _lineItems.add(
+        LineItemModel(
+          description: 'TRANSPORTATION CHARGES',
+          unit: '1',
+          unitType: 'LOT',
+          referenceCode: '',
+          subtotalAmount: 0.0,
+          totalAmount: 0.0,
+        ),
+      );
+    }
   }
 
   @override
@@ -93,8 +114,8 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
     setState(() {
       _lineItems.add(
         LineItemModel(
-          description: '',
-          unit: '',
+          description: 'TRANSPORTATION CHARGES',
+          unit: '1',
           unitType: 'LOT',
           referenceCode: '',
           subtotalAmount: 0.0,
@@ -214,7 +235,14 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       );
 
       // Save to database
-      await DatabaseService.instance.insertInvoice(invoice);
+      if (widget.invoiceToEdit != null) {
+        // Update existing invoice
+        final updatedInvoice = invoice.copyWith(id: widget.invoiceToEdit!.id);
+        await DatabaseService.instance.updateInvoice(updatedInvoice);
+      } else {
+        // Insert new invoice
+        await DatabaseService.instance.insertInvoice(invoice);
+      }
 
       // Navigate to PDF preview
       if (mounted) {
@@ -261,9 +289,9 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
         elevation: 0,
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
-        title: const Text(
-          'Create Invoice',
-          style: TextStyle(fontWeight: FontWeight.w600),
+        title: Text(
+          widget.invoiceToEdit != null ? 'Edit Invoice' : 'Create Invoice',
+          style: const TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
       body: Form(

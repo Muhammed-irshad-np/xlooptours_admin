@@ -29,12 +29,12 @@ class DatabaseService {
     try {
       debugPrint('DatabaseService: Inserting customer ${customer.id}');
       debugPrint('Customer data: ${customer.toJson()}');
-      
+
       await firestore
           .collection('customers')
           .doc(customer.id)
           .set(customer.toJson());
-      
+
       debugPrint('DatabaseService: Customer ${customer.id} saved successfully');
     } catch (e, stackTrace) {
       debugPrint('DatabaseService: Error inserting customer: $e');
@@ -105,28 +105,25 @@ class DatabaseService {
 
     // Convert invoice to Firestore document
     final invoiceData = invoice.toJson();
-    
+
     // Remove customer object (we store customerId instead and fetch customer separately)
     invoiceData.remove('customer');
-    
+
     // Convert date to Timestamp
     invoiceData['date'] = Timestamp.fromDate(invoice.date);
     invoiceData['createdAt'] = Timestamp.now();
-    
+
     // Store customerId if customer exists (for reference/lookup)
     if (invoice.customer != null) {
       invoiceData['customerId'] = invoice.customer!.id;
     }
-    
+
     // Store line items as nested array (already included from toJson())
     // invoiceData['lineItems'] is already set from invoice.toJson()
 
     print('DEBUG INSERT: Invoice map ID: ${invoiceData['id']}');
 
-    await firestore
-        .collection('invoices')
-        .doc(invoice.id)
-        .set(invoiceData);
+    await firestore.collection('invoices').doc(invoice.id).set(invoiceData);
 
     print(
       'DEBUG INSERT: Successfully saved ${invoice.lineItems.length} line items',
@@ -140,7 +137,7 @@ class DatabaseService {
       // Filter by month and year
       final startDate = DateTime(year, month, 1);
       final endDate = DateTime(year, month + 1, 1);
-      
+
       query = query
           .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
           .where('date', isLessThan: Timestamp.fromDate(endDate));
@@ -168,7 +165,10 @@ class DatabaseService {
       // Fetch all customers in parallel using Future.wait
       final customerFutures = customerIds.map((customerId) async {
         try {
-          final doc = await firestore.collection('customers').doc(customerId).get();
+          final doc = await firestore
+              .collection('customers')
+              .doc(customerId)
+              .get();
           if (doc.exists) {
             return MapEntry(customerId, CustomerModel.fromJson(doc.data()!));
           }
@@ -205,7 +205,10 @@ class DatabaseService {
       final lineItemsData = data['lineItems'];
       if (lineItemsData != null && lineItemsData is List) {
         lineItems = lineItemsData
-            .map((itemMap) => LineItemModel.fromJson(itemMap as Map<String, dynamic>))
+            .map(
+              (itemMap) =>
+                  LineItemModel.fromJson(itemMap as Map<String, dynamic>),
+            )
             .toList();
       }
 
@@ -216,7 +219,7 @@ class DatabaseService {
       // Convert Timestamp to DateTime for InvoiceModel
       final invoiceMap = Map<String, dynamic>.from(data);
       invoiceMap['id'] = invoiceId;
-      
+
       final dateValue = data['date'];
       if (dateValue is Timestamp) {
         invoiceMap['date'] = dateValue.toDate().millisecondsSinceEpoch;
@@ -246,8 +249,9 @@ class DatabaseService {
       totalDiscount += invoice.totalDiscount;
     }
 
-    double averageInvoiceValue =
-        invoiceCount > 0 ? totalRevenue / invoiceCount : 0;
+    double averageInvoiceValue = invoiceCount > 0
+        ? totalRevenue / invoiceCount
+        : 0;
 
     // Get monthly revenue breakdown (last 6 months)
     final now = DateTime.now();
@@ -307,6 +311,23 @@ class DatabaseService {
       'monthlyRevenue': monthlyRevenue,
       'topCustomers': top5Customers,
     };
+  }
+
+  Future<void> updateInvoice(InvoiceModel invoice) async {
+    final invoiceData = invoice.toJson();
+
+    // Remove customer object (we store customerId instead)
+    invoiceData.remove('customer');
+
+    // Convert date to Timestamp
+    invoiceData['date'] = Timestamp.fromDate(invoice.date);
+
+    // Store customerId if customer exists
+    if (invoice.customer != null) {
+      invoiceData['customerId'] = invoice.customer!.id;
+    }
+
+    await firestore.collection('invoices').doc(invoice.id).update(invoiceData);
   }
 
   Future<void> deleteInvoice(String invoiceId) async {

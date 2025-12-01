@@ -8,7 +8,7 @@ import '../models/company_info.dart';
 import 'number_to_words_service.dart';
 
 class PDFService {
-  static const double pageMargin = 30.0;
+  static const double pageMargin = 20.0;
   static const double headerHeight = 120.0;
   static const double footerHeight = 80.0;
   static double get availableHeight =>
@@ -75,7 +75,7 @@ class PDFService {
     }
 
     // Calculate how many pages we need for line items
-    // First page: 9 items, subsequent pages: 12 items each
+    // First page: 8 items, subsequent pages: 12 items each
     final hasLineItems = invoice.lineItems.isNotEmpty;
     int firstPageLineItemCount = 0;
     int additionalLineItemPages = 0;
@@ -83,8 +83,8 @@ class PDFService {
 
     if (hasLineItems) {
       int remaining = invoice.lineItems.length;
-      // First page gets 9 items (or less if total items < 9)
-      firstPageLineItemCount = remaining <= 9 ? remaining : 9;
+      // First page gets 8 items (or less if total items < 8)
+      firstPageLineItemCount = remaining <= 8 ? remaining : 8;
       remaining -= firstPageLineItemCount;
 
       // Calculate additional pages needed (12 items per page)
@@ -100,7 +100,7 @@ class PDFService {
         ? lineItemPageSizes.last
         : firstPageLineItemCount;
     final totalsCanShareLastPage =
-        hasLineItems && rowsOnLastPage > 0 && rowsOnLastPage <= 9;
+        hasLineItems && rowsOnLastPage > 0 && rowsOnLastPage <= 8;
     final needsSeparateTotalsPage = !hasLineItems || !totalsCanShareLastPage;
 
     // Total pages = 1 (first page with line items) + additional line item pages + (optional totals page) + 1 (bank details page)
@@ -127,55 +127,61 @@ class PDFService {
           fontFallback: [arabicFont, arabicBoldFont],
         ),
         build: (pw.Context context) {
-          return pw.Column(
-            children: [
-              // Header
-              _buildHeader(logo, arabicBoldFont),
-              pw.SizedBox(height: 10),
+          return pw.Container(
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.black, width: 1),
+            ),
+            padding: const pw.EdgeInsets.all(8),
+            child: pw.Column(
+              children: [
+                // Header
+                _buildHeader(logo, arabicBoldFont),
+                pw.SizedBox(height: 10),
 
-              // Invoice Details and Bill To Row
-              pw.Row(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  // Invoice Details (Left side, more space)
-                  pw.Expanded(
-                    flex: 3,
-                    child: _buildInvoiceDetails(invoice, arabicBoldFont),
-                  ),
-                  pw.SizedBox(width: 20),
-                  // Bill To Section (Right side, less space)
-                  pw.Expanded(
-                    flex: 2,
-                    child: _buildBillToSection(invoice.customer),
+                // Invoice Details and Bill To Row
+                pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    // Invoice Details (Left side, more space)
+                    pw.Expanded(
+                      flex: 3,
+                      child: _buildInvoiceDetails(invoice, arabicBoldFont),
+                    ),
+                    pw.SizedBox(width: 10),
+                    // Bill To Section (Right side, less space)
+                    pw.Expanded(
+                      flex: 2,
+                      child: _buildBillToSection(invoice.customer),
+                    ),
+                  ],
+                ),
+
+                // Line Items (first 4 items with header)
+                if (firstPageLineItems.isNotEmpty) ...[
+                  pw.SizedBox(height: 10),
+                  _buildLineItemsTable(
+                    firstPageLineItems,
+                    1, // Start numbering from 1
+                    arabicBoldFont,
+                    arabicFont,
+                    showHeader: true, // Show header on first page
+                    showFooter:
+                        isOnlyPage, // Show footer only if this is the only page with items
+                    invoice: invoice,
                   ),
                 ],
-              ),
 
-              // Line Items (first 4 items with header)
-              if (firstPageLineItems.isNotEmpty) ...[
-                pw.SizedBox(height: 10),
-                _buildLineItemsTable(
-                  firstPageLineItems,
-                  1, // Start numbering from 1
-                  arabicBoldFont,
-                  arabicFont,
-                  showHeader: true, // Show header on first page
-                  showFooter:
-                      isOnlyPage, // Show footer only if this is the only page with items
-                  invoice: invoice,
-                ),
+                // Totals if all items fit on first page
+                if (appendTotalsOnFirstPage) ...[
+                  pw.SizedBox(height: 16),
+                  _buildTotalsSection(invoice, arabicFont, arabicBoldFont),
+                ],
+
+                // Footer
+                pw.Spacer(),
+                _buildFooter(1, totalPages),
               ],
-
-              // Totals if all items fit on first page
-              if (appendTotalsOnFirstPage) ...[
-                pw.SizedBox(height: 16),
-                _buildTotalsSection(invoice, arabicFont, arabicBoldFont),
-              ],
-
-              // Footer
-              pw.Spacer(),
-              _buildFooter(1, totalPages),
-            ],
+            ),
           );
         },
       ),
@@ -205,32 +211,38 @@ class PDFService {
             fontFallback: [arabicFont, arabicBoldFont],
           ),
           build: (pw.Context context) {
-            return pw.Column(
-              children: [
-                // Header (on every page)
-                _buildHeader(logo, arabicBoldFont),
-                pw.SizedBox(height: 20),
+            return pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.black, width: 1),
+              ),
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Column(
+                children: [
+                  // Header (on every page)
+                  _buildHeader(logo, arabicBoldFont),
+                  pw.SizedBox(height: 20),
 
-                // Line Items Table (NO header on pages 2+)
-                _buildLineItemsTable(
-                  pageLineItems,
-                  startIndex + 1,
-                  arabicBoldFont,
-                  arabicFont,
-                  showHeader: false, // Never show header on pages 2+
-                  showFooter: isLastLineItemPage,
-                  invoice: invoice,
-                ),
+                  // Line Items Table (NO header on pages 2+)
+                  _buildLineItemsTable(
+                    pageLineItems,
+                    startIndex + 1,
+                    arabicBoldFont,
+                    arabicFont,
+                    showHeader: false, // Never show header on pages 2+
+                    showFooter: isLastLineItemPage,
+                    invoice: invoice,
+                  ),
 
-                if (appendTotalsHere) ...[
-                  pw.SizedBox(height: 16),
-                  _buildTotalsSection(invoice, arabicFont, arabicBoldFont),
+                  if (appendTotalsHere) ...[
+                    pw.SizedBox(height: 16),
+                    _buildTotalsSection(invoice, arabicFont, arabicBoldFont),
+                  ],
+
+                  // Footer (on every page)
+                  pw.Spacer(),
+                  _buildFooter(currentPageNumber, totalPages),
                 ],
-
-                // Footer (on every page)
-                pw.Spacer(),
-                _buildFooter(currentPageNumber, totalPages),
-              ],
+              ),
             );
           },
         ),
@@ -250,19 +262,25 @@ class PDFService {
             fontFallback: [arabicFont, arabicBoldFont],
           ),
           build: (pw.Context context) {
-            return pw.Column(
-              children: [
-                // Header
-                _buildHeader(logo, arabicBoldFont),
-                pw.SizedBox(height: 20),
+            return pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.black, width: 1),
+              ),
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Column(
+                children: [
+                  // Header
+                  _buildHeader(logo, arabicBoldFont),
+                  pw.SizedBox(height: 20),
 
-                // Totals Section
-                _buildTotalsSection(invoice, arabicFont, arabicBoldFont),
+                  // Totals Section
+                  _buildTotalsSection(invoice, arabicFont, arabicBoldFont),
 
-                // Footer
-                pw.Spacer(),
-                _buildFooter(totalsPageNumber, totalPages),
-              ],
+                  // Footer
+                  pw.Spacer(),
+                  _buildFooter(totalsPageNumber, totalPages),
+                ],
+              ),
             );
           },
         ),
@@ -282,29 +300,35 @@ class PDFService {
             fontFallback: [arabicFont, arabicBoldFont],
           ),
           build: (pw.Context context) {
-            return pw.Column(
-              children: [
-                // Header
-                _buildHeader(logo, arabicBoldFont),
-                pw.SizedBox(height: 20),
+            return pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.black, width: 1),
+              ),
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Column(
+                children: [
+                  // Header
+                  _buildHeader(logo, arabicBoldFont),
+                  pw.SizedBox(height: 20),
 
-                // Bank Details and Prepared By in same row
-                pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Expanded(flex: 2, child: _buildBankDetails()),
-                    pw.SizedBox(width: 20),
-                    pw.Expanded(
-                      flex: 1,
-                      child: _buildPreparedBy(signatureImage),
-                    ),
-                  ],
-                ),
+                  // Bank Details and Prepared By in same row
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Expanded(flex: 2, child: _buildBankDetails()),
+                      pw.SizedBox(width: 20),
+                      pw.Expanded(
+                        flex: 1,
+                        child: _buildPreparedBy(signatureImage),
+                      ),
+                    ],
+                  ),
 
-                // Footer
-                pw.Spacer(),
-                _buildFooter(bankDetailsPageNumber, totalPages),
-              ],
+                  // Footer
+                  pw.Spacer(),
+                  _buildFooter(bankDetailsPageNumber, totalPages),
+                ],
+              ),
             );
           },
         ),
@@ -323,19 +347,25 @@ class PDFService {
             fontFallback: [arabicFont, arabicBoldFont],
           ),
           build: (pw.Context context) {
-            return pw.Column(
-              children: [
-                // Header
-                _buildHeader(logo, arabicBoldFont),
-                pw.SizedBox(height: 20),
+            return pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.black, width: 1),
+              ),
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Column(
+                children: [
+                  // Header
+                  _buildHeader(logo, arabicBoldFont),
+                  pw.SizedBox(height: 20),
 
-                // Totals Section
-                _buildTotalsSection(invoice, arabicFont, arabicBoldFont),
+                  // Totals Section
+                  _buildTotalsSection(invoice, arabicFont, arabicBoldFont),
 
-                // Footer
-                pw.Spacer(),
-                _buildFooter(totalsPageNumber, totalPages),
-              ],
+                  // Footer
+                  pw.Spacer(),
+                  _buildFooter(totalsPageNumber, totalPages),
+                ],
+              ),
             );
           },
         ),
@@ -352,29 +382,35 @@ class PDFService {
             fontFallback: [arabicFont, arabicBoldFont],
           ),
           build: (pw.Context context) {
-            return pw.Column(
-              children: [
-                // Header
-                _buildHeader(logo, arabicBoldFont),
-                pw.SizedBox(height: 20),
+            return pw.Container(
+              decoration: pw.BoxDecoration(
+                border: pw.Border.all(color: PdfColors.black, width: 1),
+              ),
+              padding: const pw.EdgeInsets.all(8),
+              child: pw.Column(
+                children: [
+                  // Header
+                  _buildHeader(logo, arabicBoldFont),
+                  pw.SizedBox(height: 20),
 
-                // Bank Details and Prepared By in same row
-                pw.Row(
-                  crossAxisAlignment: pw.CrossAxisAlignment.start,
-                  children: [
-                    pw.Expanded(flex: 2, child: _buildBankDetails()),
-                    pw.SizedBox(width: 20),
-                    pw.Expanded(
-                      flex: 1,
-                      child: _buildPreparedBy(signatureImage),
-                    ),
-                  ],
-                ),
+                  // Bank Details and Prepared By in same row
+                  pw.Row(
+                    crossAxisAlignment: pw.CrossAxisAlignment.start,
+                    children: [
+                      pw.Expanded(flex: 2, child: _buildBankDetails()),
+                      pw.SizedBox(width: 20),
+                      pw.Expanded(
+                        flex: 1,
+                        child: _buildPreparedBy(signatureImage),
+                      ),
+                    ],
+                  ),
 
-                // Footer
-                pw.Spacer(),
-                _buildFooter(totalPages, totalPages),
-              ],
+                  // Footer
+                  pw.Spacer(),
+                  _buildFooter(totalPages, totalPages),
+                ],
+              ),
             );
           },
         ),
@@ -386,18 +422,21 @@ class PDFService {
 
   pw.Widget _buildHeader(pw.ImageProvider? logo, pw.Font arabicBoldFont) {
     return pw.Container(
+      width: 450,
+      height: 100,
       decoration: pw.BoxDecoration(
         border: pw.Border.all(color: PdfColors.black, width: 1.2),
       ),
       padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 1),
       child: pw.Column(
+        mainAxisAlignment: pw.MainAxisAlignment.center,
         children: [
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
               pw.Padding(
-                padding: pw.EdgeInsets.only(top: 10),
+                padding: pw.EdgeInsets.only(top: 20),
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
@@ -421,8 +460,8 @@ class PDFService {
               pw.Column(
                 children: [
                   pw.Container(
-                    width: 50,
-                    height: 50,
+                    width: 80,
+                    height: 80,
                     child: logo != null
                         ? pw.Image(logo, fit: pw.BoxFit.contain)
                         : pw.Center(
@@ -444,28 +483,31 @@ class PDFService {
                   ),
                 ],
               ),
-              pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.end,
-                children: [
-                  pw.Text(
-                    CompanyInfo.companyNameAr,
-                    style: pw.TextStyle(
-                      fontSize: 26,
-                      fontWeight: pw.FontWeight.bold,
-                      height: 0.6,
-                      font: arabicBoldFont,
-                    ),
-                    textDirection: pw.TextDirection.rtl,
-                  ),
-                  pw.Transform.translate(
-                    offset: const PdfPoint(0, 12),
-                    child: pw.Text(
-                      CompanyInfo.companyNameAr2,
-                      style: pw.TextStyle(fontSize: 18, height: 0.6),
+              pw.Padding(
+                padding: const pw.EdgeInsets.only(top: 6),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text(
+                      CompanyInfo.companyNameAr,
+                      style: pw.TextStyle(
+                        fontSize: 26,
+                        fontWeight: pw.FontWeight.bold,
+                        height: 0.6,
+                        font: arabicBoldFont,
+                      ),
                       textDirection: pw.TextDirection.rtl,
                     ),
-                  ),
-                ],
+                    pw.Transform.translate(
+                      offset: const PdfPoint(0, 12),
+                      child: pw.Text(
+                        CompanyInfo.companyNameAr2,
+                        style: pw.TextStyle(fontSize: 18, height: 0.6),
+                        textDirection: pw.TextDirection.rtl,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -481,7 +523,7 @@ class PDFService {
       border: pw.TableBorder.all(color: PdfColors.black, width: 1.2),
       columnWidths: {
         0: const pw.FlexColumnWidth(1),
-        1: const pw.FlexColumnWidth(1),
+        1: const pw.FlexColumnWidth(2),
       },
       children: [
         // Header row
@@ -631,6 +673,7 @@ class PDFService {
     return pw.SizedBox(
       width: double.infinity,
       child: pw.Container(
+        height: 128,
         padding: const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         decoration: pw.BoxDecoration(
           border: pw.Border.all(color: PdfColors.black, width: 1.2),
@@ -640,9 +683,13 @@ class PDFService {
           children: [
             pw.Text(
               'BILL TO:',
-              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+              style: pw.TextStyle(
+                fontSize: 13,
+                fontWeight: pw.FontWeight.bold,
+                decoration: pw.TextDecoration.underline,
+              ),
             ),
-            pw.SizedBox(height: 4),
+            pw.SizedBox(height: 3),
             if (customer != null) ...[
               pw.Text(
                 customer.companyName,
@@ -651,14 +698,14 @@ class PDFService {
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
-              pw.SizedBox(height: 2),
+              pw.SizedBox(height: 1),
               if (customer.country != null && customer.country!.isNotEmpty)
                 pw.Text(
                   customer.country!,
                   style: const pw.TextStyle(fontSize: 10),
                 ),
               if (customer.country != null && customer.country!.isNotEmpty)
-                pw.SizedBox(height: 2),
+                pw.SizedBox(height: 1),
               if (customer.streetAddress != null &&
                   customer.buildingNumber != null)
                 pw.Text(
@@ -667,7 +714,7 @@ class PDFService {
                 ),
               if (customer.streetAddress != null &&
                   customer.buildingNumber != null)
-                pw.SizedBox(height: 2),
+                pw.SizedBox(height: 1),
               if (customer.district != null)
                 pw.Text(
                   customer.addressAdditionalNumber != null &&
@@ -692,18 +739,18 @@ class PDFService {
                 ),
               if (customer.taxRegistrationNumber != null &&
                   customer.taxRegistrationNumber!.isNotEmpty)
-                pw.SizedBox(height: 2),
+                pw.SizedBox(height: 1),
               if (customer.email != null && customer.email!.isNotEmpty) ...[
                 pw.Text(
                   'Attn:',
                   style: pw.TextStyle(
-                    fontSize: 9,
+                    fontSize: 12,
                     fontWeight: pw.FontWeight.bold,
                   ),
                 ),
                 pw.Text(
                   customer.email!,
-                  style: const pw.TextStyle(fontSize: 9),
+                  style: const pw.TextStyle(fontSize: 10),
                 ),
               ],
             ] else
@@ -741,45 +788,40 @@ class PDFService {
 
     // Helper for formatting numbers
     String formatNumber(double value) {
-      if (value % 1 == 0) {
-        return NumberFormat.currency(
-          symbol: 'SR ',
-          decimalDigits: 0,
-        ).format(value);
-      }
-      return NumberFormat.currency(
-        symbol: 'SR ',
-        decimalDigits: 2,
-      ).format(value);
+      return NumberFormat.currency(symbol: '', decimalDigits: 2).format(value);
     }
 
     String formatArabicNumber(double value) {
-      String formatted;
-      if (value % 1 == 0) {
-        formatted = NumberFormat.currency(
-          symbol: '',
-          decimalDigits: 0,
-        ).format(value);
-      } else {
-        formatted = NumberFormat.currency(
-          symbol: '',
-          decimalDigits: 2,
-        ).format(value);
-      }
+      String formatted = NumberFormat.currency(
+        symbol: '',
+        decimalDigits: 2,
+      ).format(value);
       return _toArabicString(formatted);
     }
 
+    // Check if discount column should be shown
+    final bool showDiscountColumn = invoice != null && invoice.discount > 0;
+
     return pw.Table(
       border: pw.TableBorder.all(color: PdfColors.grey300),
-      columnWidths: {
-        0: const pw.FlexColumnWidth(0.7),
-        1: const pw.FlexColumnWidth(2.6),
-        2: const pw.FlexColumnWidth(0.9),
-        3: const pw.FlexColumnWidth(0.9),
-        4: const pw.FlexColumnWidth(1.3),
-        5: const pw.FlexColumnWidth(1.3),
-        6: const pw.FlexColumnWidth(1.3),
-      },
+      columnWidths: showDiscountColumn
+          ? {
+              0: const pw.FlexColumnWidth(0.7),
+              1: const pw.FlexColumnWidth(2.6),
+              2: const pw.FlexColumnWidth(0.9),
+              3: const pw.FlexColumnWidth(0.9),
+              4: const pw.FlexColumnWidth(1.3),
+              5: const pw.FlexColumnWidth(1.3),
+              6: const pw.FlexColumnWidth(1.3),
+            }
+          : {
+              0: const pw.FlexColumnWidth(0.7),
+              1: const pw.FlexColumnWidth(2.6),
+              2: const pw.FlexColumnWidth(0.9),
+              3: const pw.FlexColumnWidth(0.9),
+              4: const pw.FlexColumnWidth(1.3),
+              5: const pw.FlexColumnWidth(1.3),
+            },
       children: [
         if (showHeader)
           pw.TableRow(
@@ -803,15 +845,21 @@ class PDFService {
                 'SUBTOTAL AMOUNT',
                 'المجموع الفرعي',
                 arabicBoldFont,
+                alignCenter: true,
               ),
+              if (showDiscountColumn)
+                _buildHeaderCell(
+                  'DISCOUNT RATE ${invoice.discount == invoice.discount.toInt() ? invoice.discount.toInt() : invoice.discount}%',
+                  'تخفيض',
+                  arabicBoldFont,
+                  alignCenter: true,
+                ),
               _buildHeaderCell(
-                invoice != null
-                    ? 'DISCOUNT RATE ${invoice.discount == invoice.discount.toInt() ? invoice.discount.toInt() : invoice.discount}%'
-                    : 'DISCOUNT RATE',
-                'تخفيض',
+                'TOTAL AMOUNT',
+                'الإجمالي',
                 arabicBoldFont,
+                alignCenter: true,
               ),
-              _buildHeaderCell('TOTAL AMOUNT', 'الإجمالي', arabicBoldFont),
             ],
           ),
         // Data rows
@@ -857,22 +905,24 @@ class PDFService {
                 english: unitType,
                 arabic: unitTypeArabic,
                 alignCenter: true,
+                isRtl: true,
               ),
               _buildDualLangCell(
                 english: formatNumber(item.subtotalAmount),
                 arabic: formatArabicNumber(item.subtotalAmount),
-                alignRight: true,
+                alignCenter: true,
               ),
-              _buildDualLangCell(
-                english: formatNumber(discountAmount),
-                arabic: formatArabicNumber(discountAmount),
-                alignRight: true,
-              ),
+              if (showDiscountColumn)
+                _buildDualLangCell(
+                  english: formatNumber(discountAmount),
+                  arabic: formatArabicNumber(discountAmount),
+                  alignCenter: true,
+                ),
               _buildDualLangCell(
                 english: formatNumber(item.totalAmount - discountAmount),
                 arabic: formatArabicNumber(item.totalAmount - discountAmount),
-                alignRight: true,
-                isBold: true,
+                alignCenter: true,
+                isBold: false,
               ),
             ],
           );
@@ -893,19 +943,20 @@ class PDFService {
               _buildDualLangCell(
                 english: formatNumber(invoice.subtotalAmount),
                 arabic: formatArabicNumber(invoice.subtotalAmount),
-                alignRight: true,
+                alignCenter: true,
                 isBold: true,
               ), // Subtotal
-              _buildDualLangCell(
-                english: formatNumber(invoice.totalDiscount),
-                arabic: formatArabicNumber(invoice.totalDiscount),
-                alignRight: true,
-                isBold: true,
-              ), // Discount
+              if (showDiscountColumn)
+                _buildDualLangCell(
+                  english: formatNumber(invoice.totalDiscount),
+                  arabic: formatArabicNumber(invoice.totalDiscount),
+                  alignCenter: true,
+                  isBold: true,
+                ), // Discount
               _buildDualLangCell(
                 english: formatNumber(invoice.totalAmount),
                 arabic: formatArabicNumber(invoice.totalAmount),
-                alignRight: true,
+                alignCenter: true,
                 isBold: true,
               ), // Total
             ],
@@ -963,6 +1014,7 @@ class PDFService {
     bool alignCenter = false,
     bool alignRight = false,
     bool isBold = false,
+    bool isRtl = false,
   }) {
     return pw.Padding(
       padding: const pw.EdgeInsets.all(6),
@@ -992,6 +1044,7 @@ class PDFService {
             textAlign: alignCenter
                 ? pw.TextAlign.center
                 : (alignRight ? pw.TextAlign.right : pw.TextAlign.right),
+            textDirection: isRtl ? pw.TextDirection.rtl : null,
           ),
         ],
       ),
@@ -1065,28 +1118,14 @@ class PDFService {
   ) {
     // Helper for formatting numbers
     String formatNumber(double value) {
-      if (value % 1 == 0) {
-        return NumberFormat.currency(
-          symbol: '',
-          decimalDigits: 0,
-        ).format(value);
-      }
       return NumberFormat.currency(symbol: '', decimalDigits: 2).format(value);
     }
 
     String formatArabicNumber(double value) {
-      String formatted;
-      if (value % 1 == 0) {
-        formatted = NumberFormat.currency(
-          symbol: '',
-          decimalDigits: 0,
-        ).format(value);
-      } else {
-        formatted = NumberFormat.currency(
-          symbol: '',
-          decimalDigits: 2,
-        ).format(value);
-      }
+      String formatted = NumberFormat.currency(
+        symbol: '',
+        decimalDigits: 2,
+      ).format(value);
       return _toArabicString(formatted);
     }
 
@@ -1192,7 +1231,7 @@ class PDFService {
             ),
           ],
         ),
-        // Row 2: Empty Left + WHT Right
+        // Row 2: Empty Left + WHT or Discount Right (depending on taxRate)
         pw.Row(
           children: [
             pw.Expanded(child: pw.Container()), // Empty space
@@ -1203,11 +1242,13 @@ class PDFService {
                 right: pw.BorderSide(),
                 bottom: pw.BorderSide(),
               ), // No top border
-              child: buildRightRow(
-                'WHT ${invoice.taxRate}%',
-                'ضريبة الاستقطاع',
-                invoice.taxAmount,
-              ),
+              child: invoice.taxRate > 0
+                  ? buildRightRow(
+                      'WHT ${invoice.taxRate}%',
+                      'ضريبة الاستقطاع',
+                      invoice.taxAmount,
+                    )
+                  : buildRightRow('Discount ${invoice.discount}%', 'خصم', 0.0),
             ),
           ],
         ),

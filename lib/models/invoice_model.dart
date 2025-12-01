@@ -116,4 +116,28 @@ class InvoiceModel {
   double get grandTotal {
     return totalAmount + taxAmount;
   }
+
+  InvoiceModel copyWith({
+    String? id,
+    DateTime? date,
+    String? invoiceNumber,
+    String? contractReference,
+    String? paymentTerms,
+    CustomerModel? customer,
+    List<LineItemModel>? lineItems,
+    double? taxRate,
+    double? discount,
+  }) {
+    return InvoiceModel(
+      id: id ?? this.id,
+      date: date ?? this.date,
+      invoiceNumber: invoiceNumber ?? this.invoiceNumber,
+      contractReference: contractReference ?? this.contractReference,
+      paymentTerms: paymentTerms ?? this.paymentTerms,
+      customer: customer ?? this.customer,
+      lineItems: lineItems ?? this.lineItems,
+      taxRate: taxRate ?? this.taxRate,
+      discount: discount ?? this.discount,
+    );
+  }
 }
