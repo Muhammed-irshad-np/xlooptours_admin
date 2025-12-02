@@ -97,11 +97,20 @@ class LineItemRowWidget extends StatelessWidget {
                     FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                   ],
                   onChanged: (value) {
+                    final qty = double.tryParse(value) ?? 0.0;
+                    // Auto-set unit type: 1 = LOT, >1 = EA
+                    final newUnitType = qty == 1.0 ? 'LOT' : 'EA';
                     final total = LineItemModel.calculateTotal(
                       item.subtotalAmount,
                       value,
                     );
-                    onChanged(item.copyWith(unit: value, totalAmount: total));
+                    onChanged(
+                      item.copyWith(
+                        unit: value,
+                        unitType: newUnitType,
+                        totalAmount: total,
+                      ),
+                    );
                   },
                 ),
               ),

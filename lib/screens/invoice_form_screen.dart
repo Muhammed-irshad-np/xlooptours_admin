@@ -24,7 +24,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _contractRefController = TextEditingController();
   final _taxRateController = TextEditingController(text: '5.0');
-  final _discountController = TextEditingController(text: '0.0');
+  final _discountController = TextEditingController(text: '3.0');
   final _paymentTermsController = TextEditingController();
   final List<String> _paymentTermsOptions = const [
     'Advance 100% Cash',

@@ -21,7 +21,7 @@ class InvoiceModel {
     this.customer,
     required this.lineItems,
     this.taxRate = 5.0,
-    this.discount = 0.0,
+    this.discount = 3.0,
   });
 
   Map<String, dynamic> toJson() {
