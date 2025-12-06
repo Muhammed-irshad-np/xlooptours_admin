@@ -34,7 +34,7 @@ class PDFPreviewScreen extends StatelessWidget {
     try {
       final customerName = invoice.customer?.companyName ?? 'Customer';
       final sanitizedCustomerName = customerName.replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
-      final fileName = 'invoice_${invoice.invoiceNumber}_$sanitizedCustomerName.pdf';
+      final fileName = '${invoice.invoiceNumber}_$sanitizedCustomerName.pdf';
 
       // Create a blob from the PDF bytes
       final blob = html.Blob([pdfBytes], 'application/pdf');
@@ -69,7 +69,7 @@ class PDFPreviewScreen extends StatelessWidget {
       final directory = await getApplicationDocumentsDirectory();
       final customerName = invoice.customer?.companyName ?? 'Customer';
       final sanitizedCustomerName = customerName.replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
-      final fileName = 'invoice_${invoice.invoiceNumber}_$sanitizedCustomerName.pdf';
+      final fileName = '${invoice.invoiceNumber}_$sanitizedCustomerName.pdf';
       final file = File('${directory.path}/$fileName');
 
       await file.writeAsBytes(pdfBytes);
@@ -101,7 +101,7 @@ class PDFPreviewScreen extends StatelessWidget {
     try {
       final customerName = invoice.customer?.companyName ?? 'Customer';
       final sanitizedCustomerName = customerName.replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
-      final fileName = 'invoice_${invoice.invoiceNumber}_$sanitizedCustomerName.pdf';
+      final fileName = '${invoice.invoiceNumber}_$sanitizedCustomerName.pdf';
 
       // On web, we'll just download the file (Web Share API has limited support for PDFs)
       final blob = html.Blob([pdfBytes], 'application/pdf');
@@ -134,7 +134,7 @@ class PDFPreviewScreen extends StatelessWidget {
       final directory = await getApplicationDocumentsDirectory();
       final customerName = invoice.customer?.companyName ?? 'Customer';
       final sanitizedCustomerName = customerName.replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
-      final fileName = 'invoice_${invoice.invoiceNumber}_$sanitizedCustomerName.pdf';
+      final fileName = '${invoice.invoiceNumber}_$sanitizedCustomerName.pdf';
       final file = File('${directory.path}/$fileName');
 
       await file.writeAsBytes(pdfBytes);
