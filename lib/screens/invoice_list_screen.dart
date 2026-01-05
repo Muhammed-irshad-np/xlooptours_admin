@@ -16,8 +16,8 @@ class InvoiceListScreen extends StatefulWidget {
 class _InvoiceListScreenState extends State<InvoiceListScreen> {
   List<InvoiceModel> _invoices = [];
   bool _isLoading = true;
-  int _selectedMonth = DateTime.now().month;
-  int _selectedYear = DateTime.now().year;
+  int? _selectedMonth; // Null means "All"
+  int? _selectedYear; // Null means "All"
 
   @override
   void initState() {
@@ -118,118 +118,168 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     final dateFormat = DateFormat('yyyy-MM-dd');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Saved Invoices')),
-      body: Column(
-        children: [
-          // Filters
-          Card(
-            margin: const EdgeInsets.all(16),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: ResponsiveLayout(
-                mobile: Column(children: _buildFilterFields()),
-                desktop: Row(
-                  children: _buildFilterFields()
-                      .map(
-                        (e) => Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8.0,
-                            ),
-                            child: e,
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ),
-          ),
-
-          // Invoice List
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _invoices.isEmpty
-                ? const Center(child: Text('No invoices found for this period'))
-                : ResponsiveLayout(
-                    mobile: ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: _invoices.length,
-                      itemBuilder: (context, index) => _buildInvoiceItem(
-                        _invoices[index],
-                        currencyFormat,
-                        dateFormat,
+      appBar: AppBar(
+        title: const Text('Saved Invoices'),
+        actions: [
+          IconButton(
+            icon: Stack(
+              children: [
+                const Icon(Icons.filter_list),
+                if (_selectedMonth != null || _selectedYear != null)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
                       ),
-                    ),
-                    desktop: GridView.builder(
-                      padding: const EdgeInsets.all(16),
-                      gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 400,
-                            childAspectRatio: 2.5,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                          ),
-                      itemCount: _invoices.length,
-                      itemBuilder: (context, index) => _buildInvoiceItem(
-                        _invoices[index],
-                        currencyFormat,
-                        dateFormat,
+                      constraints: const BoxConstraints(
+                        minWidth: 8,
+                        minHeight: 8,
                       ),
                     ),
                   ),
+              ],
+            ),
+            onPressed: _showFilterDialog,
           ),
         ],
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _invoices.isEmpty
+          ? const Center(child: Text('No invoices found'))
+          : ResponsiveLayout(
+              mobile: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: _invoices.length,
+                itemBuilder: (context, index) => _buildInvoiceItem(
+                  _invoices[index],
+                  currencyFormat,
+                  dateFormat,
+                ),
+              ),
+              desktop: GridView.builder(
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 400,
+                  childAspectRatio: 2.5,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: _invoices.length,
+                itemBuilder: (context, index) => _buildInvoiceItem(
+                  _invoices[index],
+                  currencyFormat,
+                  dateFormat,
+                ),
+              ),
+            ),
     );
   }
 
-  List<Widget> _buildFilterFields() {
-    return [
-      DropdownButtonFormField<int>(
-        value: _selectedMonth,
-        decoration: const InputDecoration(
-          labelText: 'Month',
-          border: OutlineInputBorder(),
-          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        ),
-        items: List.generate(12, (index) {
-          return DropdownMenuItem(
-            value: index + 1,
-            child: Text(DateFormat('MMMM').format(DateTime(2024, index + 1))),
-          );
-        }),
-        onChanged: (value) {
-          if (value != null) {
-            setState(() => _selectedMonth = value);
-            _loadInvoices();
-          }
-        },
+  void _showFilterDialog() {
+    int? tempMonth = _selectedMonth;
+    int? tempYear = _selectedYear;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      const SizedBox(
-        height: 16,
-        width: 0,
-      ), // Use width 0 for Row layout logic if needed, but here we map
-      DropdownButtonFormField<int>(
-        value: _selectedYear,
-        decoration: const InputDecoration(
-          labelText: 'Year',
-          border: OutlineInputBorder(),
-          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        ),
-        items: List.generate(5, (index) {
-          final year = DateTime.now().year - 2 + index;
-          return DropdownMenuItem(value: year, child: Text(year.toString()));
-        }),
-        onChanged: (value) {
-          if (value != null) {
-            setState(() => _selectedYear = value);
-            _loadInvoices();
-          }
-        },
-      ),
-    ];
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Filter Invoices',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  DropdownButtonFormField<int?>(
+                    value: tempMonth,
+                    decoration: const InputDecoration(
+                      labelText: 'Month',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: List.generate(12, (index) {
+                      return DropdownMenuItem(
+                        value: index + 1,
+                        child: Text(
+                          DateFormat('MMMM').format(DateTime(2024, index + 1)),
+                        ),
+                      );
+                    }),
+                    onChanged: (value) {
+                      setModalState(() => tempMonth = value);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<int?>(
+                    value: tempYear,
+                    decoration: const InputDecoration(
+                      labelText: 'Year',
+                      border: OutlineInputBorder(),
+                    ),
+                    items: List.generate(5, (index) {
+                      final year = DateTime.now().year - 2 + index;
+                      return DropdownMenuItem(
+                        value: year,
+                        child: Text(year.toString()),
+                      );
+                    }),
+                    onChanged: (value) {
+                      setModalState(() => tempYear = value);
+                    },
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedMonth = null;
+                              _selectedYear = null;
+                            });
+                            _loadInvoices();
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Reset'),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedMonth = tempMonth;
+                              _selectedYear = tempYear;
+                            });
+                            _loadInvoices();
+                            Navigator.pop(context);
+                          },
+                          child: const Text('Apply Filter'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   Widget _buildInvoiceItem(
