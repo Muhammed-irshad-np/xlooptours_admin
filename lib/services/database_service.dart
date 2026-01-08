@@ -195,9 +195,11 @@ class DatabaseService {
   Future<String> generateNewInvoiceNumber() async {
     final now = DateTime.now();
     final year = now.year.toString();
+
+    // Use a global counter to ensure sequence continuity across years
     final counterRef = firestore
         .collection('counters')
-        .doc('invoice_counter_$year');
+        .doc('invoice_counter_global');
 
     return firestore.runTransaction((transaction) async {
       final snapshot = await transaction.get(counterRef);
@@ -205,22 +207,63 @@ class DatabaseService {
       int currentSequence;
 
       if (!snapshot.exists) {
-        final nextYear = (now.year + 1).toString();
-        final invoiceSnapshot = await firestore
-            .collection('invoices')
-            .where('invoiceNumber', isGreaterThanOrEqualTo: 'INT-$year-')
-            .where('invoiceNumber', isLessThan: 'INT-$nextYear-')
-            .get();
+        // Migration: Find the absolute last invoice sequence number used
+        // regardless of the year.
+        try {
+          // Try to get the most recently created invoice
+          // We use 'createdAt' if available, otherwise fallback to 'date' or safe default
+          final recentSnapshot = await firestore
+              .collection('invoices')
+              .orderBy('createdAt', descending: true)
+              .limit(1)
+              .get();
 
-        final count = invoiceSnapshot.docs.length;
-        currentSequence = 1640 + count;
+          if (recentSnapshot.docs.isNotEmpty) {
+            final data = recentSnapshot.docs.first.data();
+            final invoiceNum = data['invoiceNumber'] as String;
+            // Expected format: INT-YYYY-SEQ
+            final parts = invoiceNum.split('-');
+            if (parts.length >= 3) {
+              final seqStr = parts.last;
+              currentSequence = int.tryParse(seqStr) ?? 1640;
+            } else {
+              currentSequence = 1640;
+            }
+          } else {
+            // If no invoices by createdAt, try by date (legacy support)
+            final dateSnapshot = await firestore
+                .collection('invoices')
+                .orderBy('date', descending: true)
+                .limit(1)
+                .get();
+
+            if (dateSnapshot.docs.isNotEmpty) {
+              final data = dateSnapshot.docs.first.data();
+              final invoiceNum = data['invoiceNumber'] as String;
+              final parts = invoiceNum.split('-');
+              if (parts.length >= 3) {
+                final seqStr = parts.last;
+                currentSequence = int.tryParse(seqStr) ?? 1640;
+              } else {
+                currentSequence = 1640;
+              }
+            } else {
+              // Absolutely no invoices found, start fresh
+              currentSequence = 1640;
+            }
+          }
+        } catch (e) {
+          debugPrint('DatabaseService: Error determining last sequence: $e');
+          // Fallback if query fails (e.g. missing index)
+          currentSequence = 1640;
+        }
       } else {
         currentSequence = snapshot.data()!['currentSequence'] as int;
       }
 
       final nextSequence = currentSequence + 1;
 
-      // Update the counter
+      // Update the global counter
       transaction.set(counterRef, {'currentSequence': nextSequence});
 
       return 'INT-$year-$nextSequence';
