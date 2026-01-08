@@ -1,109 +1,75 @@
 class CustomerModel {
   final String id;
-  final String companyName;
-  final String? email;
-  final String? country;
-  final bool vatRegisteredInKSA;
-  final String? taxRegistrationNumber;
-  final String? city;
-  final String? streetAddress;
-  final String? buildingNumber;
-  final String? district;
-  final String? addressAdditionalNumber;
-  final String? postalCode;
+  final String name;
+  final String phone;
+  final String? companyId; // Null if independent
+  final String? companyName; // Snapshot for easier display
+  final List<String> assignedCaseCodes;
+  final String status;
+  final DateTime createdAt;
 
   CustomerModel({
     required this.id,
-    required this.companyName,
-    this.email,
-    this.country,
-    this.vatRegisteredInKSA = false,
-    this.taxRegistrationNumber,
-    this.city,
-    this.streetAddress,
-    this.buildingNumber,
-    this.district,
-    this.addressAdditionalNumber,
-    this.postalCode,
-  });
+    required this.name,
+    required this.phone,
+    this.companyId,
+    this.companyName,
+    this.assignedCaseCodes = const [],
+    this.status = 'ACTIVE',
+    DateTime? createdAt,
+  }) : createdAt = createdAt ?? DateTime.now();
 
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'name': name,
+      'phone': phone,
+      'companyId': companyId,
       'companyName': companyName,
-      'email': email,
-      'country': country,
-      'vatRegisteredInKSA': vatRegisteredInKSA,
-      'taxRegistrationNumber': taxRegistrationNumber,
-      'city': city,
-      'streetAddress': streetAddress,
-      'buildingNumber': buildingNumber,
-      'district': district,
-      'addressAdditionalNumber': addressAdditionalNumber,
-      'postalCode': postalCode,
+      'assignedCaseCodes': assignedCaseCodes,
+      'status': status,
+      'createdAt': createdAt.toIso8601String(),
     };
   }
 
   factory CustomerModel.fromJson(Map<String, dynamic> json) {
-    // Handle both legacy int format and bool format for backward compatibility
-    bool isVatRegistered = false;
-    if (json['vatRegistered'] != null) {
-      isVatRegistered = (json['vatRegistered'] is int)
-          ? (json['vatRegistered'] as int) == 1
-          : json['vatRegistered'] as bool;
-    } else if (json['vatRegisteredInKSA'] != null) {
-      if (json['vatRegisteredInKSA'] is int) {
-        isVatRegistered = (json['vatRegisteredInKSA'] as int) == 1;
-      } else {
-        isVatRegistered = json['vatRegisteredInKSA'] as bool;
-      }
-    }
-
     return CustomerModel(
       id: json['id'] as String,
-      companyName: (json['companyName'] ?? json['name'] ?? '') as String,
-      email: json['email'] as String?,
-      country: json['country'] as String?,
-      vatRegisteredInKSA: isVatRegistered,
-      taxRegistrationNumber: json['taxRegistrationNumber'] as String?,
-      city: json['city'] as String?,
-      streetAddress: (json['streetAddress'] ?? json['address']) as String?,
-      buildingNumber: json['buildingNumber'] as String?,
-      district: json['district'] as String?,
-      addressAdditionalNumber: json['addressAdditionalNumber'] as String?,
-      postalCode: json['postalCode'] as String?,
+      name: json['name'] as String,
+      phone: json['phone'] as String,
+      companyId: json['companyId'] as String?,
+      companyName: json['companyName'] as String?,
+      assignedCaseCodes:
+          (json['assignedCaseCodes'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          [],
+      status: json['status'] as String? ?? 'ACTIVE',
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : null,
     );
   }
 
   CustomerModel copyWith({
     String? id,
+    String? name,
+    String? phone,
+    String? companyId,
     String? companyName,
-    String? email,
-    String? country,
-    bool? vatRegisteredInKSA,
-    String? taxRegistrationNumber,
-    String? city,
-    String? streetAddress,
-    String? buildingNumber,
-    String? district,
-    String? addressAdditionalNumber,
-    String? postalCode,
+    List<String>? assignedCaseCodes,
+    String? status,
+    DateTime? createdAt,
   }) {
     return CustomerModel(
       id: id ?? this.id,
+      name: name ?? this.name,
+      phone: phone ?? this.phone,
+      companyId: companyId ?? this.companyId,
       companyName: companyName ?? this.companyName,
-      email: email ?? this.email,
-      country: country ?? this.country,
-      vatRegisteredInKSA: vatRegisteredInKSA ?? this.vatRegisteredInKSA,
-      taxRegistrationNumber:
-          taxRegistrationNumber ?? this.taxRegistrationNumber,
-      city: city ?? this.city,
-      streetAddress: streetAddress ?? this.streetAddress,
-      buildingNumber: buildingNumber ?? this.buildingNumber,
-      district: district ?? this.district,
-      addressAdditionalNumber:
-          addressAdditionalNumber ?? this.addressAdditionalNumber,
-      postalCode: postalCode ?? this.postalCode,
+      assignedCaseCodes: assignedCaseCodes ?? this.assignedCaseCodes,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

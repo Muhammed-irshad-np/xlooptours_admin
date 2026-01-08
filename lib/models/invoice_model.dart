@@ -1,4 +1,4 @@
-import 'customer_model.dart';
+import 'company_model.dart';
 import 'line_item_model.dart';
 
 class InvoiceModel {
@@ -7,7 +7,7 @@ class InvoiceModel {
   final String invoiceNumber;
   final String contractReference;
   final String paymentTerms;
-  final CustomerModel? customer;
+  final CompanyModel? company;
   final List<LineItemModel> lineItems;
   final double taxRate; // WHT Rate, default 5.0
   final double discount; // Global discount rate (%)
@@ -18,7 +18,7 @@ class InvoiceModel {
     required this.invoiceNumber,
     required this.contractReference,
     required this.paymentTerms,
-    this.customer,
+    this.company,
     required this.lineItems,
     this.taxRate = 5.0,
     this.discount = 3.0,
@@ -39,8 +39,8 @@ class InvoiceModel {
       map['id'] = id!;
     }
 
-    if (customer != null) {
-      map['customer'] = customer!.toJson();
+    if (company != null) {
+      map['company'] = company!.toJson();
     }
 
     return map;
@@ -55,9 +55,13 @@ class InvoiceModel {
       paymentTerms: json['paymentTerms'] as String,
       taxRate: (json['taxRate'] as num?)?.toDouble() ?? 5.0,
       discount: (json['discount'] as num?)?.toDouble() ?? 0.0,
-      customer: json['customer'] != null
-          ? CustomerModel.fromJson(json['customer'] as Map<String, dynamic>)
-          : null,
+      company: json['company'] != null
+          ? CompanyModel.fromJson(json['company'] as Map<String, dynamic>)
+          : (json['customer'] != null
+                ? CompanyModel.fromJson(
+                    json['customer'] as Map<String, dynamic>,
+                  )
+                : null), // Fallback for old data
       lineItems: (json['lineItems'] as List)
           .map((item) => LineItemModel.fromJson(item as Map<String, dynamic>))
           .toList(),
@@ -67,7 +71,7 @@ class InvoiceModel {
   // Factory for creating from Firestore document data
   factory InvoiceModel.fromMap(
     Map<String, dynamic> map, {
-    CustomerModel? customer,
+    CompanyModel? company,
     List<LineItemModel>? items,
   }) {
     // Handle date conversion - can be int (millisecondsSinceEpoch) or Timestamp
@@ -89,7 +93,7 @@ class InvoiceModel {
       paymentTerms: map['paymentTerms'] as String,
       taxRate: (map['taxRate'] as num?)?.toDouble() ?? 5.0,
       discount: (map['discount'] as num?)?.toDouble() ?? 0.0,
-      customer: customer,
+      company: company,
       lineItems: items ?? [],
     );
   }
@@ -123,7 +127,7 @@ class InvoiceModel {
     String? invoiceNumber,
     String? contractReference,
     String? paymentTerms,
-    CustomerModel? customer,
+    CompanyModel? company,
     List<LineItemModel>? lineItems,
     double? taxRate,
     double? discount,
@@ -134,7 +138,7 @@ class InvoiceModel {
       invoiceNumber: invoiceNumber ?? this.invoiceNumber,
       contractReference: contractReference ?? this.contractReference,
       paymentTerms: paymentTerms ?? this.paymentTerms,
-      customer: customer ?? this.customer,
+      company: company ?? this.company,
       lineItems: lineItems ?? this.lineItems,
       taxRate: taxRate ?? this.taxRate,
       discount: discount ?? this.discount,

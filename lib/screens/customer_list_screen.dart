@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/customer_model.dart';
-import '../services/storage_service.dart';
+import '../services/database_service.dart';
 import 'customer_form_screen.dart';
 import '../widgets/responsive_layout.dart';
 
@@ -19,7 +19,7 @@ class CustomerListScreen extends StatefulWidget {
 }
 
 class _CustomerListScreenState extends State<CustomerListScreen> {
-  final _storageService = StorageService();
+  final _databaseService = DatabaseService.instance;
   List<CustomerModel> _customers = [];
   bool _isLoading = true;
 
@@ -31,11 +31,22 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
   Future<void> _loadCustomers() async {
     setState(() => _isLoading = true);
-    final customers = await _storageService.getCustomers();
-    setState(() {
-      _customers = customers;
-      _isLoading = false;
-    });
+    try {
+      final customers = await _databaseService.getAllCustomers();
+      if (mounted) {
+        setState(() {
+          _customers = customers;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading customers: $e')));
+      }
+    }
   }
 
   Future<void> _deleteCustomer(CustomerModel customer) async {
@@ -43,9 +54,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Customer'),
-        content: Text(
-          'Are you sure you want to delete ${customer.companyName}?',
-        ),
+        content: Text('Are you sure you want to delete ${customer.name}?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -61,7 +70,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
 
     if (confirmed == true) {
-      await _storageService.deleteCustomer(customer.id);
+      await _databaseService.deleteCustomer(customer.id);
       _loadCustomers();
     }
   }
@@ -79,84 +88,15 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     }
   }
 
-  void _showCustomerDetails(CustomerModel customer) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(customer.companyName),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildDetailRow('Company', customer.companyName),
-              if (customer.email != null && customer.email!.isNotEmpty)
-                _buildDetailRow('Email', customer.email!),
-              _buildDetailRow('Country', customer.country ?? ''),
-              _buildDetailRow('City', customer.city ?? ''),
-              _buildDetailRow('Address', customer.streetAddress ?? ''),
-              _buildDetailRow('Building', customer.buildingNumber ?? ''),
-              _buildDetailRow('District', customer.district ?? ''),
-              _buildDetailRow('Postal Code', customer.postalCode ?? ''),
-              if (customer.addressAdditionalNumber != null &&
-                  customer.addressAdditionalNumber!.isNotEmpty)
-                _buildDetailRow(
-                  'Additional No.',
-                  customer.addressAdditionalNumber!,
-                ),
-              _buildDetailRow(
-                'VAT Registered',
-                customer.vatRegisteredInKSA ? 'Yes' : 'No',
-              ),
-              _buildDetailRow(
-                'Tax Reg. Number',
-                customer.taxRegistrationNumber ?? '',
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _navigateToForm(customer);
-            },
-            child: const Text('Edit'),
-          ),
-        ],
-      ),
+  Future<void> _toggleCustomerStatus(
+    CustomerModel customer,
+    bool isActive,
+  ) async {
+    final updatedCustomer = customer.copyWith(
+      status: isActive ? 'ACTIVE' : 'INACTIVE',
     );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
-      ),
-    );
+    await _databaseService.updateCustomer(updatedCustomer);
+    _loadCustomers();
   }
 
   @override
@@ -209,7 +149,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                 padding: const EdgeInsets.all(16),
                 gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                   maxCrossAxisExtent: 400,
-                  childAspectRatio: 2.5,
+                  childAspectRatio: 1.6,
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
                 ),
@@ -222,40 +162,211 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   }
 
   Widget _buildCustomerCard(CustomerModel customer) {
+    bool isActive = customer.status == 'ACTIVE';
+
     return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      child: ListTile(
-        leading: const CircleAvatar(child: Icon(Icons.person)),
-        title: Text(customer.companyName),
-        subtitle: Text(
-          '${customer.streetAddress}, ${customer.city}\nVAT: ${customer.vatRegisteredInKSA ? 'Registered' : 'Not registered'}',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
+      elevation: 0,
+      color: Colors.white,
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: () => _navigateToForm(customer),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Logo/Icon
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.person_rounded,
+                    color: Colors.blue,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+
+                // Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              customer.name,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          // Menu
+                          SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: PopupMenuButton<String>(
+                              padding: EdgeInsets.zero,
+                              icon: const Icon(
+                                Icons.more_horiz,
+                                color: Colors.grey,
+                              ),
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _navigateToForm(customer);
+                                } else if (value == 'delete') {
+                                  _deleteCustomer(customer);
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Row(
+                                    children: [
+                                      Icon(Icons.edit_outlined, size: 20),
+                                      SizedBox(width: 8),
+                                      Text('Edit'),
+                                    ],
+                                  ),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.red,
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Delete',
+                                        style: TextStyle(color: Colors.red),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        customer.phone,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                          height: 1.3,
+                        ),
+                      ),
+                      if (customer.companyName != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 6.0),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.business,
+                                size: 14,
+                                color: Colors.grey[500],
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  customer.companyName!,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.grey[800],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: () => _deleteCustomer(customer),
-              color: Colors.red,
+
+            const Spacer(),
+            const Divider(height: 24),
+
+            // Bottom Status Bar
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isActive
+                        ? Colors.green.withOpacity(0.1)
+                        : Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: isActive ? Colors.green : Colors.grey,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isActive ? 'Active' : 'Inactive',
+                        style: TextStyle(
+                          color: isActive
+                              ? Colors.green[700]
+                              : Colors.grey[600],
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  height: 24,
+                  child: Switch(
+                    value: isActive,
+                    activeColor: Colors.white,
+                    activeTrackColor: Colors.green,
+                    inactiveThumbColor: Colors.white,
+                    inactiveTrackColor: Colors.grey[300],
+                    trackOutlineColor: MaterialStateProperty.all(
+                      Colors.transparent,
+                    ),
+                    onChanged: (val) => _toggleCustomerStatus(customer, val),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
-        onTap: () {
-          if (widget.isSelectionMode || widget.onCustomerSelected != null) {
-            if (widget.onCustomerSelected != null) {
-              widget.onCustomerSelected!(customer);
-            }
-            Navigator.pop(context, customer);
-          } else {
-            _showCustomerDetails(customer);
-          }
-        },
       ),
     );
   }

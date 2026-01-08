@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:xloop_invoice/models/invoice_model.dart';
 import 'package:xloop_invoice/models/line_item_model.dart';
+import '../models/company_model.dart';
 import '../models/customer_model.dart';
 
 class DatabaseService {
@@ -24,29 +25,139 @@ class DatabaseService {
     return _firestore!;
   }
 
-  // Customer CRUD operations
+  // ======================
+  // COMPANY Operations
+  // ======================
+
+  Future<void> insertCompany(CompanyModel company) async {
+    try {
+      debugPrint('DatabaseService: Inserting company ${company.id}');
+      await firestore
+          .collection('companies')
+          .doc(company.id)
+          .set(company.toJson());
+
+      // Also save to 'customers' collection for legacy compatibility/migration if needed,
+      // but for now we are moving to 'companies'.
+      // User requested "Company owns the list... Customer can be assigned...".
+      // We will assume new structure primarily.
+
+      debugPrint('DatabaseService: Company ${company.id} saved successfully');
+    } catch (e, stackTrace) {
+      debugPrint('DatabaseService: Error inserting company: $e');
+      debugPrint('Stack trace: $stackTrace');
+      rethrow;
+    }
+  }
+
+  Future<List<CompanyModel>> getAllCompanies() async {
+    List<CompanyModel> allCompanies = [];
+    final Set<String> companyIds = {};
+
+    try {
+      // 1. Fetch from new 'companies' collection
+      final companiesSnapshot = await firestore
+          .collection('companies')
+          .orderBy('companyName')
+          .get();
+
+      final newCompanies = companiesSnapshot.docs
+          .map((doc) => CompanyModel.fromJson(doc.data()))
+          .toList();
+
+      for (var company in newCompanies) {
+        if (!companyIds.contains(company.id)) {
+          allCompanies.add(company);
+          companyIds.add(company.id);
+        }
+      }
+
+      // 2. Fetch from legacy 'customers' collection
+      // We do this to ensure no data is lost during the migration phase
+      final customersSnapshot = await firestore
+          .collection('customers')
+          .orderBy('companyName')
+          .get();
+
+      final oldCompanies = customersSnapshot.docs
+          .map((doc) => CompanyModel.fromJson(doc.data()))
+          .toList();
+
+      for (var company in oldCompanies) {
+        // Only add if not already present (prefer the version in 'companies' if ID exists in both)
+        if (!companyIds.contains(company.id)) {
+          allCompanies.add(company);
+          companyIds.add(company.id);
+        }
+      }
+
+      // Sort merged list
+      allCompanies.sort((a, b) => a.companyName.compareTo(b.companyName));
+    } catch (e) {
+      debugPrint('Error fetching companies: $e');
+      // Don't rethrow, return what we have to keep UI alive
+    }
+
+    return allCompanies;
+  }
+
+  Future<CompanyModel?> getCompanyById(String id) async {
+    final doc = await firestore.collection('companies').doc(id).get();
+    if (doc.exists) {
+      return CompanyModel.fromJson(doc.data()!);
+    }
+
+    // Fallback check in customers
+    final oldDoc = await firestore.collection('customers').doc(id).get();
+    if (oldDoc.exists) {
+      return CompanyModel.fromJson(oldDoc.data()!);
+    }
+
+    return null;
+  }
+
+  Future<void> updateCompany(CompanyModel company) async {
+    // Update both just in case we are in transition, or just companies.
+    // Let's write to 'companies' primarily.
+    await firestore
+        .collection('companies')
+        .doc(company.id)
+        .set(company.toJson()); // Use set to create if not exists (migration)
+
+    // Also update legacy collection to keep sync if we want, but better to move forward.
+    // We will stop writing to 'customers' for company data to avoid confusion.
+  }
+
+  Future<void> deleteCompany(String id) async {
+    await firestore.collection('companies').doc(id).delete();
+    // Also try delete from legacy
+    await firestore.collection('customers').doc(id).delete();
+  }
+
+  // ======================
+  // CUSTOMER (Traveler) Operations
+  // ======================
+  // Note: These are the NEW customers (people)
+
   Future<void> insertCustomer(CustomerModel customer) async {
     try {
-      debugPrint('DatabaseService: Inserting customer ${customer.id}');
-      debugPrint('Customer data: ${customer.toJson()}');
-
+      debugPrint('DatabaseService: Inserting traveler ${customer.id}');
       await firestore
-          .collection('customers')
+          .collection(
+            'travelers',
+          ) // New collection to avoid name collision with legacy 'customers'
           .doc(customer.id)
           .set(customer.toJson());
-
-      debugPrint('DatabaseService: Customer ${customer.id} saved successfully');
-    } catch (e, stackTrace) {
-      debugPrint('DatabaseService: Error inserting customer: $e');
-      debugPrint('Stack trace: $stackTrace');
+    } catch (e) {
+      debugPrint('DatabaseService: Error inserting traveler: $e');
       rethrow;
     }
   }
 
   Future<List<CustomerModel>> getAllCustomers() async {
     final snapshot = await firestore
-        .collection('customers')
-        .orderBy('companyName')
+        .collection('travelers')
+        .orderBy('name')
         .get();
 
     return snapshot.docs
@@ -54,27 +165,32 @@ class DatabaseService {
         .toList();
   }
 
-  Future<CustomerModel?> getCustomerById(String id) async {
-    final doc = await firestore.collection('customers').doc(id).get();
+  Future<List<CustomerModel>> getCustomersForCompany(String companyId) async {
+    final snapshot = await firestore
+        .collection('travelers')
+        .where('companyId', isEqualTo: companyId)
+        .orderBy('name')
+        .get();
 
-    if (doc.exists) {
-      return CustomerModel.fromJson(doc.data()!);
-    }
-    return null;
+    return snapshot.docs
+        .map((doc) => CustomerModel.fromJson(doc.data()))
+        .toList();
   }
 
   Future<void> updateCustomer(CustomerModel customer) async {
     await firestore
-        .collection('customers')
+        .collection('travelers')
         .doc(customer.id)
         .update(customer.toJson());
   }
 
   Future<void> deleteCustomer(String id) async {
-    await firestore.collection('customers').doc(id).delete();
+    await firestore.collection('travelers').doc(id).delete();
   }
 
-  // Invoice Operations
+  // ======================
+  // INVOICE Operations
+  // ======================
 
   Future<String> generateNewInvoiceNumber() async {
     final now = DateTime.now();
@@ -89,8 +205,6 @@ class DatabaseService {
       int currentSequence;
 
       if (!snapshot.exists) {
-        // First time for this year or migration: count existing invoices
-        // Pattern: INT-YYYY-SEQ
         final nextYear = (now.year + 1).toString();
         final invoiceSnapshot = await firestore
             .collection('invoices')
@@ -98,8 +212,6 @@ class DatabaseService {
             .where('invoiceNumber', isLessThan: 'INT-$nextYear-')
             .get();
 
-        // Start from 1640 + count, just like the old logic, to maintain continuity
-        // If count is 0, we start at 1641 (1640 + 0 + 1)
         final count = invoiceSnapshot.docs.length;
         currentSequence = 1640 + count;
       } else {
@@ -120,41 +232,28 @@ class DatabaseService {
       throw Exception('Invoice ID is required');
     }
 
-    print('DEBUG INSERT: Saving invoice with ID: ${invoice.id}');
-    print('DEBUG INSERT: Invoice has ${invoice.lineItems.length} line items');
-
-    // Convert invoice to Firestore document
     final invoiceData = invoice.toJson();
 
-    // Remove customer object (we store customerId instead and fetch customer separately)
-    invoiceData.remove('customer');
+    // Remove company object (store ID instead)
+    invoiceData.remove('company');
+    invoiceData.remove('customer'); // Clean up old field if present
 
-    // Convert date to Timestamp
     invoiceData['date'] = Timestamp.fromDate(invoice.date);
     invoiceData['createdAt'] = Timestamp.now();
 
-    // Store customerId if customer exists (for reference/lookup)
-    if (invoice.customer != null) {
-      invoiceData['customerId'] = invoice.customer!.id;
+    if (invoice.company != null) {
+      invoiceData['companyId'] = invoice.company!.id;
+      // Also store 'customerId' for legacy compatibility if needed, but strictly it refers to Company now
+      invoiceData['customerId'] = invoice.company!.id;
     }
 
-    // Store line items as nested array (already included from toJson())
-    // invoiceData['lineItems'] is already set from invoice.toJson()
-
-    print('DEBUG INSERT: Invoice map ID: ${invoiceData['id']}');
-
     await firestore.collection('invoices').doc(invoice.id).set(invoiceData);
-
-    print(
-      'DEBUG INSERT: Successfully saved ${invoice.lineItems.length} line items',
-    );
   }
 
   Future<List<InvoiceModel>> getAllInvoices({int? month, int? year}) async {
     Query query = firestore.collection('invoices');
 
     if (month != null && year != null) {
-      // Filter by month and year
       final startDate = DateTime(year, month, 1);
       final endDate = DateTime(year, month + 1, 1);
 
@@ -167,41 +266,36 @@ class DatabaseService {
 
     final snapshot = await query.get();
 
-    print('DEBUG RETRIEVE: Found ${snapshot.docs.length} invoices in database');
-
-    // Collect all unique customer IDs first
-    final Set<String> customerIds = {};
+    // Collect all unique company IDs (previously customerId)
+    final Set<String> companyIds = {};
     for (var doc in snapshot.docs) {
       final data = doc.data() as Map<String, dynamic>;
-      final customerId = data['customerId'];
-      if (customerId != null) {
-        customerIds.add(customerId as String);
+      // Check both new 'companyId' and old 'customerId'
+      final companyId = data['companyId'] ?? data['customerId'];
+      if (companyId != null) {
+        companyIds.add(companyId as String);
       }
     }
 
-    // Batch fetch all customers in parallel (much more efficient than sequential!)
-    final Map<String, CustomerModel> customersMap = {};
-    if (customerIds.isNotEmpty) {
-      // Fetch all customers in parallel using Future.wait
-      final customerFutures = customerIds.map((customerId) async {
+    // Batch fetch companies
+    final Map<String, CompanyModel> companiesMap = {};
+    if (companyIds.isNotEmpty) {
+      final companyFutures = companyIds.map((id) async {
         try {
-          final doc = await firestore
-              .collection('customers')
-              .doc(customerId)
-              .get();
-          if (doc.exists) {
-            return MapEntry(customerId, CustomerModel.fromJson(doc.data()!));
+          final company = await getCompanyById(id);
+          if (company != null) {
+            return MapEntry(id, company);
           }
         } catch (e) {
-          print('Error fetching customer $customerId: $e');
+          print('Error fetching company $id: $e');
         }
-        return null;
+        return null; // Should handle null entries??
       }).toList();
 
-      final customerResults = await Future.wait(customerFutures);
-      for (var result in customerResults) {
+      final results = await Future.wait(companyFutures);
+      for (var result in results) {
         if (result != null) {
-          customersMap[result.key] = result.value;
+          companiesMap[result.key] = result.value;
         }
       }
     }
@@ -211,16 +305,13 @@ class DatabaseService {
     for (var doc in snapshot.docs) {
       final data = doc.data() as Map<String, dynamic>;
       final invoiceId = doc.id;
-      print('DEBUG RETRIEVE: Processing invoice ID: $invoiceId');
 
-      // Get customer from map (no individual query needed!)
-      CustomerModel? customer;
-      final customerId = data['customerId'];
-      if (customerId != null) {
-        customer = customersMap[customerId as String];
+      CompanyModel? company;
+      final companyId = data['companyId'] ?? data['customerId'];
+      if (companyId != null) {
+        company = companiesMap[companyId as String];
       }
 
-      // Extract line items from nested array
       List<LineItemModel> lineItems = [];
       final lineItemsData = data['lineItems'];
       if (lineItemsData != null && lineItemsData is List) {
@@ -232,11 +323,6 @@ class DatabaseService {
             .toList();
       }
 
-      print(
-        'DEBUG RETRIEVE: Invoice $invoiceId has ${lineItems.length} line items in DB',
-      );
-
-      // Convert Timestamp to DateTime for InvoiceModel
       final invoiceMap = Map<String, dynamic>.from(data);
       invoiceMap['id'] = invoiceId;
 
@@ -246,7 +332,7 @@ class DatabaseService {
       }
 
       invoices.add(
-        InvoiceModel.fromMap(invoiceMap, customer: customer, items: lineItems),
+        InvoiceModel.fromMap(invoiceMap, company: company, items: lineItems),
       );
     }
 
@@ -254,10 +340,8 @@ class DatabaseService {
   }
 
   Future<Map<String, dynamic>> getAnalytics({int? month, int? year}) async {
-    // Get all invoices for the period
     final invoices = await getAllInvoices(month: month, year: year);
 
-    // Calculate total revenue and other metrics
     double totalRevenue = 0;
     double totalTax = 0;
     double totalDiscount = 0;
@@ -273,7 +357,7 @@ class DatabaseService {
         ? totalRevenue / invoiceCount
         : 0;
 
-    // Get monthly revenue breakdown (last 6 months)
+    // Monthly revenue (last 6 months)
     final now = DateTime.now();
     List<Map<String, dynamic>> monthlyRevenue = [];
 
@@ -297,30 +381,29 @@ class DatabaseService {
       });
     }
 
-    // Get top customers by revenue
-    Map<String, Map<String, dynamic>> customerRevenue = {};
+    // Top Companies by Revenue
+    Map<String, Map<String, dynamic>> companyRevenue = {};
 
     for (var invoice in invoices) {
-      if (invoice.customer != null) {
-        final customerId = invoice.customer!.id;
-        if (!customerRevenue.containsKey(customerId)) {
-          customerRevenue[customerId] = {
-            'customer': invoice.customer,
+      if (invoice.company != null) {
+        final id = invoice.company!.id;
+        if (!companyRevenue.containsKey(id)) {
+          companyRevenue[id] = {
+            'company': invoice.company,
             'revenue': 0.0,
             'invoiceCount': 0,
           };
         }
-        customerRevenue[customerId]!['revenue'] += invoice.grandTotal;
-        customerRevenue[customerId]!['invoiceCount'] += 1;
+        companyRevenue[id]!['revenue'] += invoice.grandTotal;
+        companyRevenue[id]!['invoiceCount'] += 1;
       }
     }
 
-    // Sort customers by revenue and get top 5
-    final topCustomers = customerRevenue.values.toList()
+    final topCompanies = companyRevenue.values.toList()
       ..sort(
         (a, b) => (b['revenue'] as double).compareTo(a['revenue'] as double),
       );
-    final top5Customers = topCustomers.take(5).toList();
+    final top5 = topCompanies.take(5).toList();
 
     return {
       'totalRevenue': totalRevenue,
@@ -329,22 +412,19 @@ class DatabaseService {
       'totalTax': totalTax,
       'totalDiscount': totalDiscount,
       'monthlyRevenue': monthlyRevenue,
-      'topCustomers': top5Customers,
+      'topCompanies': top5, // renamed from topCustomers
     };
   }
 
   Future<void> updateInvoice(InvoiceModel invoice) async {
     final invoiceData = invoice.toJson();
 
-    // Remove customer object (we store customerId instead)
-    invoiceData.remove('customer');
-
-    // Convert date to Timestamp
+    invoiceData.remove('company');
     invoiceData['date'] = Timestamp.fromDate(invoice.date);
 
-    // Store customerId if customer exists
-    if (invoice.customer != null) {
-      invoiceData['customerId'] = invoice.customer!.id;
+    if (invoice.company != null) {
+      invoiceData['companyId'] = invoice.company!.id;
+      invoiceData['customerId'] = invoice.company!.id; // Legacy Sync
     }
 
     await firestore.collection('invoices').doc(invoice.id).update(invoiceData);

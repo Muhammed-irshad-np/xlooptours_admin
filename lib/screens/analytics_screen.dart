@@ -2,6 +2,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/invoice_model.dart';
+import '../models/company_model.dart';
 import '../services/database_service.dart';
 import '../widgets/responsive_layout.dart';
 
@@ -23,7 +24,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   double _averageInvoiceValue = 0;
   double _totalTax = 0;
   Map<int, double> _monthlyRevenue = {};
-  Map<String, double> _topCustomers = {};
+  Map<String, double> _topCompanies = {};
 
   @override
   void initState() {
@@ -59,30 +60,21 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           }
         }
 
-        // Process top customers
-        _topCustomers = {};
-        final topCustomersData = analytics['topCustomers'] as List? ?? [];
-        for (var item in topCustomersData) {
+        // Process top companies
+        _topCompanies = {};
+        final topCompaniesData = analytics['topCompanies'] as List? ?? [];
+        for (var item in topCompaniesData) {
           if (item is Map) {
-            final customer = item['customer'];
+            final company = item['company'];
             final revenue = (item['revenue'] as num?)?.toDouble();
-            if (customer != null && revenue != null) {
-              // Assuming customer has a companyName property or similar
-              // If customer is an object, we need to extract the name.
-              // Based on previous code, customer seems to be a CustomerModel or similar.
-              // Let's check how it was used: customer.companyName
+            if (company != null && revenue != null) {
               String name = 'Unknown';
-              if (customer is Map) {
-                name = customer['companyName']?.toString() ?? 'Unknown';
-              } else {
-                // Try to access companyName dynamically or toString
-                try {
-                  name = (customer as dynamic).companyName;
-                } catch (e) {
-                  name = customer.toString();
-                }
+              if (company is CompanyModel) {
+                name = company.companyName;
+              } else if (company is Map) {
+                name = company['companyName']?.toString() ?? 'Unknown';
               }
-              _topCustomers[name] = revenue;
+              _topCompanies[name] = revenue;
             }
           }
         }
@@ -146,7 +138,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       children: [
                         _buildMonthlyRevenueChart(currencyFormat),
                         const SizedBox(height: 24),
-                        _buildTopCustomersChart(currencyFormat),
+                        _buildTopCompaniesChart(currencyFormat),
                       ],
                     ),
                     desktop: Row(
@@ -157,7 +149,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         ),
                         const SizedBox(width: 24),
                         Expanded(
-                          child: _buildTopCustomersChart(currencyFormat),
+                          child: _buildTopCompaniesChart(currencyFormat),
                         ),
                       ],
                     ),
@@ -407,7 +399,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  Widget _buildTopCustomersChart(NumberFormat currencyFormat) {
+  Widget _buildTopCompaniesChart(NumberFormat currencyFormat) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -417,20 +409,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Top Customers',
+              'Top Companies',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
             SizedBox(
               height: 300,
-              child: _topCustomers.isEmpty
+              child: _topCompanies.isEmpty
                   ? const Center(child: Text('No data available'))
                   : PieChart(
                       PieChartData(
                         sectionsSpace: 2,
                         centerSpaceRadius: 40,
-                        sections: _topCustomers.entries.map((entry) {
-                          final index = _topCustomers.keys.toList().indexOf(
+                        sections: _topCompanies.entries.map((entry) {
+                          final index = _topCompanies.keys.toList().indexOf(
                             entry.key,
                           );
                           final colors = [
@@ -458,10 +450,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
             ),
             const SizedBox(height: 16),
-            if (_topCustomers.isNotEmpty)
+            if (_topCompanies.isNotEmpty)
               Column(
-                children: _topCustomers.entries.map((entry) {
-                  final index = _topCustomers.keys.toList().indexOf(entry.key);
+                children: _topCompanies.entries.map((entry) {
+                  final index = _topCompanies.keys.toList().indexOf(entry.key);
                   final colors = [
                     Colors.blue,
                     Colors.red,

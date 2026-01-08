@@ -4,6 +4,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
 import '../models/invoice_model.dart';
+import '../models/company_model.dart';
 import '../models/company_info.dart';
 import 'number_to_words_service.dart';
 
@@ -162,7 +163,7 @@ class PDFService {
                           // Bill To Section (Right side, less space)
                           pw.Expanded(
                             flex: 2,
-                            child: _buildBillToSection(invoice.customer),
+                            child: _buildBillToSection(invoice.company),
                           ),
                         ],
                       ),
@@ -749,7 +750,7 @@ class PDFService {
     );
   }
 
-  pw.Widget _buildBillToSection(dynamic customer) {
+  pw.Widget _buildBillToSection(CompanyModel? company) {
     return pw.SizedBox(
       width: double.infinity,
       child: pw.Container(
@@ -770,57 +771,57 @@ class PDFService {
               ),
             ),
             pw.SizedBox(height: 3),
-            if (customer != null) ...[
+            if (company != null) ...[
               pw.Text(
-                customer.companyName,
+                company.companyName,
                 style: pw.TextStyle(
                   fontSize: 12,
                   fontWeight: pw.FontWeight.bold,
                 ),
               ),
               pw.SizedBox(height: 1),
-              if (customer.country != null && customer.country!.isNotEmpty)
+              if (company.country != null && company.country!.isNotEmpty)
                 pw.Text(
-                  customer.country!,
+                  company.country!,
                   style: const pw.TextStyle(fontSize: 10),
                 ),
-              if (customer.country != null && customer.country!.isNotEmpty)
+              if (company.country != null && company.country!.isNotEmpty)
                 pw.SizedBox(height: 1),
-              if (customer.streetAddress != null &&
-                  customer.buildingNumber != null)
+              if (company.streetAddress != null &&
+                  company.buildingNumber != null)
                 pw.Text(
-                  '${customer.streetAddress}, Bldg ${customer.buildingNumber}',
+                  '${company.streetAddress}, Bldg ${company.buildingNumber}',
                   style: const pw.TextStyle(fontSize: 10),
                 ),
-              if (customer.streetAddress != null &&
-                  customer.buildingNumber != null)
+              if (company.streetAddress != null &&
+                  company.buildingNumber != null)
                 pw.SizedBox(height: 1),
-              if (customer.district != null)
+              if (company.district != null)
                 pw.Text(
-                  customer.addressAdditionalNumber != null &&
-                          customer.addressAdditionalNumber!.isNotEmpty
-                      ? '${customer.district}, Addl. No: ${customer.addressAdditionalNumber}'
-                      : customer.district!,
+                  company.addressAdditionalNumber != null &&
+                          company.addressAdditionalNumber!.isNotEmpty
+                      ? '${company.district}, Addl. No: ${company.addressAdditionalNumber}'
+                      : company.district!,
                   style: const pw.TextStyle(fontSize: 10),
                 ),
-              if (customer.district != null) pw.SizedBox(height: 2),
-              if (customer.city != null && customer.postalCode != null)
+              if (company.district != null) pw.SizedBox(height: 2),
+              if (company.city != null && company.postalCode != null)
                 pw.Text(
-                  '${customer.city}, ${customer.postalCode}',
+                  '${company.city}, ${company.postalCode}',
                   style: const pw.TextStyle(fontSize: 10),
                 ),
-              if (customer.city != null && customer.postalCode != null)
+              if (company.city != null && company.postalCode != null)
                 pw.SizedBox(height: 2),
-              if (customer.taxRegistrationNumber != null &&
-                  customer.taxRegistrationNumber!.isNotEmpty)
+              if (company.taxRegistrationNumber != null &&
+                  company.taxRegistrationNumber!.isNotEmpty)
                 pw.Text(
-                  'VAT No #: ${customer.taxRegistrationNumber}',
+                  'VAT No #: ${company.taxRegistrationNumber}',
                   style: const pw.TextStyle(fontSize: 9),
                 ),
-              if (customer.taxRegistrationNumber != null &&
-                  customer.taxRegistrationNumber!.isNotEmpty)
+              if (company.taxRegistrationNumber != null &&
+                  company.taxRegistrationNumber!.isNotEmpty)
                 pw.SizedBox(height: 1),
-              if (customer.email != null && customer.email!.isNotEmpty) ...[
+              if (company.email != null && company.email!.isNotEmpty) ...[
                 pw.Text(
                   'Attn:',
                   style: pw.TextStyle(
@@ -829,13 +830,13 @@ class PDFService {
                   ),
                 ),
                 pw.Text(
-                  customer.email!,
+                  company.email!,
                   style: const pw.TextStyle(fontSize: 10),
                 ),
               ],
             ] else
               pw.Text(
-                '(Customer Name & Address)',
+                '(Company Name & Address)',
                 style: pw.TextStyle(
                   fontSize: 10,
                   fontStyle: pw.FontStyle.italic,

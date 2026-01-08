@@ -249,7 +249,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
           children: [
             const SizedBox(height: 4),
             Text(
-              '${dateFormat.format(invoice.date)} • ${invoice.customer?.companyName ?? "Unknown Customer"}',
+              '${dateFormat.format(invoice.date)} • ${invoice.company?.companyName ?? "Unknown Customer"}',
             ),
             Text(
               currencyFormat.format(invoice.grandTotal),

@@ -9,6 +9,8 @@ import 'screens/home_screen.dart';
 import 'screens/invoice_form_screen.dart';
 import 'screens/pdf_preview_screen.dart';
 import 'models/invoice_model.dart';
+import 'screens/admin_layout.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,15 +43,35 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'XLOOP Invoice Generator',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-        textTheme: GoogleFonts.merriweatherTextTheme(),
-      ),
-      home: StreamBuilder<User?>(
+    return ScreenUtilInit(
+      designSize: const Size(1440, 900),
+      minTextAdapt: true,
+      splitScreenMode: true,
+      builder: (_, child) {
+        return MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'XLoop Tours Admin',
+          theme: ThemeData(
+            // Cyan/Teal based on the logo description (Blue/Cyan mix)
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF00BCD4),
+            ),
+            useMaterial3: true,
+            textTheme: GoogleFonts.merriweatherTextTheme(),
+          ),
+          home: child,
+          routes: {
+            '/home': (context) => const HomeScreen(),
+            '/invoice': (context) => const InvoiceFormScreen(),
+            '/preview': (context) {
+              final invoice =
+                  ModalRoute.of(context)!.settings.arguments as InvoiceModel;
+              return PDFPreviewScreen(invoice: invoice);
+            },
+          },
+        );
+      },
+      child: StreamBuilder<User?>(
         stream: AuthService.instance.authStateChanges,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -59,21 +81,12 @@ class MyApp extends StatelessWidget {
           }
 
           if (snapshot.hasData) {
-            return const HomeScreen();
+            return const AdminLayout();
           }
 
           return const LoginScreen();
         },
       ),
-      routes: {
-        '/home': (context) => const HomeScreen(),
-        '/invoice': (context) => const InvoiceFormScreen(),
-        '/preview': (context) {
-          final invoice =
-              ModalRoute.of(context)!.settings.arguments as InvoiceModel;
-          return PDFPreviewScreen(invoice: invoice);
-        },
-      },
     );
   }
 }

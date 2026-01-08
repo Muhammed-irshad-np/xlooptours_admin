@@ -36,12 +36,12 @@ class HomeScreen extends StatelessWidget {
               const Icon(Icons.receipt_long, size: 80, color: Colors.blue),
               const SizedBox(height: 24),
               const Text(
-                'XLOOP',
+                'XLoop Tours',
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 2),
               const Text(
-                'Invoice Generator',
+                'Invoices Dashboard',
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 48),
@@ -94,25 +94,7 @@ class HomeScreen extends StatelessWidget {
           ),
         ),
       ),
-      const SizedBox(height: 16),
-      SizedBox(
-        width: width,
-        child: OutlinedButton.icon(
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const CustomerListScreen(),
-              ),
-            );
-          },
-          icon: const Icon(Icons.people),
-          label: const Text('Manage Customers'),
-          style: OutlinedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(vertical: 16),
-          ),
-        ),
-      ),
+
       const SizedBox(height: 16),
       SizedBox(
         width: width,

@@ -32,7 +32,7 @@ class PDFPreviewScreen extends StatelessWidget {
 
   void _savePDFWeb(BuildContext context, Uint8List pdfBytes) {
     try {
-      final customerName = invoice.customer?.companyName ?? 'Customer';
+      final customerName = invoice.company?.companyName ?? 'Customer';
       final sanitizedCustomerName = customerName.replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
       final fileName = '${invoice.invoiceNumber}_$sanitizedCustomerName.pdf';
 
@@ -67,7 +67,7 @@ class PDFPreviewScreen extends StatelessWidget {
   Future<void> _savePDFMobile(BuildContext context, Uint8List pdfBytes) async {
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final customerName = invoice.customer?.companyName ?? 'Customer';
+      final customerName = invoice.company?.companyName ?? 'Customer';
       final sanitizedCustomerName = customerName.replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
       final fileName = '${invoice.invoiceNumber}_$sanitizedCustomerName.pdf';
       final file = File('${directory.path}/$fileName');
@@ -99,7 +99,7 @@ class PDFPreviewScreen extends StatelessWidget {
 
   void _sharePDFWeb(BuildContext context, Uint8List pdfBytes) {
     try {
-      final customerName = invoice.customer?.companyName ?? 'Customer';
+      final customerName = invoice.company?.companyName ?? 'Customer';
       final sanitizedCustomerName = customerName.replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
       final fileName = '${invoice.invoiceNumber}_$sanitizedCustomerName.pdf';
 
@@ -132,7 +132,7 @@ class PDFPreviewScreen extends StatelessWidget {
   Future<void> _sharePDFMobile(BuildContext context, Uint8List pdfBytes) async {
     try {
       final directory = await getApplicationDocumentsDirectory();
-      final customerName = invoice.customer?.companyName ?? 'Customer';
+      final customerName = invoice.company?.companyName ?? 'Customer';
       final sanitizedCustomerName = customerName.replaceAll(RegExp(r'[^\w\s]+'), '').replaceAll(' ', '_');
       final fileName = '${invoice.invoiceNumber}_$sanitizedCustomerName.pdf';
       final file = File('${directory.path}/$fileName');

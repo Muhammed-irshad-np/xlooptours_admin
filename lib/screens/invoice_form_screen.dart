@@ -5,9 +5,9 @@ import 'package:xloop_invoice/services/database_service.dart'
     show DatabaseService;
 import 'package:xloop_invoice/services/storage_service.dart';
 import '../models/invoice_model.dart';
-import '../models/customer_model.dart';
+import '../models/company_model.dart';
 import '../models/line_item_model.dart';
-import 'customer_list_screen.dart';
+import 'companies_screen.dart';
 import '../widgets/line_item_row_widget.dart';
 import 'pdf_preview_screen.dart';
 import '../widgets/responsive_layout.dart';
@@ -24,8 +24,10 @@ class InvoiceFormScreen extends StatefulWidget {
 class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _contractRefController = TextEditingController();
-  final _taxRateController = TextEditingController(text: '5.0');
-  final _discountController = TextEditingController(text: '3.0');
+  final _taxRateController = TextEditingController(
+    text: '15.0',
+  ); // Updated default valid tax rate
+  final _discountController = TextEditingController(text: '0.0');
   final _paymentTermsController = TextEditingController();
   final List<String> _paymentTermsOptions = const [
     'Advance 100% Cash',
@@ -37,7 +39,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   bool _useCustomPaymentTerms = false;
 
   DateTime _selectedDate = DateTime.now();
-  CustomerModel? _selectedCustomer;
+  CompanyModel? _selectedCompany;
   List<LineItemModel> _lineItems = [];
   final _storageService = StorageService();
 
@@ -78,7 +80,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       _contractRefController.text = invoice.contractReference;
       _taxRateController.text = invoice.taxRate.toString();
       _discountController.text = invoice.discount.toString();
-      _selectedCustomer = invoice.customer;
+      _selectedCompany = invoice.company;
       _lineItems = List.from(invoice.lineItems);
 
       if (_paymentTermsOptions.contains(invoice.paymentTerms)) {
@@ -96,9 +98,9 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
     setState(() {
       _selectedDate = DateTime.now();
       _contractRefController.clear();
-      _taxRateController.text = '5.0';
-      _discountController.text = '3.0';
-      _selectedCustomer = null;
+      _taxRateController.text = '15.0';
+      _discountController.text = '0.0';
+      _selectedCompany = null;
       _selectedPaymentTermsOption = _paymentTermsOptions.first;
       _paymentTermsController.text = _selectedPaymentTermsOption;
       _useCustomPaymentTerms = false;
@@ -128,7 +130,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
           : _selectedPaymentTermsOption,
       taxRate: double.tryParse(_taxRateController.text) ?? 5.0,
       discount: double.tryParse(_discountController.text) ?? 0.0,
-      customer: _selectedCustomer,
+      company: _selectedCompany,
       lineItems: _lineItems,
     );
 
@@ -171,16 +173,16 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
     }
   }
 
-  Future<void> _selectCustomer() async {
-    final customer = await Navigator.push<CustomerModel>(
+  Future<void> _selectCompany() async {
+    final company = await Navigator.push<CompanyModel>(
       context,
       MaterialPageRoute(
-        builder: (context) => const CustomerListScreen(isSelectionMode: true),
+        builder: (context) => const CompaniesScreen(isSelectionMode: true),
       ),
     );
 
-    if (customer != null) {
-      setState(() => _selectedCustomer = customer);
+    if (company != null) {
+      setState(() => _selectedCompany = company);
       _saveDraft();
     }
   }
@@ -226,10 +228,10 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       return;
     }
 
-    if (_selectedCustomer == null) {
+    if (_selectedCompany == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a customer')));
+      ).showSnackBar(const SnackBar(content: Text('Please select a company')));
       return;
     }
 
@@ -250,9 +252,9 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       paymentTerms: _useCustomPaymentTerms
           ? _paymentTermsController.text
           : _selectedPaymentTermsOption,
-      taxRate: double.tryParse(_taxRateController.text) ?? 5.0,
+      taxRate: double.tryParse(_taxRateController.text) ?? 15.0,
       discount: double.tryParse(_discountController.text) ?? 0.0,
-      customer: _selectedCustomer,
+      company: _selectedCompany,
       lineItems: validItems,
     );
 
@@ -276,10 +278,10 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       return;
     }
 
-    if (_selectedCustomer == null) {
+    if (_selectedCompany == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a customer')));
+      ).showSnackBar(const SnackBar(content: Text('Please select a company')));
       return;
     }
 
@@ -305,9 +307,9 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
         paymentTerms: _useCustomPaymentTerms
             ? _paymentTermsController.text
             : _selectedPaymentTermsOption,
-        taxRate: double.tryParse(_taxRateController.text) ?? 5.0,
+        taxRate: double.tryParse(_taxRateController.text) ?? 15.0,
         discount: double.tryParse(_discountController.text) ?? 0.0,
-        customer: _selectedCustomer,
+        company: _selectedCompany,
         lineItems: validItems,
       );
 
@@ -316,6 +318,8 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
         // Update existing invoice
         final updatedInvoice = invoice.copyWith(id: widget.invoiceToEdit!.id);
         await DatabaseService.instance.updateInvoice(updatedInvoice);
+
+        // Also update legacy local storage for resilience if needed, but DatabaseService handles cloud
       } else {
         // Insert new invoice
         await DatabaseService.instance.insertInvoice(invoice);
@@ -350,17 +354,17 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       symbol: 'SR ',
       decimalDigits: 2,
     );
-    // Build invoice for preview
+    // Build invoice for preview (live)
     final invoice = InvoiceModel(
       date: _selectedDate,
-      invoiceNumber: 'Preview', // Placeholder for preview
+      invoiceNumber: 'Preview',
       contractReference: _contractRefController.text.trim(),
       paymentTerms: _useCustomPaymentTerms
           ? _paymentTermsController.text.trim()
           : _selectedPaymentTermsOption,
-      taxRate: double.tryParse(_taxRateController.text) ?? 5.0,
+      taxRate: double.tryParse(_taxRateController.text) ?? 15.0,
       discount: double.tryParse(_discountController.text) ?? 0.0,
-      customer: _selectedCustomer,
+      company: _selectedCompany,
       lineItems: _getActiveLineItems(),
     );
 
@@ -478,7 +482,9 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
                                                     _buildInputDecoration(
                                                       'WHT Rate (%)',
                                                       Icons.percent,
-                                                    ).copyWith(hintText: '5.0'),
+                                                    ).copyWith(
+                                                      hintText: '15.0',
+                                                    ),
                                                 validator: (value) {
                                                   if (value == null ||
                                                       value.isEmpty) {
@@ -664,7 +670,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
                 decoration: _buildInputDecoration(
                   'WHT Rate (%)',
                   Icons.percent,
-                ).copyWith(hintText: '5.0'),
+                ).copyWith(hintText: '15.0'),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Required';
@@ -778,9 +784,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
         else
           LayoutBuilder(
             builder: (context, constraints) {
-              // If width is sufficient (e.g. > 600), show 2 items per row
               final isWide = constraints.maxWidth > 600;
-              // Calculate width for each item: (total width - spacing) / 2
               final itemWidth = isWide
                   ? (constraints.maxWidth - 16) / 2
                   : constraints.maxWidth;
@@ -830,13 +834,13 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       title: 'Bill To',
       icon: Icons.business,
       action: TextButton.icon(
-        onPressed: _selectCustomer,
-        icon: const Icon(Icons.person_add_outlined, size: 20),
-        label: Text(_selectedCustomer == null ? 'Select' : 'Change'),
+        onPressed: _selectCompany,
+        icon: const Icon(Icons.business, size: 20),
+        label: Text(_selectedCompany == null ? 'Select Company' : 'Change'),
         style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
       ),
       children: [
-        if (_selectedCustomer != null) ...[
+        if (_selectedCompany != null) ...[
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -848,7 +852,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _selectedCustomer!.companyName,
+                  _selectedCompany!.companyName,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -858,27 +862,35 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
                 const SizedBox(height: 8),
                 _buildCustomerInfoRow(
                   Icons.location_on_outlined,
-                  '${_selectedCustomer!.streetAddress}, Building ${_selectedCustomer!.buildingNumber}',
+                  '${_selectedCompany!.streetAddress}, Building ${_selectedCompany!.buildingNumber}',
                 ),
                 _buildCustomerInfoRow(
                   Icons.map_outlined,
-                  '${_selectedCustomer!.district}, ${_selectedCustomer!.city}, ${_selectedCustomer!.postalCode}',
+                  '${_selectedCompany!.district}, ${_selectedCompany!.city}, ${_selectedCompany!.postalCode}',
                 ),
                 _buildCustomerInfoRow(
                   Icons.public,
-                  _selectedCustomer!.country ?? '',
+                  _selectedCompany!.country ?? '',
                 ),
                 const Divider(height: 24),
-                if (_selectedCustomer!.email != null &&
-                    _selectedCustomer!.email!.isNotEmpty)
+                if (_selectedCompany!.email != null &&
+                    _selectedCompany!.email!.isNotEmpty)
                   _buildCustomerInfoRow(
                     Icons.email_outlined,
-                    _selectedCustomer!.email!,
+                    _selectedCompany!.email!,
                   ),
                 _buildCustomerInfoRow(
                   Icons.numbers,
-                  'Tax No: ${_selectedCustomer!.taxRegistrationNumber ?? 'N/A'}',
+                  'Tax No: ${_selectedCompany!.taxRegistrationNumber ?? 'N/A'}',
                 ),
+                if (_selectedCompany!.usesCaseCode)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: _buildCustomerInfoRow(
+                      Icons.work_outline,
+                      'Uses ${_selectedCompany!.caseCodeLabel ?? 'Case Codes'}',
+                    ),
+                  ),
               ],
             ),
           ),
@@ -889,13 +901,13 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
               child: Column(
                 children: [
                   Icon(
-                    Icons.person_search_outlined,
+                    Icons.business_outlined,
                     size: 48,
                     color: Colors.grey[300],
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'No customer selected',
+                    'No company selected',
                     style: TextStyle(color: Colors.grey[500]),
                   ),
                 ],

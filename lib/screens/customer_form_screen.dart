@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/customer_model.dart';
-import '../services/storage_service.dart';
+import '../models/company_model.dart';
+import '../services/database_service.dart';
 import '../widgets/responsive_layout.dart';
 
 class CustomerFormScreen extends StatefulWidget {
@@ -14,55 +15,65 @@ class CustomerFormScreen extends StatefulWidget {
 
 class _CustomerFormScreenState extends State<CustomerFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _companyNameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _countryController = TextEditingController();
-  final _taxRegController = TextEditingController();
-  final _cityController = TextEditingController();
-  final _streetController = TextEditingController();
-  final _buildingNumberController = TextEditingController();
-  final _districtController = TextEditingController();
-  final _addressAdditionalController = TextEditingController();
-  final _postalCodeController = TextEditingController();
-  bool _vatRegisteredInKSA = false;
-  final _storageService = StorageService();
+  final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+
+  // Company Selection
+  CompanyModel? _selectedCompany;
+  List<CompanyModel> _availableCompanies = [];
+  bool _isLoadingCompanies = true;
+
+  // Case Code Selection
+  List<String> _assignedCaseCodes = [];
+
+  final _databaseService = DatabaseService.instance;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
+    _loadCompanies();
     if (widget.customer != null) {
       final customer = widget.customer!;
-      _companyNameController.text = customer.companyName;
-      _emailController.text = customer.email ?? '';
-      _countryController.text = customer.country ?? '';
-      _vatRegisteredInKSA = customer.vatRegisteredInKSA;
-      _taxRegController.text = customer.taxRegistrationNumber ?? '';
-      _cityController.text = customer.city ?? '';
-      _streetController.text = customer.streetAddress ?? '';
-      _buildingNumberController.text = customer.buildingNumber ?? '';
-      _districtController.text = customer.district ?? '';
-      _addressAdditionalController.text =
-          customer.addressAdditionalNumber ?? '';
-      _postalCodeController.text = customer.postalCode ?? '';
+      _nameController.text = customer.name;
+      _phoneController.text = customer.phone;
+      _assignedCaseCodes = List.from(customer.assignedCaseCodes);
+    }
+  }
+
+  Future<void> _loadCompanies() async {
+    try {
+      final companies = await _databaseService.getAllCompanies();
+      setState(() {
+        _availableCompanies = companies;
+        _isLoadingCompanies = false;
+
+        // If editing, set the selected company
+        if (widget.customer != null && widget.customer!.companyId != null) {
+          try {
+            _selectedCompany = companies.firstWhere(
+              (c) => c.id == widget.customer!.companyId,
+            );
+          } catch (e) {
+            // Company might have been deleted
+            debugPrint(
+              'Associated company not found: ${widget.customer!.companyId}',
+            );
+          }
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading companies: $e');
+      setState(() => _isLoadingCompanies = false);
     }
   }
 
   @override
   void dispose() {
-    _companyNameController.dispose();
-    _emailController.dispose();
-    _countryController.dispose();
-    _taxRegController.dispose();
-    _cityController.dispose();
-    _streetController.dispose();
-    _buildingNumberController.dispose();
-    _districtController.dispose();
-    _addressAdditionalController.dispose();
-    _postalCodeController.dispose();
+    _nameController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
-
-  bool _isSaving = false;
 
   Future<void> _saveCustomer() async {
     if (_formKey.currentState!.validate() && !_isSaving) {
@@ -73,58 +84,29 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
           id:
               widget.customer?.id ??
               DateTime.now().millisecondsSinceEpoch.toString(),
-          companyName: _companyNameController.text.trim(),
-          email: _emailController.text.trim().isEmpty
-              ? null
-              : _emailController.text.trim(),
-          country: _countryController.text.trim().isEmpty
-              ? null
-              : _countryController.text.trim(),
-          vatRegisteredInKSA: _vatRegisteredInKSA,
-          taxRegistrationNumber: _taxRegController.text.trim().isEmpty
-              ? null
-              : _taxRegController.text.trim(),
-          city: _cityController.text.trim().isEmpty
-              ? null
-              : _cityController.text.trim(),
-          streetAddress: _streetController.text.trim().isEmpty
-              ? null
-              : _streetController.text.trim(),
-          buildingNumber: _buildingNumberController.text.trim().isEmpty
-              ? null
-              : _buildingNumberController.text.trim(),
-          district: _districtController.text.trim().isEmpty
-              ? null
-              : _districtController.text.trim(),
-          addressAdditionalNumber:
-              _addressAdditionalController.text.trim().isEmpty
-              ? null
-              : _addressAdditionalController.text.trim(),
-          postalCode: _postalCodeController.text.trim().isEmpty
-              ? null
-              : _postalCodeController.text.trim(),
+          name: _nameController.text.trim(),
+          phone: _phoneController.text.trim(),
+          companyId: _selectedCompany?.id,
+          companyName: _selectedCompany?.companyName,
+          assignedCaseCodes: _selectedCompany?.usesCaseCode == true
+              ? _assignedCaseCodes
+              : [],
+          createdAt: widget.customer?.createdAt,
         );
 
-        debugPrint('Saving customer: ${customer.companyName}');
-        debugPrint('Customer ID: ${customer.id}');
-
-        await _storageService.saveCustomer(customer);
-
-        debugPrint('Customer saved successfully!');
+        debugPrint('Saving customer: ${customer.name}');
+        await _databaseService.insertCustomer(customer);
 
         if (mounted) {
           Navigator.pop(context, customer);
         }
-      } catch (e, stackTrace) {
+      } catch (e) {
         debugPrint('Error saving customer: $e');
-        debugPrint('Stack trace: $stackTrace');
-
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error saving customer: $e'),
               backgroundColor: Colors.red,
-              duration: const Duration(seconds: 5),
             ),
           );
         }
@@ -136,72 +118,77 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
     }
   }
 
+  void _toggleCaseCode(String code, bool? selected) {
+    setState(() {
+      if (selected == true) {
+        if (!_assignedCaseCodes.contains(code)) {
+          _assignedCaseCodes.add(code);
+        }
+      } else {
+        _assignedCaseCodes.remove(code);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.customer == null ? 'Add Customer' : 'Edit Customer'),
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              ResponsiveLayout(
-                mobile: Column(
+      body: _isLoadingCompanies
+          ? const Center(child: CircularProgressIndicator())
+          : Form(
+              key: _formKey,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
                   children: [
-                    _buildBusinessDetailsSection(),
-                    const SizedBox(height: 16),
-                    _buildAddressSection(),
-                  ],
-                ),
-                desktop: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: _buildBusinessDetailsSection()),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildAddressSection()),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveCustomer,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: _isSaving
-                      ? const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
+                    ResponsiveLayout(
+                      mobile: Column(
+                        children: [
+                          _buildPersonalDetailsSection(),
+                          const SizedBox(height: 16),
+                          _buildCompanySection(),
+                        ],
+                      ),
+                      desktop: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(child: _buildPersonalDetailsSection()),
+                          const SizedBox(width: 16),
+                          Expanded(child: _buildCompanySection()),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isSaving ? null : _saveCustomer,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: _isSaving
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
                                 ),
-                              ),
-                            ),
-                            SizedBox(width: 12),
-                            Text('Saving...'),
-                          ],
-                        )
-                      : const Text('Save Customer'),
+                              )
+                            : const Text('Save Customer'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
-  Widget _buildBusinessDetailsSection() {
+  Widget _buildPersonalDetailsSection() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -209,76 +196,33 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Business and VAT Treatment',
+              'Personal Details',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             TextFormField(
-              controller: _companyNameController,
+              controller: _nameController,
               decoration: const InputDecoration(
-                labelText: 'Company Name *',
+                labelText: 'Full Name *',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.business),
+                prefixIcon: Icon(Icons.person),
               ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return 'Enter company name';
-                }
-                return null;
-              },
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Enter full name'
+                  : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
-              controller: _emailController,
+              controller: _phoneController,
               decoration: const InputDecoration(
-                labelText: 'Email',
+                labelText: 'Mobile Number *',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.email),
+                prefixIcon: Icon(Icons.phone),
               ),
-              keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _countryController,
-              decoration: const InputDecoration(
-                labelText: 'Country',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.flag),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'VAT Treatment',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            RadioListTile<bool>(
-              title: const Text('Not VAT registered in KSA'),
-              value: false,
-              groupValue: _vatRegisteredInKSA,
-              onChanged: (value) {
-                setState(() {
-                  _vatRegisteredInKSA = value ?? false;
-                });
-              },
-            ),
-            RadioListTile<bool>(
-              title: const Text('VAT registered in KSA'),
-              value: true,
-              groupValue: _vatRegisteredInKSA,
-              onChanged: (value) {
-                setState(() {
-                  _vatRegisteredInKSA = value ?? true;
-                });
-              },
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
-              controller: _taxRegController,
-              decoration: const InputDecoration(
-                labelText: 'Tax registration number',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.confirmation_number),
-              ),
+              keyboardType: TextInputType.phone,
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Enter mobile number'
+                  : null,
             ),
           ],
         ),
@@ -286,7 +230,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
     );
   }
 
-  Widget _buildAddressSection() {
+  Widget _buildCompanySection() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -294,63 +238,66 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Address',
+              'Company Association',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _cityController,
+            DropdownButtonFormField<CompanyModel>(
+              value: _selectedCompany,
               decoration: const InputDecoration(
-                labelText: 'City',
+                labelText: 'Select Company',
                 border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.location_city),
+                prefixIcon: Icon(Icons.business),
+                helperText: 'Select "None" for independent travelers',
               ),
+              items: [
+                const DropdownMenuItem<CompanyModel>(
+                  value: null,
+                  child: Text('None / Independent'),
+                ),
+                ..._availableCompanies.map((company) {
+                  return DropdownMenuItem<CompanyModel>(
+                    value: company,
+                    child: Text(company.companyName),
+                  );
+                }),
+              ],
+              onChanged: (CompanyModel? newValue) {
+                setState(() {
+                  _selectedCompany = newValue;
+                  // Clear assigned case codes if company changes or is removed
+                  if (newValue == null || !newValue.usesCaseCode) {
+                    _assignedCaseCodes.clear();
+                  }
+                });
+              },
             ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _streetController,
-              decoration: const InputDecoration(
-                labelText: 'Street address',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.streetview),
+
+            if (_selectedCompany != null && _selectedCompany!.usesCaseCode) ...[
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 8),
+              Text(
+                'Assigned Case Codes (${_selectedCompany!.caseCodeLabel ?? 'Code'})',
+                style: const TextStyle(fontWeight: FontWeight.w600),
               ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _buildingNumberController,
-              decoration: const InputDecoration(
-                labelText: 'Building number',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.home),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _districtController,
-              decoration: const InputDecoration(
-                labelText: 'District',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.map),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _addressAdditionalController,
-              decoration: const InputDecoration(
-                labelText: 'Address additional number',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.add_location_alt),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _postalCodeController,
-              decoration: const InputDecoration(
-                labelText: 'Postal code',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.local_post_office),
-              ),
-            ),
+              const SizedBox(height: 8),
+              if (_selectedCompany!.caseCodes.isEmpty)
+                const Text(
+                  'This company has no case codes defined.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+
+              ..._selectedCompany!.caseCodes.map((code) {
+                return CheckboxListTile(
+                  title: Text(code),
+                  value: _assignedCaseCodes.contains(code),
+                  onChanged: (bool? value) => _toggleCaseCode(code, value),
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                );
+              }),
+            ],
           ],
         ),
       ),
