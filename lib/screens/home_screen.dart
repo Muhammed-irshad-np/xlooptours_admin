@@ -1,11 +1,5 @@
 import 'package:flutter/material.dart';
-import 'invoice_form_screen.dart';
-import 'customer_list_screen.dart';
-import 'invoice_list_screen.dart';
-import 'analytics_screen.dart';
-import '../models/invoice_model.dart';
-import '../models/customer_model.dart';
-import '../models/line_item_model.dart';
+import 'package:go_router/go_router.dart';
 import '../widgets/responsive_layout.dart';
 
 import '../services/auth_service.dart';
@@ -78,12 +72,7 @@ class HomeScreen extends StatelessWidget {
         width: width,
         child: ElevatedButton.icon(
           onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const InvoiceFormScreen(),
-              ),
-            );
+            context.push('/invoice');
           },
           icon: const Icon(Icons.add),
           label: const Text('Create New Invoice'),
@@ -100,10 +89,7 @@ class HomeScreen extends StatelessWidget {
         width: width,
         child: OutlinedButton.icon(
           onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const AnalyticsScreen()),
-            );
+            context.push('/analytics');
           },
           icon: const Icon(Icons.analytics),
           label: const Text('Analytics'),
@@ -119,12 +105,7 @@ class HomeScreen extends StatelessWidget {
         width: width,
         child: OutlinedButton.icon(
           onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const InvoiceListScreen(),
-              ),
-            );
+            context.push('/invoices');
           },
           icon: const Icon(Icons.folder_open),
           label: const Text('Saved Invoices'),

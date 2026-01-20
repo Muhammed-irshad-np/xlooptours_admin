@@ -3,13 +3,13 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:xloop_invoice/services/database_service.dart'
     show DatabaseService;
+import 'package:go_router/go_router.dart';
 import 'package:xloop_invoice/services/storage_service.dart';
 import '../models/invoice_model.dart';
 import '../models/company_model.dart';
 import '../models/line_item_model.dart';
-import 'companies_screen.dart';
+
 import '../widgets/line_item_row_widget.dart';
-import 'pdf_preview_screen.dart';
 import '../widgets/responsive_layout.dart';
 
 class InvoiceFormScreen extends StatefulWidget {
@@ -174,11 +174,8 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   }
 
   Future<void> _selectCompany() async {
-    final company = await Navigator.push<CompanyModel>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const CompaniesScreen(isSelectionMode: true),
-      ),
+    final company = await context.push<CompanyModel>(
+      '/companies?selection=true',
     );
 
     if (company != null) {
@@ -260,13 +257,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
 
     // Navigate to PDF preview
     if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) =>
-              PDFPreviewScreen(invoice: invoice, showActionButtons: false),
-        ),
-      );
+      context.push('/preview', extra: invoice);
     }
   }
 
@@ -331,12 +322,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
 
       // Navigate to PDF preview
       if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PDFPreviewScreen(invoice: invoice),
-          ),
-        );
+        context.push('/preview', extra: invoice);
       }
     } catch (e) {
       if (mounted) {

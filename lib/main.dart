@@ -1,7 +1,8 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:go_router/go_router.dart';
+import 'package:url_strategy/url_strategy.dart'; // Import url_strategy
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'firebase_options.dart';
@@ -11,19 +12,26 @@ import 'screens/pdf_preview_screen.dart';
 import 'models/invoice_model.dart';
 import 'screens/admin_layout.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'models/company_model.dart';
+import 'screens/public/registration_screen.dart';
+import 'screens/companies_screen.dart';
+import 'screens/company_form_screen.dart';
+import 'screens/invoice_list_screen.dart';
+import 'screens/analytics_screen.dart';
+import 'models/customer_model.dart';
+import 'screens/customer_form_screen.dart';
+import 'screens/customer_list_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  setPathUrlStrategy(); // Remove hash (#) from URL
 
   try {
-    // Initialize Firebase - this is safe to call multiple times
-    // If already initialized, it will just return the existing app
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('Firebase initialized successfully');
   } catch (e, stackTrace) {
-    // Check if it's an "already initialized" error
     final errorMessage = e.toString().toLowerCase();
     if (errorMessage.contains('already initialized') ||
         errorMessage.contains('duplicate app')) {
@@ -31,15 +39,117 @@ void main() async {
     } else {
       debugPrint('Firebase initialization error: $e');
       debugPrint('Stack trace: $stackTrace');
-      // Continue anyway - DatabaseService will handle the error
     }
   }
 
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  late final GoRouter _router;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _router = GoRouter(
+      initialLocation: '/',
+      redirect: (context, state) {
+        final isLoggedIn = AuthService.instance.currentUser != null;
+        final isLoggingIn = state.uri.path == '/login';
+        final isRegistering = state.uri.path == '/register';
+
+        // Allow public access to registration
+        if (isRegistering) {
+          return null;
+        }
+
+        if (!isLoggedIn && !isLoggingIn) {
+          return '/login';
+        }
+
+        if (isLoggedIn && isLoggingIn) {
+          return '/home';
+        }
+
+        return null;
+      },
+      refreshListenable: Listenable.merge([AuthService.instance]),
+      routes: [
+        GoRoute(path: '/', redirect: (_, __) => '/home'),
+        GoRoute(
+          path: '/login',
+          builder: (context, state) => const LoginScreen(),
+        ),
+        GoRoute(
+          path: '/home',
+          builder: (context, state) => const AdminLayout(),
+        ),
+        GoRoute(
+          path: '/invoice',
+          builder: (context, state) {
+            final invoice = state.extra as InvoiceModel?;
+            return InvoiceFormScreen(invoiceToEdit: invoice);
+          },
+        ),
+        GoRoute(
+          path: '/preview',
+          builder: (context, state) {
+            final invoice = state.extra as InvoiceModel;
+            return PDFPreviewScreen(invoice: invoice);
+          },
+        ),
+        GoRoute(
+          path: '/register',
+          builder: (context, state) {
+            final companyId = state.uri.queryParameters['companyId'];
+            return RegistrationScreen(companyId: companyId);
+          },
+        ),
+        GoRoute(
+          path: '/companies',
+          builder: (context, state) {
+            final isSelectionMode =
+                state.uri.queryParameters['selection'] == 'true';
+            return CompaniesScreen(isSelectionMode: isSelectionMode);
+          },
+        ),
+        GoRoute(
+          path: '/companies/form',
+          builder: (context, state) {
+            final company = state.extra as CompanyModel?;
+            return CompanyFormScreen(company: company);
+          },
+        ),
+        GoRoute(
+          path: '/customers',
+          builder: (context, state) => const CustomerListScreen(),
+        ),
+        GoRoute(
+          path: '/customers/form',
+          builder: (context, state) {
+            final customer = state.extra as CustomerModel?;
+            return CustomerFormScreen(customer: customer);
+          },
+        ),
+        GoRoute(
+          path: '/analytics',
+          builder: (context, state) => const AnalyticsScreen(),
+        ),
+        GoRoute(
+          path: '/invoices',
+          builder: (context, state) => const InvoiceListScreen(),
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,45 +158,19 @@ class MyApp extends StatelessWidget {
       minTextAdapt: true,
       splitScreenMode: true,
       builder: (_, child) {
-        return MaterialApp(
+        return MaterialApp.router(
+          routerConfig: _router,
           debugShowCheckedModeBanner: false,
           title: 'XLoop Tours Admin',
           theme: ThemeData(
-            // Cyan/Teal based on the logo description (Blue/Cyan mix)
             colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF00BCD4),
+              seedColor: const Color(0xFF13b1f2),
             ),
             useMaterial3: true,
             textTheme: GoogleFonts.merriweatherTextTheme(),
           ),
-          home: child,
-          routes: {
-            '/home': (context) => const HomeScreen(),
-            '/invoice': (context) => const InvoiceFormScreen(),
-            '/preview': (context) {
-              final invoice =
-                  ModalRoute.of(context)!.settings.arguments as InvoiceModel;
-              return PDFPreviewScreen(invoice: invoice);
-            },
-          },
         );
       },
-      child: StreamBuilder<User?>(
-        stream: AuthService.instance.authStateChanges,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-
-          if (snapshot.hasData) {
-            return const AdminLayout();
-          }
-
-          return const LoginScreen();
-        },
-      ),
     );
   }
 }

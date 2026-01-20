@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
+
 import '../models/company_model.dart';
 import '../services/database_service.dart';
-import 'company_form_screen.dart';
 import '../widgets/responsive_layout.dart';
 
 class CompaniesScreen extends StatefulWidget {
@@ -87,11 +89,9 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
   }
 
   Future<void> _navigateToForm(CompanyModel? company) async {
-    final result = await Navigator.push<CompanyModel>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CompanyFormScreen(company: company),
-      ),
+    final result = await context.push<CompanyModel>(
+      '/companies/form',
+      extra: company,
     );
 
     if (result != null) {
@@ -249,14 +249,52 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
                   // Top Right: Menu
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert),
-                    onSelected: (value) {
+                    onSelected: (value) async {
                       if (value == 'edit') {
                         _navigateToForm(company);
                       } else if (value == 'delete') {
                         _deleteCompany(company);
+                      } else if (value == 'copy_link') {
+                        // Construct the link
+                        // Assuming the app is hosted at the root.
+                        // Ideally we get the base URL from config.
+                        // For now, we'll use a placeholder or relative path if possible,
+                        // but clipboard needs full URL usually.
+                        // Let's assume standard domain or let user know.
+
+                        // We will copy just the path if we can't determine domain,
+                        // or better, standard app link.
+                        // Since we don't know the domain, let's use a standard format
+                        // that the user can replace 'domain.com' if needed, or
+                        // if running on web, we could get current origin.
+                        // But since this is specific code, I'll just use the path format.
+
+                        final String link =
+                            '${Uri.base.origin}/register?companyId=${company.id}';
+
+                        await Clipboard.setData(ClipboardData(text: link));
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Registration link copied to clipboard!',
+                              ),
+                            ),
+                          );
+                        }
                       }
                     },
                     itemBuilder: (context) => [
+                      const PopupMenuItem(
+                        value: 'copy_link',
+                        child: Row(
+                          children: [
+                            Icon(Icons.link, size: 20),
+                            SizedBox(width: 8),
+                            Text('Copy Link'),
+                          ],
+                        ),
+                      ),
                       const PopupMenuItem(
                         value: 'edit',
                         child: Row(

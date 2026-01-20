@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../models/customer_model.dart';
 import '../services/database_service.dart';
-import 'customer_form_screen.dart';
 import '../widgets/responsive_layout.dart';
 
 class CustomerListScreen extends StatefulWidget {
@@ -76,11 +76,9 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   }
 
   Future<void> _navigateToForm(CustomerModel? customer) async {
-    final result = await Navigator.push<CustomerModel>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CustomerFormScreen(customer: customer),
-      ),
+    final result = await context.push<CustomerModel?>(
+      '/customers/form',
+      extra: customer,
     );
 
     if (result != null) {

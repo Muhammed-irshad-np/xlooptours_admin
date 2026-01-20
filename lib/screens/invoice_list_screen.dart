@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../models/invoice_model.dart';
 import '../services/database_service.dart';
-import 'pdf_preview_screen.dart';
 import '../widgets/responsive_layout.dart';
-import 'invoice_form_screen.dart';
 
 class InvoiceListScreen extends StatefulWidget {
   const InvoiceListScreen({super.key});
@@ -48,22 +47,11 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   Future<void> _openInvoice(InvoiceModel invoice) async {
     // Navigate to PDF preview
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PDFPreviewScreen(invoice: invoice),
-      ),
-    );
+    context.push('/preview', extra: invoice);
   }
 
   Future<void> _editInvoice(InvoiceModel invoice) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            InvoiceFormScreen(invoiceToEdit: invoice), // Pass invoice to edit
-      ),
-    );
+    await context.push('/invoice', extra: invoice);
     _loadInvoices(); // Reload list after edit
   }
 
