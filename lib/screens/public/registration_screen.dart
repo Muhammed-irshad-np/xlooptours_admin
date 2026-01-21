@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+
 import 'dart:math' as math;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -23,6 +24,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _caseCodeController = TextEditingController();
   final _companyNameController = TextEditingController();
 
@@ -33,6 +35,100 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   bool _registrationSuccess = false;
   String _countryCode = '+966'; // Default to KSA
   List<String> _previewCaseCodes = [];
+  bool _isArabic = false;
+
+  final Map<String, Map<String, String>> _translations = {
+    'company_not_found': {
+      'en': 'Company not found. Please check the link.',
+      'ar': 'الشركة غير موجودة. يرجى التحقق من الرابط.',
+    },
+    'invalid_link': {
+      'en': 'Invalid Link: No Company ID provided.',
+      'ar': 'رابط غير صالح: لم يتم توفير معرف الشركة.',
+    },
+    'error_loading': {
+      'en': 'Error loading company details: ',
+      'ar': 'خطأ في تحميل تفاصيل الشركة: ',
+    },
+    'success_title': {'en': 'Success!', 'ar': 'تم بنجاح!'},
+    'success_message': {
+      'en': 'You have successfully joined',
+      'ar': 'لقد انضممت بنجاح إلى',
+    },
+    'motto': {'en': '"Excellence in every mile."', 'ar': '"التميز في كل ميل."'},
+    'tagline': {
+      'en': 'Executive Mobility for\nIndustry Leaders',
+      'ar': 'تنقل تنفيذي\nلقادة الصناعة',
+    },
+    'company_name': {'en': 'Company Name', 'ar': 'اسم الشركة'},
+    'applicant_name': {'en': 'Applicant Name', 'ar': 'اسم مقدم الطلب'},
+    'full_name': {'en': 'Full Name', 'ar': 'الاسم الكامل'},
+    'whatsapp_number': {'en': 'WhatsApp Number', 'ar': 'رقم الواتساب'},
+    'search': {'en': 'Search', 'ar': 'بحث'},
+    'start_typing': {
+      'en': 'Start typing to search',
+      'ar': 'ابدأ الكتابة للبحث',
+    },
+    'case_codes': {'en': 'Case Codes', 'ar': 'رموز الحالة'},
+    'case_code_helper': {
+      'en': 'Separate multiple codes with commas',
+      'ar': 'افصل الرموز المتعددة بفواصل',
+    },
+    'register_now': {'en': 'REGISTER NOW', 'ar': 'سجل الآن'},
+    'send_email': {'en': 'SEND EMAIL', 'ar': 'ارسل بريد الكتروني'},
+    'book_ride': {'en': 'BOOK A RIDE', 'ar': 'احجز رحلة'},
+    'support_247': {'en': 'SUPPORT 24x7', 'ar': 'الدعم 24x7'},
+    'efficient_safe': {
+      'en': 'EFFICIENT | SAFE | RELIABLE',
+      'ar': 'فعال | آمن | موثوق',
+    },
+    'mobile_desc': {
+      'en':
+          '"We offer our clients one of the most extensive fleets of luxury and regular vehicles in Saudi Arabia. At Xloop Tours W.L.L, we are committed to customer satisfaction and are dedicated to providing top quality, hassle-free mobility solutions."',
+      'ar':
+          '"نقدم لعملائنا واحدًا من أكثر أساطيل السيارات الفاخرة والعادية شمولاً في المملكة العربية السعودية. في إكس لوب تورز ذ.م.م، نحن ملتزمون برضا العملاء ومكرسون لتقديم حلول تنقل عالية الجودة وخالية من المتاعب."',
+    },
+    'submit_application': {'en': 'SUBMIT APPLICATION', 'ar': 'تقديم الطلب'},
+    'required': {'en': 'Required', 'ar': 'مطلوب'},
+    'email': {'en': 'Email', 'ar': 'البريد الإلكتروني'},
+    'error_registering': {
+      'en': 'Error registering: ',
+      'ar': 'خطأ في التسجيل: ',
+    },
+    'executive_mobility': {
+      'en': 'Executive Mobility for\nIndustry Leaders',
+      'ar': 'تنقل تنفيذي\nلقادة الصناعة',
+    },
+    'join_us': {
+      'en': 'Join Us for premium fleet services and\nprofessional chauffeurs.',
+      'ar': 'انضم إلينا للحصول على خدمات أسطول متميزة\nوسائقين محترفين.',
+    },
+    'powered_by': {
+      'en': 'Powered by XLOOP TOURS W.L.L',
+      'ar': 'مشغل بواسطة اكس لوب ت ورس ذ.ل.ل',
+    },
+    'call_any_time': {'en': 'CALL ANY TIME', 'ar': 'اتصل في أي وقت'},
+    'customer_support': {
+      'en': 'CUSTOMER SUPPORT 24x7',
+      'ar': 'دعم العملاء 24/7',
+    },
+    'for_enquiries': {'en': 'FOR ANY ENQUIRIES', 'ar': 'لأي استفسارات'},
+    'member_of': {
+      'en': 'MEMBER OF THE ELITE TRAVEL NETWORK',
+      'ar': 'عضو في شبكة السفر النخبة',
+    },
+    'header_company_name': {
+      'en': 'XLOOP TOURS W.L.L',
+      'ar': 'اكس لوب ت ورس ذ.ل.ل',
+    },
+  };
+
+  String _tr(String key) {
+    if (_isArabic) {
+      return _translations[key]?['ar'] ?? key;
+    }
+    return _translations[key]?['en'] ?? key;
+  }
 
   late AnimationController _mobileFormController;
   late Animation<double> _mobileFormAnimation;
@@ -124,6 +220,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: _nameController.text.trim(),
         phone: '', // Placeholder, updated below
+        email: _emailController.text.trim().isEmpty
+            ? null
+            : _emailController.text.trim(),
         companyId: _company!.id,
         companyName: _company!.companyName,
         assignedCaseCodes: [], // Will populate below
@@ -353,14 +452,20 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '"Excellence in every mile."',
-                      style: GoogleFonts.playfairDisplay(
-                        // Or Merriweather italic
-                        fontSize: 32.sp,
-                        color: Colors.white,
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.w500,
-                      ),
+                      _tr('excellence'),
+                      style: _isArabic
+                          ? GoogleFonts.notoSansArabic(
+                              fontSize: 32.sp,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            )
+                          : GoogleFonts.playfairDisplay(
+                              // Or Merriweather italic
+                              fontSize: 32.sp,
+                              color: Colors.white,
+                              fontStyle: FontStyle.italic,
+                              fontWeight: FontWeight.w500,
+                            ),
                     ),
                   ],
                 ),
@@ -372,228 +477,353 @@ class _RegistrationScreenState extends State<RegistrationScreen>
         // RIGHT SIDE: White Form
         Expanded(
           flex: 6, // Slightly wider for form
-          child: Container(
-            color: Colors.white,
-            alignment: Alignment.center,
-            child: SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: 80.w, vertical: 40.h),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 550.w),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      // Logo (Asset Image)
-                      Center(
-                        child: Image.asset(
-                          'assets/logo/xloop_logo.png',
-                          height: 80.h,
-                          errorBuilder: (c, o, s) => Column(
-                            children: [
-                              Icon(
-                                Icons.directions_car,
-                                size: 50.sp,
-                                color: _brandColor,
-                              ),
-                              Text(
-                                'XLOOP',
-                                style: GoogleFonts.merriweather(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 40.h),
-
-                      // Headers
-                      Text(
-                        'XLOOP TOURS W.L.L',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.merriweather(
-                          fontSize: 28.sp,
-                          fontWeight: FontWeight.bold,
-                          color: _darkNavy,
-                          height: 1.2,
-                        ),
-                      ),
-                      SizedBox(height: 8.h),
-                      Text(
-                        'Executive Mobility for\nIndustry Leaders',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.merriweather(
-                          fontSize: 18.sp,
-                          color: Colors.grey[600],
-                          height: 1.2,
-                        ),
-                      ),
-                      SizedBox(height: 24.h),
-                      Text(
-                        'Join Us for premium fleet services and\nprofessional chauffeurs.',
-                        textAlign: TextAlign.center,
-                        style: GoogleFonts.notoSans(
-                          fontSize: 14.sp,
-                          color: Colors.grey[500],
-                          height: 1.5,
-                        ),
-                      ),
-                      SizedBox(height: 50.h),
-
-                      // Company Name Field (Read-only)
-                      _buildDesktopInput(
-                        controller: _companyNameController,
-                        label: 'Company Name',
-                        icon: Icons.business,
-                        enabled: false,
-                      ),
-                      SizedBox(height: 20.h),
-
-                      // Inputs (Outlined Style)
-                      _buildDesktopInput(
-                        controller: _nameController,
-                        label: 'Applicant Name',
-                        icon: Icons.person_outline_rounded,
-                      ),
-                      SizedBox(height: 20.h),
-                      _buildDesktopInput(
-                        controller: _phoneController,
-                        label: 'WhatsApp Number',
-                        icon: FontAwesomeIcons.whatsapp,
-                        keyboardType: TextInputType.phone,
-                        prefixWidget: InkWell(
-                          onTap: () {
-                            showCountryPicker(
-                              context: context,
-                              showPhoneCode: true,
-                              onSelect: (Country country) {
-                                setState(() {
-                                  _countryCode = '+${country.phoneCode}';
-                                });
-                              },
-                              countryListTheme: CountryListThemeData(
-                                borderRadius: BorderRadius.circular(20),
-                                inputDecoration: InputDecoration(
-                                  labelText: 'Search',
-                                  hintText: 'Start typing to search',
-                                  prefixIcon: const Icon(Icons.search),
-                                  border: OutlineInputBorder(
-                                    borderSide: BorderSide(
-                                      color: const Color(
-                                        0xFF8C98A8,
-                                      ).withOpacity(0.2),
+          child: Stack(
+            children: [
+              Container(
+                color: Colors.white,
+                alignment: Alignment.center,
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 80.w,
+                    vertical: 40.h,
+                  ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: 550.w),
+                    child: Form(
+                      key: _formKey,
+                      child: Directionality(
+                        textDirection: _isArabic
+                            ? TextDirection.rtl
+                            : TextDirection.ltr,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            // Logo (Asset Image)
+                            Center(
+                              child: Image.asset(
+                                'assets/logo/xloop_logo.png',
+                                height: 80.h,
+                                errorBuilder: (c, o, s) => Column(
+                                  children: [
+                                    Icon(
+                                      Icons.directions_car,
+                                      size: 50.sp,
+                                      color: _brandColor,
                                     ),
+                                    Text(
+                                      'XLOOP',
+                                      style: GoogleFonts.merriweather(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            SizedBox(height: 40.h),
+
+                            // Headers
+                            Text(
+                              _tr('header_company_name'),
+                              textAlign: TextAlign.center,
+                              style: _isArabic
+                                  ? GoogleFonts.notoSansArabic(
+                                      fontSize: 28.sp,
+                                      fontWeight: FontWeight.bold,
+                                      color: _darkNavy,
+                                      height: 1.2,
+                                    )
+                                  : GoogleFonts.merriweather(
+                                      fontSize: 28.sp,
+                                      fontWeight: FontWeight.bold,
+                                      color: _darkNavy,
+                                      height: 1.2,
+                                    ),
+                            ),
+                            SizedBox(height: 8.h),
+                            Text(
+                              _tr('executive_mobility'),
+                              textAlign: TextAlign.center,
+                              style: _isArabic
+                                  ? GoogleFonts.notoSansArabic(
+                                      fontSize: 18.sp,
+                                      color: Colors.grey[600],
+                                      height: 1.2,
+                                    )
+                                  : GoogleFonts.merriweather(
+                                      fontSize: 18.sp,
+                                      color: Colors.grey[600],
+                                      height: 1.2,
+                                    ),
+                            ),
+                            SizedBox(height: 24.h),
+                            Text(
+                              _tr('join_us'),
+                              textAlign: TextAlign.center,
+                              style: _isArabic
+                                  ? GoogleFonts.notoSansArabic(
+                                      fontSize: 14.sp,
+                                      color: Colors.grey[500],
+                                      height: 1.5,
+                                    )
+                                  : GoogleFonts.notoSans(
+                                      fontSize: 14.sp,
+                                      color: Colors.grey[500],
+                                      height: 1.5,
+                                    ),
+                            ),
+                            SizedBox(height: 50.h),
+
+                            // Company Name Field (Read-only)
+                            _buildDesktopInput(
+                              controller: _companyNameController,
+                              label: _tr('company_name'),
+                              icon: Icons.business,
+                              enabled: false,
+                            ),
+                            SizedBox(height: 20.h),
+
+                            // Inputs (Outlined Style)
+                            _buildDesktopInput(
+                              controller: _nameController,
+                              label: _tr('applicant_name'),
+                              icon: Icons.person_outline_rounded,
+                            ),
+                            SizedBox(height: 20.h),
+                            _buildDesktopInput(
+                              controller: _phoneController,
+                              label: _tr('whatsapp_number'),
+                              icon: FontAwesomeIcons.whatsapp,
+                              keyboardType: TextInputType.phone,
+                              prefixWidget: InkWell(
+                                onTap: () {
+                                  showCountryPicker(
+                                    context: context,
+                                    showPhoneCode: true,
+                                    onSelect: (Country country) {
+                                      setState(() {
+                                        _countryCode = '+${country.phoneCode}';
+                                      });
+                                    },
+                                    countryListTheme: CountryListThemeData(
+                                      borderRadius: BorderRadius.circular(20),
+                                      inputDecoration: InputDecoration(
+                                        labelText: _tr('search'),
+                                        labelStyle: GoogleFonts.notoSans(
+                                          color: Colors.grey,
+                                        ),
+                                        hintText: _tr('start_typing'),
+                                        hintStyle: GoogleFonts.notoSans(
+                                          color: Colors.grey,
+                                        ),
+                                        prefixIcon: const Icon(Icons.search),
+                                        border: OutlineInputBorder(
+                                          borderSide: BorderSide(
+                                            color: const Color(
+                                              0xFF8C98A8,
+                                            ).withOpacity(0.2),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 12.w,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        _countryCode,
+                                        style: TextStyle(
+                                          fontSize: 15.sp,
+                                          color: const Color(0xFF334155),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      SizedBox(width: 4.w),
+                                      Icon(
+                                        Icons.arrow_drop_down,
+                                        color: Colors.grey[600],
+                                        size: 18.sp,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
-                            );
-                          },
-                          child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 12.w),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                            ),
+                            if (_company != null && _company!.usesCaseCode)
+                              Padding(
+                                padding: EdgeInsets.only(top: 20.h),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    _buildDesktopInput(
+                                      controller: _caseCodeController,
+                                      label:
+                                          _company!.caseCodeLabel ??
+                                          _tr('case_codes'),
+                                      icon: Icons.confirmation_number_outlined,
+                                      helperText: _tr('case_code_helper'),
+                                    ),
+                                    if (_previewCaseCodes.isNotEmpty) ...[
+                                      SizedBox(height: 8.h),
+                                      _buildCaseCodeChips(),
+                                    ],
+                                  ],
+                                ),
+                              ),
+
+                            SizedBox(height: 20.h),
+                            _buildDesktopInput(
+                              controller: _emailController,
+                              label: _tr('email'),
+                              icon: Icons.email_outlined,
+                              isRequired: false,
+                              keyboardType: TextInputType.emailAddress,
+                            ),
+
+                            SizedBox(height: 40.h),
+
+                            // Button (Cyan Background)
+                            SizedBox(
+                              height: 56.h,
+                              child: ElevatedButton(
+                                onPressed: _isSubmitting ? null : _submitForm,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor:
+                                      _brandColor, // Cyan Brand Color
+                                  foregroundColor: Colors.white,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8.r),
+                                  ),
+                                  elevation: 0,
+                                ),
+                                child: _isSubmitting
+                                    ? const CircularProgressIndicator(
+                                        color: Colors.white,
+                                      )
+                                    : Text(
+                                        _tr('register_now'),
+                                        style: _isArabic
+                                            ? GoogleFonts.notoSansArabic(
+                                                fontSize: 14.sp,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 1.5,
+                                              )
+                                            : GoogleFonts.notoSans(
+                                                fontSize: 14.sp,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 1.5,
+                                              ),
+                                      ),
+                              ),
+                            ),
+
+                            SizedBox(height: 60.h),
+
+                            // Footer
+                            Column(
                               children: [
-                                Text(
-                                  _countryCode,
-                                  style: TextStyle(
-                                    fontSize: 15.sp,
-                                    color: const Color(0xFF334155),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                SizedBox(width: 4.w),
                                 Icon(
-                                  Icons.arrow_drop_down,
-                                  color: Colors.grey[600],
-                                  size: 18.sp,
+                                  Icons.shield_outlined,
+                                  color: Colors.grey[300],
+                                  size: 30.sp,
                                 ),
+                                SizedBox(height: 12.h),
+                                Text(
+                                  _tr('member_of'),
+                                  style: _isArabic
+                                      ? GoogleFonts.notoSansArabic(
+                                          fontSize: 12.sp,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.grey[400],
+                                        )
+                                      : GoogleFonts.merriweather(
+                                          fontSize: 10.sp,
+                                          letterSpacing: 1.5,
+                                          color: Colors.grey[400],
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                ),
+                                SizedBox(height: 40.h),
+                                _buildContactFooter(isDark: false),
                               ],
                             ),
-                          ),
+                          ],
                         ),
                       ),
-                      if (_company!.usesCaseCode)
-                        Padding(
-                          padding: EdgeInsets.only(top: 20.h),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildDesktopInput(
-                                controller: _caseCodeController,
-                                label: _company!.caseCodeLabel ?? 'Case Codes',
-                                icon: Icons.confirmation_number_outlined,
-                                helperText:
-                                    'Separate multiple codes with commas',
-                              ),
-                              if (_previewCaseCodes.isNotEmpty) ...[
-                                SizedBox(height: 8.h),
-                                _buildCaseCodeChips(),
-                              ],
-                            ],
-                          ),
-                        ),
-
-                      SizedBox(height: 40.h),
-
-                      // Button (Cyan Background)
-                      SizedBox(
-                        height: 56.h,
-                        child: ElevatedButton(
-                          onPressed: _isSubmitting ? null : _submitForm,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _brandColor, // Cyan Brand Color
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: _isSubmitting
-                              ? const CircularProgressIndicator(
-                                  color: Colors.white,
-                                )
-                              : Text(
-                                  'REGISTER NOW',
-                                  style: GoogleFonts.notoSans(
-                                    fontSize: 14.sp,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.5,
-                                  ),
-                                ),
-                        ),
-                      ),
-
-                      SizedBox(height: 60.h),
-
-                      // Footer
-                      Column(
-                        children: [
-                          Icon(
-                            Icons.shield_outlined,
-                            color: Colors.grey[300],
-                            size: 30.sp,
-                          ),
-                          SizedBox(height: 12.h),
-                          Text(
-                            'MEMBER OF THE ELITE TRAVEL NETWORK',
-                            style: GoogleFonts.merriweather(
-                              fontSize: 10.sp,
-                              letterSpacing: 1.5,
-                              color: Colors.grey[400],
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          SizedBox(height: 40.h),
-                          _buildContactFooter(isDark: false),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
+              // Language Switcher (Dropdown)
+              Positioned(
+                top: 20,
+                right: 20,
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20.r),
+                    border: Border.all(color: Colors.grey[300]!),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _isArabic ? 'ar' : 'en',
+                      dropdownColor: Colors.white,
+                      icon: Icon(
+                        Icons.keyboard_arrow_down,
+                        color: _darkNavy,
+                        size: 20.sp,
+                      ),
+                      style: GoogleFonts.notoSans(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.bold,
+                        color: _darkNavy,
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'en',
+                          child: Row(
+                            children: [
+                              Text('En '),
+                              Text('🇺🇸', style: TextStyle(fontSize: 16.sp)),
+                            ],
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ar',
+                          child: Row(
+                            children: [
+                              Text('Ar '),
+                              Text('🇸🇦', style: TextStyle(fontSize: 16.sp)),
+                            ],
+                          ),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _isArabic = val == 'ar';
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -608,24 +838,42 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     Widget? prefixWidget,
     String? helperText,
     bool enabled = true,
+    bool isRequired = true,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       enabled: enabled,
-      style: TextStyle(
-        fontSize: 15.sp,
-        color: enabled ? const Color(0xFF334155) : Colors.grey[600],
-        fontWeight: FontWeight.w500,
-      ),
+      style: _isArabic
+          ? GoogleFonts.notoSansArabic(
+              fontSize: 15.sp,
+              color: enabled ? const Color(0xFF334155) : Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            )
+          : TextStyle(
+              fontSize: 15.sp,
+              color: enabled ? const Color(0xFF334155) : Colors.grey[600],
+              fontWeight: FontWeight.w500,
+            ),
+      textAlign: _isArabic ? TextAlign.right : TextAlign.left,
+      textDirection: _isArabic ? TextDirection.rtl : TextDirection.ltr,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: TextStyle(color: Colors.grey[400], fontSize: 14.sp),
+        labelStyle: _isArabic
+            ? GoogleFonts.notoSansArabic(
+                color: Colors.grey[400],
+                fontSize: 14.sp,
+              )
+            : TextStyle(color: Colors.grey[400], fontSize: 14.sp),
         prefixIcon:
             prefixWidget ?? Icon(icon, color: Colors.grey[400], size: 20.sp),
         helperText: helperText,
+        helperStyle: _isArabic
+            ? GoogleFonts.notoSansArabic(fontSize: 12.sp)
+            : TextStyle(fontSize: 12.sp),
         filled: true,
         fillColor: Colors.white,
+        alignLabelWithHint: true,
 
         // Outline Border Style for Desktop
         border: OutlineInputBorder(
@@ -647,7 +895,10 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       ),
       validator: (v) {
         if (!enabled) return null;
-        return v!.isEmpty ? 'Required' : null;
+        if (isRequired && (v == null || v.isEmpty)) {
+          return _tr('required');
+        }
+        return null;
       },
     );
   }
@@ -680,143 +931,242 @@ class _RegistrationScreenState extends State<RegistrationScreen>
             ),
           ),
 
-          // 2. Static Content (Logo, Name, Motto) - Pushed up when form opens
+          // 2. Language Switcher (Looking like a glass button)
+          SafeArea(
+            child: Align(
+              alignment: _isArabic ? Alignment.topLeft : Alignment.topRight,
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20.r),
+                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  padding: EdgeInsets.symmetric(horizontal: 12.w),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      value: _isArabic ? 'ar' : 'en',
+                      dropdownColor:
+                          Colors.grey[900], // Dark background for dropdown
+                      icon: Icon(
+                        Icons.keyboard_arrow_down,
+                        color: Colors.white,
+                        size: 50.sp,
+                      ),
+                      style: GoogleFonts.notoSans(
+                        fontSize: 50.sp,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'en',
+                          child: Row(children: [Text('🇺🇸 '), Text('En')]),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ar',
+                          child: Row(children: [Text('🇸🇦 '), Text('Ar')]),
+                        ),
+                      ],
+                      onChanged: (val) {
+                        if (val != null) {
+                          setState(() {
+                            _isArabic = val == 'ar';
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // 3. Static Content (Logo, Name, Motto) - Pushed up when form opens
           // We use an AnimatedBuilder to slide this content up slightly or fade it if needed
           // But user said "at that time the we offer our client that ddiscrpion will go and the form will open up till the efifcien tsafe relaivel."
           // So the Tagline "EFFICIENT..." stays visible.
           SafeArea(
             child: Padding(
               padding: EdgeInsets.symmetric(horizontal: 60.w, vertical: 20.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  SizedBox(height: 10.h),
-                  // --- LOGO ---
-                  Center(
-                    child: Image.asset(
-                      'assets/logo/xloop_logo.png',
-                      height: 70.h,
-                      errorBuilder: (c, o, s) => Icon(
-                        Icons.directions_car,
-                        size: 60.sp,
-                        color: _brandColor,
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 16.h),
+              child: AnimatedBuilder(
+                animation: _mobileFormAnimation,
+                builder: (context, child) {
+                  // 1. Slide Up Logic
+                  // Move up by 70.h (was 120, adjusted for new TOP spacing of 100)
+                  final double slideOffset = -70.h * _mobileFormAnimation.value;
 
-                  // --- COMPANY NAME ---
-                  Text(
-                    'XLOOP TOURS W.L.L',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.merriweather(
-                      fontSize: 100.sp, // Updated to 100.sp as requested
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                      letterSpacing: 1.2,
-                      height: 1.0, // Reduced line height to keep it tighter
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-
-                  // --- TAGLINE ---
-                  Text(
-                    'EFFICIENT | SAFE | RELIABLE',
-                    textAlign: TextAlign.center,
-                    style: GoogleFonts.notoSans(
-                      fontSize: 60.sp, // Updated to 30.sp
-                      fontWeight: FontWeight.w600,
-                      color: _brandColor,
-                      letterSpacing: 2.0,
-                    ),
-                  ),
-                  SizedBox(height: 24.h),
-
-                  // --- DESCRIPTION (Fades out) ---
-                  AnimatedBuilder(
-                    animation: _mobileFormAnimation,
-                    builder: (context, child) {
-                      return Opacity(
-                        opacity: (1.0 - _mobileFormAnimation.value).clamp(
-                          0.0,
-                          1.0,
-                        ),
-                        child: child,
+                  // 2. Fade Out Logic (for Description & Footer)
+                  // Fade out quickly (first 50% of animation)
+                  final double opacity =
+                      (1.0 - (_mobileFormAnimation.value * 3.0)).clamp(
+                        0.0,
+                        1.0,
                       );
-                    },
-                    child: Text(
-                      'We offer our clients one of the most extensive fleets of luxury and regular vehicles in Saudi Arabia. At Xloop Tours W.L.L, we are committed to customer satisfaction and are dedicated to providing top quality, hassle-free mobility solutions.',
-                      textAlign: TextAlign.left,
-                      style: GoogleFonts.merriweather(
-                        fontSize: 60.sp, //  Updated to 24.sp
-                        color: Colors.white.withOpacity(0.95),
-                        height: 1.4,
 
-                        shadows: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.6),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+                  return Transform.translate(
+                    offset: Offset(0, slideOffset),
+                    child: Directionality(
+                      textDirection: _isArabic
+                          ? TextDirection.rtl
+                          : TextDirection.ltr,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (_isMobileFormOpen)
+                            SizedBox(height: 100.h)
+                          else
+                            SizedBox(height: 140.h),
+                          // --- LOGO ---
+                          Center(
+                            child: Image.asset(
+                              'assets/logo/xloop_logo.png',
+                              height: 70.h,
+                              errorBuilder: (c, o, s) => Icon(
+                                Icons.directions_car,
+                                size: 60.sp,
+                                color: _brandColor,
+                              ),
+                            ),
                           ),
+                          SizedBox(height: 25.h),
+
+                          // --- COMPANY NAME ---
+                          Text(
+                            _tr('header_company_name'),
+                            textAlign: TextAlign.center,
+                            style: _isArabic
+                                ? GoogleFonts.notoSansArabic(
+                                    fontSize: 100.sp,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: 1.2,
+                                    height: 1.0,
+                                  )
+                                : GoogleFonts.merriweather(
+                                    fontSize: 100.sp,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    letterSpacing: 1.2,
+                                    height: 1.0,
+                                  ),
+                          ),
+                          SizedBox(height: 4.h),
+
+                          // --- TAGLINE ---
+                          Text(
+                            _tr('efficient_safe'),
+                            textAlign: TextAlign.center,
+                            style: GoogleFonts.notoSans(
+                              fontSize: 60.sp, // Updated to 30.sp
+                              fontWeight: FontWeight.w600,
+                              color: _brandColor,
+                              letterSpacing: 2.0,
+                            ),
+                          ),
+                          SizedBox(height: 30.h),
+
+                          // --- DESCRIPTION (Fades out) ---
+                          Opacity(
+                            opacity: opacity,
+                            child: Text(
+                              _tr('mobile_desc'),
+                              textAlign: TextAlign.center,
+                              style: _isArabic
+                                  ? GoogleFonts.notoSansArabic(
+                                      fontSize: 45.sp, // Smaller for Arabic
+                                      color: Colors.white.withOpacity(0.95),
+                                      height: 1.5,
+                                      shadows: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.6),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    )
+                                  : GoogleFonts.merriweather(
+                                      fontSize: 55.sp,
+                                      color: Colors.white.withOpacity(0.95),
+                                      height: 1.5,
+                                      fontStyle: FontStyle.italic,
+                                      shadows: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.6),
+                                          blurRadius: 4,
+                                          offset: const Offset(0, 2),
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                          ),
+                          SizedBox(height: 40.h),
+
+                          // --- FOOTER (Fades out) ---
+                          Opacity(
+                            opacity: opacity,
+                            child: Directionality(
+                              textDirection: TextDirection.ltr,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  _buildFooterInfoItem(
+                                    icon: FontAwesomeIcons.whatsapp,
+                                    label: _tr('book_ride'),
+                                    value: '+966 50 483 6105',
+                                    onTap: _launchWhatsApp,
+                                    color: const Color(0xFF25D366),
+                                    isLarge: true,
+                                  ),
+                                  SizedBox(width: 25.w),
+                                  _buildFooterInfoItem(
+                                    icon: Icons.phone_in_talk,
+                                    label: _tr('support_247'),
+                                    value: '+966 50 269 1607',
+                                    onTap: () => _launchPhone('+966502691607'),
+                                    color: Colors.orange,
+                                  ),
+                                  SizedBox(width: 25.w),
+                                  _buildFooterInfoItem(
+                                    icon: Icons.email_outlined,
+                                    label: _tr('send_email'),
+                                    value: 'enquiries@xlooptours.com',
+                                    onTap: () => _launchEmail(
+                                      'enquiries@xlooptours.com',
+                                    ),
+                                    color: Colors.redAccent,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 140.h), // Space for wave sheet
                         ],
                       ),
                     ),
-                  ),
-                  const Spacer(),
-                  const Spacer(),
-                  Text(
-                    'Powered by XLOOP TOURS W.L.L',
-                    style: GoogleFonts.merriweather(
-                      fontSize: 30.sp,
-                      color: Colors.white70,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 10.h),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildFooterInfoItem(
-                          icon: FontAwesomeIcons.whatsapp,
-                          label: 'BOOK A RIDE',
-                          value: '+966 50 483 6105',
-                          onTap: _launchWhatsApp,
-                          color: const Color(0xFF25D366),
-                        ),
-                        _buildFooterDivider(),
-                        _buildFooterInfoItem(
-                          icon: Icons.phone_in_talk,
-                          label: 'CALL ANY TIME',
-                          value: '+966 50 483 6105',
-                          onTap: () => _launchPhone('+966504836105'),
-                          color: Colors.blue,
-                        ),
-                        _buildFooterDivider(),
-                        _buildFooterInfoItem(
-                          icon: Icons.support_agent,
-                          label: 'SUPPORT 24x7',
-                          value: '+966 50 269 1607',
-                          onTap: () => _launchPhone('+966502691607'),
-                          color: Colors.orange,
-                        ),
-                        _buildFooterDivider(),
-                        _buildFooterInfoItem(
-                          icon: Icons.email_outlined,
-                          label: 'SEND EMAIL',
-                          value: 'enquiries@xlooptours.com',
-                          onTap: () => _launchEmail('enquiries@xlooptours.com'),
-                          color: Colors.redAccent,
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 140.h), // Space for wave sheet
-                ],
+                  );
+                },
               ),
             ),
           ),
+
+          // 2.5 Dismiss Barrier (Touch outside to close)
+          if (_isMobileFormOpen)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isMobileFormOpen = false;
+                  });
+                  _mobileFormController.reverse();
+                },
+                child: Container(
+                  color: Colors.transparent, // Detailed touch hit test
+                ),
+              ),
+            ),
 
           // 3. Animated Wave Form Sheet
           AnimatedBuilder(
@@ -825,7 +1175,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
               _waveController,
             ]),
             builder: (context, child) {
-              final double minHeight = 120.h;
+              final double minHeight = 150.h;
               final double maxHeight = 0.75.sh;
               final double currentHeight =
                   minHeight +
@@ -935,13 +1285,20 @@ class _RegistrationScreenState extends State<RegistrationScreen>
             ],
           ),
           child: Text(
-            'REGISTER NOW',
-            style: GoogleFonts.notoSans(
-              fontSize: 40.sp, // Updated to 20.sp for better proportion
-              fontWeight: FontWeight.bold,
-              color: _brandColor,
-              letterSpacing: 1.2,
-            ),
+            _tr('register_now'),
+            style: _isArabic
+                ? GoogleFonts.notoSansArabic(
+                    fontSize: 30.sp,
+                    fontWeight: FontWeight.bold,
+                    color: _brandColor,
+                    letterSpacing: 1.2,
+                  )
+                : GoogleFonts.notoSans(
+                    fontSize: 40.sp, // Updated to 20.sp for better proportion
+                    fontWeight: FontWeight.bold,
+                    color: _brandColor,
+                    letterSpacing: 1.2,
+                  ),
           ),
         ),
       ),
@@ -949,191 +1306,205 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   }
 
   Widget _buildMobileFormContent() {
-    return Column(
-      children: [
-        // Close / Header Row
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24.w),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Registration',
-                style: GoogleFonts.merriweather(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.close, color: Colors.white),
-                onPressed: () {
-                  FocusScope.of(context).unfocus(); // Hide keyboard
-                  _mobileFormController.reverse().then((_) {
-                    setState(() {
-                      _isMobileFormOpen = false;
-                    });
-                  });
-                },
-              ),
-            ],
-          ),
-        ),
-        Divider(height: 1, color: Colors.white.withOpacity(0.2)),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(24.w, 10.h, 24.w, 20.h),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.topCenter,
+            child: SizedBox(
+              width: constraints.maxWidth,
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Close Button
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: IconButton(
+                        icon: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            Icons.close,
+                            color: Colors.white,
+                            size: 50.sp,
+                          ),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isMobileFormOpen = false;
+                          });
+                          _mobileFormController.reverse();
+                        },
+                      ),
+                    ),
+                    SizedBox(height: 10.h),
 
-        // Expanded Scrollable Form
-        Expanded(
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(24.w, 10.h, 24.w, 40.h),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildMobileInput(
-                    controller: _companyNameController,
-                    label: 'Company Name',
-                    icon: Icons.business,
-                    enabled: false,
-                  ),
-                  _buildMobileInput(
-                    controller: _nameController,
-                    label: 'Applicant Name',
-                    icon: Icons.person_outline_rounded,
-                  ),
-                  _buildMobileInput(
-                    controller: _phoneController,
-                    label: 'WhatsApp Number',
-                    icon: FontAwesomeIcons.whatsapp,
-                    keyboardType: TextInputType.phone,
-                    prefixWidget: InkWell(
-                      onTap: () {
-                        showCountryPicker(
-                          context: context,
-                          showPhoneCode: true,
-                          onSelect: (Country country) {
-                            setState(() {
-                              _countryCode = '+${country.phoneCode}';
-                            });
-                          },
-                          countryListTheme: CountryListThemeData(
-                            bottomSheetHeight: 0.7.sh,
-                            borderRadius: const BorderRadius.only(
-                              topLeft: Radius.circular(20),
-                              topRight: Radius.circular(20),
-                            ),
-                            inputDecoration: InputDecoration(
-                              labelText: 'Search',
-                              hintText: 'Start typing to search',
-                              prefixIcon: const Icon(Icons.search),
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: const Color(
-                                    0xFF8C98A8,
-                                  ).withOpacity(0.2),
+                    _buildMobileInput(
+                      controller: _companyNameController,
+                      label: _tr('company_name'),
+                      icon: Icons.business,
+                      enabled: false,
+                    ),
+                    SizedBox(height: 10.h),
+                    _buildMobileInput(
+                      controller: _nameController,
+                      label: _tr('full_name'),
+                      icon: Icons.person_outline_rounded,
+                      isRequired: true,
+                    ),
+                    SizedBox(height: 10.h),
+
+                    _buildMobileInput(
+                      controller: _phoneController,
+                      label: _tr('whatsapp_number'),
+                      icon: FontAwesomeIcons.whatsapp,
+                      isRequired: true,
+                      keyboardType: TextInputType.phone,
+                      prefixWidget: InkWell(
+                        onTap: () {
+                          showCountryPicker(
+                            context: context,
+                            showPhoneCode: true,
+                            onSelect: (Country country) {
+                              setState(() {
+                                _countryCode = '+${country.phoneCode}';
+                              });
+                            },
+                            countryListTheme: CountryListThemeData(
+                              bottomSheetHeight: 0.7.sh,
+                              textStyle: GoogleFonts.notoSans(
+                                fontSize: 16,
+                                color: Colors.black87,
+                              ),
+                              searchTextStyle: GoogleFonts.notoSans(
+                                fontSize: 16,
+                                color: Colors.black87,
+                              ),
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(20),
+                                topRight: Radius.circular(20),
+                              ),
+                              inputDecoration: InputDecoration(
+                                labelText: _tr('search'),
+                                labelStyle: GoogleFonts.notoSans(
+                                  color: Colors.grey,
+                                ),
+                                hintText: _tr('start_typing'),
+                                hintStyle: GoogleFonts.notoSans(
+                                  color: Colors.grey,
+                                ),
+                                prefixIcon: const Icon(Icons.search),
+                                border: OutlineInputBorder(
+                                  borderSide: BorderSide(
+                                    color: const Color(
+                                      0xFF8C98A8,
+                                    ).withOpacity(0.2),
+                                  ),
                                 ),
                               ),
                             ),
+                          );
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                _countryCode,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const Icon(
+                                Icons.arrow_drop_down,
+                                color: Colors.white54,
+                                size: 20,
+                              ),
+                            ],
                           ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
+                        ),
+                      ),
+                    ),
+                    if (_company != null && _company!.usesCaseCode) ...[
+                      SizedBox(height: 10.h),
+                      Padding(
+                        padding: EdgeInsets.only(top: 10.h),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              _countryCode,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            _buildMobileInput(
+                              controller: _caseCodeController,
+                              label:
+                                  _company!.caseCodeLabel ?? _tr('case_codes'),
+                              icon: Icons.confirmation_number_outlined,
+                              isRequired: true,
                             ),
-                            const Icon(
-                              Icons.arrow_drop_down,
-                              color: Colors.white54,
-                              size: 20,
-                            ),
+                            if (_previewCaseCodes.isNotEmpty) ...[
+                              SizedBox(height: 8.h),
+                              _buildCaseCodeChips(),
+                            ],
                           ],
                         ),
                       ),
-                    ),
-                  ),
-                  if (_company != null && _company!.usesCaseCode)
-                    Padding(
-                      padding: EdgeInsets.only(top: 20.h),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildMobileInput(
-                            controller: _caseCodeController,
-                            label: _company!.caseCodeLabel ?? 'Case Codes',
-                            icon: Icons.confirmation_number_outlined,
-                            helperText: 'Separate multiple codes with commas',
-                          ),
-                          if (_previewCaseCodes.isNotEmpty) ...[
-                            SizedBox(height: 8.h),
-                            _buildCaseCodeChips(),
-                          ],
-                        ],
-                      ),
-                    ),
-                  SizedBox(height: 30.h),
-                  SizedBox(
-                    height: 50.h,
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isSubmitting ? null : _submitForm,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: _brandColor,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: _isSubmitting
-                          ? CircularProgressIndicator(color: _brandColor)
-                          : Text(
-                              'SUBMIT APPLICATION',
-                              style: GoogleFonts.notoSans(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
-                    ),
-                  ),
-
-                  SizedBox(height: 100.h),
-                  Column(
-                    children: [
-                      Icon(
-                        Icons.shield_outlined,
-                        color: Colors.white.withOpacity(0.6),
-                        size: 24,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'SECURE REGISTRATION',
-                        style: GoogleFonts.merriweather(
-                          fontSize: 10,
-                          letterSpacing: 1.5,
-                          color: Colors.white.withOpacity(0.7),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-
-                      const SizedBox(height: 40),
                     ],
-                  ),
-                ],
+                    SizedBox(height: 10.h),
+                    _buildMobileInput(
+                      controller: _emailController,
+                      label: _tr('email'),
+                      icon: Icons.email_outlined,
+                      isRequired: false,
+                      keyboardType: TextInputType.emailAddress,
+                    ),
+                    SizedBox(height: 20.h), // Reduced spacing
+                    SizedBox(
+                      height: 50.h,
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isSubmitting ? null : _submitForm,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: _brandColor,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12.r),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: _isSubmitting
+                            ? CircularProgressIndicator(color: _brandColor)
+                            : Text(
+                                _tr('submit_application'),
+                                style: _isArabic
+                                    ? GoogleFonts.notoSansArabic(
+                                        fontSize: 30.sp,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1.5,
+                                      )
+                                    : GoogleFonts.notoSans(
+                                        fontSize: 40.sp, // Slightly reduced
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1.5,
+                                      ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-        ),
-      ],
+          );
+        },
+      ),
     );
   }
 
@@ -1145,42 +1516,87 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     Widget? prefixWidget,
     String? helperText,
     bool enabled = true,
+    bool isRequired = false,
   }) {
     return Padding(
-      padding: EdgeInsets.only(bottom: _previewCaseCodes.isEmpty ? 24 : 8),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        enabled: enabled,
-        style: TextStyle(
-          fontSize: 16, // Standard input size
-          color: enabled ? Colors.white : Colors.white60,
-          fontWeight: FontWeight.w500,
-        ),
-        cursorColor: Colors.white,
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(color: Colors.white70, fontSize: 14),
-          prefixIcon:
-              prefixWidget ?? Icon(icon, color: Colors.white70, size: 24),
-          helperText: helperText,
-          helperStyle: TextStyle(color: Colors.white60),
-
-          border: UnderlineInputBorder(
-            borderSide: BorderSide(color: Colors.white30),
+      padding: EdgeInsets.only(bottom: _previewCaseCodes.isEmpty ? 12 : 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          RichText(
+            text: TextSpan(
+              text: label,
+              style: _isArabic
+                  ? GoogleFonts.notoSansArabic(
+                      color: Colors.white,
+                      fontSize: 45.sp, // Smaller for Arabic
+                      fontWeight: FontWeight.bold,
+                    )
+                  : GoogleFonts.notoSans(
+                      color: Colors.white,
+                      fontSize: 60.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+              children: [
+                if (isRequired)
+                  TextSpan(
+                    text: ' *',
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontSize: 60.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+              ],
+            ),
           ),
-          enabledBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: Colors.white30),
+          SizedBox(height: 12.h),
+          TextFormField(
+            controller: controller,
+            keyboardType: keyboardType,
+            enabled: enabled,
+            style: GoogleFonts.notoSans(
+              fontSize: 50.sp,
+              color: enabled ? Colors.white : Colors.white60,
+              fontWeight: FontWeight.w500,
+            ),
+            cursorColor: Colors.white,
+            // Directionality for Input Field Text
+            textDirection: _isArabic ? TextDirection.rtl : TextDirection.ltr,
+            decoration: InputDecoration(
+              prefixIcon:
+                  prefixWidget ?? Icon(icon, color: Colors.white, size: 50.sp),
+              helperText: helperText,
+              helperStyle: GoogleFonts.notoSans(
+                color: Colors.white70,
+                fontSize: 50.sp,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+                borderSide: BorderSide(color: Colors.white30),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+                borderSide: BorderSide(color: Colors.white30),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+                borderSide: BorderSide(color: Colors.white),
+              ),
+              contentPadding: EdgeInsets.symmetric(
+                vertical: 16.h,
+                horizontal: 16.w,
+              ),
+            ),
+            validator: (v) {
+              if (!enabled) return null;
+              if (isRequired && (v == null || v.isEmpty)) {
+                return _tr('required');
+              }
+              return null;
+            },
           ),
-          focusedBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: Colors.white),
-          ),
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        ),
-        validator: (v) {
-          if (!enabled) return null;
-          return v!.isEmpty ? 'Required' : null;
-        },
+        ],
       ),
     );
   }
@@ -1189,6 +1605,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     _caseCodeController.dispose();
     _companyNameController.dispose();
     _mobileFormController.dispose();
@@ -1228,53 +1645,73 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     required String value,
     required VoidCallback onTap,
     required Color color,
+    bool isLarge = false,
   }) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.w),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(8.w),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8.r),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16.r),
+        child: Container(
+          padding: EdgeInsets.all(18.w),
+          decoration: BoxDecoration(
+            color: isLarge
+                ? color.withOpacity(0.15)
+                : Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16.r),
+            border: Border.all(
+              color: isLarge
+                  ? color.withOpacity(0.5)
+                  : Colors.white.withOpacity(0.3),
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: color.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: color, size: 60.sp),
+                  ),
+                  SizedBox(width: 16.w),
+                  Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.white54,
+                    size: 40.sp,
+                  ),
+                ],
               ),
-              child: Icon(icon, color: color, size: 24.sp),
-            ),
-            SizedBox(width: 12.w),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: GoogleFonts.notoSans(
-                    fontSize: 30.sp,
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
+              SizedBox(height: 12.h),
+              Text(
+                label,
+                style: GoogleFonts.notoSans(
+                  fontSize: 35.sp,
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
                 ),
-                SizedBox(height: 2.h),
-                Text(
-                  value,
-                  style: GoogleFonts.notoSans(
-                    fontSize: 30.sp,
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+              ),
+              SizedBox(height: 4.h),
+              Text(
+                value,
+                style: GoogleFonts.notoSans(
+                  fontSize: 30.sp,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  Widget _buildFooterDivider() {
-    return Container(height: 30.h, width: 1, color: Colors.white24);
   }
 
   Widget _buildContactFooter({required bool isDark}) {
@@ -1301,11 +1738,17 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                 children: [
                   Text(
                     label,
-                    style: GoogleFonts.notoSans(
-                      fontSize: 10.sp,
-                      color: textColor.withOpacity(0.6),
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: _isArabic
+                        ? GoogleFonts.notoSansArabic(
+                            fontSize: 10.sp,
+                            color: textColor.withOpacity(0.6),
+                            fontWeight: FontWeight.w600,
+                          )
+                        : GoogleFonts.notoSans(
+                            fontSize: 10.sp,
+                            color: textColor.withOpacity(0.6),
+                            fontWeight: FontWeight.w600,
+                          ),
                   ),
                   Text(
                     value,
@@ -1326,29 +1769,35 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     return Column(
       children: [
         Text(
-          'Powered by XLOOP TOURS W.L.L',
-          style: GoogleFonts.merriweather(
-            fontSize: 12.sp,
-            color: textColor,
-            fontWeight: FontWeight.bold,
-          ),
+          _tr('powered_by'),
+          style: _isArabic
+              ? GoogleFonts.notoSansArabic(
+                  fontSize: 12.sp,
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                )
+              : GoogleFonts.merriweather(
+                  fontSize: 12.sp,
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                ),
         ),
         SizedBox(height: 16.h),
         buildRow(
           Icons.call,
-          'CALL ANY TIME',
+          _tr('call_any_time'),
           '+966504836105',
           () => _launchPhone('+966504836105'),
         ),
         buildRow(
           Icons.support_agent,
-          'CUSTOMER SUPPORT 24x7',
+          _tr('customer_support'),
           '+966502691607',
           () => _launchPhone('+966502691607'),
         ),
         buildRow(
           Icons.email,
-          'FOR ANY ENQUIRIES',
+          _tr('for_enquiries'),
           'enquiries@xlooptours.com',
           () => _launchEmail('enquiries@xlooptours.com'),
         ),

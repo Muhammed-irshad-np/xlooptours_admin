@@ -5,6 +5,7 @@ class CustomerModel {
   final String? companyId; // Null if independent
   final String? companyName; // Snapshot for easier display
   final List<String> assignedCaseCodes;
+  final String? email;
   final String status;
   final DateTime createdAt;
 
@@ -12,6 +13,7 @@ class CustomerModel {
     required this.id,
     required this.name,
     required this.phone,
+    this.email,
     this.companyId,
     this.companyName,
     this.assignedCaseCodes = const [],
@@ -24,6 +26,7 @@ class CustomerModel {
       'id': id,
       'name': name,
       'phone': phone,
+      'email': email,
       'companyId': companyId,
       'companyName': companyName,
       'assignedCaseCodes': assignedCaseCodes,
@@ -37,6 +40,7 @@ class CustomerModel {
       id: json['id'] as String,
       name: json['name'] as String,
       phone: json['phone'] as String,
+      email: json['email'] as String?,
       companyId: json['companyId'] as String?,
       companyName: json['companyName'] as String?,
       assignedCaseCodes:
@@ -55,6 +59,7 @@ class CustomerModel {
     String? id,
     String? name,
     String? phone,
+    String? email,
     String? companyId,
     String? companyName,
     List<String>? assignedCaseCodes,
