@@ -69,11 +69,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       'en': 'Start typing to search',
       'ar': 'ابدأ الكتابة للبحث',
     },
-    'case_codes': {'en': 'Case Codes', 'ar': 'رموز الحالة'},
-    'case_code_helper': {
-      'en': 'Separate multiple codes with commas',
-      'ar': 'افصل الرموز المتعددة بفواصل',
-    },
+    'case_codes': {'en': 'Case Codes', 'ar': 'رموز الحالى'},
     'register_now': {'en': 'REGISTER NOW', 'ar': 'سجل الآن'},
     'send_email': {'en': 'SEND EMAIL', 'ar': 'ارسل بريد الكتروني'},
     'book_ride': {'en': 'BOOK A RIDE', 'ar': 'احجز رحلة'},
@@ -444,31 +440,55 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                 ),
               ),
               // Quote Overlay
-              Positioned(
-                bottom: 60.h,
-                left: 60.w,
-                right: 60.w,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _tr('excellence'),
-                      style: _isArabic
-                          ? GoogleFonts.notoSansArabic(
-                              fontSize: 32.sp,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            )
-                          : GoogleFonts.playfairDisplay(
-                              // Or Merriweather italic
-                              fontSize: 32.sp,
-                              color: Colors.white,
-                              fontStyle: FontStyle.italic,
-                              fontWeight: FontWeight.w500,
-                            ),
-                    ),
-                  ],
+              // Quote Overlay
+              Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 60.w),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Text(
+                        _tr('mobile_desc'),
+                        textAlign: TextAlign.center,
+                        style: _isArabic
+                            ? GoogleFonts.notoSansArabic(
+                                fontSize: 18.sp,
+                                color: Colors.white,
+                                height: 1.6,
+                                shadows: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.5),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              )
+                            : GoogleFonts.merriweather(
+                                fontSize: 18.sp,
+                                color: Colors.white,
+                                height: 1.6,
+                                fontStyle: FontStyle.italic,
+                                shadows: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.5),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
+              ),
+
+              // Footer Contact Section (Moved Back to Left, Aligned Bottom)
+              Positioned(
+                bottom: 70.h, // Adjusted alignment (+20 more)
+                left: 0,
+                right: 0,
+                child: _buildDesktopFooter(isLightMode: false),
               ),
             ],
           ),
@@ -503,7 +523,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             Center(
                               child: Image.asset(
                                 'assets/logo/xloop_logo.png',
-                                height: 80.h,
+                                height: 100.h,
                                 errorBuilder: (c, o, s) => Column(
                                   children: [
                                     Icon(
@@ -535,7 +555,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                       height: 1.2,
                                     )
                                   : GoogleFonts.merriweather(
-                                      fontSize: 28.sp,
+                                      fontSize: 50.sp,
                                       fontWeight: FontWeight.bold,
                                       color: _darkNavy,
                                       height: 1.2,
@@ -543,21 +563,24 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             ),
                             SizedBox(height: 8.h),
                             Text(
-                              _tr('executive_mobility'),
+                              _tr('efficient_safe'),
                               textAlign: TextAlign.center,
                               style: _isArabic
                                   ? GoogleFonts.notoSansArabic(
                                       fontSize: 18.sp,
-                                      color: Colors.grey[600],
+                                      color: _brandColor,
                                       height: 1.2,
+                                      fontWeight: FontWeight.bold,
                                     )
-                                  : GoogleFonts.merriweather(
+                                  : GoogleFonts.notoSans(
                                       fontSize: 18.sp,
-                                      color: Colors.grey[600],
+                                      color: _brandColor,
                                       height: 1.2,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 2.0,
                                     ),
                             ),
-                            SizedBox(height: 24.h),
+                            SizedBox(height: 15.h),
                             Text(
                               _tr('join_us'),
                               textAlign: TextAlign.center,
@@ -573,7 +596,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                       height: 1.5,
                                     ),
                             ),
-                            SizedBox(height: 50.h),
+                            SizedBox(height: 25.h),
 
                             // Company Name Field (Read-only)
                             _buildDesktopInput(
@@ -582,15 +605,15 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                               icon: Icons.business,
                               enabled: false,
                             ),
-                            SizedBox(height: 20.h),
+                            SizedBox(height: 15.h),
 
                             // Inputs (Outlined Style)
                             _buildDesktopInput(
                               controller: _nameController,
-                              label: _tr('applicant_name'),
+                              label: _tr('full_name'),
                               icon: Icons.person_outline_rounded,
                             ),
-                            SizedBox(height: 20.h),
+                            SizedBox(height: 15.h),
                             _buildDesktopInput(
                               controller: _phoneController,
                               label: _tr('whatsapp_number'),
@@ -667,7 +690,6 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                           _company!.caseCodeLabel ??
                                           _tr('case_codes'),
                                       icon: Icons.confirmation_number_outlined,
-                                      helperText: _tr('case_code_helper'),
                                     ),
                                     if (_previewCaseCodes.isNotEmpty) ...[
                                       SizedBox(height: 8.h),
@@ -722,37 +744,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                       ),
                               ),
                             ),
-
-                            SizedBox(height: 60.h),
-
-                            // Footer
-                            Column(
-                              children: [
-                                Icon(
-                                  Icons.shield_outlined,
-                                  color: Colors.grey[300],
-                                  size: 30.sp,
-                                ),
-                                SizedBox(height: 12.h),
-                                Text(
-                                  _tr('member_of'),
-                                  style: _isArabic
-                                      ? GoogleFonts.notoSansArabic(
-                                          fontSize: 12.sp,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.grey[400],
-                                        )
-                                      : GoogleFonts.merriweather(
-                                          fontSize: 10.sp,
-                                          letterSpacing: 1.5,
-                                          color: Colors.grey[400],
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                ),
-                                SizedBox(height: 40.h),
-                                _buildContactFooter(isDark: false),
-                              ],
-                            ),
+                            SizedBox(height: 20.h),
                           ],
                         ),
                       ),
@@ -1646,162 +1638,182 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     required VoidCallback onTap,
     required Color color,
     bool isLarge = false,
+    bool isLightMode = false,
+    bool isDesktop = false,
   }) {
+    final borderColor = isLightMode
+        ? Colors.grey[300]!
+        : (isLarge ? color.withOpacity(0.5) : Colors.white.withOpacity(0.3));
+    final bgColor = isLightMode
+        ? Colors.white
+        : (isLarge ? color.withOpacity(0.15) : Colors.white.withOpacity(0.1));
+    final textColor = isLightMode ? _darkNavy : Colors.white;
+    final labelColor = isLightMode ? Colors.grey[600] : Colors.white70;
+    final iconBgColor = isLightMode
+        ? color.withOpacity(0.1)
+        : color.withOpacity(0.2);
+
+    // Desktop Sizing (Fixed) vs Mobile Sizing (Scaled)
+    final double containerPadding = isDesktop ? 8.0 : 18.w;
+    final double iconContainerPadding = isDesktop ? 6.0 : 12.w;
+    final double iconSize = isDesktop ? 16.0 : 60.sp;
+    final double arrowSize = isDesktop ? 12.0 : 40.sp;
+    final double gapSize = isDesktop ? 6.0 : 16.w;
+    final double labelSize = isDesktop ? 9.0 : 35.sp;
+    final double valueSize = isDesktop ? 11.0 : 30.sp;
+    final double verticalGap = isDesktop
+        ? 0.0
+        : 12.h; // No vertical gap in Row mode
+
+    Widget content;
+    if (isDesktop) {
+      // COMPACT ROW LAYOUT FOR DESKTOP
+      content = Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: EdgeInsets.all(iconContainerPadding),
+            decoration: BoxDecoration(
+              color: iconBgColor,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: color, size: iconSize),
+          ),
+          SizedBox(width: gapSize),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: GoogleFonts.notoSans(
+                  fontSize: labelSize,
+                  color: labelColor,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              SizedBox(height: 2.0),
+              Text(
+                value,
+                style: GoogleFonts.notoSans(
+                  fontSize: valueSize,
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    } else {
+      // VERTICAL COLUMN LAYOUT FOR MOBILE
+      content = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: EdgeInsets.all(iconContainerPadding),
+                decoration: BoxDecoration(
+                  color: iconBgColor,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: iconSize),
+              ),
+              SizedBox(width: gapSize),
+              Icon(
+                Icons.arrow_forward_ios,
+                color: isLightMode ? Colors.grey[400] : Colors.white54,
+                size: arrowSize,
+              ),
+            ],
+          ),
+          SizedBox(height: verticalGap),
+          Text(
+            label,
+            style: GoogleFonts.notoSans(
+              fontSize: labelSize,
+              color: labelColor,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+          SizedBox(height: 4.h),
+          Text(
+            value,
+            style: GoogleFonts.notoSans(
+              fontSize: valueSize,
+              color: textColor,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      );
+    }
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16.r),
         child: Container(
-          padding: EdgeInsets.all(18.w),
+          padding: EdgeInsets.all(containerPadding),
           decoration: BoxDecoration(
-            color: isLarge
-                ? color.withOpacity(0.15)
-                : Colors.white.withOpacity(0.1),
+            color: bgColor,
             borderRadius: BorderRadius.circular(16.r),
-            border: Border.all(
-              color: isLarge
-                  ? color.withOpacity(0.5)
-                  : Colors.white.withOpacity(0.3),
-            ),
+            border: Border.all(color: borderColor),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(12.w),
-                    decoration: BoxDecoration(
-                      color: color.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon, color: color, size: 60.sp),
-                  ),
-                  SizedBox(width: 16.w),
-                  Icon(
-                    Icons.arrow_forward_ios,
-                    color: Colors.white54,
-                    size: 40.sp,
-                  ),
-                ],
-              ),
-              SizedBox(height: 12.h),
-              Text(
-                label,
-                style: GoogleFonts.notoSans(
-                  fontSize: 35.sp,
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              SizedBox(height: 4.h),
-              Text(
-                value,
-                style: GoogleFonts.notoSans(
-                  fontSize: 30.sp,
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
+          child: content,
         ),
       ),
     );
   }
 
-  Widget _buildContactFooter({required bool isDark}) {
-    final textColor = isDark ? Colors.white70 : _darkNavy;
-    final iconColor = isDark ? _brandColor : _brandColor;
-
-    Widget buildRow(
-      IconData icon,
-      String label,
-      String value,
-      VoidCallback onTap,
-    ) {
-      return InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 8.h),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16.sp, color: iconColor),
-              SizedBox(width: 8.w),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: _isArabic
-                        ? GoogleFonts.notoSansArabic(
-                            fontSize: 10.sp,
-                            color: textColor.withOpacity(0.6),
-                            fontWeight: FontWeight.w600,
-                          )
-                        : GoogleFonts.notoSans(
-                            fontSize: 10.sp,
-                            color: textColor.withOpacity(0.6),
-                            fontWeight: FontWeight.w600,
-                          ),
-                  ),
-                  Text(
-                    value,
-                    style: GoogleFonts.notoSans(
-                      fontSize: 12.sp,
-                      color: textColor,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+  Widget _buildDesktopFooter({bool isLightMode = false}) {
+    // Web Standard Sizing: Constrain width and center
+    return Center(
+      child: Container(
+        constraints: BoxConstraints(maxWidth: 600.w),
+        padding: EdgeInsets.symmetric(horizontal: 20.w),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildFooterInfoItem(
+              icon: FontAwesomeIcons.whatsapp,
+              label: _tr('book_ride'),
+              value: '+966 50 483 6105',
+              onTap: _launchWhatsApp,
+              color: const Color(0xFF25D366),
+              isLightMode: isLightMode,
+              isLarge: true,
+              isDesktop: true,
+            ),
+            SizedBox(width: 12.w),
+            _buildFooterInfoItem(
+              icon: Icons.phone_in_talk,
+              label: _tr('support_247'),
+              value: '+966 50 269 1607',
+              onTap: () => _launchPhone('+966502691607'),
+              color: Colors.orange,
+              isLightMode: isLightMode,
+              isDesktop: true,
+            ),
+            SizedBox(width: 12.w),
+            _buildFooterInfoItem(
+              icon: Icons.email_outlined,
+              label: _tr('send_email'),
+              value: 'enquiries@xlooptours.com',
+              onTap: () => _launchEmail('enquiries@xlooptours.com'),
+              color: Colors.redAccent,
+              isLightMode: isLightMode,
+              isDesktop: true,
+            ),
+          ],
         ),
-      );
-    }
-
-    return Column(
-      children: [
-        Text(
-          _tr('powered_by'),
-          style: _isArabic
-              ? GoogleFonts.notoSansArabic(
-                  fontSize: 12.sp,
-                  color: textColor,
-                  fontWeight: FontWeight.bold,
-                )
-              : GoogleFonts.merriweather(
-                  fontSize: 12.sp,
-                  color: textColor,
-                  fontWeight: FontWeight.bold,
-                ),
-        ),
-        SizedBox(height: 16.h),
-        buildRow(
-          Icons.call,
-          _tr('call_any_time'),
-          '+966504836105',
-          () => _launchPhone('+966504836105'),
-        ),
-        buildRow(
-          Icons.support_agent,
-          _tr('customer_support'),
-          '+966502691607',
-          () => _launchPhone('+966502691607'),
-        ),
-        buildRow(
-          Icons.email,
-          _tr('for_enquiries'),
-          'enquiries@xlooptours.com',
-          () => _launchEmail('enquiries@xlooptours.com'),
-        ),
-      ],
+      ),
     );
   }
 }
