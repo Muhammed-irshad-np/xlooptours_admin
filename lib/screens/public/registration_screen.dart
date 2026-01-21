@@ -117,6 +117,15 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       'en': 'XLOOP TOURS W.L.L',
       'ar': 'اكس لوب ت ورس ذ.ل.ل',
     },
+    'success_gratitude': {
+      'en':
+          'Thanks for registering with XLoop Tours.\nWe are excited to have you on board.',
+      'ar': 'شكراً لتسجيلك مع إكس لوب تورز.\nنحن متحمسون لانضمامك إلينا.',
+    },
+    'book_first_ride_btn': {
+      'en': 'BOOK YOUR FIRST RIDE',
+      'ar': 'احجز رحلتك الأولى',
+    },
   };
 
   String _tr(String key) {
@@ -337,47 +346,117 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   Widget _buildSuccessScreen() {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Center(
-        child: Container(
-          margin: EdgeInsets.symmetric(horizontal: 24.w),
-          padding: EdgeInsets.all(40.w),
-          constraints: BoxConstraints(maxWidth: 500.w),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(30.r),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          // Check if we are on a mobile width (standard phone portrait)
+          final bool isMobileWidth = constraints.maxWidth < 600;
+
+          // Define responsive sizes
+          // On mobile, we want things to feel "bigger" and more touch-friendly
+          // Matching sizes from _buildMobileLayout (Labels ~60.sp, Input ~50.sp)
+          final double horizontalMargin = isMobileWidth ? 20.w : 0;
+          final double containerPadding = isMobileWidth ? 30.w : 40.w;
+
+          final double iconSize = isMobileWidth
+              ? 200.sp
+              : 80.sp; // Increased for mobile
+          final double headerSize = isMobileWidth
+              ? 100.sp
+              : 28.sp; // Increased to match mobile labels
+          final double messageSize = isMobileWidth
+              ? 60.sp
+              : 16.sp; // Increased to match mobile text
+          final double buttonHeight = isMobileWidth
+              ? 75.h
+              : 50.h; // Taller button
+          final double buttonFontSize = isMobileWidth
+              ? 60.sp
+              : 14.sp; // Increased button text
+
+          final BoxConstraints containerConstraints = isMobileWidth
+              ? BoxConstraints(
+                  maxWidth: double.infinity,
+                ) // Fill width minus margin
+              : BoxConstraints(maxWidth: 500.w);
+
+          return Center(
+            child: Container(
+              margin: isMobileWidth
+                  ? EdgeInsets.symmetric(horizontal: horizontalMargin)
+                  : EdgeInsets.symmetric(horizontal: 24.w),
+              padding: EdgeInsets.all(containerPadding),
+              constraints: containerConstraints,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 30,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
               ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.check_circle, color: _brandColor, size: 80.sp),
-              SizedBox(height: 24.h),
-              Text(
-                'Success!',
-                style: GoogleFonts.merriweather(
-                  fontSize: 28.sp,
-                  fontWeight: FontWeight.bold,
-                  color: _darkNavy,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.check_circle, color: _brandColor, size: iconSize),
+                  SizedBox(height: 24.h),
+                  Text(
+                    _tr('header_company_name'),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.merriweather(
+                      fontSize: headerSize,
+                      fontWeight: FontWeight.bold,
+                      color: _darkNavy,
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+                  Text(
+                    _tr('success_gratitude'),
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.notoSans(
+                      fontSize: messageSize,
+                      color: Colors.grey[600],
+                      height: 1.5,
+                    ),
+                  ),
+                  SizedBox(height: 30.h),
+                  // CTA Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: buttonHeight,
+                    child: ElevatedButton.icon(
+                      onPressed: _launchWhatsApp,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(
+                          0xFF25D366,
+                        ), // WhatsApp Green
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                        elevation: 0,
+                      ),
+                      icon: Icon(
+                        FontAwesomeIcons.whatsapp,
+                        size: buttonFontSize * 1.5,
+                      ),
+                      label: Text(
+                        _tr('book_first_ride_btn'),
+                        style: GoogleFonts.notoSans(
+                          fontWeight: FontWeight.bold,
+                          fontSize: buttonFontSize,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(height: 16.h),
-              Text(
-                'You have successfully joined ${_company?.companyName}.',
-                textAlign: TextAlign.center,
-                style: GoogleFonts.notoSansArabic(
-                  fontSize: 16.sp,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        },
       ),
     );
   }
