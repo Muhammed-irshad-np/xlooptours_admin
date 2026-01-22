@@ -1,11 +1,11 @@
 {
-    "name": "xloop_invoice",
-    "short_name": "xloop_invoice",
+    "name": "xlooptours",
+    "short_name": "xlooptours",
     "start_url": ".",
     "display": "browser",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "EFFICIENT | SAFE | RELIABLE",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -161,7 +161,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   }
 
   void _updateCaseCodePreview() {
-    final text = _caseCodeController.text;
+    final text = _caseCodeController.text.toUpperCase(); // FORCE UPPERCASE
     final selection = _caseCodeController.selection;
 
     // Auto-hyphenation logic: Letter followed continuously by Digit
@@ -173,11 +173,14 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     // However, since we are in a listener, we must be careful.
 
     final newText = text.replaceAllMapped(
-      RegExp(r'([a-zA-Z])([0-9])'),
+      RegExp(
+        r'([A-Z])([0-9])',
+      ), // Updated to match Uppercase only since we converted
       (match) => '${match.group(1)}-${match.group(2)}',
     );
 
-    if (newText != text) {
+    // Check if text changed due to Uppercase OR Hyphenation
+    if (newText != _caseCodeController.text) {
       // Calculate new cursor position
       // If the hyphen was inserted before the cursor, we shift right by 1.
       int newOffset = selection.baseOffset;
@@ -814,6 +817,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                           _company!.caseCodeLabel ??
                                           _tr('case_codes'),
                                       icon: Icons.confirmation_number_outlined,
+                                      textCapitalization:
+                                          TextCapitalization.characters,
                                       suffixIcon: IconButton(
                                         icon: Icon(
                                           Icons.add_circle,
@@ -985,12 +990,14 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     bool isRequired = true,
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
+    TextCapitalization textCapitalization = TextCapitalization.none,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       enabled: enabled,
       inputFormatters: inputFormatters,
+      textCapitalization: textCapitalization,
       style: _isArabic
           ? GoogleFonts.notoSansArabic(
               fontSize: 15.sp,
@@ -1611,6 +1618,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                   _company!.caseCodeLabel ?? _tr('case_codes'),
                               icon: Icons.confirmation_number_outlined,
                               isRequired: true,
+                              textCapitalization: TextCapitalization.characters,
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   Icons.add_circle,
@@ -1708,6 +1716,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     bool isRequired = false,
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
+    TextCapitalization textCapitalization = TextCapitalization.none,
   }) {
     return Padding(
       padding: EdgeInsets.only(bottom: _previewCaseCodes.isEmpty ? 12 : 4),
@@ -1747,6 +1756,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
             keyboardType: keyboardType,
             enabled: enabled,
             inputFormatters: inputFormatters,
+            textCapitalization: textCapitalization,
             style: GoogleFonts.notoSans(
               fontSize: 50.sp,
               color: enabled ? Colors.white : Colors.white60,
