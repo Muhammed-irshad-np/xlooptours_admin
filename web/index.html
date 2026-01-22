@@ -39,6 +39,12 @@
 </head>
 
 <body>
+  <script>
+    // Prevent the PWA install prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 
