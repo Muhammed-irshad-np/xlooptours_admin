@@ -9,6 +9,7 @@ import 'package:xloop_invoice/services/database_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/services.dart';
 
 class RegistrationScreen extends StatefulWidget {
   final String? companyId;
@@ -161,23 +162,69 @@ class _RegistrationScreenState extends State<RegistrationScreen>
 
   void _updateCaseCodePreview() {
     final text = _caseCodeController.text;
-    if (text.isEmpty) {
-      if (_previewCaseCodes.isNotEmpty) {
-        setState(() {
-          _previewCaseCodes = [];
-        });
+    final selection = _caseCodeController.selection;
+
+    // Auto-hyphenation logic: Letter followed continuously by Digit
+    // Regex matches a letter group followed by a digit group
+    // We want to insert a hyphen between them if one doesn't exist.
+    // Simple approach: Check for ([a-zA-Z])([0-9]) pattern and replace with $1-$2
+
+    // We only want to run this if the text actually changes to avoid infinite loops if we set text.
+    // However, since we are in a listener, we must be careful.
+
+    final newText = text.replaceAllMapped(
+      RegExp(r'([a-zA-Z])([0-9])'),
+      (match) => '${match.group(1)}-${match.group(2)}',
+    );
+
+    if (newText != text) {
+      // Calculate new cursor position
+      // If the hyphen was inserted before the cursor, we shift right by 1.
+      int newOffset = selection.baseOffset;
+
+      // Find where the hyphen was inserted relative to cursor
+      // This is a bit complex to do perfectly for multiple insertions,
+      // but usually users type one char at a time.
+      // If length increased by 1, and the insertion happened before cursor:
+      if (newText.length > text.length && selection.isValid) {
+        // Current simple heuristic: if cursor was after the letter that got hyphenated
+        // We can trust the framework handles mostly, but explicitly:
+        // If we are at the end, just move to end.
+        if (selection.baseOffset == text.length) {
+          newOffset = newText.length;
+        } else {
+          // For mid-text edits, crude adjustment:
+          newOffset += 1;
+        }
       }
-      return;
+
+      _caseCodeController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(
+          offset: math.min(newOffset, newText.length),
+        ),
+      );
     }
+  }
 
-    final codes = text
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
+  void _addCaseCode() {
+    final code = _caseCodeController.text.trim();
+    if (code.isNotEmpty) {
+      if (!_previewCaseCodes.contains(code)) {
+        setState(() {
+          _previewCaseCodes.add(code);
+          _caseCodeController.clear();
+        });
+      } else {
+        // Optionally show a message if code already exists
+        _caseCodeController.clear();
+      }
+    }
+  }
 
+  void _removeCaseCode(String code) {
     setState(() {
-      _previewCaseCodes = codes;
+      _previewCaseCodes.remove(code);
     });
   }
 
@@ -212,6 +259,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   }
 
   Future<void> _submitForm() async {
+    // Auto-save any pending case code
+    _addCaseCode();
+
     if (!_formKey.currentState!.validate()) return;
     if (_company == null) return;
 
@@ -232,13 +282,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       );
 
       // Handle Case Codes
-      if (_company!.usesCaseCode && _caseCodeController.text.isNotEmpty) {
-        // Split by comma and clean
-        final inputCodes = _caseCodeController.text
-            .split(',')
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList();
+      if (_company!.usesCaseCode && _previewCaseCodes.isNotEmpty) {
+        final inputCodes = _previewCaseCodes;
 
         // 1. Assign to Customer
         newCustomer = newCustomer.copyWith(assignedCaseCodes: inputCodes);
@@ -497,7 +542,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                   color: Colors.black, // Fallback dark
                   image: DecorationImage(
                     // Chauffeur opening car door
-                    image: AssetImage('assets/images/registration_new.jpg'),
+                    image: AssetImage('assets/images/bg_desktop.jpg'),
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -695,6 +740,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                               label: _tr('whatsapp_number'),
                               icon: FontAwesomeIcons.whatsapp,
                               keyboardType: TextInputType.phone,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
                               prefixWidget: InkWell(
                                 onTap: () {
                                   showCountryPicker(
@@ -766,9 +814,26 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                           _company!.caseCodeLabel ??
                                           _tr('case_codes'),
                                       icon: Icons.confirmation_number_outlined,
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          Icons.add_circle,
+                                          color: _brandColor,
+                                          size: 30.sp,
+                                        ),
+                                        onPressed: _addCaseCode,
+                                      ),
+                                      validator: (v) {
+                                        if (_previewCaseCodes.isNotEmpty) {
+                                          return null;
+                                        }
+                                        if (v == null || v.isEmpty) {
+                                          return _tr('required');
+                                        }
+                                        return null;
+                                      },
                                     ),
                                     if (_previewCaseCodes.isNotEmpty) ...[
-                                      SizedBox(height: 8.h),
+                                      SizedBox(height: 12.h),
                                       _buildCaseCodeChips(),
                                     ],
                                   ],
@@ -782,6 +847,16 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                               icon: Icons.email_outlined,
                               isRequired: false,
                               keyboardType: TextInputType.emailAddress,
+                              validator: (v) {
+                                if (v == null || v.isEmpty) return null;
+                                final emailRegex = RegExp(
+                                  r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+",
+                                );
+                                if (!emailRegex.hasMatch(v)) {
+                                  return 'Invalid Email';
+                                }
+                                return null;
+                              },
                             ),
 
                             SizedBox(height: 40.h),
@@ -904,14 +979,18 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     required IconData icon,
     TextInputType? keyboardType,
     Widget? prefixWidget,
+    Widget? suffixIcon,
     String? helperText,
     bool enabled = true,
     bool isRequired = true,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
       enabled: enabled,
+      inputFormatters: inputFormatters,
       style: _isArabic
           ? GoogleFonts.notoSansArabic(
               fontSize: 15.sp,
@@ -935,6 +1014,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
             : TextStyle(color: Colors.grey[400], fontSize: 14.sp),
         prefixIcon:
             prefixWidget ?? Icon(icon, color: Colors.grey[400], size: 20.sp),
+        suffixIcon: suffixIcon,
         helperText: helperText,
         helperStyle: _isArabic
             ? GoogleFonts.notoSansArabic(fontSize: 12.sp)
@@ -961,13 +1041,15 @@ class _RegistrationScreenState extends State<RegistrationScreen>
         ),
         contentPadding: EdgeInsets.symmetric(vertical: 20.h, horizontal: 20.w),
       ),
-      validator: (v) {
-        if (!enabled) return null;
-        if (isRequired && (v == null || v.isEmpty)) {
-          return _tr('required');
-        }
-        return null;
-      },
+      validator:
+          validator ??
+          (v) {
+            if (!enabled) return null;
+            if (isRequired && (v == null || v.isEmpty)) {
+              return _tr('required');
+            }
+            return null;
+          },
     );
   }
 
@@ -983,7 +1065,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
         fit: StackFit.expand,
         children: [
           // 0. Full Screen Background Image
-          Image.asset('assets/images/registration_new.jpg', fit: BoxFit.cover),
+          Image.asset('assets/images/bg_mobile.jpg', fit: BoxFit.cover),
 
           // 1. Dark Overlay
           Container(
@@ -1089,7 +1171,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                           // --- LOGO ---
                           Center(
                             child: Container(
-                              padding: const EdgeInsets.all(4),
+                              padding: EdgeInsets.only(right: 8.h),
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
@@ -1138,8 +1220,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             _tr('efficient_safe'),
                             textAlign: TextAlign.center,
                             style: GoogleFonts.notoSans(
-                              fontSize: 50.sp, // Updated to 30.sp
-                              fontWeight: FontWeight.w600,
+                              fontSize: 55.sp, // Updated to 30.sp
+                              fontWeight: FontWeight.bold,
                               color: _brandColor,
                               letterSpacing: 2.0,
                             ),
@@ -1447,6 +1529,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                       icon: FontAwesomeIcons.whatsapp,
                       isRequired: true,
                       keyboardType: TextInputType.phone,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       prefixWidget: InkWell(
                         onTap: () {
                           showCountryPicker(
@@ -1528,10 +1611,26 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                   _company!.caseCodeLabel ?? _tr('case_codes'),
                               icon: Icons.confirmation_number_outlined,
                               isRequired: true,
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  Icons.add_circle,
+                                  color: Colors.white,
+                                  size: 80.sp,
+                                ),
+                                onPressed: _addCaseCode,
+                              ),
+                              validator: (v) {
+                                if (_previewCaseCodes.isNotEmpty) return null;
+                                if (v == null || v.isEmpty) {
+                                  return _tr('required');
+                                }
+                                return null;
+                              },
                             ),
                             if (_previewCaseCodes.isNotEmpty) ...[
-                              SizedBox(height: 8.h),
+                              SizedBox(height: 16.h),
                               _buildCaseCodeChips(),
+                              SizedBox(height: 16.h),
                             ],
                           ],
                         ),
@@ -1544,6 +1643,16 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                       icon: Icons.email_outlined,
                       isRequired: false,
                       keyboardType: TextInputType.emailAddress,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return null;
+                        final emailRegex = RegExp(
+                          r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+",
+                        );
+                        if (!emailRegex.hasMatch(v)) {
+                          return 'Invalid Email';
+                        }
+                        return null;
+                      },
                     ),
                     SizedBox(height: 20.h), // Reduced spacing
                     SizedBox(
@@ -1593,9 +1702,12 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     required IconData icon,
     TextInputType? keyboardType,
     Widget? prefixWidget,
+    Widget? suffixIcon,
     String? helperText,
     bool enabled = true,
     bool isRequired = false,
+    List<TextInputFormatter>? inputFormatters,
+    String? Function(String?)? validator,
   }) {
     return Padding(
       padding: EdgeInsets.only(bottom: _previewCaseCodes.isEmpty ? 12 : 4),
@@ -1634,6 +1746,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
             controller: controller,
             keyboardType: keyboardType,
             enabled: enabled,
+            inputFormatters: inputFormatters,
             style: GoogleFonts.notoSans(
               fontSize: 50.sp,
               color: enabled ? Colors.white : Colors.white60,
@@ -1645,6 +1758,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
             decoration: InputDecoration(
               prefixIcon:
                   prefixWidget ?? Icon(icon, color: Colors.white, size: 50.sp),
+              suffixIcon: suffixIcon,
               helperText: helperText,
               helperStyle: GoogleFonts.notoSans(
                 color: Colors.white70,
@@ -1667,13 +1781,15 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                 horizontal: 16.w,
               ),
             ),
-            validator: (v) {
-              if (!enabled) return null;
-              if (isRequired && (v == null || v.isEmpty)) {
-                return _tr('required');
-              }
-              return null;
-            },
+            validator:
+                validator ??
+                (v) {
+                  if (!enabled) return null;
+                  if (isRequired && (v == null || v.isEmpty)) {
+                    return _tr('required');
+                  }
+                  return null;
+                },
           ),
         ],
       ),
@@ -1705,13 +1821,23 @@ class _RegistrationScreenState extends State<RegistrationScreen>
             borderRadius: BorderRadius.circular(20),
             border: Border.all(color: Colors.white.withOpacity(0.4)),
           ),
-          child: Text(
-            code,
-            style: GoogleFonts.notoSans(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                code,
+                style: GoogleFonts.notoSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => _removeCaseCode(code),
+                child: const Icon(Icons.close, size: 14, color: Colors.white),
+              ),
+            ],
           ),
         );
       }).toList(),
