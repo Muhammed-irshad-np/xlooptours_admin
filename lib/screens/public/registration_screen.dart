@@ -72,7 +72,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     'case_codes': {'en': 'Case Codes', 'ar': 'رموز الحالى'},
     'register_now': {'en': 'REGISTER NOW', 'ar': 'سجل الآن'},
     'send_email': {'en': 'SEND EMAIL', 'ar': 'ارسل بريد الكتروني'},
-    'book_ride': {'en': 'BOOK A RIDE', 'ar': 'احجز رحلة'},
+    'book_ride': {'en': 'BOOK YOUR RIDE', 'ar': 'احجز رحلتك'},
     'support_247': {'en': 'SUPPORT 24x7', 'ar': 'الدعم 24x7'},
     'efficient_safe': {
       'en': 'EFFICIENT | SAFE | RELIABLE',
@@ -80,9 +80,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     },
     'mobile_desc': {
       'en':
-          '"We offer our clients one of the most extensive fleets of luxury and regular vehicles in Saudi Arabia. At Xloop Tours W.L.L, we are committed to customer satisfaction and are dedicated to providing top quality, hassle-free mobility solutions."',
+          '"We offer our clients one of the most extensive fleets of luxury and standard vehicles across Saudi Arabia and Bahrain. At Xloop Tours W.L.L, we are dedicated to delivering top‑quality, hassle‑free mobility solutions built on comfort, reliability, safety, and a truly premium experience."',
       'ar':
-          '"نقدم لعملائنا واحدًا من أكثر أساطيل السيارات الفاخرة والعادية شمولاً في المملكة العربية السعودية. في إكس لوب تورز ذ.م.م، نحن ملتزمون برضا العملاء ومكرسون لتقديم حلول تنقل عالية الجودة وخالية من المتاعب."',
+          '"نقدم لعملائنا واحدة من أوسع أساطيل المركبات الفاخرة والقياسية في المملكة العربية السعودية والبحرين. في إكس لوب تورز ذ.م.م، نحن ملتزمون بتقديم حلول تنقل عالية الجودة وخالية من المتاعب مبنية على الراحة والموثوقية والأمان وتجربة متميزة حقًا."',
     },
     'submit_application': {'en': 'SUBMIT APPLICATION', 'ar': 'تقديم الطلب'},
     'required': {'en': 'Required', 'ar': 'مطلوب'},
@@ -122,10 +122,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
           'Thanks for registering with XLoop Tours.\nWe are excited to have you on board.',
       'ar': 'شكراً لتسجيلك مع إكس لوب تورز.\nنحن متحمسون لانضمامك إلينا.',
     },
-    'book_first_ride_btn': {
-      'en': 'BOOK YOUR FIRST RIDE',
-      'ar': 'احجز رحلتك الأولى',
-    },
+    'book_first_ride_btn': {'en': 'BOOK YOUR RIDE', 'ar': 'احجز رحلتك'},
   };
 
   String _tr(String key) {
@@ -1065,8 +1062,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                 animation: _mobileFormAnimation,
                 builder: (context, child) {
                   // 1. Slide Up Logic
-                  // Move up by 70.h (was 120, adjusted for new TOP spacing of 100)
-                  final double slideOffset = -70.h * _mobileFormAnimation.value;
+                  // Move up by 50.h (adjusted as per request)
+                  final double slideOffset = -50.h * _mobileFormAnimation.value;
 
                   // 2. Fade Out Logic (for Description & Footer)
                   // Fade out quickly (first 50% of animation)
@@ -1086,22 +1083,33 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           if (_isMobileFormOpen)
-                            SizedBox(height: 100.h)
+                            SizedBox(height: 60.h)
                           else
-                            SizedBox(height: 140.h),
+                            SizedBox(height: 90.h),
                           // --- LOGO ---
                           Center(
-                            child: Image.asset(
-                              'assets/logo/xloop_logo.png',
-                              height: 70.h,
-                              errorBuilder: (c, o, s) => Icon(
-                                Icons.directions_car,
-                                size: 60.sp,
-                                color: _brandColor,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.black,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Image.asset(
+                                'assets/logo/xloop_logo_new.png',
+                                height: 100.h,
+                                errorBuilder: (c, o, s) => Icon(
+                                  Icons.directions_car,
+                                  size: 60.sp,
+                                  color: _brandColor,
+                                ),
                               ),
                             ),
                           ),
-                          SizedBox(height: 25.h),
+                          SizedBox(height: 20.h),
 
                           // --- COMPANY NAME ---
                           Text(
@@ -1130,13 +1138,13 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             _tr('efficient_safe'),
                             textAlign: TextAlign.center,
                             style: GoogleFonts.notoSans(
-                              fontSize: 60.sp, // Updated to 30.sp
+                              fontSize: 50.sp, // Updated to 30.sp
                               fontWeight: FontWeight.w600,
                               color: _brandColor,
                               letterSpacing: 2.0,
                             ),
                           ),
-                          SizedBox(height: 30.h),
+                          SizedBox(height: 70.h),
 
                           // --- DESCRIPTION (Fades out) ---
                           Opacity(
@@ -1146,7 +1154,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                               textAlign: TextAlign.center,
                               style: _isArabic
                                   ? GoogleFonts.notoSansArabic(
-                                      fontSize: 45.sp, // Smaller for Arabic
+                                      fontSize: 50.sp, // Smaller for Arabic
                                       color: Colors.white.withOpacity(0.95),
                                       height: 1.5,
                                       shadows: [
@@ -1158,7 +1166,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                       ],
                                     )
                                   : GoogleFonts.merriweather(
-                                      fontSize: 55.sp,
+                                      fontSize: 50.sp,
                                       color: Colors.white.withOpacity(0.95),
                                       height: 1.5,
                                       fontStyle: FontStyle.italic,
@@ -1172,7 +1180,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                     ),
                             ),
                           ),
-                          SizedBox(height: 40.h),
+                          SizedBox(height: 70.h),
 
                           // --- FOOTER (Fades out) ---
                           Opacity(
@@ -1213,7 +1221,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                               ),
                             ),
                           ),
-                          SizedBox(height: 140.h), // Space for wave sheet
+                          SizedBox(height: 100.h), // Space for wave sheet
                         ],
                       ),
                     ),
