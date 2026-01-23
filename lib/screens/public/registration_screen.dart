@@ -70,23 +70,20 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       'en': 'Start typing to search',
       'ar': 'ابدأ الكتابة للبحث',
     },
-    'case_codes': {
-      'en': 'Case Code / Project Code',
-      'ar': 'رموز الحالة / رمز المشروع',
-    },
+    'case_codes': {'en': 'Case Codes', 'ar': 'رموز الحالى'},
     'register_now': {'en': 'REGISTER NOW', 'ar': 'سجل الآن'},
     'send_email': {'en': 'SEND EMAIL', 'ar': 'ارسل بريد الكتروني'},
     'book_ride': {'en': 'BOOK YOUR RIDE', 'ar': 'احجز رحلتك'},
     'support_247': {'en': 'SUPPORT 24x7', 'ar': 'الدعم 24x7'},
     'efficient_safe': {
-      'en': 'SAFE | EFFICIENT | RELIABLE',
-      'ar': 'آمن | فعال | موثوق',
+      'en': 'EFFICIENT | SAFE | RELIABLE',
+      'ar': 'فعال | آمن | موثوق',
     },
     'mobile_desc': {
       'en':
-          '"We offer our clients one of the most extensive fleets of luxury and standard vehicles across Saudi Arabia and Bahrain. At Xloop Tours W.L.L, we are dedicated to delivering top‑quality, hassle‑free mobility solutions built on safety, comfort, reliability, and a truly premium experience."',
+          '"We offer our clients one of the most extensive fleets of luxury and standard vehicles across Saudi Arabia and Bahrain. At Xloop Tours W.L.L, we are dedicated to delivering top‑quality, hassle‑free mobility solutions built on comfort, reliability, safety, and a truly premium experience."',
       'ar':
-          '"نقدم لعملائنا واحدة من أوسع أساطيل المركبات الفاخرة والقياسية في المملكة العربية السعودية والبحرين. في إكس لوب تورز ذ.م.م، نحن ملتزمون بتقديم حلول تنقل عالية الجودة وخالية من المتاعب مبنية على الأمان والراحة والموثوقية وتجربة متميزة حقًا."',
+          '"نقدم لعملائنا واحدة من أوسع أساطيل المركبات الفاخرة والقياسية في المملكة العربية السعودية والبحرين. في إكس لوب تورز ذ.م.م، نحن ملتزمون بتقديم حلول تنقل عالية الجودة وخالية من المتاعب مبنية على الراحة والموثوقية والأمان وتجربة متميزة حقًا."',
     },
     'submit_application': {'en': 'SUBMIT APPLICATION', 'ar': 'تقديم الطلب'},
     'required': {'en': 'Required', 'ar': 'مطلوب'},
@@ -816,7 +813,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                   children: [
                                     _buildDesktopInput(
                                       controller: _caseCodeController,
-                                      label: _tr('case_codes'),
+                                      label:
+                                          _company!.caseCodeLabel ??
+                                          _tr('case_codes'),
                                       icon: Icons.confirmation_number_outlined,
                                       textCapitalization:
                                           TextCapitalization.characters,
@@ -1615,7 +1614,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                           children: [
                             _buildMobileInput(
                               controller: _caseCodeController,
-                              label: _tr('case_codes'),
+                              label:
+                                  _company!.caseCodeLabel ?? _tr('case_codes'),
                               icon: Icons.confirmation_number_outlined,
                               isRequired: true,
                               textCapitalization: TextCapitalization.characters,
