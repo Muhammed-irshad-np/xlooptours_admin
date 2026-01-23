@@ -1,20 +1,16 @@
 {
   "rewrites": [
     {
-      "source": "/",
-      "destination": "/home.html"
-    },
-    {
       "source": "/admin",
-      "destination": "/index.html"
+      "destination": "/app.html"
     },
     {
       "source": "/admin/",
-      "destination": "/index.html"
+      "destination": "/app.html"
     },
     {
       "source": "/admin/((?!.*\\.).*)",
-      "destination": "/index.html"
+      "destination": "/app.html"
     },
     {
       "source": "/admin/(.*)",

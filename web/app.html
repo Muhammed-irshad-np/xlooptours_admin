@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <!--
+    We are serving the app from the /admin subpath.
+  -->
+  <base href="/admin/">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="SAFE | EFFICIENT | RELIABLE">
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://xlooptours.com/">
+  <meta property="og:title" content="xlooptours">
+  <meta property="og:description" content="SAFE | EFFICIENT | RELIABLE">
+  <meta property="og:image" content="https://xlooptours.com/icons/og_image.png">
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://xlooptours.com/">
+  <meta property="twitter:title" content="xlooptours">
+  <meta property="twitter:description" content="SAFE | EFFICIENT | RELIABLE">
+  <meta property="twitter:image" content="https://xlooptours.com/icons/og_image.png">
+
+  <!-- Schema.org -->
+  <meta itemprop="name" content="xlooptours">
+  <meta itemprop="description" content="SAFE | EFFICIENT | RELIABLE">
+  <meta itemprop="image" content="https://xlooptours.com/icons/og_image.png">
+
+  <!-- Google Sign-In Client ID -->
+  <meta name="google-signin-client_id"
+    content="1098817651136-nv3hg1dtaio5tvfk7flbn3b4f6k5fgqt.apps.googleusercontent.com">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="xlooptours">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png?v=2">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png?v=2" />
+
+  <title>xlooptours</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+
+<body>
+  <script>
+    // Prevent the PWA install prompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+    });
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+
+</html>

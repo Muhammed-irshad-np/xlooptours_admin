@@ -1,60 +1,133 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
-  <!--
-    We are serving the app from the /admin subpath.
-  -->
-  <base href="/admin/">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XLOOP TOURS - Coming Soon</title>
+    <meta name="description"
+        content="XLoop Tours - Safe, Efficient, Reliable. Our main site is currently under development.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-color: #EF5B25;
+            --bg-color: #1a1a1a;
+            --text-color: #ffffff;
+        }
 
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="SAFE | EFFICIENT | RELIABLE">
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://xlooptours.com/">
-  <meta property="og:title" content="xlooptours">
-  <meta property="og:description" content="SAFE | EFFICIENT | RELIABLE">
-  <meta property="og:image" content="https://xlooptours.com/icons/og_image.png">
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
 
-  <!-- Twitter -->
-  <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://xlooptours.com/">
-  <meta property="twitter:title" content="xlooptours">
-  <meta property="twitter:description" content="SAFE | EFFICIENT | RELIABLE">
-  <meta property="twitter:image" content="https://xlooptours.com/icons/og_image.png">
+        .background-gradient {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 50% 50%, rgba(239, 91, 37, 0.15) 0%, rgba(26, 26, 26, 0.95) 70%);
+            z-index: -1;
+        }
 
-  <!-- Schema.org -->
-  <meta itemprop="name" content="xlooptours">
-  <meta itemprop="description" content="SAFE | EFFICIENT | RELIABLE">
-  <meta itemprop="image" content="https://xlooptours.com/icons/og_image.png">
+        .container {
+            text-align: center;
+            padding: 2rem;
+            z-index: 1;
+            max-width: 600px;
+        }
 
-  <!-- Google Sign-In Client ID -->
-  <meta name="google-signin-client_id"
-    content="1098817651136-nv3hg1dtaio5tvfk7flbn3b4f6k5fgqt.apps.googleusercontent.com">
+        .logo-text {
+            font-size: 2.5rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            margin-bottom: 0.5rem;
+        }
 
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="xlooptours">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png?v=2">
+        .tagline {
+            font-size: 1rem;
+            font-weight: 300;
+            color: rgba(255, 255, 255, 0.7);
+            letter-spacing: 4px;
+            margin-bottom: 3rem;
+            text-transform: uppercase;
+        }
 
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png?v=2" />
+        .message {
+            font-size: 1.5rem;
+            font-weight: 400;
+            margin-bottom: 1.5rem;
+            line-height: 1.4;
+        }
 
-  <title>xlooptours</title>
-  <link rel="manifest" href="manifest.json">
+        .message span {
+            color: var(--brand-color);
+            font-weight: 600;
+        }
+
+        .sub-message {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 1rem;
+        }
+
+        .loader {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(239, 91, 37, 0.3);
+            border-radius: 50%;
+            border-top-color: var(--brand-color);
+            animation: spin 1s ease-in-out infinite;
+            margin: 3rem auto 0;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Glassmorphism card */
+        .card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 3rem;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+    </style>
 </head>
 
 <body>
-  <script>
-    // Prevent the PWA install prompt
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-    });
-  </script>
-  <script src="flutter_bootstrap.js" async></script>
+    <div class="background-gradient"></div>
+    <div class="container">
+        <div class="card">
+            <h1 class="logo-text">XLOOP TOURS</h1>
+            <p class="tagline">Safe | Efficient | Reliable</p>
+
+            <p class="message">Something amazing is in the<br><span>Works</span></p>
+            <p class="sub-message">Our main website is currently under development.</p>
+
+            <div class="loader"></div>
+        </div>
+    </div>
 </body>
 
 </html>
