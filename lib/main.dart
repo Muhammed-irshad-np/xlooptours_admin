@@ -161,7 +161,7 @@ class _MyAppState extends State<MyApp> {
         return MaterialApp.router(
           routerConfig: _router,
           debugShowCheckedModeBanner: false,
-          title: 'XLoop Tours Admin',
+          title: 'xlooptours',
           theme: ThemeData(
             colorScheme: ColorScheme.fromSeed(
               seedColor: const Color(0xFF13b1f2),

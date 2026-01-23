@@ -270,7 +270,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
                         // But since this is specific code, I'll just use the path format.
 
                         final String link =
-                            '${Uri.base.origin}/register?companyId=${company.id}';
+                            '${Uri.base.origin}/admin/register?companyId=${company.id}';
 
                         await Clipboard.setData(ClipboardData(text: link));
                         if (mounted) {
