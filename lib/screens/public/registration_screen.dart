@@ -414,12 +414,6 @@ class _RegistrationScreenState extends State<RegistrationScreen>
           final double messageSize = isMobileWidth
               ? 60.sp
               : 16.sp; // Increased to match mobile text
-          final double buttonHeight = isMobileWidth
-              ? 75.h
-              : 50.h; // Taller button
-          final double buttonFontSize = isMobileWidth
-              ? 60.sp
-              : 14.sp; // Increased button text
 
           final BoxConstraints containerConstraints = isMobileWidth
               ? BoxConstraints(
@@ -470,36 +464,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                     ),
                   ),
                   SizedBox(height: 30.h),
-                  // CTA Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: buttonHeight,
-                    child: ElevatedButton.icon(
-                      onPressed: _launchWhatsApp,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(
-                          0xFF25D366,
-                        ), // WhatsApp Green
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12.r),
-                        ),
-                        elevation: 0,
-                      ),
-                      icon: Icon(
-                        FontAwesomeIcons.whatsapp,
-                        size: buttonFontSize * 1.5,
-                      ),
-                      label: Text(
-                        _tr('book_first_ride_btn'),
-                        style: GoogleFonts.notoSans(
-                          fontWeight: FontWeight.bold,
-                          fontSize: buttonFontSize,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                    ),
-                  ),
+                  // CTA Button removed as per request
+                  SizedBox(height: 10.h),
                 ],
               ),
             ),
