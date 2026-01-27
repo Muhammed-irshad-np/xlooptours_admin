@@ -181,58 +181,63 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
       ),
       body: Form(
         key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              ResponsiveLayout(
-                mobile: Column(
-                  children: [
-                    _buildBusinessDetailsSection(),
-                    const SizedBox(height: 16),
-                    _buildCaseCodeSection(),
-                    const SizedBox(height: 16),
-                    _buildAddressSection(),
-                  ],
-                ),
-                desktop: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        children: [
-                          _buildBusinessDetailsSection(),
-                          const SizedBox(height: 16),
-                          _buildCaseCodeSection(),
-                        ],
-                      ),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  ResponsiveLayout(
+                    mobile: Column(
+                      children: [
+                        _buildBusinessDetailsSection(),
+                        const SizedBox(height: 16),
+                        _buildCaseCodeSection(),
+                        const SizedBox(height: 16),
+                        _buildAddressSection(),
+                      ],
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(child: _buildAddressSection()),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveCompany,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: _isSaving
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                    desktop: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            children: [
+                              _buildBusinessDetailsSection(),
+                              const SizedBox(height: 16),
+                              _buildCaseCodeSection(),
+                            ],
                           ),
-                        )
-                      : const Text('Save Company'),
-                ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(child: _buildAddressSection()),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isSaving ? null : _saveCompany,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: _isSaving
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Save Company'),
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),

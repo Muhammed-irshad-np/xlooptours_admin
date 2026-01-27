@@ -4,6 +4,7 @@ import 'package:xloop_invoice/models/invoice_model.dart';
 import 'package:xloop_invoice/models/line_item_model.dart';
 import '../models/company_model.dart';
 import '../models/customer_model.dart';
+import '../models/employee_model.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
@@ -475,5 +476,44 @@ class DatabaseService {
 
   Future<void> deleteInvoice(String invoiceId) async {
     await firestore.collection('invoices').doc(invoiceId).delete();
+  }
+
+  // ======================
+  // EMPLOYEE Operations
+  // ======================
+
+  Future<void> insertEmployee(EmployeeModel employee) async {
+    try {
+      debugPrint('DatabaseService: Inserting employee ${employee.id}');
+      await firestore
+          .collection('employees')
+          .doc(employee.id)
+          .set(employee.toJson());
+    } catch (e) {
+      debugPrint('DatabaseService: Error inserting employee: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<EmployeeModel>> getAllEmployees() async {
+    final snapshot = await firestore
+        .collection('employees')
+        .orderBy('fullName')
+        .get();
+
+    return snapshot.docs
+        .map((doc) => EmployeeModel.fromJson(doc.data()))
+        .toList();
+  }
+
+  Future<void> updateEmployee(EmployeeModel employee) async {
+    await firestore
+        .collection('employees')
+        .doc(employee.id)
+        .update(employee.toJson());
+  }
+
+  Future<void> deleteEmployee(String id) async {
+    await firestore.collection('employees').doc(id).delete();
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'home_screen.dart';
-import 'drivers_screen.dart';
+import 'employees_screen.dart';
 import 'vehicles_screen.dart';
 import 'customer_list_screen.dart';
 import 'trip_creation_screen.dart';
@@ -22,7 +22,7 @@ class _AdminLayoutState extends State<AdminLayout> {
   final List<Widget> _screens = [
     // const AnalyticsScreen(), // Dashboard REMOVED as per request
     const TripCreationScreen(),
-    const DriversScreen(),
+    const EmployeesScreen(),
     const VehiclesScreen(),
     const CompaniesScreen(),
     const CustomerListScreen(),

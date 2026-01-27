@@ -379,7 +379,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
         key: _formKey,
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1400),
+            constraints: const BoxConstraints(maxWidth: 1200),
             child: ResponsiveLayout(
               mobile: SingleChildScrollView(
                 padding: const EdgeInsets.all(20.0),
