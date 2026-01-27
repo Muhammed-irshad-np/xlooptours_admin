@@ -6,7 +6,7 @@ import 'package:url_strategy/url_strategy.dart'; // Import url_strategy
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
 import 'firebase_options.dart';
-import 'screens/home_screen.dart';
+
 import 'screens/invoice_form_screen.dart';
 import 'screens/pdf_preview_screen.dart';
 import 'models/invoice_model.dart';
@@ -21,6 +21,7 @@ import 'screens/analytics_screen.dart';
 import 'models/customer_model.dart';
 import 'screens/customer_form_screen.dart';
 import 'screens/customer_list_screen.dart';
+import 'screens/public/under_maintenance_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -65,9 +66,10 @@ class _MyAppState extends State<MyApp> {
         final isLoggedIn = AuthService.instance.currentUser != null;
         final isLoggingIn = state.uri.path == '/login';
         final isRegistering = state.uri.path == '/register';
+        final isRoot = state.uri.path == '/';
 
-        // Allow public access to registration
-        if (isRegistering) {
+        // Allow public access to registration and maintenance screen
+        if (isRegistering || isRoot) {
           return null;
         }
 
@@ -83,7 +85,11 @@ class _MyAppState extends State<MyApp> {
       },
       refreshListenable: Listenable.merge([AuthService.instance]),
       routes: [
-        GoRoute(path: '/', redirect: (_, __) => '/home'),
+        GoRoute(
+          path: '/',
+          builder: (context, state) => const UnderMaintenanceScreen(),
+        ),
+        GoRoute(path: '/admin', redirect: (_, __) => '/home'),
         GoRoute(
           path: '/login',
           builder: (context, state) => const LoginScreen(),
