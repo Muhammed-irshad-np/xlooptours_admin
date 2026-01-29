@@ -25,7 +25,6 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _emailController = TextEditingController();
   final _caseCodeController = TextEditingController();
   final _companyNameController = TextEditingController();
 
@@ -64,7 +63,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     'company_name': {'en': 'Company Name', 'ar': 'اسم الشركة'},
     'applicant_name': {'en': 'Applicant Name', 'ar': 'اسم مقدم الطلب'},
     'full_name': {'en': 'Full Name', 'ar': 'الاسم الكامل'},
-    'whatsapp_number': {'en': 'WhatsApp Number', 'ar': 'رقم الواتساب'},
+    'whatsapp_number': {'en': 'Contact Number', 'ar': 'رقم التواصل'},
     'search': {'en': 'Search', 'ar': 'بحث'},
     'start_typing': {
       'en': 'Start typing to search',
@@ -278,9 +277,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         name: _nameController.text.trim(),
         phone: '', // Placeholder, updated below
-        email: _emailController.text.trim().isEmpty
-            ? null
-            : _emailController.text.trim(),
+        email: null,
         companyId: _company!.id,
         companyName: _company!.companyName,
         assignedCaseCodes: [], // Will populate below
@@ -811,25 +808,6 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                   ],
                                 ),
                               ),
-
-                            SizedBox(height: 20.h),
-                            _buildDesktopInput(
-                              controller: _emailController,
-                              label: _tr('email'),
-                              icon: Icons.email_outlined,
-                              isRequired: false,
-                              keyboardType: TextInputType.emailAddress,
-                              validator: (v) {
-                                if (v == null || v.isEmpty) return null;
-                                final emailRegex = RegExp(
-                                  r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+",
-                                );
-                                if (!emailRegex.hasMatch(v)) {
-                                  return 'Invalid Email';
-                                }
-                                return null;
-                              },
-                            ),
 
                             SizedBox(height: 40.h),
 
@@ -1610,24 +1588,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                         ),
                       ),
                     ],
-                    SizedBox(height: 10.h),
-                    _buildMobileInput(
-                      controller: _emailController,
-                      label: _tr('email'),
-                      icon: Icons.email_outlined,
-                      isRequired: false,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return null;
-                        final emailRegex = RegExp(
-                          r"^[a-zA-Z0-9.a-zA-Z0-9.!#$%&'*+-/=?^_`{|}~]+@[a-zA-Z0-9]+\.[a-zA-Z]+",
-                        );
-                        if (!emailRegex.hasMatch(v)) {
-                          return 'Invalid Email';
-                        }
-                        return null;
-                      },
-                    ),
+
                     SizedBox(height: 20.h), // Reduced spacing
                     SizedBox(
                       height: 50.h,
@@ -1776,7 +1737,6 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
-    _emailController.dispose();
     _caseCodeController.dispose();
     _companyNameController.dispose();
     _mobileFormController.dispose();
