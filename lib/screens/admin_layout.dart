@@ -5,6 +5,7 @@ import 'employees_screen.dart';
 import 'vehicles_screen.dart';
 import 'customer_list_screen.dart';
 import 'trip_creation_screen.dart';
+import 'notifications_screen.dart';
 
 import 'companies_screen.dart';
 import '../services/auth_service.dart';
@@ -22,6 +23,7 @@ class _AdminLayoutState extends State<AdminLayout> {
   final List<Widget> _screens = [
     // const AnalyticsScreen(), // Dashboard REMOVED as per request
     const TripCreationScreen(),
+    const NotificationsScreen(),
     const EmployeesScreen(),
     const VehiclesScreen(),
     const CompaniesScreen(),
@@ -70,6 +72,14 @@ class _AdminLayoutState extends State<AdminLayout> {
                           ),
                           label: Text(
                             'New Trip',
+                            style: TextStyle(fontSize: 12.sp),
+                          ),
+                        ),
+                        NavigationRailDestination(
+                          icon: Icon(Icons.notifications_outlined, size: 24.sp),
+                          selectedIcon: Icon(Icons.notifications, size: 24.sp),
+                          label: Text(
+                            'Activity',
                             style: TextStyle(fontSize: 12.sp),
                           ),
                         ),

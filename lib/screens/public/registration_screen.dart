@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:xloop_invoice/models/company_model.dart';
 import 'package:xloop_invoice/models/customer_model.dart';
+import 'package:xloop_invoice/models/notification_model.dart';
 import 'package:xloop_invoice/services/database_service.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:country_picker/country_picker.dart';
@@ -318,6 +319,17 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       );
 
       await DatabaseService.instance.insertCustomer(newCustomer);
+
+      // Create Notification
+      final notification = NotificationModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: 'New Registration',
+        message: 'New user ${newCustomer.name} has registered.',
+        timestamp: DateTime.now(),
+        type: NotificationType.registration,
+        relatedId: newCustomer.id,
+      );
+      await DatabaseService.instance.insertNotification(notification);
 
       setState(() {
         _registrationSuccess = true;

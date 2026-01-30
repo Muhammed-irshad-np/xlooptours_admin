@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // Import for kReleaseMode
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:go_router/go_router.dart';
@@ -68,16 +69,33 @@ class _MyAppState extends State<MyApp> {
         final isRegistering = state.uri.path == '/register';
         final isRoot = state.uri.path == '/';
 
-        // Allow public access to registration and maintenance screen
-        if (isRegistering || isRoot) {
+        // Allow public access to registration
+        // Maintenance Screen logic:
+        // - In Release Mode: Always show maintenance screen at root '/'
+        // - In Debug/Profile Mode: Bypass maintenance, treat '/' as normal app root (login or home)
+
+        if (isRegistering) {
           return null;
+        }
+
+        // Maintenance Screen Logic
+        if (isRoot) {
+          if (kReleaseMode) {
+            // In Release mode, let it go to '/' which is UnderMaintenanceScreen
+            return null;
+          } else {
+            // In Debug/Learner mode, we want to skip maintenance.
+            // So we fall through to Auth checks below.
+            // Note: If we are logged in, we should redirect to /home.
+            // If not logged in, we should redirect to /login.
+          }
         }
 
         if (!isLoggedIn && !isLoggingIn) {
           return '/login';
         }
 
-        if (isLoggedIn && isLoggingIn) {
+        if (isLoggedIn && (isLoggingIn || isRoot)) {
           return '/home';
         }
 

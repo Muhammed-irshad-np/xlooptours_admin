@@ -63,6 +63,7 @@ dependencies:
   font_awesome_flutter: ^10.12.0
   country_picker: ^2.0.27
   url_launcher: ^6.3.2
+  timeago: ^3.7.1
 
 dev_dependencies:
   flutter_test:

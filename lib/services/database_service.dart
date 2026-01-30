@@ -5,6 +5,7 @@ import 'package:xloop_invoice/models/line_item_model.dart';
 import '../models/company_model.dart';
 import '../models/customer_model.dart';
 import '../models/employee_model.dart';
+import '../models/notification_model.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
@@ -515,5 +516,40 @@ class DatabaseService {
 
   Future<void> deleteEmployee(String id) async {
     await firestore.collection('employees').doc(id).delete();
+  }
+
+  // ======================
+  // NOTIFICATION Operations
+  // ======================
+
+  Future<void> insertNotification(NotificationModel notification) async {
+    try {
+      debugPrint('DatabaseService: Inserting notification ${notification.id}');
+      await firestore
+          .collection('notifications')
+          .doc(notification.id)
+          .set(notification.toJson());
+    } catch (e) {
+      debugPrint('DatabaseService: Error inserting notification: $e');
+      rethrow;
+    }
+  }
+
+  Stream<List<NotificationModel>> getNotifications() {
+    return firestore
+        .collection('notifications')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => NotificationModel.fromJson(doc.data()))
+              .toList();
+        });
+  }
+
+  Future<void> markNotificationAsRead(String id) async {
+    await firestore.collection('notifications').doc(id).update({
+      'isRead': true,
+    });
   }
 }
