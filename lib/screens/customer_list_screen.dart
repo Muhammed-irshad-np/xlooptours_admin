@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/customer_model.dart';
+import '../models/notification_model.dart'; // Added
 import '../services/database_service.dart';
 import '../widgets/responsive_layout.dart';
 
@@ -70,7 +71,19 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
 
     if (confirmed == true) {
+      // Create Notification for Deletion
+      final notification = NotificationModel(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        title: 'Customer Deleted',
+        message: 'Customer ${customer.name} has been deleted.',
+        timestamp: DateTime.now(),
+        type: NotificationType.system,
+        relatedId: customer.id,
+      );
+
       await _databaseService.deleteCustomer(customer.id);
+      await _databaseService.insertNotification(notification);
+
       _loadCustomers();
     }
   }

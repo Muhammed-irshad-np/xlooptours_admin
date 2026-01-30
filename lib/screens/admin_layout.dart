@@ -9,6 +9,8 @@ import 'notifications_screen.dart';
 
 import 'companies_screen.dart';
 import '../services/auth_service.dart';
+import '../services/database_service.dart'; // Added
+import '../models/notification_model.dart'; // Added
 
 class AdminLayout extends StatefulWidget {
   const AdminLayout({super.key});
@@ -76,8 +78,48 @@ class _AdminLayoutState extends State<AdminLayout> {
                           ),
                         ),
                         NavigationRailDestination(
-                          icon: Icon(Icons.notifications_outlined, size: 24.sp),
-                          selectedIcon: Icon(Icons.notifications, size: 24.sp),
+                          icon: StreamBuilder<List<NotificationModel>>(
+                            stream: DatabaseService.instance.getNotifications(),
+                            builder: (context, snapshot) {
+                              final notifications = snapshot.data ?? [];
+                              final unreadCount = notifications
+                                  .where((n) => !n.isRead)
+                                  .length;
+
+                              if (unreadCount == 0) {
+                                return Icon(
+                                  Icons.notifications_outlined,
+                                  size: 24.sp,
+                                );
+                              }
+
+                              return Badge(
+                                label: Text('$unreadCount'),
+                                child: Icon(
+                                  Icons.notifications_outlined,
+                                  size: 24.sp,
+                                ),
+                              );
+                            },
+                          ),
+                          selectedIcon: StreamBuilder<List<NotificationModel>>(
+                            stream: DatabaseService.instance.getNotifications(),
+                            builder: (context, snapshot) {
+                              final notifications = snapshot.data ?? [];
+                              final unreadCount = notifications
+                                  .where((n) => !n.isRead)
+                                  .length;
+
+                              if (unreadCount == 0) {
+                                return Icon(Icons.notifications, size: 24.sp);
+                              }
+
+                              return Badge(
+                                label: Text('$unreadCount'),
+                                child: Icon(Icons.notifications, size: 24.sp),
+                              );
+                            },
+                          ),
                           label: Text(
                             'Activity',
                             style: TextStyle(fontSize: 12.sp),
