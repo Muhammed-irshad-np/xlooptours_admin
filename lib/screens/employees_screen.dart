@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../models/employee_model.dart';
+import '../models/vehicle_model.dart'; // Added
 import '../services/database_service.dart';
 import '../widgets/responsive_layout.dart';
 import 'employee_form_screen.dart';
@@ -17,6 +18,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   final _databaseService = DatabaseService.instance;
   List<EmployeeModel> _allEmployees = [];
   List<EmployeeModel> _filteredEmployees = [];
+  Map<String, VehicleModel> _assignedVehicles = {}; // Added
   bool _isLoading = true;
   String _searchQuery = '';
   late TabController _tabController;
@@ -42,9 +44,20 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     setState(() => _isLoading = true);
     try {
       final employees = await _databaseService.getAllEmployees();
+      final vehicles = await _databaseService.getAllVehicles(); // Added
+
+      // Map vehicles by driver ID for quick lookup
+      final vehicleMap = <String, VehicleModel>{};
+      for (var v in vehicles) {
+        if (v.assignedDriverId != null) {
+          vehicleMap[v.assignedDriverId!] = v;
+        }
+      }
+
       if (mounted) {
         setState(() {
           _allEmployees = employees;
+          _assignedVehicles = vehicleMap; // Added
           _isLoading = false;
         });
         _filterEmployees();
@@ -93,7 +106,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
         temp = temp
             .where(
               (e) => [
-                'Office Manager',
+                'Administrative Officer',
                 'Senior Software Developer',
               ].contains(e.position),
             )
@@ -243,13 +256,12 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                     ),
                     desktop: GridView.builder(
                       padding: const EdgeInsets.all(16),
-                      gridDelegate:
-                          const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 400,
-                            childAspectRatio: 1.5,
-                            crossAxisSpacing: 16,
-                            mainAxisSpacing: 16,
-                          ),
+                      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                        maxCrossAxisExtent: 430.w,
+                        childAspectRatio: 1.8,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                      ),
                       itemCount: _filteredEmployees.length,
                       itemBuilder: (context, index) =>
                           _buildEmployeeCard(_filteredEmployees[index]),
@@ -317,34 +329,49 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                     ],
                   ),
                 ),
-                PopupMenuButton<String>(
-                  onSelected: (value) {
-                    if (value == 'edit') {
-                      _navigateToForm(employee);
-                    } else if (value == 'delete') {
-                      _deleteEmployee(employee);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 20),
-                          SizedBox(width: 8),
-                          Text('Edit'),
-                        ],
+                Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.remove_red_eye,
+                        color: Colors.blue,
                       ),
+                      tooltip: 'View Details',
+                      onPressed: () => _showDetails(employee),
                     ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, size: 20, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Delete', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'edit') {
+                          _navigateToForm(employee);
+                        } else if (value == 'delete') {
+                          _deleteEmployee(employee);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit, size: 20),
+                              SizedBox(width: 8),
+                              Text('Edit'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete, size: 20, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text(
+                                'Delete',
+                                style: TextStyle(color: Colors.red),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -381,6 +408,41 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                 ],
               ),
             ],
+            // Show Assigned Vehicle for Drivers
+            if (_assignedVehicles.isNotEmpty &&
+                _assignedVehicles[employee.id] != null) ...[
+              SizedBox(height: 12.h),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(8.r),
+                  border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.directions_car,
+                      size: 16.sp,
+                      color: Colors.blue[700],
+                    ),
+                    SizedBox(width: 8.w),
+                    Expanded(
+                      child: Text(
+                        '${_assignedVehicles[employee.id]?.make ?? ''} ${_assignedVehicles[employee.id]?.model ?? ''} (${_assignedVehicles[employee.id]?.plateNumber ?? ''})',
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: Colors.blue[900],
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             SizedBox(height: 16.h),
             Divider(),
             Row(
@@ -404,6 +466,147 @@ class _EmployeesScreenState extends State<EmployeesScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showDetails(EmployeeModel employee) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 500,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: Colors.blue.withOpacity(0.1),
+                    child: Text(
+                      employee.fullName.isNotEmpty
+                          ? employee.fullName[0].toUpperCase()
+                          : '?',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          employee.fullName,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          employee.position,
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const Divider(height: 32),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDetailRow('Email', employee.email, Icons.email),
+                      _buildDetailRow(
+                        'Phone',
+                        employee.phoneNumber,
+                        Icons.phone,
+                      ),
+                      _buildDetailRow(
+                        'Nationality',
+                        employee.nationality,
+                        Icons.flag,
+                      ),
+                      _buildDetailRow('Gender', employee.gender, Icons.person),
+                      _buildDetailRow('ID Type', employee.idType, Icons.badge),
+                      _buildDetailRow(
+                        'ID Number',
+                        employee.idNumber,
+                        Icons.numbers,
+                      ),
+                      _buildDetailRow(
+                        'Join Date',
+                        employee.joinDate?.toString().split(' ')[0] ?? 'N/A',
+                        Icons.calendar_today,
+                      ),
+                      _buildDetailRow(
+                        'Birth Date',
+                        employee.birthDate?.toString().split(' ')[0] ?? 'N/A',
+                        Icons.cake,
+                      ),
+                      if (employee.driverType != null)
+                        _buildDetailRow(
+                          'Driver Type',
+                          employee.driverType!,
+                          Icons.directions_car,
+                        ),
+                      _buildDetailRow(
+                        'Status',
+                        employee.isActive ? 'Active' : 'Inactive',
+                        Icons.info,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, IconData icon) {
+    if (value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Colors.grey),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

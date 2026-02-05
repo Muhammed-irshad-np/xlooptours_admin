@@ -247,73 +247,75 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
                   ),
 
                   // Top Right: Menu
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert),
-                    onSelected: (value) async {
-                      if (value == 'edit') {
-                        _navigateToForm(company);
-                      } else if (value == 'delete') {
-                        _deleteCompany(company);
-                      } else if (value == 'copy_link') {
-                        // Construct the link
-                        // Assuming the app is hosted at the root.
-                        // Ideally we get the base URL from config.
-                        // For now, we'll use a placeholder or relative path if possible,
-                        // but clipboard needs full URL usually.
-                        // Let's assume standard domain or let user know.
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(
+                          Icons.remove_red_eye,
+                          color: Colors.blue,
+                        ),
+                        onPressed: () => _showDetails(company),
+                        tooltip: 'View Details',
+                      ),
+                      PopupMenuButton<String>(
+                        icon: const Icon(Icons.more_vert),
+                        onSelected: (value) async {
+                          if (value == 'edit') {
+                            _navigateToForm(company);
+                          } else if (value == 'delete') {
+                            _deleteCompany(company);
+                          } else if (value == 'copy_link') {
+                            final String link =
+                                '${Uri.base.origin}/register?companyId=${company.id}';
 
-                        // We will copy just the path if we can't determine domain,
-                        // or better, standard app link.
-                        // Since we don't know the domain, let's use a standard format
-                        // that the user can replace 'domain.com' if needed, or
-                        // if running on web, we could get current origin.
-                        // But since this is specific code, I'll just use the path format.
-
-                        final String link =
-                            '${Uri.base.origin}/register?companyId=${company.id}';
-
-                        await Clipboard.setData(ClipboardData(text: link));
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Registration link copied to clipboard!',
-                              ),
+                            await Clipboard.setData(ClipboardData(text: link));
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Registration link copied to clipboard!',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'copy_link',
+                            child: Row(
+                              children: [
+                                Icon(Icons.link, size: 20),
+                                SizedBox(width: 8),
+                                Text('Copy Link'),
+                              ],
                             ),
-                          );
-                        }
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(
-                        value: 'copy_link',
-                        child: Row(
-                          children: [
-                            Icon(Icons.link, size: 20),
-                            SizedBox(width: 8),
-                            Text('Copy Link'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'edit',
-                        child: Row(
-                          children: [
-                            Icon(Icons.edit, size: 20),
-                            SizedBox(width: 8),
-                            Text('Edit'),
-                          ],
-                        ),
-                      ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, color: Colors.red, size: 20),
-                            SizedBox(width: 8),
-                            Text('Delete', style: TextStyle(color: Colors.red)),
-                          ],
-                        ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'edit',
+                            child: Row(
+                              children: [
+                                Icon(Icons.edit, size: 20),
+                                SizedBox(width: 8),
+                                Text('Edit'),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete, color: Colors.red, size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Delete',
+                                  style: TextStyle(color: Colors.red),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -382,6 +384,116 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showDetails(CompanyModel company) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          width: 500,
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Company Details',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close),
+                  ),
+                ],
+              ),
+              const Divider(height: 32),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildDetailRow(
+                        'Company Name',
+                        company.companyName,
+                        Icons.business,
+                      ),
+                      if (company.email != null)
+                        _buildDetailRow('Email', company.email!, Icons.email),
+                      if (company.city != null)
+                        _buildDetailRow(
+                          'City',
+                          company.city!,
+                          Icons.location_city,
+                        ),
+                      if (company.taxRegistrationNumber != null)
+                        _buildDetailRow(
+                          'VAT Number',
+                          company.taxRegistrationNumber!,
+                          Icons.receipt,
+                        ),
+                      if (company.streetAddress != null)
+                        _buildDetailRow(
+                          'Address',
+                          company.streetAddress!,
+                          Icons.location_on,
+                        ),
+                      if (company.usesCaseCode)
+                        _buildDetailRow(
+                          'Case Codes',
+                          company.caseCodes.join(', '),
+                          Icons.list,
+                        ),
+                      _buildDetailRow(
+                        'Status',
+                        company.status,
+                        Icons.info_outline,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, IconData icon) {
+    if (value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: Colors.grey),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

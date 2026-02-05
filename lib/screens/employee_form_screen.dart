@@ -40,7 +40,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     'CFO',
     'Driver',
     'Senior Software Developer',
-    'Office Manager',
+    'Administrative Officer',
     'Other',
   ];
 

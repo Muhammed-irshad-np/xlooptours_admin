@@ -6,6 +6,7 @@ import '../models/company_model.dart';
 import '../models/customer_model.dart';
 import '../models/employee_model.dart';
 import '../models/notification_model.dart';
+import '../models/vehicle_model.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
@@ -551,5 +552,43 @@ class DatabaseService {
     await firestore.collection('notifications').doc(id).update({
       'isRead': true,
     });
+  }
+  // ======================
+  // VEHICLE Operations
+  // ======================
+
+  Future<void> insertVehicle(VehicleModel vehicle) async {
+    try {
+      debugPrint('DatabaseService: Inserting vehicle ${vehicle.id}');
+      await firestore
+          .collection('vehicles')
+          .doc(vehicle.id)
+          .set(vehicle.toJson());
+    } catch (e) {
+      debugPrint('DatabaseService: Error inserting vehicle: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<VehicleModel>> getAllVehicles() async {
+    final snapshot = await firestore
+        .collection('vehicles')
+        .orderBy('make')
+        .get();
+
+    return snapshot.docs
+        .map((doc) => VehicleModel.fromJson(doc.data()))
+        .toList();
+  }
+
+  Future<void> updateVehicle(VehicleModel vehicle) async {
+    await firestore
+        .collection('vehicles')
+        .doc(vehicle.id)
+        .update(vehicle.toJson());
+  }
+
+  Future<void> deleteVehicle(String id) async {
+    await firestore.collection('vehicles').doc(id).delete();
   }
 }

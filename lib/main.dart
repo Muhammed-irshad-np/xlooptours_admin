@@ -23,6 +23,9 @@ import 'models/customer_model.dart';
 import 'screens/customer_form_screen.dart';
 import 'screens/customer_list_screen.dart';
 import 'screens/public/under_maintenance_screen.dart';
+import 'models/vehicle_model.dart'; // Added
+// import 'screens/vehicles_screen.dart'; // Removed unused import
+import 'screens/vehicle_form_screen.dart'; // Added
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -170,6 +173,13 @@ class _MyAppState extends State<MyApp> {
         GoRoute(
           path: '/invoices',
           builder: (context, state) => const InvoiceListScreen(),
+        ),
+        GoRoute(
+          path: '/vehicles/form',
+          builder: (context, state) {
+            final vehicle = state.extra as VehicleModel?;
+            return VehicleFormScreen(vehicle: vehicle);
+          },
         ),
       ],
     );
