@@ -12,6 +12,7 @@ class EmployeeModel {
   final String gender;
   final String? driverType; // Internal or External (only for Drivers)
   final bool isActive;
+  final String? imageUrl;
 
   EmployeeModel({
     required this.id,
@@ -27,6 +28,7 @@ class EmployeeModel {
     required this.gender,
     this.driverType,
     this.isActive = true,
+    this.imageUrl,
   });
 
   Map<String, dynamic> toJson() {
@@ -44,6 +46,7 @@ class EmployeeModel {
       'gender': gender,
       'driverType': driverType,
       'isActive': isActive,
+      'imageUrl': imageUrl,
     };
   }
 
@@ -66,6 +69,7 @@ class EmployeeModel {
       gender: json['gender'] as String? ?? '',
       driverType: json['driverType'] as String?,
       isActive: json['isActive'] as bool? ?? true,
+      imageUrl: json['imageUrl'] as String?,
     );
   }
 
@@ -83,6 +87,7 @@ class EmployeeModel {
     String? gender,
     String? driverType,
     bool? isActive,
+    String? imageUrl,
   }) {
     return EmployeeModel(
       id: id ?? this.id,
@@ -98,6 +103,7 @@ class EmployeeModel {
       gender: gender ?? this.gender,
       driverType: driverType ?? this.driverType,
       isActive: isActive ?? this.isActive,
+      imageUrl: imageUrl ?? this.imageUrl,
     );
   }
 }

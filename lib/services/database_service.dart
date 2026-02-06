@@ -1,7 +1,11 @@
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:xloop_invoice/models/invoice_model.dart';
 import 'package:xloop_invoice/models/line_item_model.dart';
+import 'package:xloop_invoice/models/vehicle_make_model.dart'; // Added
 import '../models/company_model.dart';
 import '../models/customer_model.dart';
 import '../models/employee_model.dart';
@@ -519,6 +523,26 @@ class DatabaseService {
     await firestore.collection('employees').doc(id).delete();
   }
 
+  Future<String> uploadEmployeeImage(XFile image, String employeeId) async {
+    try {
+      final storageRef = FirebaseStorage.instance
+          .ref()
+          .child('employee_images')
+          .child('$employeeId.jpg');
+
+      if (kIsWeb) {
+        await storageRef.putData(await image.readAsBytes());
+      } else {
+        await storageRef.putFile(File(image.path));
+      }
+
+      return await storageRef.getDownloadURL();
+    } catch (e) {
+      debugPrint('Error uploading employee image: $e');
+      rethrow;
+    }
+  }
+
   // ======================
   // NOTIFICATION Operations
   // ======================
@@ -560,6 +584,22 @@ class DatabaseService {
   Future<void> insertVehicle(VehicleModel vehicle) async {
     try {
       debugPrint('DatabaseService: Inserting vehicle ${vehicle.id}');
+
+      // Enforce 1:1 Driver Assignment
+      if (vehicle.assignedDriverId != null) {
+        final batch = firestore.batch();
+        final currentAssignments = await firestore
+            .collection('vehicles')
+            .where('assignedDriverId', isEqualTo: vehicle.assignedDriverId)
+            .get();
+
+        for (var doc in currentAssignments.docs) {
+          // New vehicle, so any existing assignment is "other"
+          batch.update(doc.reference, {'assignedDriverId': null});
+        }
+        await batch.commit();
+      }
+
       await firestore
           .collection('vehicles')
           .doc(vehicle.id)
@@ -582,13 +622,417 @@ class DatabaseService {
   }
 
   Future<void> updateVehicle(VehicleModel vehicle) async {
-    await firestore
-        .collection('vehicles')
-        .doc(vehicle.id)
-        .update(vehicle.toJson());
+    try {
+      // Enforce 1:1 Driver Assignment
+      if (vehicle.assignedDriverId != null) {
+        final batch = firestore.batch();
+        final currentAssignments = await firestore
+            .collection('vehicles')
+            .where('assignedDriverId', isEqualTo: vehicle.assignedDriverId)
+            .get();
+
+        for (var doc in currentAssignments.docs) {
+          if (doc.id != vehicle.id) {
+            batch.update(doc.reference, {'assignedDriverId': null});
+          }
+        }
+        await batch.commit();
+      }
+      await firestore
+          .collection('vehicles')
+          .doc(vehicle.id)
+          .update(vehicle.toJson());
+    } catch (e) {
+      debugPrint('DatabaseService: Error updating vehicle: $e');
+      rethrow;
+    }
   }
 
   Future<void> deleteVehicle(String id) async {
     await firestore.collection('vehicles').doc(id).delete();
+  }
+
+  /// Assigns a driver to a vehicle, ensuing 1:1 relationship.
+  /// If the driver was assigned to another vehicle, they are unassigned from it.
+  /// If the vehicle had another driver, that driver is replaced.
+  Future<void> assignDriverToVehicle(String? vehicleId, String driverId) async {
+    try {
+      final batch = firestore.batch();
+
+      // 1. Find any OTHER vehicle currently assigned to this driver
+      final currentAssignments = await firestore
+          .collection('vehicles')
+          .where('assignedDriverId', isEqualTo: driverId)
+          .get();
+
+      for (var doc in currentAssignments.docs) {
+        if (doc.id != vehicleId) {
+          // Unassign from old vehicle
+          batch.update(doc.reference, {'assignedDriverId': null});
+        }
+      }
+
+      // 2. Assign to new vehicle (if provided)
+      if (vehicleId != null) {
+        final vehicleRef = firestore.collection('vehicles').doc(vehicleId);
+        batch.update(vehicleRef, {'assignedDriverId': driverId});
+      }
+
+      await batch.commit();
+    } catch (e) {
+      debugPrint('DatabaseService: Error assigning driver: $e');
+      rethrow;
+    }
+  }
+
+  // ======================
+  // VEHICLE MASTER Operations
+  // ======================
+
+  Future<void> insertVehicleMake(VehicleMakeModel make) async {
+    await firestore.collection('vehicle_makes').doc(make.id).set(make.toJson());
+  }
+
+  Future<List<VehicleMakeModel>> getAllVehicleMakes() async {
+    final snapshot = await firestore
+        .collection('vehicle_makes')
+        .orderBy('name')
+        .get();
+    return snapshot.docs
+        .map((doc) => VehicleMakeModel.fromJson(doc.data()))
+        .toList();
+  }
+
+  Future<void> updateVehicleMake(VehicleMakeModel make) async {
+    await firestore
+        .collection('vehicle_makes')
+        .doc(make.id)
+        .update(make.toJson());
+  }
+
+  Future<void> deleteVehicleMake(String id) async {
+    await firestore.collection('vehicle_makes').doc(id).delete();
+  }
+  // ======================
+  // DATA SEEDING
+  // ======================
+
+  Future<void> seedVehicleMasterData() async {
+    final List<VehicleMakeModel> defaultMakes = [
+      VehicleMakeModel(
+        id: 'toyota',
+        name: 'Toyota',
+        logoUrl: 'https://logo.clearbit.com/toyota.com',
+        models: [
+          VehicleModelDetail(name: 'Land Cruiser', type: 'SUV'),
+          VehicleModelDetail(name: 'Land Cruiser Prado', type: 'SUV'),
+          VehicleModelDetail(name: 'Fortuner', type: 'SUV'),
+          VehicleModelDetail(name: 'Highlander', type: 'SUV'),
+          VehicleModelDetail(name: 'Camry', type: 'Sedan'),
+          VehicleModelDetail(name: 'Corolla', type: 'Sedan'),
+          VehicleModelDetail(name: 'Yaris', type: 'Sedan'),
+          VehicleModelDetail(name: 'Hiace', type: 'Van'),
+          VehicleModelDetail(name: 'Granvia', type: 'Van'),
+          VehicleModelDetail(name: 'Coaster', type: 'Bus'),
+          VehicleModelDetail(name: 'Hilux', type: 'Pickup'),
+          VehicleModelDetail(name: 'Innova', type: 'Van'),
+          VehicleModelDetail(name: 'Supra', type: 'Coupe'),
+        ],
+        years: List.generate(12, (index) => 2015 + index), // 2015-2026
+        colors: [
+          'White',
+          'Pearl White',
+          'Black',
+          'Silver',
+          'Grey',
+          'Beige',
+          'Red',
+          'Blue',
+          'Gold',
+        ],
+      ),
+      VehicleMakeModel(
+        id: 'nissan',
+        name: 'Nissan',
+        logoUrl: 'https://logo.clearbit.com/nissan-global.com',
+        models: [
+          VehicleModelDetail(name: 'Patrol', type: 'SUV'),
+          VehicleModelDetail(name: 'Patrol Super Safari', type: 'SUV'),
+          VehicleModelDetail(name: 'X-Terra', type: 'SUV'),
+          VehicleModelDetail(name: 'X-Trail', type: 'SUV'),
+          VehicleModelDetail(name: 'Pathfinder', type: 'SUV'),
+          VehicleModelDetail(name: 'Kicks', type: 'Crossover'),
+          VehicleModelDetail(name: 'Altima', type: 'Sedan'),
+          VehicleModelDetail(name: 'Maxima', type: 'Sedan'),
+          VehicleModelDetail(name: 'Sunny', type: 'Sedan'),
+          VehicleModelDetail(name: 'Urvan', type: 'Van'),
+          VehicleModelDetail(name: 'Civilian', type: 'Bus'),
+          VehicleModelDetail(name: 'Navara', type: 'Pickup'),
+        ],
+        years: List.generate(12, (index) => 2015 + index),
+        colors: [
+          'White',
+          'Super Black',
+          'Silver',
+          'Grey',
+          'Red',
+          'Blue',
+          'Gold',
+          'Brown',
+        ],
+      ),
+      VehicleMakeModel(
+        id: 'mitsubishi',
+        name: 'Mitsubishi',
+        logoUrl: 'https://logo.clearbit.com/mitsubishi-motors.com',
+        models: [
+          VehicleModelDetail(name: 'Pajero', type: 'SUV'),
+          VehicleModelDetail(name: 'Montero Sport', type: 'SUV'),
+          VehicleModelDetail(name: 'Outlander', type: 'SUV'),
+          VehicleModelDetail(name: 'ASX', type: 'Crossover'),
+          VehicleModelDetail(name: 'Eclipse Cross', type: 'Crossover'),
+          VehicleModelDetail(name: 'Xpander', type: 'MPV'),
+          VehicleModelDetail(name: 'Attrage', type: 'Sedan'),
+          VehicleModelDetail(name: 'L200', type: 'Pickup'),
+          VehicleModelDetail(name: 'Rosa', type: 'Bus'),
+        ],
+        years: List.generate(12, (index) => 2015 + index),
+        colors: ['White', 'Black', 'Silver', 'Grey', 'Red', 'Blue', 'Brown'],
+      ),
+      VehicleMakeModel(
+        id: 'lexus',
+        name: 'Lexus',
+        logoUrl: 'https://logo.clearbit.com/lexus.com',
+        models: [
+          VehicleModelDetail(name: 'LX', type: 'SUV'),
+          VehicleModelDetail(name: 'GX', type: 'SUV'),
+          VehicleModelDetail(name: 'RX', type: 'SUV'),
+          VehicleModelDetail(name: 'NX', type: 'SUV'),
+          VehicleModelDetail(name: 'UX', type: 'Crossover'),
+          VehicleModelDetail(name: 'ES', type: 'Sedan'),
+          VehicleModelDetail(name: 'LS', type: 'Sedan'),
+          VehicleModelDetail(name: 'IS', type: 'Sedan'),
+          VehicleModelDetail(name: 'RC', type: 'Coupe'),
+          VehicleModelDetail(name: 'LC', type: 'Coupe'),
+        ],
+        years: List.generate(12, (index) => 2015 + index),
+        colors: [
+          'White',
+          'Black',
+          'Titanium',
+          'Sonic Quartz',
+          'Sonic Titanium',
+          'Deep Blue Mica',
+          'Red',
+        ],
+      ),
+      VehicleMakeModel(
+        id: 'mercedes',
+        name: 'Mercedes-Benz',
+        logoUrl: 'https://logo.clearbit.com/mercedes-benz.com',
+        models: [
+          VehicleModelDetail(name: 'S-Class', type: 'Sedan'),
+          VehicleModelDetail(name: 'E-Class', type: 'Sedan'),
+          VehicleModelDetail(name: 'C-Class', type: 'Sedan'),
+          VehicleModelDetail(name: 'G-Class', type: 'SUV'),
+          VehicleModelDetail(name: 'GLE', type: 'SUV'),
+          VehicleModelDetail(name: 'GLS', type: 'SUV'),
+          VehicleModelDetail(name: 'GLC', type: 'SUV'),
+          VehicleModelDetail(name: 'V-Class', type: 'Van'),
+          VehicleModelDetail(name: 'Sprinter', type: 'Van'),
+          VehicleModelDetail(name: 'Maybach', type: 'Sedan'),
+        ],
+        years: List.generate(12, (index) => 2015 + index),
+        colors: [
+          'White',
+          'Obsidian Black',
+          'Iridium Silver',
+          'Selenite Grey',
+          'Blue',
+          'Designo Red',
+        ],
+      ),
+      VehicleMakeModel(
+        id: 'bmw',
+        name: 'BMW',
+        logoUrl: 'https://logo.clearbit.com/bmw.com',
+        models: [
+          VehicleModelDetail(name: '7 Series', type: 'Sedan'),
+          VehicleModelDetail(name: 'X7', type: 'SUV'),
+          VehicleModelDetail(name: 'X6', type: 'SUV'),
+          VehicleModelDetail(name: 'X5', type: 'SUV'),
+          VehicleModelDetail(name: 'X4', type: 'SUV'),
+          VehicleModelDetail(name: 'X3', type: 'SUV'),
+          VehicleModelDetail(name: '5 Series', type: 'Sedan'),
+          VehicleModelDetail(name: '3 Series', type: 'Sedan'),
+          VehicleModelDetail(name: '8 Series', type: 'Coupe'),
+        ],
+        years: List.generate(12, (index) => 2015 + index),
+        colors: [
+          'Alpine White',
+          'Black Sapphire',
+          'Mineral White',
+          'Phytonic Blue',
+          'Carbon Black',
+          'Grey',
+        ],
+      ),
+      VehicleMakeModel(
+        id: 'hyundai',
+        name: 'Hyundai',
+        logoUrl: 'https://logo.clearbit.com/hyundai.com',
+        models: [
+          VehicleModelDetail(name: 'Palisade', type: 'SUV'),
+          VehicleModelDetail(name: 'Santa Fe', type: 'SUV'),
+          VehicleModelDetail(name: 'Tucson', type: 'SUV'),
+          VehicleModelDetail(name: 'Creta', type: 'Crossover'),
+          VehicleModelDetail(name: 'Staria', type: 'Van'),
+          VehicleModelDetail(name: 'H-1', type: 'Van'),
+          VehicleModelDetail(name: 'Sonata', type: 'Sedan'),
+          VehicleModelDetail(name: 'Elantra', type: 'Sedan'),
+          VehicleModelDetail(name: 'Accent', type: 'Sedan'),
+        ],
+        years: List.generate(12, (index) => 2015 + index),
+        colors: [
+          'White',
+          'Black',
+          'Silver',
+          'Titan Grey',
+          'Red',
+          'Blue',
+          'Creamy White',
+        ],
+      ),
+      VehicleMakeModel(
+        id: 'kia',
+        name: 'Kia',
+        logoUrl: 'https://logo.clearbit.com/kia.com',
+        models: [
+          VehicleModelDetail(name: 'Telluride', type: 'SUV'),
+          VehicleModelDetail(name: 'Sorento', type: 'SUV'),
+          VehicleModelDetail(name: 'Sportage', type: 'SUV'),
+          VehicleModelDetail(name: 'Seltos', type: 'Crossover'),
+          VehicleModelDetail(name: 'Carnival', type: 'Van'),
+          VehicleModelDetail(name: 'K5', type: 'Sedan'),
+          VehicleModelDetail(name: 'Cerato', type: 'Sedan'),
+          VehicleModelDetail(name: 'Pegas', type: 'Sedan'),
+          VehicleModelDetail(name: 'Picanto', type: 'Hatchback'),
+        ],
+        years: List.generate(12, (index) => 2015 + index),
+        colors: [
+          'Snow White Pearl',
+          'Aurora Black Pearl',
+          'Silky Silver',
+          'Steel Grey',
+          'Gravity Grey',
+          'Blue',
+          'Red',
+        ],
+      ),
+      VehicleMakeModel(
+        id: 'ford',
+        name: 'Ford',
+        logoUrl: 'https://logo.clearbit.com/ford.com',
+        models: [
+          VehicleModelDetail(name: 'Expedition', type: 'SUV'),
+          VehicleModelDetail(name: 'Explorer', type: 'SUV'),
+          VehicleModelDetail(name: 'Everest', type: 'SUV'),
+          VehicleModelDetail(name: 'Edge', type: 'SUV'),
+          VehicleModelDetail(name: 'Territory', type: 'Crossover'),
+          VehicleModelDetail(name: 'F-150', type: 'Pickup'),
+          VehicleModelDetail(name: 'Ranger', type: 'Pickup'),
+          VehicleModelDetail(name: 'Mustang', type: 'Coupe'),
+          VehicleModelDetail(name: 'Taurus', type: 'Sedan'),
+          VehicleModelDetail(name: 'Transit', type: 'Van'),
+        ],
+        years: List.generate(12, (index) => 2015 + index),
+        colors: [
+          'Oxford White',
+          'Absolute Black',
+          'Iconic Silver',
+          'Carbonized Grey',
+          'Rapid Red',
+          'Velocity Blue',
+        ],
+      ),
+      VehicleMakeModel(
+        id: 'chevrolet',
+        name: 'Chevrolet',
+        logoUrl: 'https://logo.clearbit.com/chevrolet.com',
+        models: [
+          VehicleModelDetail(name: 'Tahoe', type: 'SUV'),
+          VehicleModelDetail(name: 'Suburban', type: 'SUV'),
+          VehicleModelDetail(name: 'Silverado', type: 'Pickup'),
+          VehicleModelDetail(name: 'Traverse', type: 'SUV'),
+          VehicleModelDetail(name: 'Blazer', type: 'SUV'),
+          VehicleModelDetail(name: 'Equinox', type: 'SUV'),
+          VehicleModelDetail(name: 'Captiva', type: 'SUV'),
+          VehicleModelDetail(name: 'Groove', type: 'Crossover'),
+          VehicleModelDetail(name: 'Camaro', type: 'Coupe'),
+          VehicleModelDetail(name: 'Corvette', type: 'Coupe'),
+        ],
+        years: List.generate(12, (index) => 2015 + index),
+        colors: [
+          'Summit White',
+          'Black',
+          'Silver Ice',
+          'Shadow Grey',
+          'Cherry Red',
+          'Blue',
+        ],
+      ),
+      VehicleMakeModel(
+        id: 'land_rover',
+        name: 'Land Rover',
+        logoUrl: 'https://logo.clearbit.com/landrover.com',
+        models: [
+          VehicleModelDetail(name: 'Range Rover', type: 'SUV'),
+          VehicleModelDetail(name: 'Range Rover Sport', type: 'SUV'),
+          VehicleModelDetail(name: 'Range Rover Velar', type: 'SUV'),
+          VehicleModelDetail(name: 'Range Rover Evoque', type: 'SUV'),
+          VehicleModelDetail(name: 'Defender', type: 'SUV'),
+          VehicleModelDetail(name: 'Discovery', type: 'SUV'),
+          VehicleModelDetail(name: 'Discovery Sport', type: 'SUV'),
+        ],
+        years: List.generate(12, (index) => 2015 + index),
+        colors: [
+          'White',
+          'Santorini Black',
+          'Eiger Grey',
+          'Hakka Silver',
+          'Fuji White',
+          'Blue',
+        ],
+      ),
+      VehicleMakeModel(
+        id: 'gmc',
+        name: 'GMC',
+        logoUrl: 'https://logo.clearbit.com/gmc.com',
+        models: [
+          VehicleModelDetail(name: 'Yukon', type: 'SUV'),
+          VehicleModelDetail(name: 'Yukon XL', type: 'SUV'),
+          VehicleModelDetail(name: 'Sierra', type: 'Pickup'),
+          VehicleModelDetail(name: 'Acadia', type: 'SUV'),
+          VehicleModelDetail(name: 'Terrain', type: 'SUV'),
+          VehicleModelDetail(name: 'Savana', type: 'Van'),
+        ],
+        years: List.generate(12, (index) => 2015 + index),
+        colors: [
+          'Summit White',
+          'Onyx Black',
+          'Quicksilver',
+          'Satin Steel',
+          'Red Quartz',
+          'Blue',
+        ],
+      ),
+    ];
+
+    final batch = firestore.batch();
+    for (var make in defaultMakes) {
+      final docRef = firestore.collection('vehicle_makes').doc(make.id);
+      batch.set(docRef, make.toJson());
+    }
+    await batch.commit();
   }
 }

@@ -1,11 +1,17 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import '../models/employee_model.dart';
+import '../models/vehicle_model.dart'; // Added
 import '../services/database_service.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
+  // ... (rest of class)
+
   final EmployeeModel? employee;
 
   const EmployeeFormScreen({super.key, this.employee});
@@ -31,8 +37,13 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   DateTime? _joinDate;
   DateTime? _birthDate;
   bool _isActive = true;
+  String? _currentImageUrl;
+  XFile? _pickedImage;
+  final ImagePicker _picker = ImagePicker();
 
   bool _isSaving = false;
+  List<VehicleModel> _availableVehicles = []; // Added
+  String? _selectedVehicleId; // Added
 
   final List<String> _positions = [
     'CEO',
@@ -80,6 +91,27 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       _joinDate = e.joinDate;
       _birthDate = e.birthDate;
       _isActive = e.isActive;
+      _currentImageUrl = e.imageUrl;
+    }
+    _loadVehicles(); // Load vehicles
+  }
+
+  // Added method to load vehicles
+  Future<void> _loadVehicles() async {
+    try {
+      final vehicles = await _databaseService.getAllVehicles();
+      setState(() {
+        _availableVehicles = vehicles;
+        // If editing, find the vehicle assigned to this driver
+        if (widget.employee != null) {
+          final assignedVehicle = vehicles
+              .where((v) => v.assignedDriverId == widget.employee!.id)
+              .firstOrNull;
+          _selectedVehicleId = assignedVehicle?.id;
+        }
+      });
+    } catch (e) {
+      debugPrint('Error loading vehicles: $e');
     }
   }
 
@@ -113,6 +145,24 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     }
   }
 
+  Future<void> _pickImage() async {
+    try {
+      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          _pickedImage = image;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error picking image: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+      }
+    }
+  }
+
   Future<void> _saveEmployee() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -143,6 +193,14 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         await _databaseService.insertEmployee(newEmployee);
       } else {
         await _databaseService.updateEmployee(newEmployee);
+      }
+
+      // Handle Vehicle Assignment
+      if (_selectedPosition == 'Driver') {
+        await _databaseService.assignDriverToVehicle(
+          _selectedVehicleId,
+          id, // The employee ID
+        );
       }
 
       if (mounted) {
@@ -187,6 +245,52 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                   // Basic Info Section
                   _buildSectionTitle('Basic Information'),
                   SizedBox(height: 16.h),
+
+                  // Image Picker
+                  Center(
+                    child: Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 50.r,
+                          backgroundColor: Colors.grey[200],
+                          backgroundImage: _pickedImage != null
+                              ? (kIsWeb
+                                    ? NetworkImage(_pickedImage!.path)
+                                    : FileImage(File(_pickedImage!.path))
+                                          as ImageProvider)
+                              : (_currentImageUrl != null
+                                    ? NetworkImage(_currentImageUrl!)
+                                    : null),
+                          child:
+                              (_pickedImage == null && _currentImageUrl == null)
+                              ? Icon(
+                                  Icons.person,
+                                  size: 50.sp,
+                                  color: Colors.grey[400],
+                                )
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: InkWell(
+                            onTap: _pickImage,
+                            child: CircleAvatar(
+                              radius: 18.r,
+                              backgroundColor: Colors.blue,
+                              child: Icon(
+                                Icons.edit,
+                                size: 18.sp,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 24.h),
+
                   Row(
                     children: [
                       Expanded(
@@ -222,6 +326,45 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                       onChanged: (val) =>
                           setState(() => _selectedDriverType = val!),
                     ),
+                    SizedBox(height: 16.h),
+                    DropdownButtonFormField<String>(
+                      value: _selectedVehicleId,
+                      decoration: InputDecoration(
+                        labelText: 'Assign Vehicle',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                      ),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('No Vehicle Assigned'),
+                        ),
+                        ..._availableVehicles.map((v) {
+                          final isAssigned =
+                              v.assignedDriverId != null &&
+                              v.assignedDriverId != widget.employee?.id;
+                          return DropdownMenuItem(
+                            value: v.id,
+                            child: Text(
+                              '${v.make} ${v.model} (${v.plateNumber})${isAssigned ? " [Assigned]" : ""}',
+                              style: TextStyle(
+                                color: isAssigned ? Colors.orange : null,
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedVehicleId = val;
+                        });
+                      },
+                    ),
                   ],
                   SizedBox(height: 16.h),
 
@@ -239,14 +382,17 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               v!.isEmpty ? 'Please enter phone number' : null,
                         ),
                       ),
-                      SizedBox(width: 16.w),
-                      Expanded(
-                        child: _buildTextField(
-                          controller: _emailController,
-                          label: 'Email',
-                          icon: Icons.email,
+                      if (!(_selectedPosition == 'Driver' &&
+                          _selectedDriverType == 'External')) ...[
+                        SizedBox(width: 16.w),
+                        Expanded(
+                          child: _buildTextField(
+                            controller: _emailController,
+                            label: 'Email',
+                            icon: Icons.email,
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                   SizedBox(height: 16.h),
@@ -297,26 +443,29 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                       ),
                     ],
                   ),
-                  SizedBox(height: 16.h),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDatePicker(
-                          label: 'Birth Date',
-                          date: _birthDate,
-                          onTap: () => _selectDate(context, false),
+                  if (!(_selectedPosition == 'Driver' &&
+                      _selectedDriverType == 'External')) ...[
+                    SizedBox(height: 16.h),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDatePicker(
+                            label: 'Birth Date',
+                            date: _birthDate,
+                            onTap: () => _selectDate(context, false),
+                          ),
                         ),
-                      ),
-                      SizedBox(width: 16.w),
-                      Expanded(
-                        child: _buildDatePicker(
-                          label: 'Join Date',
-                          date: _joinDate,
-                          onTap: () => _selectDate(context, true),
+                        SizedBox(width: 16.w),
+                        Expanded(
+                          child: _buildDatePicker(
+                            label: 'Join Date',
+                            date: _joinDate,
+                            onTap: () => _selectDate(context, true),
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
 
                   SizedBox(height: 24.h),
                   Divider(),

@@ -7,7 +7,6 @@ class VehicleModel {
   final String plateNumber;
   final String type; // e.g., SUV, Sedan
   final String? assignedDriverId; // Reference to Employee ID
-  final String? contactCardReference;
   final String? imageUrl;
   final bool isActive;
 
@@ -20,7 +19,6 @@ class VehicleModel {
     required this.plateNumber,
     required this.type,
     this.assignedDriverId,
-    this.contactCardReference,
     this.imageUrl,
     this.isActive = true,
   });
@@ -35,7 +33,6 @@ class VehicleModel {
       'plateNumber': plateNumber,
       'type': type,
       'assignedDriverId': assignedDriverId,
-      'contactCardReference': contactCardReference,
       'imageUrl': imageUrl,
       'isActive': isActive,
     };
@@ -51,7 +48,6 @@ class VehicleModel {
       plateNumber: json['plateNumber'] as String,
       type: json['type'] as String,
       assignedDriverId: json['assignedDriverId'] as String?,
-      contactCardReference: json['contactCardReference'] as String?,
       imageUrl: json['imageUrl'] as String?,
       isActive: json['isActive'] as bool? ?? true,
     );
@@ -66,7 +62,6 @@ class VehicleModel {
     String? plateNumber,
     String? type,
     String? assignedDriverId,
-    String? contactCardReference,
     String? imageUrl,
     bool? isActive,
   }) {
@@ -79,7 +74,6 @@ class VehicleModel {
       plateNumber: plateNumber ?? this.plateNumber,
       type: type ?? this.type,
       assignedDriverId: assignedDriverId ?? this.assignedDriverId,
-      contactCardReference: contactCardReference ?? this.contactCardReference,
       imageUrl: imageUrl ?? this.imageUrl,
       isActive: isActive ?? this.isActive,
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:xloop_invoice/screens/vehicle_master_screen.dart'; // Added
 import '../models/vehicle_model.dart';
 import '../models/employee_model.dart';
 import '../services/database_service.dart';
@@ -85,168 +86,174 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Fleet Management'),
-        actions: [
-          IconButton(
-            onPressed: () => _navigateToAddEdit(),
-            icon: const Icon(Icons.add),
-            tooltip: 'Add Vehicle',
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Fleet Management'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Fleet List', icon: Icon(Icons.directions_car)),
+              Tab(text: 'Vehicle Master', icon: Icon(Icons.settings)),
+            ],
           ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _vehicles.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.directions_car_outlined,
-                    size: 80.sp,
-                    color: Colors.grey,
-                  ),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'No vehicles found',
-                    style: TextStyle(color: Colors.grey, fontSize: 18.sp),
-                  ),
-                  SizedBox(height: 16.h),
-                  ElevatedButton(
-                    onPressed: () => _navigateToAddEdit(),
-                    child: const Text('Add Vehicle'),
-                  ),
-                ],
-              ),
-            )
-          : ListView.separated(
-              padding: EdgeInsets.all(16.w),
-              itemCount: _vehicles.length,
-              separatorBuilder: (context, index) => SizedBox(height: 16.h),
-              itemBuilder: (context, index) {
-                final vehicle = _vehicles[index];
-                final driver = vehicle.assignedDriverId != null
-                    ? _driversMap[vehicle.assignedDriverId]
-                    : null;
-
-                return Card(
-                  child: ListTile(
-                    leading: Container(
-                      width: 60.w,
-                      height: 60.w,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(8.r),
-                        image: vehicle.imageUrl != null
-                            ? DecorationImage(
-                                image: NetworkImage(vehicle.imageUrl!),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
-                      ),
-                      child: vehicle.imageUrl == null
-                          ? Icon(Icons.directions_car, color: Colors.grey[500])
-                          : null,
-                    ),
-                    title: Text(
-                      '${vehicle.make} ${vehicle.model} (${vehicle.year})',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.sp,
-                      ),
-                    ),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+          actions: [
+            IconButton(
+              onPressed: () => _navigateToAddEdit(),
+              icon: const Icon(Icons.add),
+              tooltip: 'Add Vehicle',
+            ),
+          ],
+        ),
+        body: TabBarView(
+          children: [
+            // Tab 1: Fleet List (Existing UI)
+            _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : _vehicles.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        SizedBox(height: 4.h),
+                        Icon(
+                          Icons.directions_car_outlined,
+                          size: 80.sp,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(height: 16.h),
                         Text(
-                          'Plate: ${vehicle.plateNumber} • ${vehicle.color}',
+                          'No vehicles found',
+                          style: TextStyle(color: Colors.grey, fontSize: 18.sp),
                         ),
-                        SizedBox(height: 4.h),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.person,
-                              size: 14.sp,
-                              color: Colors.blueGrey,
-                            ),
-                            SizedBox(width: 4.w),
-                            Text(
-                              driver != null
-                                  ? driver.fullName
-                                  : 'No Driver Assigned',
-                              style: TextStyle(
-                                color: driver != null
-                                    ? Colors.black87
-                                    : Colors.orange,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
+                        SizedBox(height: 16.h),
+                        ElevatedButton(
+                          onPressed: () => _navigateToAddEdit(),
+                          child: const Text('Add Vehicle'),
                         ),
                       ],
                     ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.remove_red_eye_outlined,
-                            color: Colors.blue,
-                          ),
-                          onPressed: () => _showDetails(vehicle, driver),
-                          tooltip: 'View Details',
-                        ),
-                        PopupMenuButton(
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.edit, size: 20),
-                                  SizedBox(width: 8),
-                                  Text('Edit'),
-                                ],
-                              ),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.delete,
-                                    color: Colors.red,
-                                    size: 20,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Delete',
-                                    style: TextStyle(color: Colors.red),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                          onSelected: (value) {
-                            if (value == 'edit') {
-                              _navigateToAddEdit(vehicle: vehicle);
-                            } else if (value == 'delete') {
-                              _deleteVehicle(vehicle.id);
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                    onTap: () => _showDetails(
-                      vehicle,
-                      driver,
-                    ), // Tap opens details now instead of edit
+                  )
+                : ListView.separated(
+                    padding: EdgeInsets.all(16.w),
+                    itemCount: _vehicles.length,
+                    separatorBuilder: (context, index) =>
+                        SizedBox(height: 16.h),
+                    itemBuilder: (context, index) {
+                      final vehicle = _vehicles[index];
+                      final driver = vehicle.assignedDriverId != null
+                          ? _driversMap[vehicle.assignedDriverId]
+                          : null;
+
+                      return _buildVehicleCard(vehicle, driver);
+                    },
                   ),
-                );
+
+            // Tab 2: Vehicle Master
+            const VehicleMasterScreen(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVehicleCard(VehicleModel vehicle, EmployeeModel? driver) {
+    return Card(
+      child: ListTile(
+        leading: Container(
+          width: 60.w,
+          height: 60.w,
+          decoration: BoxDecoration(
+            color: Colors.grey[200],
+            borderRadius: BorderRadius.circular(8.r),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: vehicle.imageUrl != null
+              ? Image.network(
+                  vehicle.imageUrl!,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Icon(Icons.broken_image, color: Colors.grey[500]);
+                  },
+                )
+              : Icon(Icons.directions_car, color: Colors.grey[500]),
+        ),
+        title: Text(
+          '${vehicle.make} ${vehicle.model} (${vehicle.year})',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16.sp),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 4.h),
+            Text('Plate: ${vehicle.plateNumber} • ${vehicle.color}'),
+            SizedBox(height: 4.h),
+            Row(
+              children: [
+                Icon(Icons.person, size: 14.sp, color: Colors.blueGrey),
+                SizedBox(width: 4.w),
+                Text(
+                  driver != null ? driver.fullName : 'No Driver Assigned',
+                  style: TextStyle(
+                    color: driver != null ? Colors.black87 : Colors.orange,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(
+                Icons.remove_red_eye_outlined,
+                color: Colors.blue,
+              ),
+              onPressed: () => _showDetails(vehicle, driver),
+              tooltip: 'View Details',
+            ),
+            PopupMenuButton(
+              itemBuilder: (context) => [
+                const PopupMenuItem(
+                  value: 'edit',
+                  child: Row(
+                    children: [
+                      Icon(Icons.edit, size: 20),
+                      SizedBox(width: 8),
+                      Text('Edit'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'delete',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete, color: Colors.red, size: 20),
+                      SizedBox(width: 8),
+                      Text('Delete', style: TextStyle(color: Colors.red)),
+                    ],
+                  ),
+                ),
+              ],
+              onSelected: (value) {
+                if (value == 'edit') {
+                  _navigateToAddEdit(vehicle: vehicle);
+                } else if (value == 'delete') {
+                  _deleteVehicle(vehicle.id);
+                }
               },
             ),
+          ],
+        ),
+        onTap: () => _showDetails(vehicle, driver),
+      ),
     );
   }
 
@@ -287,11 +294,28 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                           width: double.infinity,
                           margin: const EdgeInsets.only(bottom: 16),
                           decoration: BoxDecoration(
+                            color: Colors.grey[200],
                             borderRadius: BorderRadius.circular(12),
-                            image: DecorationImage(
-                              image: NetworkImage(vehicle.imageUrl!),
-                              fit: BoxFit.cover,
-                            ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: Image.network(
+                            vehicle.imageUrl!,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return const Center(
+                                child: CircularProgressIndicator(),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Center(
+                                child: Icon(
+                                  Icons.broken_image,
+                                  size: 50,
+                                  color: Colors.grey,
+                                ),
+                              );
+                            },
                           ),
                         ),
 

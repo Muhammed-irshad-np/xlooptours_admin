@@ -258,7 +258,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                       padding: const EdgeInsets.all(16),
                       gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: 430.w,
-                        childAspectRatio: 1.8,
+                        childAspectRatio: 1.5,
                         crossAxisSpacing: 16,
                         mainAxisSpacing: 16,
                       ),
@@ -295,15 +295,20 @@ class _EmployeesScreenState extends State<EmployeesScreen>
               children: [
                 CircleAvatar(
                   backgroundColor: Colors.blue.withOpacity(0.1),
-                  child: Text(
-                    employee.fullName.isNotEmpty
-                        ? employee.fullName[0].toUpperCase()
-                        : '?',
-                    style: TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  backgroundImage: employee.imageUrl != null
+                      ? NetworkImage(employee.imageUrl!)
+                      : null,
+                  child: employee.imageUrl == null
+                      ? Text(
+                          employee.fullName.isNotEmpty
+                              ? employee.fullName[0].toUpperCase()
+                              : '?',
+                          style: TextStyle(
+                            color: Colors.blue,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
                 ),
                 SizedBox(width: 12.w),
                 Expanded(
@@ -319,12 +324,53 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      Text(
-                        employee.position,
-                        style: TextStyle(
-                          fontSize: 13.sp,
-                          color: Colors.grey[600],
-                        ),
+                      SizedBox(height: 4.h),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment
+                            .start, // Changed from center to start
+                        children: [
+                          Text(
+                            employee.position,
+                            style: TextStyle(
+                              fontSize: 14.sp,
+                              color: Colors.grey[600],
+                              fontWeight: FontWeight.w500,
+                            ),
+                            // textAlign: TextAlign.center, // Removed as it's in a Row with start alignment
+                          ),
+                          if (employee.position == 'Driver' &&
+                              employee.driverType != null) ...[
+                            SizedBox(width: 8.w),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 6.w,
+                                vertical: 2.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: employee.driverType == 'Internal'
+                                    ? Colors.green.withOpacity(0.1)
+                                    : Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4.r),
+                                border: Border.all(
+                                  color: employee.driverType == 'Internal'
+                                      ? Colors.green
+                                      : Colors.orange,
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: Text(
+                                employee.driverType!,
+                                style: TextStyle(
+                                  fontSize: 10.sp,
+                                  color: employee.driverType == 'Internal'
+                                      ? Colors.green
+                                      : Colors.orange,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),
@@ -487,16 +533,21 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                   CircleAvatar(
                     radius: 30,
                     backgroundColor: Colors.blue.withOpacity(0.1),
-                    child: Text(
-                      employee.fullName.isNotEmpty
-                          ? employee.fullName[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
-                      ),
-                    ),
+                    backgroundImage: employee.imageUrl != null
+                        ? NetworkImage(employee.imageUrl!)
+                        : null,
+                    child: employee.imageUrl == null
+                        ? Text(
+                            employee.fullName.isNotEmpty
+                                ? employee.fullName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue,
+                            ),
+                          )
+                        : null,
                   ),
                   const SizedBox(width: 16),
                   Expanded(
@@ -532,7 +583,8 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildDetailRow('Email', employee.email, Icons.email),
+                      if (employee.driverType != 'External')
+                        _buildDetailRow('Email', employee.email, Icons.email),
                       _buildDetailRow(
                         'Phone',
                         employee.phoneNumber,
@@ -550,16 +602,18 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                         employee.idNumber,
                         Icons.numbers,
                       ),
-                      _buildDetailRow(
-                        'Join Date',
-                        employee.joinDate?.toString().split(' ')[0] ?? 'N/A',
-                        Icons.calendar_today,
-                      ),
-                      _buildDetailRow(
-                        'Birth Date',
-                        employee.birthDate?.toString().split(' ')[0] ?? 'N/A',
-                        Icons.cake,
-                      ),
+                      if (employee.driverType != 'External') ...[
+                        _buildDetailRow(
+                          'Join Date',
+                          employee.joinDate?.toString().split(' ')[0] ?? 'N/A',
+                          Icons.calendar_today,
+                        ),
+                        _buildDetailRow(
+                          'Birth Date',
+                          employee.birthDate?.toString().split(' ')[0] ?? 'N/A',
+                          Icons.cake,
+                        ),
+                      ],
                       if (employee.driverType != null)
                         _buildDetailRow(
                           'Driver Type',
