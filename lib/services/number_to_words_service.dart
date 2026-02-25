@@ -179,24 +179,25 @@ class NumberToWordsService {
     int remainder = n % 100;
 
     if (hundreds > 0) {
-      if (hundreds == 1)
+      if (hundreds == 1) {
         words += 'مائة';
-      else if (hundreds == 2)
+      } else if (hundreds == 2) {
         words += 'مائتان';
-      else if (hundreds == 3)
+      } else if (hundreds == 3) {
         words += 'ثلاثمائة';
-      else if (hundreds == 4)
+      } else if (hundreds == 4) {
         words += 'أربعمائة';
-      else if (hundreds == 5)
+      } else if (hundreds == 5) {
         words += 'خمسمائة';
-      else if (hundreds == 6)
+      } else if (hundreds == 6) {
         words += 'ستمائة';
-      else if (hundreds == 7)
+      } else if (hundreds == 7) {
         words += 'سبعمائة';
-      else if (hundreds == 8)
+      } else if (hundreds == 8) {
         words += 'ثمانمائة';
-      else if (hundreds == 9)
+      } else if (hundreds == 9) {
         words += 'تسعمائة';
+      }
 
       if (remainder > 0) words += ' و';
     }

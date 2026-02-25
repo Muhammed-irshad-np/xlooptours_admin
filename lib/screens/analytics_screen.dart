@@ -1,9 +1,9 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../models/invoice_model.dart';
-import '../models/company_model.dart';
-import '../services/database_service.dart';
+import 'package:provider/provider.dart';
+import '../features/analytics/presentation/providers/analytics_provider.dart';
+import '../features/analytics/domain/entities/analytics_entity.dart';
 import '../widgets/responsive_layout.dart';
 
 class AnalyticsScreen extends StatefulWidget {
@@ -14,17 +14,8 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  bool _isLoading = true;
-  int? _selectedMonth;
-  int? _selectedYear;
-
-  // Analytics Data
-  double _totalRevenue = 0;
-  int _totalInvoices = 0;
-  double _averageInvoiceValue = 0;
-  double _totalTax = 0;
-  Map<int, double> _monthlyRevenue = {};
-  Map<String, double> _topCompanies = {};
+  final ValueNotifier<int?> _selectedMonth = ValueNotifier<int?>(null);
+  final ValueNotifier<int?> _selectedYear = ValueNotifier<int?>(null);
 
   @override
   void initState() {
@@ -32,57 +23,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     _loadData();
   }
 
+  @override
+  void dispose() {
+    _selectedMonth.dispose();
+    _selectedYear.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
     try {
-      final analytics = await DatabaseService.instance.getAnalytics(
-        month: _selectedMonth,
-        year: _selectedYear,
+      await context.read<AnalyticsProvider>().fetchAnalytics(
+        month: _selectedMonth.value,
+        year: _selectedYear.value,
       );
-
-      setState(() {
-        _totalRevenue = (analytics['totalRevenue'] as num?)?.toDouble() ?? 0;
-        _totalInvoices = (analytics['invoiceCount'] as num?)?.toInt() ?? 0;
-        _averageInvoiceValue =
-            (analytics['averageInvoiceValue'] as num?)?.toDouble() ?? 0;
-        _totalTax = (analytics['totalTax'] as num?)?.toDouble() ?? 0;
-
-        // Process monthly revenue
-        _monthlyRevenue = {};
-        final monthlyData = analytics['monthlyRevenue'] as List? ?? [];
-        for (var item in monthlyData) {
-          if (item is Map) {
-            final month = (item['month'] as num?)?.toInt();
-            final revenue = (item['revenue'] as num?)?.toDouble();
-            if (month != null && revenue != null) {
-              _monthlyRevenue[month] = revenue;
-            }
-          }
-        }
-
-        // Process top companies
-        _topCompanies = {};
-        final topCompaniesData = analytics['topCompanies'] as List? ?? [];
-        for (var item in topCompaniesData) {
-          if (item is Map) {
-            final company = item['company'];
-            final revenue = (item['revenue'] as num?)?.toDouble();
-            if (company != null && revenue != null) {
-              String name = 'Unknown';
-              if (company is CompanyModel) {
-                name = company.companyName;
-              } else if (company is Map) {
-                name = company['companyName']?.toString() ?? 'Unknown';
-              }
-              _topCompanies[name] = revenue;
-            }
-          }
-        }
-
-        _isLoading = false;
-      });
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -100,71 +54,129 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Analytics'), elevation: 0),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Filters
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: ResponsiveLayout(
-                        mobile: Column(children: _buildFilterChildren()),
-                        desktop: Row(
-                          children: _buildFilterChildren(isRow: true),
-                        ),
+      body: Consumer<AnalyticsProvider>(
+        builder: (context, provider, child) {
+          if (provider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (provider.error != null) {
+            return Center(child: Text('Error: ${provider.error}'));
+          }
+
+          final analytics = provider.analytics;
+          if (analytics == null) {
+            return const Center(child: Text('No analytics data available'));
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Filters
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: ResponsiveLayout(
+                      mobile: ValueListenableBuilder<int?>(
+                        valueListenable: _selectedYear,
+                        builder: (context, selectedYear, _) {
+                          return ValueListenableBuilder<int?>(
+                            valueListenable: _selectedMonth,
+                            builder: (context, selectedMonth, _) {
+                              return Column(
+                                children: _buildFilterChildren(
+                                  selectedYear: selectedYear,
+                                  selectedMonth: selectedMonth,
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                      desktop: ValueListenableBuilder<int?>(
+                        valueListenable: _selectedYear,
+                        builder: (context, selectedYear, _) {
+                          return ValueListenableBuilder<int?>(
+                            valueListenable: _selectedMonth,
+                            builder: (context, selectedMonth, _) {
+                              return Row(
+                                children: _buildFilterChildren(
+                                  isRow: true,
+                                  selectedYear: selectedYear,
+                                  selectedMonth: selectedMonth,
+                                ),
+                              );
+                            },
+                          );
+                        },
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                ),
+                const SizedBox(height: 24),
 
-                  // Summary Cards
-                  ResponsiveLayout(
-                    mobile: Column(
-                      children: _buildSummaryCards(currencyFormat),
-                    ),
-                    desktop: Row(
-                      children: _buildSummaryCards(currencyFormat, isRow: true),
+                // Summary Cards
+                ResponsiveLayout(
+                  mobile: Column(
+                    children: _buildSummaryCards(analytics, currencyFormat),
+                  ),
+                  desktop: Row(
+                    children: _buildSummaryCards(
+                      analytics,
+                      currencyFormat,
+                      isRow: true,
                     ),
                   ),
-                  const SizedBox(height: 24),
+                ),
+                const SizedBox(height: 24),
 
-                  // Charts
-                  ResponsiveLayout(
-                    mobile: Column(
-                      children: [
-                        _buildMonthlyRevenueChart(currencyFormat),
-                        const SizedBox(height: 24),
-                        _buildTopCompaniesChart(currencyFormat),
-                      ],
-                    ),
-                    desktop: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _buildMonthlyRevenueChart(currencyFormat),
-                        ),
-                        const SizedBox(width: 24),
-                        Expanded(
-                          child: _buildTopCompaniesChart(currencyFormat),
-                        ),
-                      ],
-                    ),
+                // Charts
+                ResponsiveLayout(
+                  mobile: Column(
+                    children: [
+                      _buildMonthlyRevenueChart(analytics, currencyFormat),
+                      const SizedBox(height: 24),
+                      _buildTopCompaniesChart(analytics, currencyFormat),
+                    ],
                   ),
-                ],
-              ),
+                  desktop: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: _buildMonthlyRevenueChart(
+                          analytics,
+                          currencyFormat,
+                        ),
+                      ),
+                      const SizedBox(width: 24),
+                      Expanded(
+                        child: _buildTopCompaniesChart(
+                          analytics,
+                          currencyFormat,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+          );
+        },
+      ),
     );
   }
 
-  List<Widget> _buildFilterChildren({bool isRow = false}) {
+  List<Widget> _buildFilterChildren({
+    bool isRow = false,
+    int? selectedYear,
+    int? selectedMonth,
+  }) {
     final children = [
       Expanded(
         child: DropdownButtonFormField<int>(
-          value: _selectedYear,
+          value: selectedYear,
           decoration: const InputDecoration(
             labelText: 'Year',
             border: OutlineInputBorder(),
@@ -176,7 +188,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           }),
           onChanged: (value) {
             if (value != null) {
-              setState(() => _selectedYear = value);
+              _selectedYear.value = value;
               _loadData();
             }
           },
@@ -185,7 +197,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       if (!isRow) const SizedBox(height: 16) else const SizedBox(width: 16),
       Expanded(
         child: DropdownButtonFormField<int?>(
-          value: _selectedMonth,
+          value: selectedMonth,
           decoration: const InputDecoration(
             labelText: 'Month (Optional)',
             border: OutlineInputBorder(),
@@ -203,7 +215,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             }),
           ],
           onChanged: (value) {
-            setState(() => _selectedMonth = value);
+            _selectedMonth.value = value;
             _loadData();
           },
         ),
@@ -214,34 +226,35 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   List<Widget> _buildSummaryCards(
+    AnalyticsEntity analytics,
     NumberFormat currencyFormat, {
     bool isRow = false,
   }) {
     final children = [
       _buildSummaryCard(
         'Total Revenue',
-        currencyFormat.format(_totalRevenue),
+        currencyFormat.format(analytics.totalRevenue),
         Icons.attach_money,
         Colors.green,
       ),
       if (!isRow) const SizedBox(height: 16) else const SizedBox(width: 16),
       _buildSummaryCard(
         'Total Invoices',
-        _totalInvoices.toString(),
+        analytics.invoiceCount.toString(),
         Icons.receipt_long,
         Colors.blue,
       ),
       if (!isRow) const SizedBox(height: 16) else const SizedBox(width: 16),
       _buildSummaryCard(
         'Average Invoice',
-        currencyFormat.format(_averageInvoiceValue),
+        currencyFormat.format(analytics.averageInvoiceValue),
         Icons.trending_up,
         Colors.orange,
       ),
       if (!isRow) const SizedBox(height: 16) else const SizedBox(width: 16),
       _buildSummaryCard(
         'Total Tax',
-        currencyFormat.format(_totalTax),
+        currencyFormat.format(analytics.totalTax),
         Icons.account_balance,
         Colors.purple,
       ),
@@ -300,7 +313,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  Widget _buildMonthlyRevenueChart(NumberFormat currencyFormat) {
+  Widget _buildMonthlyRevenueChart(
+    AnalyticsEntity analytics,
+    NumberFormat currencyFormat,
+  ) {
+    // Sort to ensure the order is correct for the chart (oldest to newest)
+    final sortedRevenue = List.of(analytics.monthlyRevenue)
+      ..sort(
+        (a, b) =>
+            DateTime(a.year, a.month).compareTo(DateTime(b.year, b.month)),
+      );
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -319,9 +342,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               child: BarChart(
                 BarChartData(
                   alignment: BarChartAlignment.spaceAround,
-                  maxY: _monthlyRevenue.values.isEmpty
+                  maxY: sortedRevenue.isEmpty
                       ? 100
-                      : _monthlyRevenue.values.reduce((a, b) => a > b ? a : b) *
+                      : sortedRevenue
+                                .map((e) => e.revenue)
+                                .reduce((a, b) => a > b ? a : b) *
                             1.2,
                   barTouchData: BarTouchData(
                     enabled: true,
@@ -341,13 +366,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       sideTitles: SideTitles(
                         showTitles: true,
                         getTitlesWidget: (value, meta) {
-                          if (value < 1 || value > 12) return const Text('');
+                          if (value < 0 || value >= sortedRevenue.length) {
+                            return const Text('');
+                          }
+                          final item = sortedRevenue[value.toInt()];
                           return Padding(
                             padding: const EdgeInsets.only(top: 8.0),
                             child: Text(
                               DateFormat(
                                 'MMM',
-                              ).format(DateTime(2024, value.toInt())),
+                              ).format(DateTime(item.year, item.month)),
                               style: const TextStyle(fontSize: 10),
                             ),
                           );
@@ -375,12 +403,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ),
                   gridData: const FlGridData(show: false),
                   borderData: FlBorderData(show: false),
-                  barGroups: _monthlyRevenue.entries.map((entry) {
+                  barGroups: sortedRevenue.asMap().entries.map((entry) {
                     return BarChartGroupData(
                       x: entry.key,
                       barRods: [
                         BarChartRodData(
-                          toY: entry.value,
+                          toY: entry.value.revenue,
                           color: Colors.blue,
                           width: 16,
                           borderRadius: const BorderRadius.vertical(
@@ -399,7 +427,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  Widget _buildTopCompaniesChart(NumberFormat currencyFormat) {
+  Widget _buildTopCompaniesChart(
+    AnalyticsEntity analytics,
+    NumberFormat currencyFormat,
+  ) {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -415,16 +446,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             const SizedBox(height: 24),
             SizedBox(
               height: 300,
-              child: _topCompanies.isEmpty
+              child: analytics.topCompanies.isEmpty
                   ? const Center(child: Text('No data available'))
                   : PieChart(
                       PieChartData(
                         sectionsSpace: 2,
                         centerSpaceRadius: 40,
-                        sections: _topCompanies.entries.map((entry) {
-                          final index = _topCompanies.keys.toList().indexOf(
-                            entry.key,
-                          );
+                        sections: analytics.topCompanies.asMap().entries.map((
+                          entry,
+                        ) {
+                          final index = entry.key;
+                          final company = entry.value;
                           final colors = [
                             Colors.blue,
                             Colors.red,
@@ -434,9 +466,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           ];
                           return PieChartSectionData(
                             color: colors[index % colors.length],
-                            value: entry.value,
-                            title: _totalRevenue > 0
-                                ? '${(entry.value / _totalRevenue * 100).toStringAsFixed(0)}%'
+                            value: company.revenue,
+                            title: analytics.totalRevenue > 0
+                                ? '${(company.revenue / analytics.totalRevenue * 100).toStringAsFixed(0)}%'
                                 : '0%',
                             radius: 100,
                             titleStyle: const TextStyle(
@@ -450,10 +482,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
             ),
             const SizedBox(height: 16),
-            if (_topCompanies.isNotEmpty)
+            if (analytics.topCompanies.isNotEmpty)
               Column(
-                children: _topCompanies.entries.map((entry) {
-                  final index = _topCompanies.keys.toList().indexOf(entry.key);
+                children: analytics.topCompanies.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final company = entry.value;
                   final colors = [
                     Colors.blue,
                     Colors.red,
@@ -476,13 +509,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            entry.key,
+                            company.companyName,
                             style: const TextStyle(fontSize: 12),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         Text(
-                          currencyFormat.format(entry.value),
+                          currencyFormat.format(company.revenue),
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,

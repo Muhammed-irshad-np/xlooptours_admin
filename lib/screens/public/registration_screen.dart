@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
-
 import 'dart:math' as math;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:xloop_invoice/models/company_model.dart';
-import 'package:xloop_invoice/models/customer_model.dart';
-import 'package:xloop_invoice/models/notification_model.dart';
-import 'package:xloop_invoice/services/database_service.dart';
+import 'package:xloop_invoice/features/company/domain/entities/company_entity.dart';
+import 'package:xloop_invoice/features/customer/data/models/customer_model.dart';
+import 'package:xloop_invoice/features/notifications/data/models/notification_model.dart';
+
+import 'package:xloop_invoice/features/notifications/domain/entities/notification_entity.dart';
+import 'package:provider/provider.dart';
+import 'package:xloop_invoice/features/company/presentation/providers/company_provider.dart';
+import 'package:xloop_invoice/features/customer/presentation/providers/customer_provider.dart';
+import 'package:xloop_invoice/features/notifications/presentation/providers/notification_provider.dart';
+
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -29,14 +34,16 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   final _caseCodeController = TextEditingController();
   final _companyNameController = TextEditingController();
 
-  bool _isLoading = true;
-  bool _isSubmitting = false;
-  CompanyModel? _company;
-  String? _errorMessage;
-  bool _registrationSuccess = false;
-  String _countryCode = '+966'; // Default to KSA
-  List<String> _previewCaseCodes = [];
-  bool _isArabic = false;
+  final ValueNotifier<bool> _isLoading = ValueNotifier(true);
+  final ValueNotifier<bool> _isSubmitting = ValueNotifier(false);
+  final ValueNotifier<CompanyEntity?> _company = ValueNotifier(null);
+  final ValueNotifier<String?> _errorMessage = ValueNotifier(null);
+  final ValueNotifier<bool> _registrationSuccess = ValueNotifier(false);
+  final ValueNotifier<String> _countryCode = ValueNotifier(
+    '+966',
+  ); // Default to KSA
+  final ValueNotifier<List<String>> _previewCaseCodes = ValueNotifier([]);
+  final ValueNotifier<bool> _isArabic = ValueNotifier(false);
 
   final Map<String, Map<String, String>> _translations = {
     'company_not_found': {
@@ -130,7 +137,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   };
 
   String _tr(String key) {
-    if (_isArabic) {
+    if (_isArabic.value) {
       return _translations[key]?['ar'] ?? key;
     }
     return _translations[key]?['en'] ?? key;
@@ -139,7 +146,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   late AnimationController _mobileFormController;
   late Animation<double> _mobileFormAnimation;
   late AnimationController _waveController;
-  bool _isMobileFormOpen = false;
+  final ValueNotifier<bool> _isMobileFormOpen = ValueNotifier(false);
 
   @override
   void initState() {
@@ -216,11 +223,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   void _addCaseCode() {
     final code = _caseCodeController.text.trim();
     if (code.isNotEmpty) {
-      if (!_previewCaseCodes.contains(code)) {
-        setState(() {
-          _previewCaseCodes.add(code);
-          _caseCodeController.clear();
-        });
+      if (!_previewCaseCodes.value.contains(code)) {
+        _previewCaseCodes.value.add(code);
+        _caseCodeController.clear();
       } else {
         // Optionally show a message if code already exists
         _caseCodeController.clear();
@@ -229,38 +234,30 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   }
 
   void _removeCaseCode(String code) {
-    setState(() {
-      _previewCaseCodes.remove(code);
-    });
+    _previewCaseCodes.value.remove(code);
   }
 
   Future<void> _fetchCompany() async {
     if (widget.companyId == null) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Invalid Link: No Company ID provided.';
-      });
+      _isLoading.value = false;
+      _errorMessage.value = 'Invalid Link: No Company ID provided.';
       return;
     }
 
     try {
-      final company = await DatabaseService.instance.getCompanyById(
+      final company = await context.read<CompanyProvider>().getCompanyById(
         widget.companyId!,
       );
-      setState(() {
-        _company = company;
-        _isLoading = false;
-        if (company == null) {
-          _errorMessage = 'Company not found. Please check the link.';
-        } else {
-          _companyNameController.text = company.companyName;
-        }
-      });
+      _company.value = company;
+      _isLoading.value = false;
+      if (company == null) {
+        _errorMessage.value = 'Company not found. Please check the link.';
+      } else {
+        _companyNameController.text = company.companyName;
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Error loading company details: $e';
-      });
+      _isLoading.value = false;
+      _errorMessage.value = 'Error loading company details: $e';
     }
   }
 
@@ -269,9 +266,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     _addCaseCode();
 
     if (!_formKey.currentState!.validate()) return;
-    if (_company == null) return;
+    if (_company.value == null) return;
 
-    setState(() => _isSubmitting = true);
+    _isSubmitting.value = true;
 
     try {
       var newCustomer = CustomerModel(
@@ -279,21 +276,21 @@ class _RegistrationScreenState extends State<RegistrationScreen>
         name: _nameController.text.trim(),
         phone: '', // Placeholder, updated below
         email: null,
-        companyId: _company!.id,
-        companyName: _company!.companyName,
+        companyId: _company.value!.id,
+        companyName: _company.value!.companyName,
         assignedCaseCodes: [], // Will populate below
         createdAt: DateTime.now(),
       );
 
       // Handle Case Codes
-      if (_company!.usesCaseCode && _previewCaseCodes.isNotEmpty) {
-        final inputCodes = _previewCaseCodes;
+      if (_company.value!.usesCaseCode && _previewCaseCodes.value.isNotEmpty) {
+        final inputCodes = _previewCaseCodes.value;
 
         // 1. Assign to Customer
         newCustomer = newCustomer.copyWith(assignedCaseCodes: inputCodes);
 
         // 2. Update Company with NEW codes
-        final currentCompanyCodes = Set<String>.from(_company!.caseCodes);
+        final currentCompanyCodes = Set<String>.from(_company.value!.caseCodes);
         bool companyUpdated = false;
 
         for (var code in inputCodes) {
@@ -304,21 +301,22 @@ class _RegistrationScreenState extends State<RegistrationScreen>
         }
 
         if (companyUpdated) {
-          final updatedCompany = _company!.copyWith(
+          final updatedCompany = _company.value!.copyWith(
             caseCodes: currentCompanyCodes.toList(),
           );
-          await DatabaseService.instance.updateCompany(updatedCompany);
+          await context.read<CompanyProvider>().updateCompany(updatedCompany);
           // Update local state to reflect changes immediately if needed
-          _company = updatedCompany;
+          _company.value = updatedCompany;
         }
       }
 
       // Handle Phone with Country Code
       newCustomer = newCustomer.copyWith(
-        phone: '$_countryCode ${_phoneController.text.trim()}',
+        phone: '$_countryCode.value ${_phoneController.text.trim()}',
       );
 
-      await DatabaseService.instance.insertCustomer(newCustomer);
+      if (!mounted) return;
+      await context.read<CustomerProvider>().addCustomer(newCustomer);
 
       // Create Notification
       final notification = NotificationModel(
@@ -329,17 +327,19 @@ class _RegistrationScreenState extends State<RegistrationScreen>
         type: NotificationType.registration,
         relatedId: newCustomer.id,
       );
-      await DatabaseService.instance.insertNotification(notification);
+      if (!mounted) return;
+      await context.read<NotificationProvider>().insertNotification(
+        notification,
+      );
 
-      setState(() {
-        _registrationSuccess = true;
-      });
+      _registrationSuccess.value = true;
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error registering: $e')));
     } finally {
-      setState(() => _isSubmitting = false);
+      _isSubmitting.value = false;
     }
   }
 
@@ -349,54 +349,73 @@ class _RegistrationScreenState extends State<RegistrationScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        _isLoading,
+        _isSubmitting,
+        _company,
+        _errorMessage,
+        _registrationSuccess,
+        _countryCode,
+        _previewCaseCodes,
+        _isArabic,
+        _isMobileFormOpen,
+      ]),
+      builder: (context, _) {
+        if (_isLoading.value) {
+          return Scaffold(
+            backgroundColor: Colors.black,
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    if (_errorMessage != null) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: Padding(
-            padding: EdgeInsets.all(24.w),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.error_outline, color: Colors.red[300], size: 60.sp),
-                SizedBox(height: 16.h),
-                Text(
-                  _errorMessage!,
-                  style: GoogleFonts.merriweather(
-                    color: _darkNavy,
-                    fontSize: 18.sp,
-                  ),
-                  textAlign: TextAlign.center,
+        if (_errorMessage.value != null) {
+          return Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(
+              child: Padding(
+                padding: EdgeInsets.all(24.w),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Colors.red[300],
+                      size: 60.sp,
+                    ),
+                    SizedBox(height: 16.h),
+                    Text(
+                      _errorMessage.value!,
+                      style: GoogleFonts.merriweather(
+                        color: _darkNavy,
+                        fontSize: 18.sp,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
+          );
+        }
+
+        if (_registrationSuccess.value) {
+          return _buildSuccessScreen();
+        }
+
+        return Scaffold(
+          backgroundColor: Colors.black,
+          body: LayoutBuilder(
+            builder: (context, constraints) {
+              if (constraints.maxWidth > 900) {
+                return _buildDesktopLayout();
+              } else {
+                return _buildMobileLayout();
+              }
+            },
           ),
-        ),
-      );
-    }
-
-    if (_registrationSuccess) {
-      return _buildSuccessScreen();
-    }
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          if (constraints.maxWidth > 900) {
-            return _buildDesktopLayout();
-          } else {
-            return _buildMobileLayout();
-          }
-        },
-      ),
+        );
+      },
     );
   }
 
@@ -553,7 +572,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                       Text(
                         _tr('mobile_desc'),
                         textAlign: TextAlign.center,
-                        style: _isArabic
+                        style: _isArabic.value
                             ? GoogleFonts.notoSansArabic(
                                 fontSize: 18.sp,
                                 color: Colors.white,
@@ -614,7 +633,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                     child: Form(
                       key: _formKey,
                       child: Directionality(
-                        textDirection: _isArabic
+                        textDirection: _isArabic.value
                             ? TextDirection.rtl
                             : TextDirection.ltr,
                         child: Column(
@@ -649,7 +668,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             Text(
                               _tr('header_company_name'),
                               textAlign: TextAlign.center,
-                              style: _isArabic
+                              style: _isArabic.value
                                   ? GoogleFonts.notoSansArabic(
                                       fontSize: 28.sp,
                                       fontWeight: FontWeight.bold,
@@ -667,7 +686,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             Text(
                               _tr('efficient_safe'),
                               textAlign: TextAlign.center,
-                              style: _isArabic
+                              style: _isArabic.value
                                   ? GoogleFonts.notoSansArabic(
                                       fontSize: 18.sp,
                                       color: _brandColor,
@@ -686,7 +705,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             Text(
                               _tr('join_us'),
                               textAlign: TextAlign.center,
-                              style: _isArabic
+                              style: _isArabic.value
                                   ? GoogleFonts.notoSansArabic(
                                       fontSize: 14.sp,
                                       color: Colors.grey[500],
@@ -730,9 +749,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                     context: context,
                                     showPhoneCode: true,
                                     onSelect: (Country country) {
-                                      setState(() {
-                                        _countryCode = '+${country.phoneCode}';
-                                      });
+                                      _countryCode.value =
+                                          '+${country.phoneCode}';
                                     },
                                     countryListTheme: CountryListThemeData(
                                       borderRadius: BorderRadius.circular(20),
@@ -765,7 +783,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        _countryCode,
+                                        _countryCode.value,
                                         style: TextStyle(
                                           fontSize: 15.sp,
                                           color: const Color(0xFF334155),
@@ -783,7 +801,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                 ),
                               ),
                             ),
-                            if (_company != null && _company!.usesCaseCode)
+                            if (_company.value != null &&
+                                _company.value!.usesCaseCode)
                               Padding(
                                 padding: EdgeInsets.only(top: 20.h),
                                 child: Column(
@@ -804,7 +823,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                         onPressed: _addCaseCode,
                                       ),
                                       validator: (v) {
-                                        if (_previewCaseCodes.isNotEmpty) {
+                                        if (_previewCaseCodes
+                                            .value
+                                            .isNotEmpty) {
                                           return null;
                                         }
                                         if (v == null || v.isEmpty) {
@@ -813,7 +834,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                         return null;
                                       },
                                     ),
-                                    if (_previewCaseCodes.isNotEmpty) ...[
+                                    if (_previewCaseCodes.value.isNotEmpty) ...[
                                       SizedBox(height: 12.h),
                                       _buildCaseCodeChips(),
                                     ],
@@ -827,7 +848,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             SizedBox(
                               height: 56.h,
                               child: ElevatedButton(
-                                onPressed: _isSubmitting ? null : _submitForm,
+                                onPressed: _isSubmitting.value
+                                    ? null
+                                    : _submitForm,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor:
                                       _brandColor, // Cyan Brand Color
@@ -837,13 +860,13 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                   ),
                                   elevation: 0,
                                 ),
-                                child: _isSubmitting
+                                child: _isSubmitting.value
                                     ? const CircularProgressIndicator(
                                         color: Colors.white,
                                       )
                                     : Text(
                                         _tr('register_now'),
-                                        style: _isArabic
+                                        style: _isArabic.value
                                             ? GoogleFonts.notoSansArabic(
                                                 fontSize: 14.sp,
                                                 fontWeight: FontWeight.bold,
@@ -885,7 +908,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
-                      value: _isArabic ? 'ar' : 'en',
+                      value: _isArabic.value ? 'ar' : 'en',
                       dropdownColor: Colors.white,
                       icon: Icon(
                         Icons.keyboard_arrow_down,
@@ -919,9 +942,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                       ],
                       onChanged: (val) {
                         if (val != null) {
-                          setState(() {
-                            _isArabic = val == 'ar';
-                          });
+                          _isArabic.value = val == 'ar';
                         }
                       },
                     ),
@@ -955,7 +976,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       enabled: enabled,
       inputFormatters: inputFormatters,
       textCapitalization: textCapitalization,
-      style: _isArabic
+      style: _isArabic.value
           ? GoogleFonts.notoSansArabic(
               fontSize: 15.sp,
               color: enabled ? const Color(0xFF334155) : Colors.grey[600],
@@ -966,11 +987,11 @@ class _RegistrationScreenState extends State<RegistrationScreen>
               color: enabled ? const Color(0xFF334155) : Colors.grey[600],
               fontWeight: FontWeight.w500,
             ),
-      textAlign: _isArabic ? TextAlign.right : TextAlign.left,
-      textDirection: _isArabic ? TextDirection.rtl : TextDirection.ltr,
+      textAlign: _isArabic.value ? TextAlign.right : TextAlign.left,
+      textDirection: _isArabic.value ? TextDirection.rtl : TextDirection.ltr,
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: _isArabic
+        labelStyle: _isArabic.value
             ? GoogleFonts.notoSansArabic(
                 color: Colors.grey[400],
                 fontSize: 14.sp,
@@ -980,7 +1001,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
             prefixWidget ?? Icon(icon, color: Colors.grey[400], size: 20.sp),
         suffixIcon: suffixIcon,
         helperText: helperText,
-        helperStyle: _isArabic
+        helperStyle: _isArabic.value
             ? GoogleFonts.notoSansArabic(fontSize: 12.sp)
             : TextStyle(fontSize: 12.sp),
         filled: true,
@@ -1048,7 +1069,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
           // 2. Language Switcher (Looking like a glass button)
           SafeArea(
             child: Align(
-              alignment: _isArabic ? Alignment.topLeft : Alignment.topRight,
+              alignment: _isArabic.value
+                  ? Alignment.topLeft
+                  : Alignment.topRight,
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
                 child: Container(
@@ -1060,7 +1083,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                   padding: EdgeInsets.symmetric(horizontal: 12.w),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String>(
-                      value: _isArabic ? 'ar' : 'en',
+                      value: _isArabic.value ? 'ar' : 'en',
                       dropdownColor:
                           Colors.grey[900], // Dark background for dropdown
                       icon: Icon(
@@ -1085,9 +1108,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                       ],
                       onChanged: (val) {
                         if (val != null) {
-                          setState(() {
-                            _isArabic = val == 'ar';
-                          });
+                          _isArabic.value = val == 'ar';
                         }
                       },
                     ),
@@ -1122,13 +1143,13 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                   return Transform.translate(
                     offset: Offset(0, slideOffset),
                     child: Directionality(
-                      textDirection: _isArabic
+                      textDirection: _isArabic.value
                           ? TextDirection.rtl
                           : TextDirection.ltr,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if (_isMobileFormOpen)
+                          if (_isMobileFormOpen.value)
                             SizedBox(height: 60.h)
                           else
                             SizedBox(height: 90.h),
@@ -1161,7 +1182,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                           Text(
                             _tr('header_company_name'),
                             textAlign: TextAlign.center,
-                            style: _isArabic
+                            style: _isArabic.value
                                 ? GoogleFonts.notoSansArabic(
                                     fontSize: 100.sp,
                                     fontWeight: FontWeight.w900,
@@ -1198,7 +1219,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             child: Text(
                               _tr('mobile_desc'),
                               textAlign: TextAlign.center,
-                              style: _isArabic
+                              style: _isArabic.value
                                   ? GoogleFonts.notoSansArabic(
                                       fontSize: 50.sp, // Smaller for Arabic
                                       color: Colors.white.withOpacity(0.95),
@@ -1278,13 +1299,11 @@ class _RegistrationScreenState extends State<RegistrationScreen>
           ),
 
           // 2.5 Dismiss Barrier (Touch outside to close)
-          if (_isMobileFormOpen)
+          if (_isMobileFormOpen.value)
             Positioned.fill(
               child: GestureDetector(
                 onTap: () {
-                  setState(() {
-                    _isMobileFormOpen = false;
-                  });
+                  _isMobileFormOpen.value = false;
                   _mobileFormController.reverse();
                 },
                 child: Container(
@@ -1371,7 +1390,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             ),
                           ],
                         ),
-                        child: _isMobileFormOpen
+                        child: _isMobileFormOpen.value
                             ? _buildMobileFormContent()
                             : _buildRegisterButton(),
                       ),
@@ -1390,9 +1409,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     return Center(
       child: GestureDetector(
         onTap: () {
-          setState(() {
-            _isMobileFormOpen = true;
-          });
+          _isMobileFormOpen.value = true;
           _mobileFormController.forward();
         },
         child: Container(
@@ -1411,7 +1428,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
           ),
           child: Text(
             _tr('register_now'),
-            style: _isArabic
+            style: _isArabic.value
                 ? GoogleFonts.notoSansArabic(
                     fontSize: 30.sp,
                     fontWeight: FontWeight.bold,
@@ -1463,9 +1480,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                           ),
                         ),
                         onPressed: () {
-                          setState(() {
-                            _isMobileFormOpen = false;
-                          });
+                          _isMobileFormOpen.value = false;
                           _mobileFormController.reverse();
                         },
                       ),
@@ -1500,9 +1515,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             context: context,
                             showPhoneCode: true,
                             onSelect: (Country country) {
-                              setState(() {
-                                _countryCode = '+${country.phoneCode}';
-                              });
+                              _countryCode.value = '+${country.phoneCode}';
                             },
                             countryListTheme: CountryListThemeData(
                               bottomSheetHeight: 0.7.sh,
@@ -1545,7 +1558,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                _countryCode,
+                                _countryCode.value,
                                 style: const TextStyle(
                                   fontSize: 16,
                                   color: Colors.white,
@@ -1562,7 +1575,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                         ),
                       ),
                     ),
-                    if (_company != null && _company!.usesCaseCode) ...[
+                    if (_company.value != null &&
+                        _company.value!.usesCaseCode) ...[
                       SizedBox(height: 10.h),
                       Padding(
                         padding: EdgeInsets.only(top: 10.h),
@@ -1584,14 +1598,15 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                 onPressed: _addCaseCode,
                               ),
                               validator: (v) {
-                                if (_previewCaseCodes.isNotEmpty) return null;
+                                if (_previewCaseCodes.value.isNotEmpty)
+                                  return null;
                                 if (v == null || v.isEmpty) {
                                   return _tr('required');
                                 }
                                 return null;
                               },
                             ),
-                            if (_previewCaseCodes.isNotEmpty) ...[
+                            if (_previewCaseCodes.value.isNotEmpty) ...[
                               SizedBox(height: 16.h),
                               _buildCaseCodeChips(),
                               SizedBox(height: 16.h),
@@ -1606,7 +1621,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                       height: 50.h,
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _isSubmitting ? null : _submitForm,
+                        onPressed: _isSubmitting.value ? null : _submitForm,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.white,
                           foregroundColor: _brandColor,
@@ -1615,11 +1630,11 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                           ),
                           elevation: 0,
                         ),
-                        child: _isSubmitting
+                        child: _isSubmitting.value
                             ? CircularProgressIndicator(color: _brandColor)
                             : Text(
                                 _tr('submit_application'),
-                                style: _isArabic
+                                style: _isArabic.value
                                     ? GoogleFonts.notoSansArabic(
                                         fontSize: 30.sp,
                                         fontWeight: FontWeight.bold,
@@ -1658,14 +1673,16 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     TextCapitalization textCapitalization = TextCapitalization.none,
   }) {
     return Padding(
-      padding: EdgeInsets.only(bottom: _previewCaseCodes.isEmpty ? 12 : 4),
+      padding: EdgeInsets.only(
+        bottom: _previewCaseCodes.value.isEmpty ? 12 : 4,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           RichText(
             text: TextSpan(
               text: label,
-              style: _isArabic
+              style: _isArabic.value
                   ? GoogleFonts.notoSansArabic(
                       color: Colors.white,
                       fontSize: 45.sp, // Smaller for Arabic
@@ -1703,7 +1720,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
             ),
             cursorColor: Colors.white,
             // Directionality for Input Field Text
-            textDirection: _isArabic ? TextDirection.rtl : TextDirection.ltr,
+            textDirection: _isArabic.value
+                ? TextDirection.rtl
+                : TextDirection.ltr,
             decoration: InputDecoration(
               prefixIcon:
                   prefixWidget ?? Icon(icon, color: Colors.white, size: 50.sp),
@@ -1747,6 +1766,15 @@ class _RegistrationScreenState extends State<RegistrationScreen>
 
   @override
   void dispose() {
+    _isLoading.dispose();
+    _isSubmitting.dispose();
+    _company.dispose();
+    _errorMessage.dispose();
+    _registrationSuccess.dispose();
+    _countryCode.dispose();
+    _previewCaseCodes.dispose();
+    _isArabic.dispose();
+    _isMobileFormOpen.dispose();
     _nameController.dispose();
     _phoneController.dispose();
     _caseCodeController.dispose();
@@ -1761,7 +1789,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     return Wrap(
       spacing: 8,
       runSpacing: 8,
-      children: _previewCaseCodes.map((code) {
+      children: _previewCaseCodes.value.map((code) {
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(

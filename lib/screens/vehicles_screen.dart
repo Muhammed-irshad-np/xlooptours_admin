@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:xloop_invoice/screens/vehicle_master_screen.dart'; // Added
-import '../models/vehicle_model.dart';
-import '../models/employee_model.dart';
-import '../services/database_service.dart';
+import 'package:provider/provider.dart';
+import '../features/employee/domain/entities/employee_entity.dart';
+import '../features/employee/presentation/providers/employee_provider.dart';
+import '../features/vehicle/domain/entities/vehicle_entity.dart';
+import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 
 class VehiclesScreen extends StatefulWidget {
   const VehiclesScreen({super.key});
@@ -14,44 +16,44 @@ class VehiclesScreen extends StatefulWidget {
 }
 
 class _VehiclesScreenState extends State<VehiclesScreen> {
-  List<VehicleModel> _vehicles = [];
-  Map<String, EmployeeModel> _driversMap = {};
-  bool _isLoading = true;
+  final ValueNotifier<Map<String, EmployeeEntity>> _driversMap = ValueNotifier(
+    {},
+  );
+
+  @override
+  void dispose() {
+    _driversMap.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+    });
   }
 
   Future<void> _loadData() async {
     try {
-      setState(() => _isLoading = true);
-      // Load vehicles
-      final vehicles = await DatabaseService.instance.getAllVehicles();
-
-      // Load drivers (employees) to resolve names
-      final employees = await DatabaseService.instance.getAllEmployees();
-      final Map<String, EmployeeModel> driversMap = {
+      await context.read<VehicleProvider>().fetchAllVehicles();
+      if (!mounted) return;
+      await context.read<EmployeeProvider>().fetchAllEmployees();
+      if (!mounted) return;
+      final employees = context.read<EmployeeProvider>().employees;
+      final Map<String, EmployeeEntity> driversMap = {
         for (var e in employees) e.id: e,
       };
 
       if (mounted) {
-        setState(() {
-          _vehicles = vehicles;
-          _driversMap = driversMap;
-          _isLoading = false;
-        });
+        _driversMap.value = driversMap;
       }
     } catch (e) {
-      debugPrint('Error loading vehicles: $e');
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      debugPrint('Error loading vehicles: \$e');
     }
   }
 
-  Future<void> _navigateToAddEdit({VehicleModel? vehicle}) async {
+  Future<void> _navigateToAddEdit({VehicleEntity? vehicle}) async {
     final result = await context.push('/vehicles/form', extra: vehicle);
     if (result == true) {
       _loadData();
@@ -78,14 +80,18 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
       ),
     );
 
-    if (confirmed == true) {
-      await DatabaseService.instance.deleteVehicle(id);
+    if (confirmed == true && mounted) {
+      await context.read<VehicleProvider>().deleteVehicle(id);
       _loadData();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final vehicleProvider = context.watch<VehicleProvider>();
+    final isLoading = vehicleProvider.isLoading;
+    final vehicles = vehicleProvider.vehicles;
+
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -108,12 +114,13 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         body: TabBarView(
           children: [
             // Tab 1: Fleet List (Existing UI)
-            _isLoading
+            isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : _vehicles.isEmpty
+                : vehicles.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           Icons.directions_car_outlined,
@@ -133,18 +140,23 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                       ],
                     ),
                   )
-                : ListView.separated(
-                    padding: EdgeInsets.all(16.w),
-                    itemCount: _vehicles.length,
-                    separatorBuilder: (context, index) =>
-                        SizedBox(height: 16.h),
-                    itemBuilder: (context, index) {
-                      final vehicle = _vehicles[index];
-                      final driver = vehicle.assignedDriverId != null
-                          ? _driversMap[vehicle.assignedDriverId]
-                          : null;
+                : ValueListenableBuilder<Map<String, EmployeeEntity>>(
+                    valueListenable: _driversMap,
+                    builder: (context, driversMap, _) {
+                      return ListView.separated(
+                        padding: EdgeInsets.all(16.w),
+                        itemCount: vehicles.length,
+                        separatorBuilder: (context, index) =>
+                            SizedBox(height: 16.h),
+                        itemBuilder: (context, index) {
+                          final vehicle = vehicles[index];
+                          final driver = vehicle.assignedDriverId != null
+                              ? driversMap[vehicle.assignedDriverId]
+                              : null;
 
-                      return _buildVehicleCard(vehicle, driver);
+                          return _buildVehicleCard(vehicle, driver);
+                        },
+                      );
                     },
                   ),
 
@@ -156,7 +168,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     );
   }
 
-  Widget _buildVehicleCard(VehicleModel vehicle, EmployeeModel? driver) {
+  Widget _buildVehicleCard(VehicleEntity vehicle, EmployeeEntity? driver) {
     return Card(
       child: ListTile(
         leading: Container(
@@ -189,6 +201,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(height: 4.h),
             Text('Plate: ${vehicle.plateNumber} • ${vehicle.color}'),
@@ -257,7 +270,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     );
   }
 
-  void _showDetails(VehicleModel vehicle, EmployeeModel? driver) {
+  void _showDetails(VehicleEntity vehicle, EmployeeEntity? driver) {
     showDialog(
       context: context,
       builder: (context) => Dialog(

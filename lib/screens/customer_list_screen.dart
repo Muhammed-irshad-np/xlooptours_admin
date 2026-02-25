@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../models/customer_model.dart';
-import '../models/notification_model.dart'; // Added
-import '../services/database_service.dart';
+import 'package:provider/provider.dart';
+import '../features/notifications/domain/entities/notification_entity.dart';
+import '../features/notifications/presentation/providers/notification_provider.dart';
+import '../features/customer/domain/entities/customer_entity.dart';
+import '../features/customer/presentation/providers/customer_provider.dart';
 import '../widgets/responsive_layout.dart';
 
 class CustomerListScreen extends StatefulWidget {
-  final Function(CustomerModel)? onCustomerSelected;
+  final Function(CustomerEntity)? onCustomerSelected;
   final bool isSelectionMode;
 
   const CustomerListScreen({
@@ -20,37 +22,15 @@ class CustomerListScreen extends StatefulWidget {
 }
 
 class _CustomerListScreenState extends State<CustomerListScreen> {
-  final _databaseService = DatabaseService.instance;
-  List<CustomerModel> _customers = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadCustomers();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CustomerProvider>().fetchAllCustomers();
+    });
   }
 
-  Future<void> _loadCustomers() async {
-    setState(() => _isLoading = true);
-    try {
-      final customers = await _databaseService.getAllCustomers();
-      if (mounted) {
-        setState(() {
-          _customers = customers;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading customers: $e')));
-      }
-    }
-  }
-
-  Future<void> _deleteCustomer(CustomerModel customer) async {
+  Future<void> _deleteCustomer(CustomerEntity customer) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -72,7 +52,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
     if (confirmed == true) {
       // Create Notification for Deletion
-      final notification = NotificationModel(
+      final notification = NotificationEntity(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         title: 'Customer Deleted',
         message: 'Customer ${customer.name} has been deleted.',
@@ -81,98 +61,123 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
         relatedId: customer.id,
       );
 
-      await _databaseService.deleteCustomer(customer.id);
-      await _databaseService.insertNotification(notification);
+      if (context.mounted) {
+        await context.read<NotificationProvider>().insertNotification(
+          notification,
+        );
 
-      _loadCustomers();
+        try {
+          await context.read<CustomerProvider>().deleteCustomer(customer.id);
+        } catch (e) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error deleting customer: $e')),
+            );
+          }
+        }
+      }
     }
   }
 
-  Future<void> _navigateToForm(CustomerModel? customer) async {
-    final result = await context.push<CustomerModel?>(
+  Future<void> _navigateToForm(CustomerEntity? customer) async {
+    final result = await context.push<CustomerEntity?>(
       '/customers/form',
       extra: customer,
     );
 
-    if (result != null) {
-      _loadCustomers();
+    if (result != null && context.mounted) {
+      context.read<CustomerProvider>().fetchAllCustomers();
     }
   }
 
   Future<void> _toggleCustomerStatus(
-    CustomerModel customer,
+    CustomerEntity customer,
     bool isActive,
   ) async {
     final updatedCustomer = customer.copyWith(
       status: isActive ? 'ACTIVE' : 'INACTIVE',
     );
-    await _databaseService.updateCustomer(updatedCustomer);
-    _loadCustomers();
+    try {
+      if (context.mounted) {
+        await context.read<CustomerProvider>().updateCustomer(updatedCustomer);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error updating status: $e')));
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Customers'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _navigateToForm(null),
-            tooltip: 'Add Customer',
+    return Consumer<CustomerProvider>(
+      builder: (context, provider, child) {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Customers'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.add),
+                onPressed: () => _navigateToForm(null),
+                tooltip: 'Add Customer',
+              ),
+            ],
           ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _customers.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.people_outline,
-                    size: 64,
-                    color: Colors.grey,
+          body: provider.isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : provider.customers.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.people_outline,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'No customers yet',
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      ),
+                      const SizedBox(height: 8),
+                      ElevatedButton.icon(
+                        onPressed: () => _navigateToForm(null),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add First Customer'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'No customers yet',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                )
+              : ResponsiveLayout(
+                  mobile: ListView.builder(
+                    itemCount: provider.customers.length,
+                    padding: const EdgeInsets.all(8),
+                    itemBuilder: (context, index) =>
+                        _buildCustomerCard(provider.customers[index]),
                   ),
-                  const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    onPressed: () => _navigateToForm(null),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add First Customer'),
+                  desktop: GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate:
+                        const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 400,
+                          childAspectRatio: 1.6,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                        ),
+                    itemCount: provider.customers.length,
+                    itemBuilder: (context, index) =>
+                        _buildCustomerCard(provider.customers[index]),
                   ),
-                ],
-              ),
-            )
-          : ResponsiveLayout(
-              mobile: ListView.builder(
-                itemCount: _customers.length,
-                padding: const EdgeInsets.all(8),
-                itemBuilder: (context, index) =>
-                    _buildCustomerCard(_customers[index]),
-              ),
-              desktop: GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 400,
-                  childAspectRatio: 1.6,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
                 ),
-                itemCount: _customers.length,
-                itemBuilder: (context, index) =>
-                    _buildCustomerCard(_customers[index]),
-              ),
-            ),
+        );
+      },
     );
   }
 
-  Widget _buildCustomerCard(CustomerModel customer) {
+  Widget _buildCustomerCard(CustomerEntity customer) {
     bool isActive = customer.status == 'ACTIVE';
 
     return Card(
@@ -399,7 +404,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
   }
 
-  void _showDetails(CustomerModel customer) {
+  void _showDetails(CustomerEntity customer) {
     showDialog(
       context: context,
       builder: (context) => Dialog(

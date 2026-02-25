@@ -1,10 +1,10 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
-import '../models/invoice_model.dart';
-import '../models/company_model.dart';
+import '../features/invoice/domain/entities/invoice_entity.dart';
+import '../features/company/domain/entities/company_entity.dart';
 import '../models/company_info.dart';
 import 'number_to_words_service.dart';
 
@@ -15,7 +15,7 @@ class PDFService {
   static double get availableHeight =>
       PdfPageFormat.a4.height - (pageMargin * 2) - headerHeight - footerHeight;
 
-  Future<Uint8List> generateInvoicePDF(InvoiceModel invoice) async {
+  Future<Uint8List> generateInvoicePDF(InvoiceEntity invoice) async {
     final pdf = pw.Document();
     // Always use placeholder - logo is optional
     // Skip logo loading to avoid any errors - placeholder will be shown
@@ -67,7 +67,7 @@ class PDFService {
       englishBoldFont = pw.Font.timesBold();
     } catch (e) {
       // Fallback: Use default fonts if Arabic fonts fail to load
-      print('Warning: Failed to load Arabic fonts: $e');
+      debugPrint('Warning: Failed to load Arabic fonts: $e');
       // Use default fonts - Arabic will show as symbols but won't crash
       arabicFont = pw.Font.helvetica();
       arabicBoldFont = pw.Font.helveticaBold();
@@ -614,7 +614,10 @@ class PDFService {
     );
   }
 
-  pw.Widget _buildInvoiceDetails(InvoiceModel invoice, pw.Font arabicBoldFont) {
+  pw.Widget _buildInvoiceDetails(
+    InvoiceEntity invoice,
+    pw.Font arabicBoldFont,
+  ) {
     final dateFormat = DateFormat('dd-MM-yyyy');
 
     // Helper to build a table cell with fixed height
@@ -750,7 +753,7 @@ class PDFService {
     );
   }
 
-  pw.Widget _buildBillToSection(CompanyModel? company) {
+  pw.Widget _buildBillToSection(CompanyEntity? company) {
     return pw.SizedBox(
       width: double.infinity,
       child: pw.Container(
@@ -855,7 +858,7 @@ class PDFService {
     pw.Font arabicFont, {
     bool showHeader = true,
     bool showFooter = false,
-    InvoiceModel? invoice,
+    InvoiceEntity? invoice,
   }) {
     if (lineItems.isEmpty) {
       return pw.Container(
@@ -1193,7 +1196,7 @@ class PDFService {
   }
 
   pw.Widget _buildTotalsSection(
-    InvoiceModel invoice,
+    InvoiceEntity invoice,
     pw.Font arabicFont,
     pw.Font arabicBoldFont,
   ) {

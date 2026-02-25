@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import '../widgets/responsive_layout.dart';
-
-import '../services/auth_service.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -14,7 +14,7 @@ class HomeScreen extends StatelessWidget {
         actions: [
           IconButton(
             onPressed: () async {
-              await AuthService.instance.signOut();
+              await context.read<AuthProvider>().logout();
             },
             icon: const Icon(Icons.logout),
             tooltip: 'Sign Out',

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:uuid/uuid.dart';
-import '../models/vehicle_make_model.dart';
-import '../services/database_service.dart';
+import 'package:provider/provider.dart';
+import '../features/vehicle/domain/entities/vehicle_make_entity.dart';
+import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 
 class VehicleMasterScreen extends StatefulWidget {
   const VehicleMasterScreen({super.key});
@@ -12,9 +13,8 @@ class VehicleMasterScreen extends StatefulWidget {
 }
 
 class _VehicleMasterScreenState extends State<VehicleMasterScreen> {
-  final DatabaseService _databaseService = DatabaseService.instance;
-  List<VehicleMakeModel> _makes = [];
-  bool _isLoading = true;
+  final ValueNotifier<List<VehicleMakeEntity>> _makes = ValueNotifier([]);
+  final ValueNotifier<bool> _isLoading = ValueNotifier(true);
 
   @override
   void initState() {
@@ -23,45 +23,47 @@ class _VehicleMasterScreenState extends State<VehicleMasterScreen> {
   }
 
   Future<void> _loadMakes() async {
-    setState(() => _isLoading = true);
+    _isLoading.value = true;
     try {
-      final makes = await _databaseService.getAllVehicleMakes();
       if (mounted) {
-        setState(() {
-          _makes = makes;
-          _isLoading = false;
-        });
+        await context.read<VehicleProvider>().fetchAllVehicleMakes();
+        if (!mounted) return;
+        _makes.value = context.read<VehicleProvider>().vehicleMakes;
+        _isLoading.value = false;
       }
     } catch (e) {
       debugPrint('Error loading vehicle makes: $e');
       if (mounted) {
-        setState(() => _isLoading = false);
+        _isLoading.value = false;
       }
     }
   }
 
   Future<void> _deleteMake(String id) async {
     try {
-      await _databaseService.deleteVehicleMake(id);
-      _loadMakes();
+      if (mounted) {
+        await context.read<VehicleProvider>().deleteVehicleMake(id);
+        _loadMakes();
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error deleting make: $e')));
+      }
     }
   }
 
-  void _showAddEditDialog({VehicleMakeModel? make}) {
+  void _showAddEditDialog({VehicleMakeEntity? make}) {
     showDialog(
       context: context,
       builder: (context) => _AddEditMakeDialog(
         make: make,
         onSave: (newMake) async {
           if (make == null) {
-            await _databaseService.insertVehicleMake(newMake);
+            await context.read<VehicleProvider>().addVehicleMake(newMake);
           } else {
-            await _databaseService.updateVehicleMake(newMake);
+            await context.read<VehicleProvider>().updateVehicleMake(newMake);
           }
           _loadMakes();
         },
@@ -70,213 +72,180 @@ class _VehicleMasterScreenState extends State<VehicleMasterScreen> {
   }
 
   @override
+  void dispose() {
+    _makes.dispose();
+    _isLoading.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _makes.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.category_outlined,
-                    size: 64.sp,
-                    color: Colors.grey,
-                  ),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'No vehicle makes found',
-                    style: TextStyle(color: Colors.grey, fontSize: 16.sp),
-                  ),
-                  SizedBox(height: 16.h),
-                  Row(
+      body: AnimatedBuilder(
+        animation: Listenable.merge([_isLoading, _makes]),
+        builder: (context, _) {
+          return _isLoading.value
+              ? const Center(child: CircularProgressIndicator())
+              : _makes.value.isEmpty
+              ? Center(
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      ElevatedButton.icon(
-                        onPressed: () => _showAddEditDialog(),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add Make'),
+                      Icon(
+                        Icons.category_outlined,
+                        size: 64.sp,
+                        color: Colors.grey,
                       ),
-                      SizedBox(width: 16.w),
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          setState(() => _isLoading = true);
-                          await _databaseService.seedVehicleMasterData();
-                          _loadMakes();
-                        },
-                        icon: const Icon(Icons.cloud_download),
-                        label: const Text('Load Default Data'),
+                      SizedBox(height: 16.h),
+                      Text(
+                        'No vehicle makes found',
+                        style: TextStyle(color: Colors.grey, fontSize: 16.sp),
                       ),
-                    ],
-                  ),
-                ],
-              ),
-            )
-          : ListView.separated(
-              padding: EdgeInsets.all(16.w),
-              itemCount: _makes.length,
-              separatorBuilder: (context, index) => SizedBox(height: 12.h),
-              itemBuilder: (context, index) {
-                final make = _makes[index];
-                return Card(
-                  child: ListTile(
-                    leading: Container(
-                      width: 50.w,
-                      height: 50.w,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey[200]!),
-                      ),
-                      child: ClipOval(
-                        child: make.logoUrl != null && make.logoUrl!.isNotEmpty
-                            ? Image.network(
-                                make.logoUrl!,
-                                fit: BoxFit.contain,
-                                errorBuilder: (c, o, s) => Center(
-                                  child: Text(
-                                    make.name.isNotEmpty
-                                        ? make.name[0].toUpperCase()
-                                        : '?',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue,
-                                      fontSize: 20.sp,
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : Center(
-                                child: Text(
-                                  make.name.isNotEmpty
-                                      ? make.name[0].toUpperCase()
-                                      : '?',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
-                                    fontSize: 20.sp,
-                                  ),
-                                ),
-                              ),
-                      ),
-                    ),
-                    title: Text(
-                      make.name,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.sp,
-                      ),
-                    ),
-                    subtitle: Text(
-                      '${make.models.length} Models • ${make.years.length} Years • ${make.colors.length} Colors',
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        IconButton(
-                          icon: const Icon(
-                            Icons.visibility,
-                            color: Colors.blue,
+                      SizedBox(height: 16.h),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: () => _showAddEditDialog(),
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add Make'),
                           ),
-                          onPressed: () => _showMakeDetails(make),
-                          tooltip: 'View Details',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.edit, color: Colors.orange),
-                          onPressed: () => _showAddEditDialog(make: make),
-                          tooltip: 'Edit',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
-                          onPressed: () async {
-                            final confirm = await showDialog<bool>(
-                              context: context,
-                              builder: (c) => AlertDialog(
-                                title: const Text('Delete Make'),
-                                content: Text(
-                                  'Are you sure you want to delete ${make.name}?',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(c, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(c, true),
-                                    child: const Text(
-                                      'Delete',
-                                      style: TextStyle(color: Colors.red),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (confirm == true) _deleteMake(make.id);
-                          },
-                          tooltip: 'Delete',
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_makes.isNotEmpty)
-            FloatingActionButton.small(
-              heroTag: 'seedBtn',
-              onPressed: () async {
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (c) => AlertDialog(
-                    title: const Text('Load Default Data?'),
-                    content: const Text(
-                      'This will add/overwrite standard vehicle makes (Toyota, Honda, etc). Existing custom makes will remain unless they conflict.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(c, false),
-                        child: const Text('Cancel'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(c, true),
-                        child: const Text('Load'),
+                        ],
                       ),
                     ],
                   ),
+                )
+              : ListView.separated(
+                  padding: EdgeInsets.all(16.w),
+                  itemCount: _makes.value.length,
+                  separatorBuilder: (context, index) => SizedBox(height: 12.h),
+                  itemBuilder: (context, index) {
+                    final make = _makes.value[index];
+                    return Card(
+                      child: ListTile(
+                        leading: Container(
+                          width: 50.w,
+                          height: 50.w,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.grey[200]!),
+                          ),
+                          child: ClipOval(
+                            child:
+                                make.logoUrl != null && make.logoUrl!.isNotEmpty
+                                ? Image.network(
+                                    make.logoUrl!,
+                                    fit: BoxFit.contain,
+                                    errorBuilder: (c, o, s) => Center(
+                                      child: Text(
+                                        make.name.isNotEmpty
+                                            ? make.name[0].toUpperCase()
+                                            : '?',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue,
+                                          fontSize: 20.sp,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Center(
+                                    child: Text(
+                                      make.name.isNotEmpty
+                                          ? make.name[0].toUpperCase()
+                                          : '?',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue,
+                                        fontSize: 20.sp,
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        title: Text(
+                          make.name,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16.sp,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${make.models.length} Models • ${make.years.length} Years • ${make.colors.length} Colors',
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: const Icon(
+                                Icons.visibility,
+                                color: Colors.blue,
+                              ),
+                              onPressed: () => _showMakeDetails(make),
+                              tooltip: 'View Details',
+                            ),
+                            IconButton(
+                              icon: const Icon(
+                                Icons.edit,
+                                color: Colors.orange,
+                              ),
+                              onPressed: () => _showAddEditDialog(make: make),
+                              tooltip: 'Edit',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () async {
+                                final confirm = await showDialog<bool>(
+                                  context: context,
+                                  builder: (c) => AlertDialog(
+                                    title: const Text('Delete Make'),
+                                    content: Text(
+                                      'Are you sure you want to delete ${make.name}?',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(c, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(c, true),
+                                        child: const Text(
+                                          'Delete',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                                if (confirm == true) _deleteMake(make.id);
+                              },
+                              tooltip: 'Delete',
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 );
-
-                if (confirm == true) {
-                  setState(() => _isLoading = true);
-                  await _databaseService.seedVehicleMasterData();
-                  _loadMakes();
-                }
-              },
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.blue,
-              tooltip: 'Load Default Data',
-              child: const Icon(Icons.cloud_download),
-            ),
-          SizedBox(height: 16.h),
-          FloatingActionButton.extended(
-            heroTag: 'addBtn',
-            onPressed: () => _showAddEditDialog(),
-            label: const Text('Add Make'),
-            icon: const Icon(Icons.add),
-          ),
-        ],
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'addBtn',
+        onPressed: () => _showAddEditDialog(),
+        label: const Text('Add Make'),
+        icon: const Icon(Icons.add),
       ),
     );
   }
 
-  void _showMakeDetails(VehicleMakeModel make) {
+  void _showMakeDetails(VehicleMakeEntity make) {
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -342,7 +311,7 @@ class _VehicleMasterScreenState extends State<VehicleMasterScreen> {
                         children: make.models.map((m) {
                           return Chip(
                             label: Text('${m.name} (${m.type})'),
-                            backgroundColor: Colors.blue.withOpacity(0.1),
+                            backgroundColor: Colors.blue.withValues(alpha: 0.1),
                             side: BorderSide.none,
                           );
                         }).toList(),
@@ -365,7 +334,9 @@ class _VehicleMasterScreenState extends State<VehicleMasterScreen> {
                         children: make.years.map((y) {
                           return Chip(
                             label: Text(y.toString()),
-                            backgroundColor: Colors.green.withOpacity(0.1),
+                            backgroundColor: Colors.green.withValues(
+                              alpha: 0.1,
+                            ),
                             side: BorderSide.none,
                           );
                         }).toList(),
@@ -392,7 +363,9 @@ class _VehicleMasterScreenState extends State<VehicleMasterScreen> {
                               radius: 8.r,
                             ),
                             label: Text(c),
-                            backgroundColor: Colors.purple.withOpacity(0.1),
+                            backgroundColor: Colors.purple.withValues(
+                              alpha: 0.1,
+                            ),
                             side: BorderSide.none,
                           );
                         }).toList(),
@@ -433,8 +406,8 @@ class _VehicleMasterScreenState extends State<VehicleMasterScreen> {
 }
 
 class _AddEditMakeDialog extends StatefulWidget {
-  final VehicleMakeModel? make;
-  final Function(VehicleMakeModel) onSave;
+  final VehicleMakeEntity? make;
+  final Function(VehicleMakeEntity) onSave;
 
   const _AddEditMakeDialog({this.make, required this.onSave});
 
@@ -446,9 +419,9 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _logoUrlController;
-  late List<VehicleModelDetail> _models;
-  late List<int> _years;
-  late List<String> _colors;
+  late final ValueNotifier<List<VehicleModelDetailEntity>> _models;
+  late final ValueNotifier<List<int>> _years;
+  late final ValueNotifier<List<String>> _colors;
 
   final _modelController = TextEditingController();
   final _modelTypeController = TextEditingController(); // Added
@@ -463,13 +436,15 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
       text: widget.make?.logoUrl ?? '',
     );
     // Deep copy models
-    _models =
-        widget.make?.models
-            .map((m) => VehicleModelDetail(name: m.name, type: m.type))
-            .toList() ??
-        [];
-    _years = List.from(widget.make?.years ?? []);
-    _colors = List.from(widget.make?.colors ?? []);
+    // Deep copy models
+    _models = ValueNotifier(
+      widget.make?.models
+              .map((m) => VehicleModelDetailEntity(name: m.name, type: m.type))
+              .toList() ??
+          [],
+    );
+    _years = ValueNotifier(List.from(widget.make?.years ?? []));
+    _colors = ValueNotifier(List.from(widget.make?.colors ?? []));
   }
 
   @override
@@ -480,6 +455,9 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
     _modelTypeController.dispose(); // Added
     _yearController.dispose();
     _colorController.dispose();
+    _models.dispose();
+    _years.dispose();
+    _colors.dispose();
     super.dispose();
   }
 
@@ -488,57 +466,57 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
     final type = _modelTypeController.text.trim();
 
     if (name.isNotEmpty) {
-      final exists = _models.any(
+      final exists = _models.value.any(
         (m) => m.name.toLowerCase() == name.toLowerCase(),
       );
       if (!exists) {
-        setState(() {
-          _models.add(
-            VehicleModelDetail(
-              name: name,
-              type: type.isNotEmpty ? type : 'Sedan', // Default if empty
-            ),
-          );
-          _modelController.clear();
-          _modelTypeController.clear();
-        });
+        final current = List<VehicleModelDetailEntity>.from(_models.value);
+        current.add(
+          VehicleModelDetailEntity(
+            name: name,
+            type: type.isNotEmpty ? type : 'Sedan', // Default if empty
+          ),
+        );
+        _models.value = current;
+        _modelController.clear();
+        _modelTypeController.clear();
       }
     }
   }
 
   void _addYear() {
     final val = int.tryParse(_yearController.text.trim());
-    if (val != null && !_years.contains(val)) {
-      setState(() {
-        _years.add(val);
-        _years.sort(); // Keep sorted
-        _yearController.clear();
-      });
+    if (val != null && !_years.value.contains(val)) {
+      final current = List<int>.from(_years.value);
+      current.add(val);
+      current.sort(); // Keep sorted
+      _years.value = current;
+      _yearController.clear();
     }
   }
 
   void _addColor() {
     final val = _colorController.text.trim();
-    if (val.isNotEmpty && !_colors.contains(val)) {
-      setState(() {
-        _colors.add(val);
-        _colorController.clear();
-      });
+    if (val.isNotEmpty && !_colors.value.contains(val)) {
+      final current = List<String>.from(_colors.value);
+      current.add(val);
+      _colors.value = current;
+      _colorController.clear();
     }
   }
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
 
-    final newMake = VehicleMakeModel(
+    final newMake = VehicleMakeEntity(
       id: widget.make?.id ?? const Uuid().v4(),
       name: _nameController.text.trim(),
       logoUrl: _logoUrlController.text.trim().isEmpty
           ? null
           : _logoUrlController.text.trim(),
-      models: _models,
-      years: _years,
-      colors: _colors,
+      models: _models.value,
+      years: _years.value,
+      colors: _colors.value,
     );
 
     widget.onSave(newMake);
@@ -591,31 +569,57 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
                     // Models Column
                     Expanded(
                       flex: 2, // Give more space to models
-                      child: _buildModelSection(),
+                      child:
+                          ValueListenableBuilder<
+                            List<VehicleModelDetailEntity>
+                          >(
+                            valueListenable: _models,
+                            builder: (context, models, _) {
+                              return _buildModelSection(models);
+                            },
+                          ),
                     ),
                     const SizedBox(width: 16),
                     // Years Column
                     Expanded(
-                      child: _buildListSection(
-                        title: 'Years',
-                        controller: _yearController,
-                        items: _years.map((e) => e.toString()).toList(),
-                        onAdd: _addYear,
-                        onRemove: (i) => setState(() => _years.removeAt(i)),
-                        hint: 'Year',
-                        isNumber: true,
+                      child: ValueListenableBuilder<List<int>>(
+                        valueListenable: _years,
+                        builder: (context, years, _) {
+                          return _buildListSection(
+                            title: 'Years',
+                            controller: _yearController,
+                            items: years.map((e) => e.toString()).toList(),
+                            onAdd: _addYear,
+                            onRemove: (i) {
+                              final current = List<int>.from(_years.value);
+                              current.removeAt(i);
+                              _years.value = current;
+                            },
+                            hint: 'Year',
+                            isNumber: true,
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(width: 16),
                     // Colors Column
                     Expanded(
-                      child: _buildListSection(
-                        title: 'Colors',
-                        controller: _colorController,
-                        items: _colors,
-                        onAdd: _addColor,
-                        onRemove: (i) => setState(() => _colors.removeAt(i)),
-                        hint: 'Color',
+                      child: ValueListenableBuilder<List<String>>(
+                        valueListenable: _colors,
+                        builder: (context, colors, _) {
+                          return _buildListSection(
+                            title: 'Colors',
+                            controller: _colorController,
+                            items: colors,
+                            onAdd: _addColor,
+                            onRemove: (i) {
+                              final current = List<String>.from(_colors.value);
+                              current.removeAt(i);
+                              _colors.value = current;
+                            },
+                            hint: 'Color',
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -720,7 +724,7 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
     );
   }
 
-  Widget _buildModelSection() {
+  Widget _buildModelSection(List<VehicleModelDetailEntity> modelsList) {
     return Container(
       decoration: BoxDecoration(
         border: Border.all(color: Colors.grey[300]!),
@@ -769,9 +773,9 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
           const SizedBox(height: 8),
           Expanded(
             child: ListView.builder(
-              itemCount: _models.length,
+              itemCount: modelsList.length,
               itemBuilder: (context, index) {
-                final model = _models[index];
+                final model = modelsList[index];
                 return Container(
                   margin: const EdgeInsets.only(bottom: 4),
                   decoration: BoxDecoration(
@@ -795,7 +799,13 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
                         size: 16,
                         color: Colors.grey,
                       ),
-                      onPressed: () => setState(() => _models.removeAt(index)),
+                      onPressed: () {
+                        final current = List<VehicleModelDetailEntity>.from(
+                          _models.value,
+                        );
+                        current.removeAt(index);
+                        _models.value = current;
+                      },
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(),
                     ),

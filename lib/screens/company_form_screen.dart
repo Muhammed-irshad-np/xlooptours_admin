@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import '../models/company_model.dart';
-import '../services/database_service.dart';
+import 'package:provider/provider.dart';
+import '../features/company/domain/entities/company_entity.dart';
+import '../features/company/presentation/providers/company_provider.dart';
 import '../widgets/responsive_layout.dart';
 
 class CompanyFormScreen extends StatefulWidget {
-  final CompanyModel? company;
+  final CompanyEntity? company;
 
   const CompanyFormScreen({super.key, this.company});
 
@@ -26,14 +27,14 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
   final _postalCodeController = TextEditingController();
 
   // Case Code Logic
-  bool _usesCaseCode = false;
+  final ValueNotifier<bool> _usesCaseCode = ValueNotifier(false);
   final _caseCodeLabelController = TextEditingController(text: 'Case Code');
   final _newCaseCodeController = TextEditingController();
-  List<String> _caseCodes = [];
+  final ValueNotifier<List<String>> _caseCodes = ValueNotifier([]);
 
-  bool _vatRegisteredInKSA = false;
-  final _databaseService = DatabaseService.instance;
-  bool _isSaving = false;
+  final ValueNotifier<bool> _vatRegisteredInKSA = ValueNotifier(false);
+
+  final ValueNotifier<bool> _isSaving = ValueNotifier(false);
 
   @override
   void initState() {
@@ -43,7 +44,7 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
       _companyNameController.text = company.companyName;
       _emailController.text = company.email ?? '';
       _countryController.text = company.country ?? '';
-      _vatRegisteredInKSA = company.vatRegisteredInKSA;
+      _vatRegisteredInKSA.value = company.vatRegisteredInKSA;
       _taxRegController.text = company.taxRegistrationNumber ?? '';
       _cityController.text = company.city ?? '';
       _streetController.text = company.streetAddress ?? '';
@@ -53,11 +54,11 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
       _postalCodeController.text = company.postalCode ?? '';
 
       // Load Case Code settings
-      _usesCaseCode = company.usesCaseCode;
+      _usesCaseCode.value = company.usesCaseCode;
       if (company.caseCodeLabel != null) {
         _caseCodeLabelController.text = company.caseCodeLabel!;
       }
-      _caseCodes = List.from(company.caseCodes);
+      _caseCodes.value = List.from(company.caseCodes);
     }
   }
 
@@ -75,15 +76,19 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
     _postalCodeController.dispose();
     _caseCodeLabelController.dispose();
     _newCaseCodeController.dispose();
+    _usesCaseCode.dispose();
+    _vatRegisteredInKSA.dispose();
+    _isSaving.dispose();
+    _caseCodes.dispose();
     super.dispose();
   }
 
   Future<void> _saveCompany() async {
-    if (_formKey.currentState!.validate() && !_isSaving) {
-      setState(() => _isSaving = true);
+    if (_formKey.currentState!.validate() && !_isSaving.value) {
+      _isSaving.value = true;
 
       try {
-        final company = CompanyModel(
+        final company = CompanyEntity(
           id:
               widget.company?.id ??
               DateTime.now().millisecondsSinceEpoch.toString(),
@@ -94,7 +99,7 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
           country: _countryController.text.trim().isEmpty
               ? null
               : _countryController.text.trim(),
-          vatRegisteredInKSA: _vatRegisteredInKSA,
+          vatRegisteredInKSA: _vatRegisteredInKSA.value,
           taxRegistrationNumber: _taxRegController.text.trim().isEmpty
               ? null
               : _taxRegController.text.trim(),
@@ -118,20 +123,40 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
               ? null
               : _postalCodeController.text.trim(),
           // New Fields
-          usesCaseCode: _usesCaseCode,
-          caseCodeLabel: _usesCaseCode
+          usesCaseCode: _usesCaseCode.value,
+          caseCodeLabel: _usesCaseCode.value
               ? _caseCodeLabelController.text.trim()
               : null,
-          caseCodes: _usesCaseCode ? _caseCodes : [],
+          caseCodes: _usesCaseCode.value ? _caseCodes.value : [],
           createdAt:
-              widget.company?.createdAt, // Preserve creation time if editing
+              widget.company?.createdAt ??
+              DateTime.now(), // Preserve creation time if editing
         );
 
         debugPrint('Saving company: ${company.companyName}');
-        await _databaseService.insertCompany(company);
-
+        bool success = false;
         if (mounted) {
+          if (widget.company != null) {
+            success = await context.read<CompanyProvider>().updateCompany(
+              company,
+            );
+          } else {
+            success = await context.read<CompanyProvider>().insertCompany(
+              company,
+            );
+          }
+        }
+
+        if (mounted && success) {
           Navigator.pop(context, company);
+        } else if (mounted && !success) {
+          final error = context.read<CompanyProvider>().errorMessage;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to save: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       } catch (e) {
         debugPrint('Error saving company: $e');
@@ -145,7 +170,7 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
         }
       } finally {
         if (mounted) {
-          setState(() => _isSaving = false);
+          _isSaving.value = false;
         }
       }
     }
@@ -154,11 +179,9 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
   void _addCaseCode() {
     final code = _newCaseCodeController.text.trim();
     if (code.isNotEmpty) {
-      if (!_caseCodes.contains(code)) {
-        setState(() {
-          _caseCodes.add(code);
-          _newCaseCodeController.clear();
-        });
+      if (!_caseCodes.value.contains(code)) {
+        _caseCodes.value = [..._caseCodes.value, code];
+        _newCaseCodeController.clear();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Case code already exists')),
@@ -168,9 +191,7 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
   }
 
   void _removeCaseCode(String code) {
-    setState(() {
-      _caseCodes.remove(code);
-    });
+    _caseCodes.value = _caseCodes.value.where((c) => c != code).toList();
   }
 
   @override
@@ -218,21 +239,26 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isSaving ? null : _saveCompany,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: _isSaving
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text('Save Company'),
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: _isSaving,
+                      builder: (context, isSaving, _) {
+                        return ElevatedButton(
+                          onPressed: isSaving ? null : _saveCompany,
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: isSaving
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Text('Save Company'),
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -282,30 +308,39 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
               'VAT Treatment',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
-            RadioListTile<bool>(
-              title: const Text('Not VAT registered in KSA'),
-              value: false,
-              groupValue: _vatRegisteredInKSA,
-              onChanged: (val) => setState(() => _vatRegisteredInKSA = val!),
+            ValueListenableBuilder<bool>(
+              valueListenable: _vatRegisteredInKSA,
+              builder: (context, vatRegisteredInKSA, _) {
+                return Column(
+                  children: [
+                    RadioListTile<bool>(
+                      title: const Text('Not VAT registered in KSA'),
+                      value: false,
+                      groupValue: vatRegisteredInKSA,
+                      onChanged: (val) => _vatRegisteredInKSA.value = val!,
+                    ),
+                    RadioListTile<bool>(
+                      title: const Text('VAT registered in KSA'),
+                      value: true,
+                      groupValue: vatRegisteredInKSA,
+                      onChanged: (val) => _vatRegisteredInKSA.value = val!,
+                    ),
+                    if (vatRegisteredInKSA)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: TextFormField(
+                          controller: _taxRegController,
+                          decoration: const InputDecoration(
+                            labelText: 'Tax Registration Number',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.confirmation_number),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
-            RadioListTile<bool>(
-              title: const Text('VAT registered in KSA'),
-              value: true,
-              groupValue: _vatRegisteredInKSA,
-              onChanged: (val) => setState(() => _vatRegisteredInKSA = val!),
-            ),
-            if (_vatRegisteredInKSA)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: TextFormField(
-                  controller: _taxRegController,
-                  decoration: const InputDecoration(
-                    labelText: 'Tax Registration Number',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.confirmation_number),
-                  ),
-                ),
-              ),
           ],
         ),
       ),
@@ -316,79 +351,92 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: ValueListenableBuilder<bool>(
+          valueListenable: _usesCaseCode,
+          builder: (context, usesCaseCode, _) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Case Code Settings',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Switch(
-                  value: _usesCaseCode,
-                  onChanged: (val) => setState(() => _usesCaseCode = val),
-                ),
-              ],
-            ),
-            if (_usesCaseCode) ...[
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _caseCodeLabelController,
-                decoration: const InputDecoration(
-                  labelText: 'Case Code Label (e.g. "Project Code")',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _newCaseCodeController,
-                      decoration: const InputDecoration(
-                        labelText: 'Add Case Code',
-                        hintText: 'e.g. OW-A12',
-                        border: OutlineInputBorder(),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Case Code Settings',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
-                      onFieldSubmitted: (_) => _addCaseCode(),
+                    ),
+                    Switch(
+                      value: usesCaseCode,
+                      onChanged: (val) => _usesCaseCode.value = val,
+                    ),
+                  ],
+                ),
+                if (usesCaseCode) ...[
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _caseCodeLabelController,
+                    decoration: const InputDecoration(
+                      labelText: 'Case Code Label (e.g. "Project Code")',
+                      border: OutlineInputBorder(),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _addCaseCode,
-                    icon: const Icon(Icons.add),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextFormField(
+                          controller: _newCaseCodeController,
+                          decoration: const InputDecoration(
+                            labelText: 'Add Case Code',
+                            hintText: 'e.g. OW-A12',
+                            border: OutlineInputBorder(),
+                          ),
+                          onFieldSubmitted: (_) => _addCaseCode(),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        onPressed: _addCaseCode,
+                        icon: const Icon(Icons.add),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  ValueListenableBuilder<List<String>>(
+                    valueListenable: _caseCodes,
+                    builder: (context, caseCodes, _) {
+                      if (caseCodes.isEmpty) {
+                        return const Text(
+                          'No case codes added yet.',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        );
+                      }
+                      return Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: caseCodes.map((code) {
+                          return Chip(
+                            label: Text(code),
+                            onDeleted: () => _removeCaseCode(code),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                ] else ...[
+                  const Text(
+                    'Enable this if this company uses Case Codes or Project Codes for billing.',
+                    style: TextStyle(color: Colors.grey),
                   ),
                 ],
-              ),
-              const SizedBox(height: 16),
-              if (_caseCodes.isEmpty)
-                const Text(
-                  'No case codes added yet.',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
-                  ),
-                )
-              else
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _caseCodes.map((code) {
-                    return Chip(
-                      label: Text(code),
-                      onDeleted: () => _removeCaseCode(code),
-                    );
-                  }).toList(),
-                ),
-            ] else ...[
-              const Text(
-                'Enable this if this company uses Case Codes or Project Codes for billing.',
-                style: TextStyle(color: Colors.grey),
-              ),
-            ],
-          ],
+              ],
+            );
+          },
         ),
       ),
     );

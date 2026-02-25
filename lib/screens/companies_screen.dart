@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
-import '../models/company_model.dart';
-import '../services/database_service.dart';
+import 'package:provider/provider.dart';
+import '../features/company/domain/entities/company_entity.dart';
+import '../features/company/presentation/providers/company_provider.dart';
 import '../widgets/responsive_layout.dart';
 
 class CompaniesScreen extends StatefulWidget {
-  final Function(CompanyModel)? onCompanySelected;
+  final Function(CompanyEntity)? onCompanySelected;
   final bool isSelectionMode;
 
   const CompaniesScreen({
@@ -21,38 +22,15 @@ class CompaniesScreen extends StatefulWidget {
 }
 
 class _CompaniesScreenState extends State<CompaniesScreen> {
-  final _databaseService =
-      DatabaseService.instance; // Use DatabaseService directly
-  List<CompanyModel> _companies = [];
-  bool _isLoading = true;
-
   @override
   void initState() {
     super.initState();
-    _loadCompanies();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CompanyProvider>().loadCompanies();
+    });
   }
 
-  Future<void> _loadCompanies() async {
-    setState(() => _isLoading = true);
-    try {
-      final companies = await _databaseService.getAllCompanies();
-      if (mounted) {
-        setState(() {
-          _companies = companies;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading companies: $e')));
-      }
-    }
-  }
-
-  Future<void> _deleteCompany(CompanyModel company) async {
+  Future<void> _deleteCompany(CompanyEntity company) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -74,28 +52,62 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
       ),
     );
 
-    if (confirmed == true) {
-      await _databaseService.deleteCompany(company.id);
-      _loadCompanies();
+    if (confirmed == true && mounted) {
+      final success = await context.read<CompanyProvider>().deleteCompany(
+        company.id,
+      );
+      if (!success && mounted) {
+        final error = context.read<CompanyProvider>().errorMessage;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete company: $error')),
+        );
+      }
     }
   }
 
-  Future<void> _toggleCompanyStatus(CompanyModel company, bool isActive) async {
-    final updatedCompany = company.copyWith(
+  Future<void> _toggleCompanyStatus(
+    CompanyEntity company,
+    bool isActive,
+  ) async {
+    final updatedCompany = CompanyEntity(
+      id: company.id,
+      companyName: company.companyName,
+      email: company.email,
+      country: company.country,
+      vatRegisteredInKSA: company.vatRegisteredInKSA,
+      taxRegistrationNumber: company.taxRegistrationNumber,
+      city: company.city,
+      streetAddress: company.streetAddress,
+      buildingNumber: company.buildingNumber,
+      district: company.district,
+      addressAdditionalNumber: company.addressAdditionalNumber,
+      postalCode: company.postalCode,
+      usesCaseCode: company.usesCaseCode,
+      caseCodeLabel: company.caseCodeLabel,
+      caseCodes: company.caseCodes,
       status: isActive ? 'ACTIVE' : 'INACTIVE',
+      createdAt: company.createdAt,
     );
-    await _databaseService.updateCompany(updatedCompany);
-    _loadCompanies();
+
+    if (mounted) {
+      await context.read<CompanyProvider>().updateCompany(updatedCompany);
+      final error = context.read<CompanyProvider>().errorMessage;
+      if (error != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update status: $error')),
+        );
+      }
+    }
   }
 
-  Future<void> _navigateToForm(CompanyModel? company) async {
-    final result = await context.push<CompanyModel>(
+  Future<void> _navigateToForm(CompanyEntity? company) async {
+    final result = await context.push<CompanyEntity>(
       '/companies/form',
       extra: company,
     );
 
-    if (result != null) {
-      _loadCompanies();
+    if (result != null && mounted) {
+      context.read<CompanyProvider>().loadCompanies();
     }
   }
 
@@ -112,10 +124,25 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _companies.isEmpty
-          ? Center(
+      body: Consumer<CompanyProvider>(
+        builder: (context, provider, child) {
+          if (provider.isLoading && provider.companies.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (provider.errorMessage != null && provider.companies.isEmpty) {
+            return Center(
+              child: Text(
+                'Error: ${provider.errorMessage}',
+                style: const TextStyle(color: Colors.red),
+              ),
+            );
+          }
+
+          final _companies = provider.companies;
+
+          if (_companies.isEmpty) {
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -133,31 +160,35 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
                   ),
                 ],
               ),
-            )
-          : ResponsiveLayout(
-              mobile: ListView.builder(
-                itemCount: _companies.length,
-                padding: const EdgeInsets.all(8),
-                itemBuilder: (context, index) =>
-                    _buildCompanyCard(_companies[index]),
-              ),
-              desktop: GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 400,
-                  childAspectRatio: 1.3,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                ),
-                itemCount: _companies.length,
-                itemBuilder: (context, index) =>
-                    _buildCompanyCard(_companies[index]),
-              ),
+            );
+          }
+
+          return ResponsiveLayout(
+            mobile: ListView.builder(
+              itemCount: _companies.length,
+              padding: const EdgeInsets.all(8),
+              itemBuilder: (context, index) =>
+                  _buildCompanyCard(_companies[index]),
             ),
+            desktop: GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 400,
+                childAspectRatio: 1.3,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+              ),
+              itemCount: _companies.length,
+              itemBuilder: (context, index) =>
+                  _buildCompanyCard(_companies[index]),
+            ),
+          );
+        },
+      ),
     );
   }
 
-  Widget _buildCompanyCard(CompanyModel company) {
+  Widget _buildCompanyCard(CompanyEntity company) {
     bool isActive = company.status == 'ACTIVE';
 
     return Card(
@@ -388,7 +419,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
     );
   }
 
-  void _showDetails(CompanyModel company) {
+  void _showDetails(CompanyEntity company) {
     showDialog(
       context: context,
       builder: (context) => Dialog(

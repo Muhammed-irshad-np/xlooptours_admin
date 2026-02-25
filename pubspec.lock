@@ -129,14 +129,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.8"
-  equatable:
-    dependency: transitive
+  dartz:
+    dependency: "direct main"
     description:
-      name: equatable
-      sha256: "567c64b3cb4cf82397aac55f4f0cbd3ca20d77c6c03bedbc4ceaddc08904aef7"
+      name: dartz
+      sha256: e6acf34ad2e31b1eb00948692468c30ab48ac8250e0f0df661e29f12dd252168
       url: "https://pub.dev"
     source: hosted
-    version: "2.0.7"
+    version: "0.10.1"
+  equatable:
+    dependency: "direct main"
+    description:
+      name: equatable
+      sha256: "3e0141505477fd8ad55d6eb4e7776d3fe8430be8e497ccb1521370c3f21a3e2b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.8"
   fake_async:
     dependency: transitive
     description:
@@ -333,6 +341,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "10.12.0"
+  get_it:
+    dependency: "direct main"
+    description:
+      name: get_it
+      sha256: "568d62f0e68666fb5d95519743b3c24a34c7f19d834b0658c46e26d778461f66"
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.2.1"
   go_router:
     dependency: "direct main"
     description:
@@ -565,6 +581,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.0.0"
+  nested:
+    dependency: transitive
+    description:
+      name: nested
+      sha256: "03bac4c528c64c95c722ec99280375a6f2fc708eec17c7b3f07253b626cd2a20"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.0"
   path:
     dependency: transitive
     description:
@@ -685,6 +709,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "5.14.2"
+  provider:
+    dependency: "direct main"
+    description:
+      name: provider
+      sha256: "4e82183fa20e5ca25703ead7e05de9e4cceed1fbd1eadc1ac3cb6f565a09f272"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.1.5+1"
   qr:
     dependency: transitive
     description:
@@ -915,13 +947,13 @@ packages:
     source: hosted
     version: "0.3.0"
   uuid:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: uuid
-      sha256: a11b666489b1954e01d992f3d601b1804a33937b5a8fe677bd26b8a9f96f96e8
+      sha256: "1fef9e8e11e2991bb773070d4656b7bd5d850967a2456cfc83cf47925ba79489"
       url: "https://pub.dev"
     source: hosted
-    version: "4.5.2"
+    version: "4.5.3"
   vector_math:
     dependency: transitive
     description:

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:xloop_invoice/models/notification_model.dart';
-import 'package:xloop_invoice/services/database_service.dart';
+import 'package:provider/provider.dart';
+import '../features/notifications/domain/entities/notification_entity.dart';
+import '../features/notifications/presentation/providers/notification_provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 class NotificationsScreen extends StatelessWidget {
@@ -26,18 +27,17 @@ class NotificationsScreen extends StatelessWidget {
         centerTitle: false,
         iconTheme: IconThemeData(color: Colors.indigo[900]),
       ),
-      body: StreamBuilder<List<NotificationModel>>(
-        stream: DatabaseService.instance.getNotifications(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+      body: Consumer<NotificationProvider>(
+        builder: (context, provider, child) {
+          if (provider.isLoading && provider.notifications.isEmpty) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+          if (provider.errorMessage != null) {
+            return Center(child: Text('Error: ${provider.errorMessage}'));
           }
 
-          final notifications = snapshot.data ?? [];
+          final notifications = provider.notifications;
 
           if (notifications.isEmpty) {
             return Center(
@@ -78,7 +78,7 @@ class NotificationsScreen extends StatelessWidget {
 
   Widget _buildNotificationCard(
     BuildContext context,
-    NotificationModel notification,
+    NotificationEntity notification,
   ) {
     // Determine icon and color based on type
     IconData icon;
@@ -148,7 +148,7 @@ class NotificationsScreen extends StatelessWidget {
                 icon: const Icon(Icons.mark_email_read, color: Colors.blue),
                 tooltip: 'Mark as read',
                 onPressed: () {
-                  DatabaseService.instance.markNotificationAsRead(
+                  context.read<NotificationProvider>().markAsRead(
                     notification.id,
                   );
                 },

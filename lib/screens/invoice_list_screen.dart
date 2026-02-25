@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
-import '../models/invoice_model.dart';
-import '../services/database_service.dart';
+import 'package:provider/provider.dart';
+import '../features/invoice/domain/entities/invoice_entity.dart';
+import '../features/invoice/presentation/providers/invoice_provider.dart';
 import '../widgets/responsive_layout.dart';
 
 class InvoiceListScreen extends StatefulWidget {
@@ -13,30 +14,31 @@ class InvoiceListScreen extends StatefulWidget {
 }
 
 class _InvoiceListScreenState extends State<InvoiceListScreen> {
-  List<InvoiceModel> _invoices = [];
-  bool _isLoading = true;
-  int? _selectedMonth; // Null means "All"
-  int? _selectedYear; // Null means "All"
+  final ValueNotifier<int?> _selectedMonth = ValueNotifier(null);
+  final ValueNotifier<int?> _selectedYear = ValueNotifier(null);
+
+  @override
+  void dispose() {
+    _selectedMonth.dispose();
+    _selectedYear.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
     super.initState();
-    _loadInvoices();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadInvoices();
+    });
   }
 
   Future<void> _loadInvoices() async {
-    setState(() => _isLoading = true);
     try {
-      final invoices = await DatabaseService.instance.getAllInvoices(
-        month: _selectedMonth,
-        year: _selectedYear,
+      await context.read<InvoiceProvider>().fetchAllInvoices(
+        month: _selectedMonth.value,
+        year: _selectedYear.value,
       );
-      setState(() {
-        _invoices = invoices;
-        _isLoading = false;
-      });
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -45,17 +47,17 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     }
   }
 
-  Future<void> _openInvoice(InvoiceModel invoice) async {
+  Future<void> _openInvoice(InvoiceEntity invoice) async {
     // Navigate to PDF preview
     context.push('/preview', extra: invoice);
   }
 
-  Future<void> _editInvoice(InvoiceModel invoice) async {
+  Future<void> _editInvoice(InvoiceEntity invoice) async {
     await context.push('/invoice', extra: invoice);
     _loadInvoices(); // Reload list after edit
   }
 
-  Future<void> _deleteInvoice(InvoiceModel invoice) async {
+  Future<void> _deleteInvoice(InvoiceEntity invoice) async {
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
@@ -79,8 +81,9 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     );
 
     if (confirmed == true && invoice.id != null) {
+      if (!mounted) return;
       try {
-        await DatabaseService.instance.deleteInvoice(invoice.id!);
+        await context.read<InvoiceProvider>().deleteInvoice(invoice.id!);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Invoice deleted successfully')),
@@ -110,67 +113,87 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
         title: const Text('Saved Invoices'),
         actions: [
           IconButton(
-            icon: Stack(
-              children: [
-                const Icon(Icons.filter_list),
-                if (_selectedMonth != null || _selectedYear != null)
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.red,
-                        shape: BoxShape.circle,
+            icon: AnimatedBuilder(
+              animation: Listenable.merge([_selectedMonth, _selectedYear]),
+              builder: (context, _) {
+                return Stack(
+                  children: [
+                    const Icon(Icons.filter_list),
+                    if (_selectedMonth.value != null ||
+                        _selectedYear.value != null)
+                      Positioned(
+                        right: 0,
+                        top: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 8,
+                            minHeight: 8,
+                          ),
+                        ),
                       ),
-                      constraints: const BoxConstraints(
-                        minWidth: 8,
-                        minHeight: 8,
-                      ),
-                    ),
-                  ),
-              ],
+                  ],
+                );
+              },
             ),
             onPressed: _showFilterDialog,
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _invoices.isEmpty
-          ? const Center(child: Text('No invoices found'))
-          : ResponsiveLayout(
-              mobile: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _invoices.length,
-                itemBuilder: (context, index) => _buildInvoiceItem(
-                  _invoices[index],
-                  currencyFormat,
-                  dateFormat,
-                ),
-              ),
-              desktop: GridView.builder(
-                padding: const EdgeInsets.all(16),
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  maxCrossAxisExtent: 400,
-                  childAspectRatio: 2.5,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                ),
-                itemCount: _invoices.length,
-                itemBuilder: (context, index) => _buildInvoiceItem(
-                  _invoices[index],
-                  currencyFormat,
-                  dateFormat,
-                ),
+      body: Consumer<InvoiceProvider>(
+        builder: (context, provider, child) {
+          if (provider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          if (provider.error != null) {
+            return Center(child: Text('Error: ${provider.error}'));
+          }
+
+          final invoices = provider.invoices;
+
+          if (invoices.isEmpty) {
+            return const Center(child: Text('No invoices found'));
+          }
+
+          return ResponsiveLayout(
+            mobile: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: invoices.length,
+              itemBuilder: (context, index) => _buildInvoiceItem(
+                invoices[index],
+                currencyFormat,
+                dateFormat,
               ),
             ),
+            desktop: GridView.builder(
+              padding: const EdgeInsets.all(16),
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 400,
+                childAspectRatio: 2.5,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+              ),
+              itemCount: invoices.length,
+              itemBuilder: (context, index) => _buildInvoiceItem(
+                invoices[index],
+                currencyFormat,
+                dateFormat,
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
   void _showFilterDialog() {
-    int? tempMonth = _selectedMonth;
-    int? tempYear = _selectedYear;
+    int? tempMonth = _selectedMonth.value;
+    int? tempYear = _selectedYear.value;
 
     showModalBottomSheet(
       context: context,
@@ -234,10 +257,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () {
-                            setState(() {
-                              _selectedMonth = null;
-                              _selectedYear = null;
-                            });
+                            _selectedMonth.value = null;
+                            _selectedYear.value = null;
                             _loadInvoices();
                             Navigator.pop(context);
                           },
@@ -248,10 +269,8 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                       Expanded(
                         child: FilledButton(
                           onPressed: () {
-                            setState(() {
-                              _selectedMonth = tempMonth;
-                              _selectedYear = tempYear;
-                            });
+                            _selectedMonth.value = tempMonth;
+                            _selectedYear.value = tempYear;
                             _loadInvoices();
                             Navigator.pop(context);
                           },
@@ -271,7 +290,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   }
 
   Widget _buildInvoiceItem(
-    InvoiceModel invoice,
+    InvoiceEntity invoice,
     NumberFormat currencyFormat,
     DateFormat dateFormat,
   ) {

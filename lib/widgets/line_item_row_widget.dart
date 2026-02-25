@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import '../models/line_item_model.dart';
+import '../features/invoice/domain/entities/line_item_entity.dart';
 
 class LineItemRowWidget extends StatelessWidget {
-  final LineItemModel item;
+  final LineItemEntity item;
   final int index;
-  final Function(LineItemModel) onChanged;
+  final Function(LineItemEntity) onChanged;
   final VoidCallback onDelete;
 
   const LineItemRowWidget({
@@ -100,7 +100,7 @@ class LineItemRowWidget extends StatelessWidget {
                     final qty = double.tryParse(value) ?? 0.0;
                     // Auto-set unit type: 1 = LOT, >1 = EA
                     final newUnitType = qty == 1.0 ? 'LOT' : 'EA';
-                    final total = LineItemModel.calculateTotal(
+                    final total = LineItemEntity.calculateTotal(
                       item.subtotalAmount,
                       value,
                     );
@@ -118,7 +118,7 @@ class LineItemRowWidget extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: DropdownButtonFormField<String>(
-                  value: item.unitType,
+                  initialValue: item.unitType,
                   decoration: _buildInputDecoration('Unit'),
                   items: const [
                     DropdownMenuItem(value: 'LOT', child: Text('LOT')),
@@ -145,7 +145,7 @@ class LineItemRowWidget extends StatelessWidget {
             ],
             onChanged: (value) {
               final unitPrice = double.tryParse(value) ?? 0.0;
-              final total = LineItemModel.calculateTotal(unitPrice, item.unit);
+              final total = LineItemEntity.calculateTotal(unitPrice, item.unit);
               onChanged(
                 item.copyWith(subtotalAmount: unitPrice, totalAmount: total),
               );

@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import '../models/employee_model.dart';
-import '../models/vehicle_model.dart'; // Added
-import '../services/database_service.dart';
+import 'package:provider/provider.dart';
+import '../features/employee/domain/entities/employee_entity.dart';
+import '../features/employee/presentation/providers/employee_provider.dart';
+import '../features/vehicle/domain/entities/vehicle_entity.dart';
+import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+
 import '../widgets/responsive_layout.dart';
 import 'employee_form_screen.dart';
 
@@ -15,14 +18,16 @@ class EmployeesScreen extends StatefulWidget {
 
 class _EmployeesScreenState extends State<EmployeesScreen>
     with SingleTickerProviderStateMixin {
-  final _databaseService = DatabaseService.instance;
-  List<EmployeeModel> _allEmployees = [];
-  List<EmployeeModel> _filteredEmployees = [];
-  Map<String, VehicleModel> _assignedVehicles = {}; // Added
-  bool _isLoading = true;
+  List<EmployeeEntity> _allEmployees = [];
   String _searchQuery = '';
   late TabController _tabController;
-  bool _showInactive = false; // Filter state
+
+  final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(true);
+  final ValueNotifier<bool> _showInactive = ValueNotifier<bool>(false);
+  final ValueNotifier<List<EmployeeEntity>> _filteredEmployees =
+      ValueNotifier<List<EmployeeEntity>>([]);
+  final ValueNotifier<Map<String, VehicleEntity>> _assignedVehicles =
+      ValueNotifier<Map<String, VehicleEntity>>({});
 
   final List<String> _tabs = ['All', 'Management', 'Office', 'Drivers'];
 
@@ -37,34 +42,40 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _isLoading.dispose();
+    _showInactive.dispose();
+    _filteredEmployees.dispose();
+    _assignedVehicles.dispose();
     super.dispose();
   }
 
   Future<void> _loadEmployees() async {
-    setState(() => _isLoading = true);
+    _isLoading.value = true;
     try {
-      final employees = await _databaseService.getAllEmployees();
-      final vehicles = await _databaseService.getAllVehicles(); // Added
+      if (mounted) {
+        await context.read<EmployeeProvider>().fetchAllEmployees();
+        if (!mounted) return;
+        await context.read<VehicleProvider>().fetchAllVehicles();
+      }
+      if (!mounted) return;
+      final vehicles = context.read<VehicleProvider>().vehicles;
 
       // Map vehicles by driver ID for quick lookup
-      final vehicleMap = <String, VehicleModel>{};
+      final vehicleMap = <String, VehicleEntity>{};
       for (var v in vehicles) {
         if (v.assignedDriverId != null) {
           vehicleMap[v.assignedDriverId!] = v;
         }
       }
 
-      if (mounted) {
-        setState(() {
-          _allEmployees = employees;
-          _assignedVehicles = vehicleMap; // Added
-          _isLoading = false;
-        });
-        _filterEmployees();
-      }
+      _allEmployees = context.read<EmployeeProvider>().employees;
+      _assignedVehicles.value = vehicleMap;
+      _isLoading.value = false;
+
+      _filterEmployees();
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        _isLoading.value = false;
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('Error loading employees: $e')));
@@ -73,10 +84,10 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   }
 
   void _filterEmployees() {
-    List<EmployeeModel> temp = _allEmployees;
+    List<EmployeeEntity> temp = _allEmployees;
 
     // 1. Filter by Active/Inactive
-    if (!_showInactive) {
+    if (!_showInactive.value) {
       temp = temp.where((e) => e.isActive).toList();
     }
 
@@ -116,12 +127,10 @@ class _EmployeesScreenState extends State<EmployeesScreen>
       }
     }
 
-    setState(() {
-      _filteredEmployees = temp;
-    });
+    _filteredEmployees.value = List.from(temp);
   }
 
-  Future<void> _navigateToForm(EmployeeModel? employee) async {
+  Future<void> _navigateToForm(EmployeeEntity? employee) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
@@ -134,7 +143,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     }
   }
 
-  Future<void> _deleteEmployee(EmployeeModel employee) async {
+  Future<void> _deleteEmployee(EmployeeEntity employee) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -154,16 +163,18 @@ class _EmployeesScreenState extends State<EmployeesScreen>
       ),
     );
 
-    if (confirmed == true) {
-      await _databaseService.deleteEmployee(employee.id);
+    if (confirmed == true && mounted) {
+      await context.read<EmployeeProvider>().deleteEmployee(employee.id);
       _loadEmployees();
     }
   }
 
-  Future<void> _toggleStatus(EmployeeModel employee, bool isActive) async {
+  Future<void> _toggleStatus(EmployeeEntity employee, bool isActive) async {
     final updatedEmployee = employee.copyWith(isActive: isActive);
-    await _databaseService.updateEmployee(updatedEmployee);
-    _loadEmployees();
+    if (mounted) {
+      await context.read<EmployeeProvider>().updateEmployee(updatedEmployee);
+      _loadEmployees();
+    }
   }
 
   @override
@@ -184,13 +195,16 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                 'Show Inactive',
                 style: TextStyle(fontSize: 12.sp, color: Colors.grey[700]),
               ),
-              Switch(
-                value: _showInactive,
-                onChanged: (val) {
-                  setState(() {
-                    _showInactive = val;
-                  });
-                  _filterEmployees();
+              ValueListenableBuilder<bool>(
+                valueListenable: _showInactive,
+                builder: (context, showInactive, _) {
+                  return Switch(
+                    value: showInactive,
+                    onChanged: (val) {
+                      _showInactive.value = val;
+                      _filterEmployees();
+                    },
+                  );
                 },
               ),
             ],
@@ -227,46 +241,72 @@ class _EmployeesScreenState extends State<EmployeesScreen>
             ),
           ),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredEmployees.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.person_off_outlined,
-                          size: 64.sp,
-                          color: Colors.grey,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _isLoading,
+              builder: (context, isLoading, _) {
+                if (isLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                return ValueListenableBuilder<List<EmployeeEntity>>(
+                  valueListenable: _filteredEmployees,
+                  builder: (context, filteredEmployees, _) {
+                    if (filteredEmployees.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.person_off_outlined,
+                              size: 64.sp,
+                              color: Colors.grey,
+                            ),
+                            SizedBox(height: 16.h),
+                            Text(
+                              'No employees found',
+                              style: TextStyle(
+                                fontSize: 18.sp,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ],
                         ),
-                        SizedBox(height: 16.h),
-                        Text(
-                          'No employees found',
-                          style: TextStyle(fontSize: 18.sp, color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  )
-                : ResponsiveLayout(
-                    mobile: ListView.builder(
-                      itemCount: _filteredEmployees.length,
-                      padding: const EdgeInsets.all(8),
-                      itemBuilder: (context, index) =>
-                          _buildEmployeeCard(_filteredEmployees[index]),
-                    ),
-                    desktop: GridView.builder(
-                      padding: const EdgeInsets.all(16),
-                      gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
-                        maxCrossAxisExtent: 430.w,
-                        childAspectRatio: 1.5,
-                        crossAxisSpacing: 16,
-                        mainAxisSpacing: 16,
-                      ),
-                      itemCount: _filteredEmployees.length,
-                      itemBuilder: (context, index) =>
-                          _buildEmployeeCard(_filteredEmployees[index]),
-                    ),
-                  ),
+                      );
+                    }
+
+                    return ValueListenableBuilder<Map<String, VehicleEntity>>(
+                      valueListenable: _assignedVehicles,
+                      builder: (context, assignedVehicles, _) {
+                        return ResponsiveLayout(
+                          mobile: ListView.builder(
+                            itemCount: filteredEmployees.length,
+                            padding: const EdgeInsets.all(8),
+                            itemBuilder: (context, index) => _buildEmployeeCard(
+                              filteredEmployees[index],
+                              assignedVehicles,
+                            ),
+                          ),
+                          desktop: GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate:
+                                SliverGridDelegateWithMaxCrossAxisExtent(
+                                  maxCrossAxisExtent: 430.w,
+                                  childAspectRatio: 1.5,
+                                  crossAxisSpacing: 16,
+                                  mainAxisSpacing: 16,
+                                ),
+                            itemCount: filteredEmployees.length,
+                            itemBuilder: (context, index) => _buildEmployeeCard(
+                              filteredEmployees[index],
+                              assignedVehicles,
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            ),
           ),
         ],
       ),
@@ -277,7 +317,10 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     );
   }
 
-  Widget _buildEmployeeCard(EmployeeModel employee) {
+  Widget _buildEmployeeCard(
+    EmployeeEntity employee,
+    Map<String, VehicleEntity> assignedVehicles,
+  ) {
     return Card(
       elevation: 0,
       color: Colors.white,
@@ -455,8 +498,8 @@ class _EmployeesScreenState extends State<EmployeesScreen>
               ),
             ],
             // Show Assigned Vehicle for Drivers
-            if (_assignedVehicles.isNotEmpty &&
-                _assignedVehicles[employee.id] != null) ...[
+            if (assignedVehicles.isNotEmpty &&
+                assignedVehicles[employee.id] != null) ...[
               SizedBox(height: 12.h),
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -475,7 +518,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                     SizedBox(width: 8.w),
                     Expanded(
                       child: Text(
-                        '${_assignedVehicles[employee.id]?.make ?? ''} ${_assignedVehicles[employee.id]?.model ?? ''} (${_assignedVehicles[employee.id]?.plateNumber ?? ''})',
+                        '${assignedVehicles[employee.id]?.make ?? ''} ${assignedVehicles[employee.id]?.model ?? ''} (${assignedVehicles[employee.id]?.plateNumber ?? ''})',
                         style: TextStyle(
                           fontSize: 13.sp,
                           color: Colors.blue[900],
@@ -516,7 +559,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     );
   }
 
-  void _showDetails(EmployeeModel employee) {
+  void _showDetails(EmployeeEntity employee) {
     showDialog(
       context: context,
       builder: (context) => Dialog(

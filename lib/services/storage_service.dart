@@ -1,34 +1,20 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/customer_model.dart';
-import '../models/invoice_model.dart';
-import 'database_service.dart';
+import '../features/invoice/domain/entities/invoice_entity.dart';
+import '../features/invoice/data/models/invoice_model.dart';
 
 class StorageService {
-  final _dbService = DatabaseService.instance;
   static const String _invoiceDraftKey = 'invoice_draft';
 
-  // Customer CRUD operations
-  Future<List<CustomerModel>> getCustomers() async {
-    return await _dbService.getAllCustomers();
-  }
-
-  Future<void> saveCustomer(CustomerModel customer) async {
-    await _dbService.insertCustomer(customer);
-  }
-
-  Future<void> deleteCustomer(String customerId) async {
-    await _dbService.deleteCustomer(customerId);
-  }
-
   // Invoice Draft operations
-  Future<void> saveInvoiceDraft(InvoiceModel invoice) async {
+  Future<void> saveInvoiceDraft(InvoiceEntity invoice) async {
     final prefs = await SharedPreferences.getInstance();
-    final invoiceJson = jsonEncode(invoice.toJson());
+    final model = InvoiceModel.fromEntity(invoice);
+    final invoiceJson = jsonEncode(model.toJson());
     await prefs.setString(_invoiceDraftKey, invoiceJson);
   }
 
-  Future<InvoiceModel?> getInvoiceDraft() async {
+  Future<InvoiceEntity?> getInvoiceDraft() async {
     final prefs = await SharedPreferences.getInstance();
     final invoiceJson = prefs.getString(_invoiceDraftKey);
     if (invoiceJson != null) {

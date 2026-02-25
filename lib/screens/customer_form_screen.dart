@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import '../models/customer_model.dart';
-import '../models/company_model.dart';
-import '../services/database_service.dart';
+import 'package:provider/provider.dart';
+import '../features/company/domain/entities/company_entity.dart';
+import '../features/company/presentation/providers/company_provider.dart';
+import '../features/customer/domain/entities/customer_entity.dart';
+import '../features/customer/presentation/providers/customer_provider.dart';
 import '../widgets/responsive_layout.dart';
 
 class CustomerFormScreen extends StatefulWidget {
-  final CustomerModel? customer;
+  final CustomerEntity? customer;
 
   const CustomerFormScreen({super.key, this.customer});
 
@@ -19,15 +21,16 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   final _phoneController = TextEditingController();
 
   // Company Selection
-  CompanyModel? _selectedCompany;
-  List<CompanyModel> _availableCompanies = [];
-  bool _isLoadingCompanies = true;
+  final ValueNotifier<CompanyEntity?> _selectedCompany = ValueNotifier(null);
+  final ValueNotifier<List<CompanyEntity>> _availableCompanies = ValueNotifier(
+    [],
+  );
+  final ValueNotifier<bool> _isLoadingCompanies = ValueNotifier(true);
 
   // Case Code Selection
-  List<String> _assignedCaseCodes = [];
+  final ValueNotifier<List<String>> _assignedCaseCodes = ValueNotifier([]);
 
-  final _databaseService = DatabaseService.instance;
-  bool _isSaving = false;
+  final ValueNotifier<bool> _isSaving = ValueNotifier(false);
 
   @override
   void initState() {
@@ -37,21 +40,23 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       final customer = widget.customer!;
       _nameController.text = customer.name;
       _phoneController.text = customer.phone;
-      _assignedCaseCodes = List.from(customer.assignedCaseCodes);
+      _assignedCaseCodes.value = List.from(customer.assignedCaseCodes);
     }
   }
 
   Future<void> _loadCompanies() async {
     try {
-      final companies = await _databaseService.getAllCompanies();
-      setState(() {
-        _availableCompanies = companies;
-        _isLoadingCompanies = false;
+      if (mounted) {
+        await context.read<CompanyProvider>().loadCompanies();
+        if (!mounted) return;
+        final companies = context.read<CompanyProvider>().companies;
+        _availableCompanies.value = companies;
+        _isLoadingCompanies.value = false;
 
         // If editing, set the selected company
         if (widget.customer != null && widget.customer!.companyId != null) {
           try {
-            _selectedCompany = companies.firstWhere(
+            _selectedCompany.value = companies.firstWhere(
               (c) => c.id == widget.customer!.companyId,
             );
           } catch (e) {
@@ -61,10 +66,12 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
             );
           }
         }
-      });
+      }
     } catch (e) {
       debugPrint('Error loading companies: $e');
-      setState(() => _isLoadingCompanies = false);
+      if (mounted) {
+        _isLoadingCompanies.value = false;
+      }
     }
   }
 
@@ -72,30 +79,42 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _selectedCompany.dispose();
+    _availableCompanies.dispose();
+    _isLoadingCompanies.dispose();
+    _assignedCaseCodes.dispose();
+    _isSaving.dispose();
     super.dispose();
   }
 
   Future<void> _saveCustomer() async {
-    if (_formKey.currentState!.validate() && !_isSaving) {
-      setState(() => _isSaving = true);
+    if (_formKey.currentState!.validate() && !_isSaving.value) {
+      _isSaving.value = true;
 
       try {
-        final customer = CustomerModel(
+        final customer = CustomerEntity(
           id:
               widget.customer?.id ??
               DateTime.now().millisecondsSinceEpoch.toString(),
           name: _nameController.text.trim(),
           phone: _phoneController.text.trim(),
-          companyId: _selectedCompany?.id,
-          companyName: _selectedCompany?.companyName,
-          assignedCaseCodes: _selectedCompany?.usesCaseCode == true
-              ? _assignedCaseCodes
+          companyId: _selectedCompany.value?.id,
+          companyName: _selectedCompany.value?.companyName,
+          assignedCaseCodes: _selectedCompany.value?.usesCaseCode == true
+              ? _assignedCaseCodes.value
               : [],
-          createdAt: widget.customer?.createdAt,
+          createdAt: widget.customer?.createdAt ?? DateTime.now(),
         );
 
         debugPrint('Saving customer: ${customer.name}');
-        await _databaseService.insertCustomer(customer);
+
+        if (mounted) {
+          if (widget.customer != null) {
+            await context.read<CustomerProvider>().updateCustomer(customer);
+          } else {
+            await context.read<CustomerProvider>().addCustomer(customer);
+          }
+        }
 
         if (mounted) {
           Navigator.pop(context, customer);
@@ -112,22 +131,22 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         }
       } finally {
         if (mounted) {
-          setState(() => _isSaving = false);
+          _isSaving.value = false;
         }
       }
     }
   }
 
   void _toggleCaseCode(String code, bool? selected) {
-    setState(() {
-      if (selected == true) {
-        if (!_assignedCaseCodes.contains(code)) {
-          _assignedCaseCodes.add(code);
-        }
-      } else {
-        _assignedCaseCodes.remove(code);
+    if (selected == true) {
+      if (!_assignedCaseCodes.value.contains(code)) {
+        _assignedCaseCodes.value = [..._assignedCaseCodes.value, code];
       }
-    });
+    } else {
+      _assignedCaseCodes.value = _assignedCaseCodes.value
+          .where((c) => c != code)
+          .toList();
+    }
   }
 
   @override
@@ -136,60 +155,74 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       appBar: AppBar(
         title: Text(widget.customer == null ? 'Add Customer' : 'Edit Customer'),
       ),
-      body: _isLoadingCompanies
-          ? const Center(child: CircularProgressIndicator())
-          : Form(
-              key: _formKey,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 800),
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        ResponsiveLayout(
-                          mobile: Column(
-                            children: [
-                              _buildPersonalDetailsSection(),
-                              const SizedBox(height: 16),
-                              _buildCompanySection(),
-                            ],
-                          ),
-                          desktop: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(child: _buildPersonalDetailsSection()),
-                              const SizedBox(width: 16),
-                              Expanded(child: _buildCompanySection()),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _isSaving ? null : _saveCustomer,
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
+      body: ValueListenableBuilder<bool>(
+        valueListenable: _isLoadingCompanies,
+        builder: (context, isLoadingCompanies, _) {
+          return isLoadingCompanies
+              ? const Center(child: CircularProgressIndicator())
+              : Form(
+                  key: _formKey,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 800),
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          children: [
+                            ResponsiveLayout(
+                              mobile: Column(
+                                children: [
+                                  _buildPersonalDetailsSection(),
+                                  const SizedBox(height: 16),
+                                  _buildCompanySection(),
+                                ],
+                              ),
+                              desktop: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Expanded(
+                                    child: _buildPersonalDetailsSection(),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(child: _buildCompanySection()),
+                                ],
+                              ),
                             ),
-                            child: _isSaving
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ValueListenableBuilder<bool>(
+                                valueListenable: _isSaving,
+                                builder: (context, isSaving, _) {
+                                  return ElevatedButton(
+                                    onPressed: isSaving ? null : _saveCustomer,
+                                    style: ElevatedButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 16,
+                                      ),
                                     ),
-                                  )
-                                : const Text('Save Customer'),
-                          ),
+                                    child: isSaving
+                                        ? const SizedBox(
+                                            height: 20,
+                                            width: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : const Text('Save Customer'),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ),
-            ),
+                );
+        },
+      ),
     );
   }
 
@@ -247,62 +280,85 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<CompanyModel>(
-              value: _selectedCompany,
-              decoration: const InputDecoration(
-                labelText: 'Select Company',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.business),
-                helperText: 'Select "None" for independent travelers',
-              ),
-              items: [
-                const DropdownMenuItem<CompanyModel>(
-                  value: null,
-                  child: Text('None / Independent'),
-                ),
-                ..._availableCompanies.map((company) {
-                  return DropdownMenuItem<CompanyModel>(
-                    value: company,
-                    child: Text(company.companyName),
-                  );
-                }),
-              ],
-              onChanged: (CompanyModel? newValue) {
-                setState(() {
-                  _selectedCompany = newValue;
-                  // Clear assigned case codes if company changes or is removed
-                  if (newValue == null || !newValue.usesCaseCode) {
-                    _assignedCaseCodes.clear();
-                  }
-                });
+            ValueListenableBuilder<List<CompanyEntity>>(
+              valueListenable: _availableCompanies,
+              builder: (context, availableCompanies, _) {
+                return ValueListenableBuilder<CompanyEntity?>(
+                  valueListenable: _selectedCompany,
+                  builder: (context, selectedCompany, _) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        DropdownButtonFormField<CompanyEntity>(
+                          value: selectedCompany,
+                          decoration: const InputDecoration(
+                            labelText: 'Select Company',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.business),
+                            helperText:
+                                'Select "None" for independent travelers',
+                          ),
+                          items: [
+                            const DropdownMenuItem<CompanyEntity>(
+                              value: null,
+                              child: Text('None / Independent'),
+                            ),
+                            ...availableCompanies.map((company) {
+                              return DropdownMenuItem<CompanyEntity>(
+                                value: company,
+                                child: Text(company.companyName),
+                              );
+                            }),
+                          ],
+                          onChanged: (CompanyEntity? newValue) {
+                            _selectedCompany.value = newValue;
+                            // Clear assigned case codes if company changes or is removed
+                            if (newValue == null || !newValue.usesCaseCode) {
+                              _assignedCaseCodes.value = [];
+                            }
+                          },
+                        ),
+
+                        if (selectedCompany != null &&
+                            selectedCompany.usesCaseCode) ...[
+                          const SizedBox(height: 24),
+                          const Divider(),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Assigned Case Codes (${selectedCompany.caseCodeLabel ?? 'Code'})',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 8),
+                          if (selectedCompany.caseCodes.isEmpty)
+                            const Text(
+                              'This company has no case codes defined.',
+                              style: TextStyle(color: Colors.grey),
+                            ),
+
+                          ValueListenableBuilder<List<String>>(
+                            valueListenable: _assignedCaseCodes,
+                            builder: (context, assignedCaseCodes, _) {
+                              return Column(
+                                children: selectedCompany.caseCodes.map((code) {
+                                  return CheckboxListTile(
+                                    title: Text(code),
+                                    value: assignedCaseCodes.contains(code),
+                                    onChanged: (bool? value) =>
+                                        _toggleCaseCode(code, value),
+                                    dense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
+                        ],
+                      ],
+                    );
+                  },
+                );
               },
             ),
-
-            if (_selectedCompany != null && _selectedCompany!.usesCaseCode) ...[
-              const SizedBox(height: 24),
-              const Divider(),
-              const SizedBox(height: 8),
-              Text(
-                'Assigned Case Codes (${_selectedCompany!.caseCodeLabel ?? 'Code'})',
-                style: const TextStyle(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(height: 8),
-              if (_selectedCompany!.caseCodes.isEmpty)
-                const Text(
-                  'This company has no case codes defined.',
-                  style: TextStyle(color: Colors.grey),
-                ),
-
-              ..._selectedCompany!.caseCodes.map((code) {
-                return CheckboxListTile(
-                  title: Text(code),
-                  value: _assignedCaseCodes.contains(code),
-                  onChanged: (bool? value) => _toggleCaseCode(code, value),
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                );
-              }),
-            ],
           ],
         ),
       ),

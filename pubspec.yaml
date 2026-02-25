@@ -66,6 +66,11 @@ dependencies:
   timeago: ^3.7.1
   image_picker: ^1.2.1
   firebase_storage: ^12.4.10
+  provider: ^6.1.5+1
+  get_it: ^9.2.1
+  equatable: ^2.0.8
+  dartz: ^0.10.1
+  uuid: ^4.5.3
 
 dev_dependencies:
   flutter_test:

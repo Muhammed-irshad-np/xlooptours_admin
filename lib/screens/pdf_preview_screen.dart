@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
-import '../models/invoice_model.dart';
+import '../features/invoice/domain/entities/invoice_entity.dart';
 import '../services/pdf_service.dart';
 import '../widgets/responsive_layout.dart';
 
@@ -13,7 +13,7 @@ import 'dart:io' show File if (dart.library.html) '';
 import 'dart:html' as html if (dart.library.io) '';
 
 class PDFPreviewScreen extends StatelessWidget {
-  final InvoiceModel invoice;
+  final InvoiceEntity invoice;
   final bool showActionButtons;
 
   const PDFPreviewScreen({

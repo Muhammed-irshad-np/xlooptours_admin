@@ -7,10 +7,10 @@ import 'customer_list_screen.dart';
 import 'trip_creation_screen.dart';
 import 'notifications_screen.dart';
 
+import 'package:provider/provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import 'companies_screen.dart';
-import '../services/auth_service.dart';
-import '../services/database_service.dart'; // Added
-import '../models/notification_model.dart'; // Added
+import '../features/notifications/presentation/providers/notification_provider.dart';
 
 class AdminLayout extends StatefulWidget {
   const AdminLayout({super.key});
@@ -20,7 +20,7 @@ class AdminLayout extends StatefulWidget {
 }
 
 class _AdminLayoutState extends State<AdminLayout> {
-  int _selectedIndex = 0;
+  final ValueNotifier<int> _selectedIndex = ValueNotifier<int>(0);
 
   final List<Widget> _screens = [
     // const AnalyticsScreen(), // Dashboard REMOVED as per request
@@ -34,6 +34,12 @@ class _AdminLayoutState extends State<AdminLayout> {
   ];
 
   @override
+  void dispose() {
+    _selectedIndex.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Row(
@@ -44,146 +50,156 @@ class _AdminLayoutState extends State<AdminLayout> {
                 child: ConstrainedBox(
                   constraints: BoxConstraints(minHeight: constraints.maxHeight),
                   child: IntrinsicHeight(
-                    child: NavigationRail(
-                      selectedIndex: _selectedIndex,
-                      onDestinationSelected: (int index) {
-                        setState(() {
-                          _selectedIndex = index;
-                        });
-                      },
-                      labelType: NavigationRailLabelType.all,
-                      leading: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24.h),
-                        child: Image.asset(
-                          'assets/logo/logo.png',
-                          height: 40.h,
-                          errorBuilder: (c, o, s) =>
-                              Icon(Icons.circle, size: 40.sp),
-                        ),
-                      ),
-                      destinations: <NavigationRailDestination>[
-                        // Dashboard hidden
-                        NavigationRailDestination(
-                          icon: Icon(
-                            Icons.add_location_alt_outlined,
-                            size: 24.sp,
-                          ),
-                          selectedIcon: Icon(
-                            Icons.add_location_alt,
-                            size: 24.sp,
-                          ),
-                          label: Text(
-                            'New Trip',
-                            style: TextStyle(fontSize: 12.sp),
-                          ),
-                        ),
-                        NavigationRailDestination(
-                          icon: StreamBuilder<List<NotificationModel>>(
-                            stream: DatabaseService.instance.getNotifications(),
-                            builder: (context, snapshot) {
-                              final notifications = snapshot.data ?? [];
-                              final unreadCount = notifications
-                                  .where((n) => !n.isRead)
-                                  .length;
-
-                              if (unreadCount == 0) {
-                                return Icon(
-                                  Icons.notifications_outlined,
-                                  size: 24.sp,
-                                );
-                              }
-
-                              return Badge(
-                                label: Text('$unreadCount'),
-                                child: Icon(
-                                  Icons.notifications_outlined,
-                                  size: 24.sp,
-                                ),
-                              );
-                            },
-                          ),
-                          selectedIcon: StreamBuilder<List<NotificationModel>>(
-                            stream: DatabaseService.instance.getNotifications(),
-                            builder: (context, snapshot) {
-                              final notifications = snapshot.data ?? [];
-                              final unreadCount = notifications
-                                  .where((n) => !n.isRead)
-                                  .length;
-
-                              if (unreadCount == 0) {
-                                return Icon(Icons.notifications, size: 24.sp);
-                              }
-
-                              return Badge(
-                                label: Text('$unreadCount'),
-                                child: Icon(Icons.notifications, size: 24.sp),
-                              );
-                            },
-                          ),
-                          label: Text(
-                            'Activity',
-                            style: TextStyle(fontSize: 12.sp),
-                          ),
-                        ),
-                        NavigationRailDestination(
-                          icon: Icon(Icons.badge_outlined, size: 24.sp),
-                          selectedIcon: Icon(Icons.badge, size: 24.sp),
-                          label: Text(
-                            'Employees',
-                            style: TextStyle(fontSize: 12.sp),
-                          ),
-                        ),
-                        NavigationRailDestination(
-                          icon: Icon(
-                            Icons.directions_bus_outlined,
-                            size: 24.sp,
-                          ),
-                          selectedIcon: Icon(Icons.directions_bus, size: 24.sp),
-                          label: Text(
-                            'Vehicles',
-                            style: TextStyle(fontSize: 12.sp),
-                          ),
-                        ),
-                        NavigationRailDestination(
-                          icon: Icon(Icons.business_outlined, size: 24.sp),
-                          selectedIcon: Icon(Icons.business, size: 24.sp),
-                          label: Text(
-                            'Companies',
-                            style: TextStyle(fontSize: 12.sp),
-                          ),
-                        ),
-                        NavigationRailDestination(
-                          icon: Icon(Icons.people_outline, size: 24.sp),
-                          selectedIcon: Icon(Icons.people, size: 24.sp),
-                          label: Text(
-                            'Customers',
-                            style: TextStyle(fontSize: 12.sp),
-                          ),
-                        ),
-                        NavigationRailDestination(
-                          icon: Icon(Icons.receipt_long_outlined, size: 24.sp),
-                          selectedIcon: Icon(Icons.receipt_long, size: 24.sp),
-                          label: Text(
-                            'Invoices',
-                            style: TextStyle(fontSize: 12.sp),
-                          ),
-                        ),
-                      ],
-                      trailing: Expanded(
-                        child: Align(
-                          alignment: Alignment.bottomCenter,
-                          child: Padding(
-                            padding: EdgeInsets.only(bottom: 24.h),
-                            child: IconButton(
-                              onPressed: () async {
-                                await AuthService.instance.signOut();
-                              },
-                              icon: Icon(Icons.logout, size: 24.sp),
-                              tooltip: 'Sign Out',
+                    child: ValueListenableBuilder<int>(
+                      valueListenable: _selectedIndex,
+                      builder: (context, selectedIndex, child) {
+                        return NavigationRail(
+                          selectedIndex: selectedIndex,
+                          onDestinationSelected: (int index) {
+                            _selectedIndex.value = index;
+                          },
+                          labelType: NavigationRailLabelType.all,
+                          leading: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24.h),
+                            child: Image.asset(
+                              'assets/logo/logo.png',
+                              height: 40.h,
+                              errorBuilder: (c, o, s) =>
+                                  Icon(Icons.circle, size: 40.sp),
                             ),
                           ),
-                        ),
-                      ),
+                          destinations: <NavigationRailDestination>[
+                            // Dashboard hidden
+                            NavigationRailDestination(
+                              icon: Icon(
+                                Icons.add_location_alt_outlined,
+                                size: 24.sp,
+                              ),
+                              selectedIcon: Icon(
+                                Icons.add_location_alt,
+                                size: 24.sp,
+                              ),
+                              label: Text(
+                                'New Trip',
+                                style: TextStyle(fontSize: 12.sp),
+                              ),
+                            ),
+                            NavigationRailDestination(
+                              icon: Consumer<NotificationProvider>(
+                                builder: (context, provider, child) {
+                                  final unreadCount = provider.unreadCount;
+
+                                  if (unreadCount == 0) {
+                                    return Icon(
+                                      Icons.notifications_outlined,
+                                      size: 24.sp,
+                                    );
+                                  }
+
+                                  return Badge(
+                                    label: Text('$unreadCount'),
+                                    child: Icon(
+                                      Icons.notifications_outlined,
+                                      size: 24.sp,
+                                    ),
+                                  );
+                                },
+                              ),
+                              selectedIcon: Consumer<NotificationProvider>(
+                                builder: (context, provider, child) {
+                                  final unreadCount = provider.unreadCount;
+
+                                  if (unreadCount == 0) {
+                                    return Icon(
+                                      Icons.notifications,
+                                      size: 24.sp,
+                                    );
+                                  }
+
+                                  return Badge(
+                                    label: Text('$unreadCount'),
+                                    child: Icon(
+                                      Icons.notifications,
+                                      size: 24.sp,
+                                    ),
+                                  );
+                                },
+                              ),
+                              label: Text(
+                                'Activity',
+                                style: TextStyle(fontSize: 12.sp),
+                              ),
+                            ),
+                            NavigationRailDestination(
+                              icon: Icon(Icons.badge_outlined, size: 24.sp),
+                              selectedIcon: Icon(Icons.badge, size: 24.sp),
+                              label: Text(
+                                'Employees',
+                                style: TextStyle(fontSize: 12.sp),
+                              ),
+                            ),
+                            NavigationRailDestination(
+                              icon: Icon(
+                                Icons.directions_bus_outlined,
+                                size: 24.sp,
+                              ),
+                              selectedIcon: Icon(
+                                Icons.directions_bus,
+                                size: 24.sp,
+                              ),
+                              label: Text(
+                                'Vehicles',
+                                style: TextStyle(fontSize: 12.sp),
+                              ),
+                            ),
+                            NavigationRailDestination(
+                              icon: Icon(Icons.business_outlined, size: 24.sp),
+                              selectedIcon: Icon(Icons.business, size: 24.sp),
+                              label: Text(
+                                'Companies',
+                                style: TextStyle(fontSize: 12.sp),
+                              ),
+                            ),
+                            NavigationRailDestination(
+                              icon: Icon(Icons.people_outline, size: 24.sp),
+                              selectedIcon: Icon(Icons.people, size: 24.sp),
+                              label: Text(
+                                'Customers',
+                                style: TextStyle(fontSize: 12.sp),
+                              ),
+                            ),
+                            NavigationRailDestination(
+                              icon: Icon(
+                                Icons.receipt_long_outlined,
+                                size: 24.sp,
+                              ),
+                              selectedIcon: Icon(
+                                Icons.receipt_long,
+                                size: 24.sp,
+                              ),
+                              label: Text(
+                                'Invoices',
+                                style: TextStyle(fontSize: 12.sp),
+                              ),
+                            ),
+                          ],
+                          trailing: Expanded(
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Padding(
+                                padding: EdgeInsets.only(bottom: 24.h),
+                                child: IconButton(
+                                  onPressed: () async {
+                                    await context.read<AuthProvider>().logout();
+                                  },
+                                  icon: Icon(Icons.logout, size: 24.sp),
+                                  tooltip: 'Sign Out',
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ),
@@ -191,7 +207,14 @@ class _AdminLayoutState extends State<AdminLayout> {
             },
           ),
           VerticalDivider(thickness: 1, width: 1.w),
-          Expanded(child: _screens[_selectedIndex]),
+          Expanded(
+            child: ValueListenableBuilder<int>(
+              valueListenable: _selectedIndex,
+              builder: (context, selectedIndex, child) {
+                return _screens[selectedIndex];
+              },
+            ),
+          ),
         ],
       ),
     );
