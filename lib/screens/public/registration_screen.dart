@@ -95,6 +95,12 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       'ar':
           '"نقدم لعملائنا واحدة من أوسع أساطيل المركبات الفاخرة والقياسية في المملكة العربية السعودية والبحرين. في إكس لوب تورز ذ.م.م، نحن ملتزمون بتقديم حلول تنقل عالية الجودة وخالية من المتاعب مبنية على الأمان والراحة والموثوقية وتجربة متميزة حقًا."',
     },
+    'mobile_desc_ow': {
+      'en':
+          '"We offer our clients one of the most extensive fleets of luxury and standard vehicles across GCC countries. At Xloop Tours W.L.L, we are dedicated to delivering top‑quality, hassle‑free mobility solutions built on safety, comfort, reliability, and a truly premium experience."',
+      'ar':
+          '"نقدم لعملائنا واحدة من أوسع أساطيل المركبات الفاخرة والقياسية في دول مجلس التعاون الخليجي. في إكس لوب تورز ذ.م.م، نحن ملتزمون بتقديم حلول تنقل عالية الجودة وخالية من المتاعب مبنية على الأمان والراحة والموثوقية وتجربة متميزة حقًا."',
+    },
     'submit_application': {'en': 'SUBMIT APPLICATION', 'ar': 'تقديم الطلب'},
     'required': {'en': 'Required', 'ar': 'مطلوب'},
     'email': {'en': 'Email', 'ar': 'البريد الإلكتروني'},
@@ -141,6 +147,14 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       return _translations[key]?['ar'] ?? key;
     }
     return _translations[key]?['en'] ?? key;
+  }
+
+  String _getMobileDescKey() {
+    final name = _company.value?.companyName.toLowerCase().trim() ?? '';
+    if (name.contains('oliver wyman') || name == 'ow') {
+      return 'mobile_desc_ow';
+    }
+    return 'mobile_desc';
   }
 
   late AnimationController _mobileFormController;
@@ -570,7 +584,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Text(
-                        _tr('mobile_desc'),
+                        _tr(_getMobileDescKey()),
                         textAlign: TextAlign.center,
                         style: _isArabic.value
                             ? GoogleFonts.notoSansArabic(
@@ -1217,7 +1231,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                           Opacity(
                             opacity: opacity,
                             child: Text(
-                              _tr('mobile_desc'),
+                              _tr(_getMobileDescKey()),
                               textAlign: TextAlign.center,
                               style: _isArabic.value
                                   ? GoogleFonts.notoSansArabic(
