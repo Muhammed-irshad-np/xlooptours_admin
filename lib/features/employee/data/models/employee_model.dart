@@ -1,4 +1,6 @@
 import '../../domain/entities/employee_entity.dart';
+import '../../domain/entities/employee_documents.dart';
+import 'employee_document_models.dart';
 
 class EmployeeModel extends EmployeeEntity {
   const EmployeeModel({
@@ -16,6 +18,14 @@ class EmployeeModel extends EmployeeEntity {
     super.driverType,
     super.isActive = true,
     super.imageUrl,
+    super.assignedVehicleId,
+    super.iqama,
+    super.drivingLicense,
+    super.passport,
+    super.saudiVisa,
+    super.bahrainVisa,
+    super.authorization,
+    super.phoneRechargeDate,
   });
 
   Map<String, dynamic> toJson() {
@@ -34,6 +44,49 @@ class EmployeeModel extends EmployeeEntity {
       'driverType': driverType,
       'isActive': isActive,
       'imageUrl': imageUrl,
+      'assignedVehicleId': assignedVehicleId,
+      'iqama': iqama != null
+          ? IqamaModel(
+              number: iqama!.number,
+              expiryDate: iqama!.expiryDate,
+              insuranceExpiryDate: iqama!.insuranceExpiryDate,
+            ).toJson()
+          : null,
+      'drivingLicense': drivingLicense != null
+          ? DrivingLicenseModel(
+              countryOfOrigin: drivingLicense!.countryOfOrigin,
+              number: drivingLicense!.number,
+              expiryDate: drivingLicense!.expiryDate,
+              type: drivingLicense!.type,
+            ).toJson()
+          : null,
+      'passport': passport != null
+          ? PassportModel(
+              nameOnPassport: passport!.nameOnPassport,
+              number: passport!.number,
+              expiryDate: passport!.expiryDate,
+            ).toJson()
+          : null,
+      'saudiVisa': saudiVisa != null
+          ? VisaModel(
+              number: saudiVisa!.number,
+              expiryDate: saudiVisa!.expiryDate,
+              type: saudiVisa!.type,
+              attachmentUrl: saudiVisa!.attachmentUrl,
+            ).toJson()
+          : null,
+      'bahrainVisa': bahrainVisa != null
+          ? VisaModel(
+              number: bahrainVisa!.number,
+              expiryDate: bahrainVisa!.expiryDate,
+              type: bahrainVisa!.type,
+              attachmentUrl: bahrainVisa!.attachmentUrl,
+            ).toJson()
+          : null,
+      'authorization': authorization != null
+          ? AuthorizationModel(expiryDate: authorization!.expiryDate).toJson()
+          : null,
+      'phoneRechargeDate': phoneRechargeDate?.toIso8601String(),
     };
   }
 
@@ -57,6 +110,32 @@ class EmployeeModel extends EmployeeEntity {
       driverType: json['driverType'] as String?,
       isActive: json['isActive'] as bool? ?? true,
       imageUrl: json['imageUrl'] as String?,
+      assignedVehicleId: json['assignedVehicleId'] as String?,
+      iqama: json['iqama'] != null
+          ? IqamaModel.fromJson(json['iqama'] as Map<String, dynamic>)
+          : null,
+      drivingLicense: json['drivingLicense'] != null
+          ? DrivingLicenseModel.fromJson(
+              json['drivingLicense'] as Map<String, dynamic>,
+            )
+          : null,
+      passport: json['passport'] != null
+          ? PassportModel.fromJson(json['passport'] as Map<String, dynamic>)
+          : null,
+      saudiVisa: json['saudiVisa'] != null
+          ? VisaModel.fromJson(json['saudiVisa'] as Map<String, dynamic>)
+          : null,
+      bahrainVisa: json['bahrainVisa'] != null
+          ? VisaModel.fromJson(json['bahrainVisa'] as Map<String, dynamic>)
+          : null,
+      authorization: json['authorization'] != null
+          ? AuthorizationModel.fromJson(
+              json['authorization'] as Map<String, dynamic>,
+            )
+          : null,
+      phoneRechargeDate: json['phoneRechargeDate'] != null
+          ? DateTime.tryParse(json['phoneRechargeDate'] as String)
+          : null,
     );
   }
 
@@ -76,6 +155,14 @@ class EmployeeModel extends EmployeeEntity {
       driverType: entity.driverType,
       isActive: entity.isActive,
       imageUrl: entity.imageUrl,
+      assignedVehicleId: entity.assignedVehicleId,
+      iqama: entity.iqama,
+      drivingLicense: entity.drivingLicense,
+      passport: entity.passport,
+      saudiVisa: entity.saudiVisa,
+      bahrainVisa: entity.bahrainVisa,
+      authorization: entity.authorization,
+      phoneRechargeDate: entity.phoneRechargeDate,
     );
   }
 
@@ -95,6 +182,14 @@ class EmployeeModel extends EmployeeEntity {
     String? driverType,
     bool? isActive,
     String? imageUrl,
+    String? assignedVehicleId,
+    IqamaDocument? iqama,
+    DrivingLicenseDocument? drivingLicense,
+    PassportDocument? passport,
+    VisaDocument? saudiVisa,
+    VisaDocument? bahrainVisa,
+    AuthorizationDocument? authorization,
+    DateTime? phoneRechargeDate,
   }) {
     return EmployeeModel(
       id: id ?? this.id,
@@ -111,6 +206,15 @@ class EmployeeModel extends EmployeeEntity {
       driverType: driverType ?? this.driverType,
       isActive: isActive ?? this.isActive,
       imageUrl: imageUrl ?? this.imageUrl,
+      assignedVehicleId: assignedVehicleId ?? this.assignedVehicleId,
+      iqama: iqama ?? this.iqama as IqamaModel?,
+      drivingLicense:
+          drivingLicense ?? this.drivingLicense as DrivingLicenseModel?,
+      passport: passport ?? this.passport as PassportModel?,
+      saudiVisa: saudiVisa ?? this.saudiVisa as VisaModel?,
+      bahrainVisa: bahrainVisa ?? this.bahrainVisa as VisaModel?,
+      authorization: authorization ?? this.authorization as AuthorizationModel?,
+      phoneRechargeDate: phoneRechargeDate ?? this.phoneRechargeDate,
     );
   }
 }

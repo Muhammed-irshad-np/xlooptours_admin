@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-enum NotificationType { registration, invoice, system }
+enum NotificationType { registration, invoice, system, expiry }
 
 class NotificationEntity extends Equatable {
   final String id;

@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'employee_documents.dart';
 
 class EmployeeEntity extends Equatable {
   final String id;
@@ -15,6 +16,14 @@ class EmployeeEntity extends Equatable {
   final String? driverType; // Internal or External (only for Drivers)
   final bool isActive;
   final String? imageUrl;
+  final String? assignedVehicleId;
+  final IqamaDocument? iqama;
+  final DrivingLicenseDocument? drivingLicense;
+  final PassportDocument? passport;
+  final VisaDocument? saudiVisa;
+  final VisaDocument? bahrainVisa;
+  final AuthorizationDocument? authorization;
+  final DateTime? phoneRechargeDate;
 
   const EmployeeEntity({
     required this.id,
@@ -31,6 +40,14 @@ class EmployeeEntity extends Equatable {
     this.driverType,
     this.isActive = true,
     this.imageUrl,
+    this.assignedVehicleId,
+    this.iqama,
+    this.drivingLicense,
+    this.passport,
+    this.saudiVisa,
+    this.bahrainVisa,
+    this.authorization,
+    this.phoneRechargeDate,
   });
 
   EmployeeEntity copyWith({
@@ -48,6 +65,14 @@ class EmployeeEntity extends Equatable {
     String? driverType,
     bool? isActive,
     String? imageUrl,
+    String? assignedVehicleId,
+    IqamaDocument? iqama,
+    DrivingLicenseDocument? drivingLicense,
+    PassportDocument? passport,
+    VisaDocument? saudiVisa,
+    VisaDocument? bahrainVisa,
+    AuthorizationDocument? authorization,
+    DateTime? phoneRechargeDate,
   }) {
     return EmployeeEntity(
       id: id ?? this.id,
@@ -64,6 +89,14 @@ class EmployeeEntity extends Equatable {
       driverType: driverType ?? this.driverType,
       isActive: isActive ?? this.isActive,
       imageUrl: imageUrl ?? this.imageUrl,
+      assignedVehicleId: assignedVehicleId ?? this.assignedVehicleId,
+      iqama: iqama ?? this.iqama,
+      drivingLicense: drivingLicense ?? this.drivingLicense,
+      passport: passport ?? this.passport,
+      saudiVisa: saudiVisa ?? this.saudiVisa,
+      bahrainVisa: bahrainVisa ?? this.bahrainVisa,
+      authorization: authorization ?? this.authorization,
+      phoneRechargeDate: phoneRechargeDate ?? this.phoneRechargeDate,
     );
   }
 
@@ -83,5 +116,13 @@ class EmployeeEntity extends Equatable {
     driverType,
     isActive,
     imageUrl,
+    assignedVehicleId,
+    iqama,
+    drivingLicense,
+    passport,
+    saudiVisa,
+    bahrainVisa,
+    authorization,
+    phoneRechargeDate,
   ];
 }

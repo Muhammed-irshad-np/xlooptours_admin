@@ -19,6 +19,8 @@ import 'features/notifications/domain/repositories/notification_repository.dart'
 import 'features/notifications/domain/usecases/notification_usecases.dart';
 import 'features/notifications/presentation/providers/notification_provider.dart';
 
+import 'features/employee/domain/usecases/get_employee_expiry_alerts_usecase.dart';
+
 import 'features/employee/data/datasources/employee_remote_data_source.dart';
 import 'features/employee/data/repositories/employee_repository_impl.dart';
 import 'features/employee/domain/repositories/employee_repository.dart';
@@ -116,6 +118,7 @@ Future<void> init() async {
       getNotifications: sl(),
       insertNotification: sl(),
       markNotificationAsRead: sl(),
+      getEmployeeExpiryAlerts: sl(),
     ),
   );
 
@@ -210,6 +213,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => UpdateEmployeeUseCase(sl()));
   sl.registerLazySingleton(() => DeleteEmployeeUseCase(sl()));
   sl.registerLazySingleton(() => UploadEmployeeImageUseCase(sl()));
+  sl.registerLazySingleton(() => GetEmployeeExpiryAlertsUseCase(sl()));
 
   // Repositories
   sl.registerLazySingleton<EmployeeRepository>(

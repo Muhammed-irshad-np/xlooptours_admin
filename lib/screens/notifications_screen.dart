@@ -93,8 +93,11 @@ class NotificationsScreen extends StatelessWidget {
         icon = Icons.receipt;
         color = Colors.blue;
         break;
+      case NotificationType.expiry:
+        icon = Icons.warning_amber_rounded;
+        color = Colors.red;
+        break;
       case NotificationType.system:
-      default:
         icon = Icons.info;
         color = Colors.orange;
         break;

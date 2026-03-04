@@ -36,7 +36,8 @@ class EmployeeProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      _employees = await getAllEmployeesUseCase();
+      final fetchedEmployees = await getAllEmployeesUseCase();
+      _employees = List<EmployeeEntity>.from(fetchedEmployees);
     } catch (e) {
       _error = e.toString();
       debugPrint('Error fetching employees: $e');

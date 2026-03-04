@@ -6,6 +6,7 @@ import 'vehicles_screen.dart';
 import 'customer_list_screen.dart';
 import 'trip_creation_screen.dart';
 import 'notifications_screen.dart';
+import 'dashboard_screen.dart';
 
 import 'package:provider/provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
@@ -23,7 +24,7 @@ class _AdminLayoutState extends State<AdminLayout> {
   final ValueNotifier<int> _selectedIndex = ValueNotifier<int>(0);
 
   final List<Widget> _screens = [
-    // const AnalyticsScreen(), // Dashboard REMOVED as per request
+    const DashboardScreen(),
     const TripCreationScreen(),
     const NotificationsScreen(),
     const EmployeesScreen(),
@@ -69,7 +70,14 @@ class _AdminLayoutState extends State<AdminLayout> {
                             ),
                           ),
                           destinations: <NavigationRailDestination>[
-                            // Dashboard hidden
+                            NavigationRailDestination(
+                              icon: Icon(Icons.dashboard_outlined, size: 24.sp),
+                              selectedIcon: Icon(Icons.dashboard, size: 24.sp),
+                              label: Text(
+                                'Dashboard',
+                                style: TextStyle(fontSize: 12.sp),
+                              ),
+                            ),
                             NavigationRailDestination(
                               icon: Icon(
                                 Icons.add_location_alt_outlined,

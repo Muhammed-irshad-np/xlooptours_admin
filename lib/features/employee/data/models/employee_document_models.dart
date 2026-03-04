@@ -1,0 +1,127 @@
+import '../../domain/entities/employee_documents.dart';
+
+class IqamaModel extends IqamaDocument {
+  const IqamaModel({
+    required super.number,
+    required super.expiryDate,
+    super.insuranceExpiryDate,
+  });
+
+  factory IqamaModel.fromJson(Map<String, dynamic> json) {
+    return IqamaModel(
+      number: json['number'] as String? ?? '',
+      expiryDate: DateTime.parse(json['expiryDate'] as String),
+      insuranceExpiryDate: json['insuranceExpiryDate'] != null
+          ? DateTime.parse(json['insuranceExpiryDate'] as String)
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'number': number,
+      'expiryDate': expiryDate.toIso8601String(),
+      'insuranceExpiryDate': insuranceExpiryDate?.toIso8601String(),
+    };
+  }
+}
+
+class DrivingLicenseModel extends DrivingLicenseDocument {
+  const DrivingLicenseModel({
+    required super.countryOfOrigin,
+    required super.number,
+    required super.expiryDate,
+    required super.type,
+  });
+
+  factory DrivingLicenseModel.fromJson(Map<String, dynamic> json) {
+    return DrivingLicenseModel(
+      countryOfOrigin: json['countryOfOrigin'] as String? ?? '',
+      number: json['number'] as String? ?? '',
+      expiryDate: DateTime.parse(json['expiryDate'] as String),
+      type: DrivingLicenseType.values.firstWhere(
+        (e) => e.name == json['type'],
+        orElse: () => DrivingLicenseType.private,
+      ),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'countryOfOrigin': countryOfOrigin,
+      'number': number,
+      'expiryDate': expiryDate.toIso8601String(),
+      'type': type.name,
+    };
+  }
+}
+
+class PassportModel extends PassportDocument {
+  const PassportModel({
+    required super.nameOnPassport,
+    required super.number,
+    required super.expiryDate,
+  });
+
+  factory PassportModel.fromJson(Map<String, dynamic> json) {
+    return PassportModel(
+      nameOnPassport: json['nameOnPassport'] as String? ?? '',
+      number: json['number'] as String? ?? '',
+      expiryDate: DateTime.parse(json['expiryDate'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'nameOnPassport': nameOnPassport,
+      'number': number,
+      'expiryDate': expiryDate.toIso8601String(),
+    };
+  }
+}
+
+class VisaModel extends VisaDocument {
+  const VisaModel({
+    required super.number,
+    required super.expiryDate,
+    super.type,
+    super.attachmentUrl,
+  });
+
+  factory VisaModel.fromJson(Map<String, dynamic> json) {
+    return VisaModel(
+      number: json['number'] as String? ?? '',
+      expiryDate: DateTime.parse(json['expiryDate'] as String),
+      type: json['type'] != null
+          ? VisaType.values.firstWhere(
+              (e) => e.name == json['type'],
+              orElse: () => VisaType.singleEntry,
+            )
+          : null,
+      attachmentUrl: json['attachmentUrl'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'number': number,
+      'expiryDate': expiryDate.toIso8601String(),
+      if (type != null) 'type': type!.name,
+      if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
+    };
+  }
+}
+
+class AuthorizationModel extends AuthorizationDocument {
+  const AuthorizationModel({required super.expiryDate});
+
+  factory AuthorizationModel.fromJson(Map<String, dynamic> json) {
+    return AuthorizationModel(
+      expiryDate: DateTime.parse(json['expiryDate'] as String),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {'expiryDate': expiryDate.toIso8601String()};
+  }
+}

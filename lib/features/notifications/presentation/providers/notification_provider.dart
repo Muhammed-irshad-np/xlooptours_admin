@@ -2,11 +2,13 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/notification_entity.dart';
 import '../../domain/usecases/notification_usecases.dart';
+import '../../../employee/domain/usecases/get_employee_expiry_alerts_usecase.dart';
 
 class NotificationProvider extends ChangeNotifier {
   final GetNotifications _getNotifications;
   final InsertNotification _insertNotification;
   final MarkNotificationAsRead _markNotificationAsRead;
+  final GetEmployeeExpiryAlertsUseCase _getEmployeeExpiryAlerts;
 
   List<NotificationEntity> _notifications = [];
   bool _isLoading = false;
@@ -17,9 +19,11 @@ class NotificationProvider extends ChangeNotifier {
     required GetNotifications getNotifications,
     required InsertNotification insertNotification,
     required MarkNotificationAsRead markNotificationAsRead,
+    required GetEmployeeExpiryAlertsUseCase getEmployeeExpiryAlerts,
   }) : _getNotifications = getNotifications,
        _insertNotification = insertNotification,
-       _markNotificationAsRead = markNotificationAsRead {
+       _markNotificationAsRead = markNotificationAsRead,
+       _getEmployeeExpiryAlerts = getEmployeeExpiryAlerts {
     _init();
   }
 
@@ -32,8 +36,33 @@ class NotificationProvider extends ChangeNotifier {
   void _init() {
     _setLoading(true);
     _subscription = _getNotifications().listen(
-      (data) {
-        _notifications = data;
+      (data) async {
+        _notifications = List.from(data);
+
+        try {
+          final expiryAlerts = await _getEmployeeExpiryAlerts();
+          final expiryNotifications = expiryAlerts
+              .map(
+                (alert) => NotificationEntity(
+                  id: 'expiry_${alert.employeeId}_${alert.documentType.replaceAll(' ', '_')}',
+                  title: '${alert.documentType} Expiring Soon',
+                  message:
+                      '${alert.employeeName}\'s ${alert.documentType} is expiring on ${alert.expiryDate.toLocal().toString().split(' ')[0]} (${alert.daysUntilExpiry} days left).',
+                  timestamp:
+                      DateTime.now(), // Use current time or a fixed time so it sorts properly, or maybe alert.expiryDate? Let's use current time so it shows at the top.
+                  isRead: false,
+                  type: NotificationType.expiry,
+                  relatedId: alert.employeeId,
+                ),
+              )
+              .toList();
+
+          _notifications.addAll(expiryNotifications);
+          _notifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        } catch (e) {
+          debugPrint('Failed to fetch expiry alerts: $e');
+        }
+
         _errorMessage = null;
         _setLoading(false);
       },

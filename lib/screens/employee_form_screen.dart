@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../features/employee/domain/entities/employee_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
@@ -42,6 +43,34 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   final ValueNotifier<XFile?> _pickedImage = ValueNotifier(null);
   final ImagePicker _picker = ImagePicker();
 
+  // Document Specific Controllers
+  late TextEditingController _iqamaNumberController;
+  final ValueNotifier<DateTime?> _iqamaExpiryDate = ValueNotifier(null);
+  final ValueNotifier<DateTime?> _insuranceExpiryDate = ValueNotifier(null);
+
+  late TextEditingController _passportNameController;
+  late TextEditingController _passportNumberController;
+  final ValueNotifier<DateTime?> _passportExpiryDate = ValueNotifier(null);
+
+  late TextEditingController _saudiVisaNumberController;
+  final ValueNotifier<DateTime?> _saudiVisaExpiryDate = ValueNotifier(null);
+  final ValueNotifier<VisaType> _selectedSaudiVisaType = ValueNotifier(
+    VisaType.singleEntry,
+  );
+
+  late TextEditingController _bahrainVisaNumberController;
+  final ValueNotifier<DateTime?> _bahrainVisaExpiryDate = ValueNotifier(null);
+  final ValueNotifier<VisaType> _selectedBahrainVisaType = ValueNotifier(
+    VisaType.singleEntry,
+  );
+
+  late TextEditingController _licenseCountryController;
+  late TextEditingController _licenseNumberController;
+  final ValueNotifier<DateTime?> _licenseExpiryDate = ValueNotifier(null);
+  final ValueNotifier<DrivingLicenseType> _selectedLicenseType = ValueNotifier(
+    DrivingLicenseType.private,
+  );
+
   final ValueNotifier<bool> _isSaving = ValueNotifier(false);
   final ValueNotifier<List<VehicleEntity>> _availableVehicles = ValueNotifier(
     [],
@@ -71,6 +100,44 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _phoneController = TextEditingController(text: e?.phoneNumber ?? '');
     _idNumberController = TextEditingController(text: e?.idNumber ?? '');
     _nationalityController = TextEditingController(text: e?.nationality ?? '');
+
+    _iqamaNumberController = TextEditingController(
+      text: e?.iqama?.number ?? '',
+    );
+    _iqamaExpiryDate.value = e?.iqama?.expiryDate;
+    _insuranceExpiryDate.value = e?.iqama?.insuranceExpiryDate;
+
+    _passportNameController = TextEditingController(
+      text: e?.passport?.nameOnPassport ?? '',
+    );
+    _passportNumberController = TextEditingController(
+      text: e?.passport?.number ?? '',
+    );
+    _passportExpiryDate.value = e?.passport?.expiryDate;
+
+    _saudiVisaNumberController = TextEditingController(
+      text: e?.saudiVisa?.number ?? '',
+    );
+    _saudiVisaExpiryDate.value = e?.saudiVisa?.expiryDate;
+    if (e?.saudiVisa?.type != null)
+      _selectedSaudiVisaType.value = e!.saudiVisa!.type!;
+
+    _bahrainVisaNumberController = TextEditingController(
+      text: e?.bahrainVisa?.number ?? '',
+    );
+    _bahrainVisaExpiryDate.value = e?.bahrainVisa?.expiryDate;
+    if (e?.bahrainVisa?.type != null)
+      _selectedBahrainVisaType.value = e!.bahrainVisa!.type!;
+
+    _licenseCountryController = TextEditingController(
+      text: e?.drivingLicense?.countryOfOrigin ?? '',
+    );
+    _licenseNumberController = TextEditingController(
+      text: e?.drivingLicense?.number ?? '',
+    );
+    _licenseExpiryDate.value = e?.drivingLicense?.expiryDate;
+    if (e?.drivingLicense?.type != null)
+      _selectedLicenseType.value = e!.drivingLicense!.type;
 
     if (e != null) {
       if (_positions.contains(e.position)) {
@@ -136,6 +203,24 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _isActive.dispose();
     _currentImageUrl.dispose();
     _pickedImage.dispose();
+
+    _iqamaNumberController.dispose();
+    _iqamaExpiryDate.dispose();
+    _insuranceExpiryDate.dispose();
+    _passportNameController.dispose();
+    _passportNumberController.dispose();
+    _passportExpiryDate.dispose();
+    _saudiVisaNumberController.dispose();
+    _saudiVisaExpiryDate.dispose();
+    _selectedSaudiVisaType.dispose();
+    _bahrainVisaNumberController.dispose();
+    _bahrainVisaExpiryDate.dispose();
+    _selectedBahrainVisaType.dispose();
+    _licenseCountryController.dispose();
+    _licenseNumberController.dispose();
+    _licenseExpiryDate.dispose();
+    _selectedLicenseType.dispose();
+
     _isSaving.dispose();
     _availableVehicles.dispose();
     _selectedVehicleId.dispose();
@@ -211,6 +296,53 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
             : null,
         isActive: _isActive.value,
         imageUrl: imageUrl,
+        iqama:
+            _iqamaNumberController.text.isNotEmpty &&
+                _iqamaExpiryDate.value != null
+            ? IqamaDocument(
+                number: _iqamaNumberController.text.trim(),
+                expiryDate: _iqamaExpiryDate.value!,
+                insuranceExpiryDate: _insuranceExpiryDate.value,
+              )
+            : null,
+        passport:
+            _passportNumberController.text.isNotEmpty &&
+                _passportExpiryDate.value != null
+            ? PassportDocument(
+                nameOnPassport: _passportNameController.text.trim(),
+                number: _passportNumberController.text.trim(),
+                expiryDate: _passportExpiryDate.value!,
+              )
+            : null,
+        saudiVisa:
+            _saudiVisaNumberController.text.isNotEmpty &&
+                _saudiVisaExpiryDate.value != null
+            ? VisaDocument(
+                number: _saudiVisaNumberController.text.trim(),
+                expiryDate: _saudiVisaExpiryDate.value!,
+                type: _selectedSaudiVisaType.value,
+              )
+            : null,
+        bahrainVisa:
+            _bahrainVisaNumberController.text.isNotEmpty &&
+                _bahrainVisaExpiryDate.value != null
+            ? VisaDocument(
+                number: _bahrainVisaNumberController.text.trim(),
+                expiryDate: _bahrainVisaExpiryDate.value!,
+                type: _selectedBahrainVisaType.value,
+              )
+            : null,
+        drivingLicense:
+            _selectedPosition.value == 'Driver' &&
+                _licenseNumberController.text.isNotEmpty &&
+                _licenseExpiryDate.value != null
+            ? DrivingLicenseDocument(
+                countryOfOrigin: _licenseCountryController.text.trim(),
+                number: _licenseNumberController.text.trim(),
+                expiryDate: _licenseExpiryDate.value!,
+                type: _selectedLicenseType.value,
+              )
+            : null,
       );
 
       if (mounted) {
@@ -584,6 +716,447 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
                   SizedBox(height: 24.h),
                   Divider(),
+                  SizedBox(height: 16.h),
+                  _buildSectionTitle('Documents & Expiries'),
+                  SizedBox(height: 16.h),
+
+                  // Iqama Card
+                  Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ExpansionTile(
+                      title: const Text(
+                        'Iqama Details',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      leading: const Icon(Icons.badge, color: Colors.blue),
+                      childrenPadding: const EdgeInsets.all(16),
+                      children: [
+                        _buildTextField(
+                          controller: _iqamaNumberController,
+                          label: 'Iqama Number',
+                          icon: Icons.numbers,
+                          keyboardType: TextInputType.number,
+                        ),
+                        SizedBox(height: 16.h),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ValueListenableBuilder<DateTime?>(
+                                valueListenable: _iqamaExpiryDate,
+                                builder: (context, date, _) {
+                                  return _buildDatePicker(
+                                    label: 'Iqama Expiry',
+                                    date: date,
+                                    onTap: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate:
+                                            date ??
+                                            DateTime.now().add(
+                                              const Duration(days: 365),
+                                            ),
+                                        firstDate: DateTime.now().subtract(
+                                          const Duration(days: 365 * 5),
+                                        ),
+                                        lastDate: DateTime.now().add(
+                                          const Duration(days: 365 * 10),
+                                        ),
+                                      );
+                                      if (picked != null)
+                                        _iqamaExpiryDate.value = picked;
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: ValueListenableBuilder<DateTime?>(
+                                valueListenable: _insuranceExpiryDate,
+                                builder: (context, date, _) {
+                                  return _buildDatePicker(
+                                    label: 'Health Ins. Expiry',
+                                    date: date,
+                                    onTap: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate:
+                                            date ??
+                                            DateTime.now().add(
+                                              const Duration(days: 365),
+                                            ),
+                                        firstDate: DateTime.now().subtract(
+                                          const Duration(days: 365 * 5),
+                                        ),
+                                        lastDate: DateTime.now().add(
+                                          const Duration(days: 365 * 10),
+                                        ),
+                                      );
+                                      if (picked != null)
+                                        _insuranceExpiryDate.value = picked;
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Passport Card
+                  Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ExpansionTile(
+                      title: const Text(
+                        'Passport Details',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      leading: const Icon(Icons.book, color: Colors.orange),
+                      childrenPadding: const EdgeInsets.all(16),
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _passportNumberController,
+                                label: 'Passport No.',
+                                icon: Icons.numbers,
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: ValueListenableBuilder<DateTime?>(
+                                valueListenable: _passportExpiryDate,
+                                builder: (context, date, _) {
+                                  return _buildDatePicker(
+                                    label: 'Expiry',
+                                    date: date,
+                                    onTap: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate:
+                                            date ??
+                                            DateTime.now().add(
+                                              const Duration(days: 365),
+                                            ),
+                                        firstDate: DateTime.now().subtract(
+                                          const Duration(days: 365 * 5),
+                                        ),
+                                        lastDate: DateTime.now().add(
+                                          const Duration(days: 365 * 10),
+                                        ),
+                                      );
+                                      if (picked != null)
+                                        _passportExpiryDate.value = picked;
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildTextField(
+                          controller: _passportNameController,
+                          label: 'Name on Passport',
+                          icon: Icons.person,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Saudi Visa Card
+                  Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ExpansionTile(
+                      title: const Text(
+                        'Saudi Visa Details',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      leading: const Icon(
+                        Icons.airplane_ticket,
+                        color: Colors.green,
+                      ),
+                      childrenPadding: const EdgeInsets.all(16),
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _saudiVisaNumberController,
+                                label: 'Visa No.',
+                                icon: Icons.numbers,
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: ValueListenableBuilder<DateTime?>(
+                                valueListenable: _saudiVisaExpiryDate,
+                                builder: (context, date, _) {
+                                  return _buildDatePicker(
+                                    label: 'Expiry',
+                                    date: date,
+                                    onTap: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate:
+                                            date ??
+                                            DateTime.now().add(
+                                              const Duration(days: 365),
+                                            ),
+                                        firstDate: DateTime.now().subtract(
+                                          const Duration(days: 365 * 5),
+                                        ),
+                                        lastDate: DateTime.now().add(
+                                          const Duration(days: 365 * 10),
+                                        ),
+                                      );
+                                      if (picked != null)
+                                        _saudiVisaExpiryDate.value = picked;
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                        ValueListenableBuilder<VisaType>(
+                          valueListenable: _selectedSaudiVisaType,
+                          builder: (context, type, _) {
+                            return _buildDropdown(
+                              label: 'Visa Type',
+                              value: type.toString().split('.').last,
+                              items: VisaType.values
+                                  .map((e) => e.toString().split('.').last)
+                                  .toList(),
+                              onChanged: (val) {
+                                _selectedSaudiVisaType.value = VisaType.values
+                                    .firstWhere(
+                                      (e) =>
+                                          e.toString().split('.').last == val,
+                                    );
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Bahrain Visa Card
+                  Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ExpansionTile(
+                      title: const Text(
+                        'Bahrain Visa Details',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      leading: const Icon(
+                        Icons.airplane_ticket_outlined,
+                        color: Colors.teal,
+                      ),
+                      childrenPadding: const EdgeInsets.all(16),
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _bahrainVisaNumberController,
+                                label: 'Visa No.',
+                                icon: Icons.numbers,
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: ValueListenableBuilder<DateTime?>(
+                                valueListenable: _bahrainVisaExpiryDate,
+                                builder: (context, date, _) {
+                                  return _buildDatePicker(
+                                    label: 'Expiry',
+                                    date: date,
+                                    onTap: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate:
+                                            date ??
+                                            DateTime.now().add(
+                                              const Duration(days: 365),
+                                            ),
+                                        firstDate: DateTime.now().subtract(
+                                          const Duration(days: 365 * 5),
+                                        ),
+                                        lastDate: DateTime.now().add(
+                                          const Duration(days: 365 * 10),
+                                        ),
+                                      );
+                                      if (picked != null)
+                                        _bahrainVisaExpiryDate.value = picked;
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                        ValueListenableBuilder<VisaType>(
+                          valueListenable: _selectedBahrainVisaType,
+                          builder: (context, type, _) {
+                            return _buildDropdown(
+                              label: 'Visa Type',
+                              value: type.toString().split('.').last,
+                              items: VisaType.values
+                                  .map((e) => e.toString().split('.').last)
+                                  .toList(),
+                              onChanged: (val) {
+                                _selectedBahrainVisaType.value = VisaType.values
+                                    .firstWhere(
+                                      (e) =>
+                                          e.toString().split('.').last == val,
+                                    );
+                              },
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Driving License Card (Conditional)
+                  ValueListenableBuilder<String>(
+                    valueListenable: _selectedPosition,
+                    builder: (context, pos, _) {
+                      if (pos != 'Driver') return const SizedBox.shrink();
+                      return Card(
+                        elevation: 1,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: ExpansionTile(
+                          title: const Text(
+                            'Driving License Details',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          leading: const Icon(
+                            Icons.drive_eta,
+                            color: Colors.indigo,
+                          ),
+                          childrenPadding: const EdgeInsets.all(16),
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller: _licenseNumberController,
+                                    label: 'License No.',
+                                    icon: Icons.numbers,
+                                  ),
+                                ),
+                                SizedBox(width: 16.w),
+                                Expanded(
+                                  child: ValueListenableBuilder<DateTime?>(
+                                    valueListenable: _licenseExpiryDate,
+                                    builder: (context, date, _) {
+                                      return _buildDatePicker(
+                                        label: 'Expiry',
+                                        date: date,
+                                        onTap: () async {
+                                          final picked = await showDatePicker(
+                                            context: context,
+                                            initialDate:
+                                                date ??
+                                                DateTime.now().add(
+                                                  const Duration(days: 365),
+                                                ),
+                                            firstDate: DateTime.now().subtract(
+                                              const Duration(days: 365 * 5),
+                                            ),
+                                            lastDate: DateTime.now().add(
+                                              const Duration(days: 365 * 10),
+                                            ),
+                                          );
+                                          if (picked != null)
+                                            _licenseExpiryDate.value = picked;
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 16.h),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _buildTextField(
+                                    controller: _licenseCountryController,
+                                    label: 'Country',
+                                    icon: Icons.public,
+                                  ),
+                                ),
+                                SizedBox(width: 16.w),
+                                Expanded(
+                                  child:
+                                      ValueListenableBuilder<
+                                        DrivingLicenseType
+                                      >(
+                                        valueListenable: _selectedLicenseType,
+                                        builder: (context, type, _) {
+                                          return _buildDropdown(
+                                            label: 'License Type',
+                                            value: type
+                                                .toString()
+                                                .split('.')
+                                                .last,
+                                            items: DrivingLicenseType.values
+                                                .map(
+                                                  (e) => e
+                                                      .toString()
+                                                      .split('.')
+                                                      .last,
+                                                )
+                                                .toList(),
+                                            onChanged: (val) {
+                                              _selectedLicenseType.value =
+                                                  DrivingLicenseType.values
+                                                      .firstWhere(
+                                                        (e) =>
+                                                            e
+                                                                .toString()
+                                                                .split('.')
+                                                                .last ==
+                                                            val,
+                                                      );
+                                            },
+                                          );
+                                        },
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+
+                  SizedBox(height: 24.h),
+                  Divider(),
                   ValueListenableBuilder<bool>(
                     valueListenable: _isActive,
                     builder: (context, isActive, _) {
@@ -652,9 +1225,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     required String label,
     required IconData icon,
     String? Function(String?)? validator,
+    TextInputType? keyboardType,
   }) {
     return TextFormField(
       controller: controller,
+      keyboardType: keyboardType,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 20),
