@@ -357,9 +357,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     }
   }
 
-  // Vibrant Brand Color (Sky Blue)
-  Color get _brandColor => const Color(0xFF13b1f2);
-  Color get _darkNavy => const Color(0xFF0F172A);
+  // Brand color palette: Black, White, and Logo Blue
+  Color get _brandColor => const Color(0xFF13B1F2); // Logo Blue
+  Color get _darkNavy => const Color(0xFF0A0A0A); // Near Black for headings
 
   @override
   Widget build(BuildContext context) {
@@ -635,7 +635,16 @@ class _RegistrationScreenState extends State<RegistrationScreen>
           child: Stack(
             children: [
               Container(
-                color: Colors.white,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0x1A13B1F2),
+                      blurRadius: 40,
+                      offset: Offset(-10, 0),
+                    ),
+                  ],
+                ),
                 alignment: Alignment.center,
                 child: SingleChildScrollView(
                   padding: EdgeInsets.symmetric(
@@ -685,35 +694,59 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                               style: _isArabic.value
                                   ? GoogleFonts.notoSansArabic(
                                       fontSize: 28.sp,
-                                      fontWeight: FontWeight.bold,
-                                      color: _darkNavy,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.black,
                                       height: 1.2,
+                                      letterSpacing: 0.5,
                                     )
                                   : GoogleFonts.merriweather(
                                       fontSize: 50.sp,
-                                      fontWeight: FontWeight.bold,
-                                      color: _darkNavy,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.black,
                                       height: 1.2,
+                                      letterSpacing: 0.5,
                                     ),
                             ),
                             SizedBox(height: 8.h),
-                            Text(
-                              _tr('efficient_safe'),
-                              textAlign: TextAlign.center,
-                              style: _isArabic.value
-                                  ? GoogleFonts.notoSansArabic(
-                                      fontSize: 18.sp,
-                                      color: _brandColor,
-                                      height: 1.2,
-                                      fontWeight: FontWeight.bold,
-                                    )
-                                  : GoogleFonts.notoSans(
-                                      fontSize: 18.sp,
-                                      color: _brandColor,
-                                      height: 1.2,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 2.0,
-                                    ),
+                            // Blue brand tagline divider
+                            Container(
+                              margin: EdgeInsets.symmetric(vertical: 10.h),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 30.w,
+                                    height: 2.h,
+                                    color: _brandColor,
+                                  ),
+                                  SizedBox(width: 10.w),
+                                  Text(
+                                    _tr('efficient_safe'),
+                                    textAlign: TextAlign.center,
+                                    style: _isArabic.value
+                                        ? GoogleFonts.notoSansArabic(
+                                            fontSize: 12.sp,
+                                            color: _brandColor,
+                                            height: 1.2,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1.5,
+                                          )
+                                        : GoogleFonts.notoSans(
+                                            fontSize: 12.sp,
+                                            color: _brandColor,
+                                            height: 1.2,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 2.0,
+                                          ),
+                                  ),
+                                  SizedBox(width: 10.w),
+                                  Container(
+                                    width: 30.w,
+                                    height: 2.h,
+                                    color: _brandColor,
+                                  ),
+                                ],
+                              ),
                             ),
                             SizedBox(height: 15.h),
                             Text(
@@ -858,39 +891,63 @@ class _RegistrationScreenState extends State<RegistrationScreen>
 
                             SizedBox(height: 40.h),
 
-                            // Button (Cyan Background)
+                            // Register Button (Brand Blue)
                             SizedBox(
                               height: 56.h,
                               child: ElevatedButton(
                                 onPressed: _isSubmitting.value
                                     ? null
                                     : _submitForm,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      _brandColor, // Cyan Brand Color
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8.r),
-                                  ),
-                                  elevation: 0,
-                                ),
+                                style:
+                                    ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.black,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          8.r,
+                                        ),
+                                      ),
+                                      elevation: 0,
+                                      shadowColor: _brandColor.withOpacity(0.4),
+                                    ).copyWith(
+                                      overlayColor:
+                                          WidgetStateProperty.resolveWith(
+                                            (states) =>
+                                                states.contains(
+                                                  WidgetState.hovered,
+                                                )
+                                                ? _brandColor
+                                                : null,
+                                          ),
+                                    ),
                                 child: _isSubmitting.value
                                     ? const CircularProgressIndicator(
                                         color: Colors.white,
                                       )
-                                    : Text(
-                                        _tr('register_now'),
-                                        style: _isArabic.value
-                                            ? GoogleFonts.notoSansArabic(
-                                                fontSize: 14.sp,
-                                                fontWeight: FontWeight.bold,
-                                                letterSpacing: 1.5,
-                                              )
-                                            : GoogleFonts.notoSans(
-                                                fontSize: 14.sp,
-                                                fontWeight: FontWeight.bold,
-                                                letterSpacing: 1.5,
-                                              ),
+                                    : Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            _tr('register_now'),
+                                            style: _isArabic.value
+                                                ? GoogleFonts.notoSansArabic(
+                                                    fontSize: 14.sp,
+                                                    fontWeight: FontWeight.bold,
+                                                    letterSpacing: 1.5,
+                                                  )
+                                                : GoogleFonts.notoSans(
+                                                    fontSize: 14.sp,
+                                                    fontWeight: FontWeight.bold,
+                                                    letterSpacing: 1.5,
+                                                  ),
+                                          ),
+                                          SizedBox(width: 8.w),
+                                          Icon(
+                                            Icons.arrow_forward_rounded,
+                                            size: 18.sp,
+                                          ),
+                                        ],
                                       ),
                               ),
                             ),
@@ -1019,24 +1076,25 @@ class _RegistrationScreenState extends State<RegistrationScreen>
             ? GoogleFonts.notoSansArabic(fontSize: 12.sp)
             : TextStyle(fontSize: 12.sp),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: enabled ? Colors.grey[50] : Colors.grey[100],
         alignLabelWithHint: true,
 
-        // Outline Border Style for Desktop
+        // Crisp Outline Border for Desktop
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8.r),
-          borderSide: BorderSide(color: Colors.grey[200]!, width: 1.5),
+          borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8.r),
-          borderSide: BorderSide(color: Colors.grey[200]!, width: 1.5),
+          borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8.r),
-          borderSide: BorderSide(
-            color: _brandColor,
-            width: 1.5,
-          ), // Highlight with Brand Color
+          borderSide: BorderSide(color: _brandColor, width: 2),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.r),
+          borderSide: BorderSide(color: Colors.grey[200]!, width: 1),
         ),
         contentPadding: EdgeInsets.symmetric(vertical: 20.h, horizontal: 20.w),
       ),
