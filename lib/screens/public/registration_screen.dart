@@ -326,7 +326,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
 
       // Handle Phone with Country Code
       newCustomer = newCustomer.copyWith(
-        phone: '$_countryCode.value ${_phoneController.text.trim()}',
+        phone: '${_countryCode.value} ${_phoneController.text.trim()}',
       );
 
       if (!mounted) return;

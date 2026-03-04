@@ -28,10 +28,20 @@ class CustomerModel extends CustomerEntity {
   }
 
   factory CustomerModel.fromJson(Map<String, dynamic> json) {
+    String rawPhone = json['phone'] as String;
+    // Sanitize malformed phone numbers previously saved due to a bug
+    // E.g., "<optimized out>#23704(+966).value 591984003" -> "+966 591984003"
+    if (rawPhone.contains('<optimized out>') && rawPhone.contains('.value')) {
+      final match = RegExp(r'\(([^)]+)\)\.value\s+(.+)').firstMatch(rawPhone);
+      if (match != null && match.groupCount >= 2) {
+        rawPhone = '${match.group(1)} ${match.group(2)}';
+      }
+    }
+
     return CustomerModel(
       id: json['id'] as String,
       name: json['name'] as String,
-      phone: json['phone'] as String,
+      phone: rawPhone,
       email: json['email'] as String?,
       companyId: json['companyId'] as String?,
       companyName: json['companyName'] as String?,
