@@ -11,6 +11,14 @@ abstract class EmployeeRemoteDataSource {
   Future<void> updateEmployee(EmployeeModel employee);
   Future<void> deleteEmployee(String id);
   Future<String> uploadEmployeeImage(XFile image, String employeeId);
+
+  /// Uploads a scanned document attachment to Firebase Storage.
+  /// [docType] is a short label like 'iqama', 'passport', etc.
+  Future<String> uploadDocumentAttachment(
+    XFile file,
+    String employeeId,
+    String docType,
+  );
 }
 
 class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
@@ -66,6 +74,31 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
       await storageRef.putData(await image.readAsBytes());
     } else {
       await storageRef.putFile(File(image.path));
+    }
+
+    return await storageRef.getDownloadURL();
+  }
+
+  @override
+  Future<String> uploadDocumentAttachment(
+    XFile file,
+    String employeeId,
+    String docType,
+  ) async {
+    final ext = file.name.split('.').last.toLowerCase();
+    final storageRef = storage
+        .ref()
+        .child('employee_documents')
+        .child(employeeId)
+        .child('$docType.$ext');
+
+    if (kIsWeb) {
+      await storageRef.putData(
+        await file.readAsBytes(),
+        SettableMetadata(contentType: 'application/octet-stream'),
+      );
+    } else {
+      await storageRef.putFile(File(file.path));
     }
 
     return await storageRef.getDownloadURL();

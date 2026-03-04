@@ -5,6 +5,7 @@ class IqamaModel extends IqamaDocument {
     required super.number,
     required super.expiryDate,
     super.insuranceExpiryDate,
+    super.attachmentUrl,
   });
 
   factory IqamaModel.fromJson(Map<String, dynamic> json) {
@@ -14,6 +15,7 @@ class IqamaModel extends IqamaDocument {
       insuranceExpiryDate: json['insuranceExpiryDate'] != null
           ? DateTime.parse(json['insuranceExpiryDate'] as String)
           : null,
+      attachmentUrl: json['attachmentUrl'] as String?,
     );
   }
 
@@ -21,7 +23,9 @@ class IqamaModel extends IqamaDocument {
     return {
       'number': number,
       'expiryDate': expiryDate.toIso8601String(),
-      'insuranceExpiryDate': insuranceExpiryDate?.toIso8601String(),
+      if (insuranceExpiryDate != null)
+        'insuranceExpiryDate': insuranceExpiryDate!.toIso8601String(),
+      if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
     };
   }
 }
@@ -32,6 +36,7 @@ class DrivingLicenseModel extends DrivingLicenseDocument {
     required super.number,
     required super.expiryDate,
     required super.type,
+    super.attachmentUrl,
   });
 
   factory DrivingLicenseModel.fromJson(Map<String, dynamic> json) {
@@ -43,6 +48,7 @@ class DrivingLicenseModel extends DrivingLicenseDocument {
         (e) => e.name == json['type'],
         orElse: () => DrivingLicenseType.private,
       ),
+      attachmentUrl: json['attachmentUrl'] as String?,
     );
   }
 
@@ -52,6 +58,7 @@ class DrivingLicenseModel extends DrivingLicenseDocument {
       'number': number,
       'expiryDate': expiryDate.toIso8601String(),
       'type': type.name,
+      if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
     };
   }
 }
@@ -61,6 +68,7 @@ class PassportModel extends PassportDocument {
     required super.nameOnPassport,
     required super.number,
     required super.expiryDate,
+    super.attachmentUrl,
   });
 
   factory PassportModel.fromJson(Map<String, dynamic> json) {
@@ -68,6 +76,7 @@ class PassportModel extends PassportDocument {
       nameOnPassport: json['nameOnPassport'] as String? ?? '',
       number: json['number'] as String? ?? '',
       expiryDate: DateTime.parse(json['expiryDate'] as String),
+      attachmentUrl: json['attachmentUrl'] as String?,
     );
   }
 
@@ -76,6 +85,7 @@ class PassportModel extends PassportDocument {
       'nameOnPassport': nameOnPassport,
       'number': number,
       'expiryDate': expiryDate.toIso8601String(),
+      if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
     };
   }
 }
@@ -113,15 +123,19 @@ class VisaModel extends VisaDocument {
 }
 
 class AuthorizationModel extends AuthorizationDocument {
-  const AuthorizationModel({required super.expiryDate});
+  const AuthorizationModel({required super.expiryDate, super.attachmentUrl});
 
   factory AuthorizationModel.fromJson(Map<String, dynamic> json) {
     return AuthorizationModel(
       expiryDate: DateTime.parse(json['expiryDate'] as String),
+      attachmentUrl: json['attachmentUrl'] as String?,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'expiryDate': expiryDate.toIso8601String()};
+    return {
+      'expiryDate': expiryDate.toIso8601String(),
+      if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
+    };
   }
 }

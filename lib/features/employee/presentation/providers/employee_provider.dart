@@ -5,6 +5,7 @@ import '../../domain/usecases/delete_employee_usecase.dart';
 import '../../domain/usecases/get_all_employees_usecase.dart';
 import '../../domain/usecases/insert_employee_usecase.dart';
 import '../../domain/usecases/update_employee_usecase.dart';
+import '../../domain/usecases/upload_document_attachment_usecase.dart';
 import '../../domain/usecases/upload_employee_image_usecase.dart';
 
 class EmployeeProvider with ChangeNotifier {
@@ -13,6 +14,7 @@ class EmployeeProvider with ChangeNotifier {
   final UpdateEmployeeUseCase updateEmployeeUseCase;
   final DeleteEmployeeUseCase deleteEmployeeUseCase;
   final UploadEmployeeImageUseCase uploadEmployeeImageUseCase;
+  final UploadDocumentAttachmentUseCase uploadDocumentAttachmentUseCase;
 
   EmployeeProvider({
     required this.getAllEmployeesUseCase,
@@ -20,6 +22,7 @@ class EmployeeProvider with ChangeNotifier {
     required this.updateEmployeeUseCase,
     required this.deleteEmployeeUseCase,
     required this.uploadEmployeeImageUseCase,
+    required this.uploadDocumentAttachmentUseCase,
   });
 
   List<EmployeeEntity> _employees = [];
@@ -111,6 +114,20 @@ class EmployeeProvider with ChangeNotifier {
       return await uploadEmployeeImageUseCase(image, employeeId);
     } catch (e) {
       debugPrint('Error uploading employee image in provider: $e');
+      rethrow;
+    }
+  }
+
+  /// Upload a document scan for a specific doc type (iqama, passport, etc.)
+  Future<String> uploadDocumentAttachment(
+    XFile file,
+    String employeeId,
+    String docType,
+  ) async {
+    try {
+      return await uploadDocumentAttachmentUseCase(file, employeeId, docType);
+    } catch (e) {
+      debugPrint('Error uploading document attachment in provider: $e');
       rethrow;
     }
   }

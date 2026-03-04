@@ -34,13 +34,13 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   final _plateNumberController = TextEditingController();
   final _typeController = TextEditingController();
 
-  final ValueNotifier<String?> _assignedDriverId = ValueNotifier(null);
+  final ValueNotifier<String?> _assignedEmployeeId = ValueNotifier(null);
   final ValueNotifier<XFile?> _selectedImage = ValueNotifier(null);
   final ValueNotifier<String?> _currentImageUrl = ValueNotifier(null);
   final ValueNotifier<bool> _isLoading = ValueNotifier(false);
   final ValueNotifier<bool> _isUploadingImage = ValueNotifier(false);
   final ValueNotifier<double> _uploadProgress = ValueNotifier(0.0);
-  final ValueNotifier<List<EmployeeEntity>> _drivers = ValueNotifier([]);
+  final ValueNotifier<List<EmployeeEntity>> _employees = ValueNotifier([]);
 
   // Vehicle Master Data
   final ValueNotifier<List<VehicleMakeEntity>> _allMakes = ValueNotifier([]);
@@ -55,13 +55,13 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _selectedModel.dispose();
     _selectedYear.dispose();
     _selectedColor.dispose();
-    _assignedDriverId.dispose();
+    _assignedEmployeeId.dispose();
     _selectedImage.dispose();
     _currentImageUrl.dispose();
     _isLoading.dispose();
     _isUploadingImage.dispose();
     _uploadProgress.dispose();
-    _drivers.dispose();
+    _employees.dispose();
     _allMakes.dispose();
     _availableModels.dispose();
     _availableYears.dispose();
@@ -105,13 +105,8 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     final provider = context.read<EmployeeProvider>();
     await provider.fetchAllEmployees();
     if (mounted) {
-      final employees = provider.employees;
-      _drivers.value = employees.where((e) {
-        final isDriver =
-            e.position.toLowerCase().contains('driver') ||
-            (e.driverType != null && e.driverType!.isNotEmpty);
-        return e.isActive && isDriver;
-      }).toList();
+      // Show all active employees so any employee can be assigned a vehicle
+      _employees.value = provider.employees.where((e) => e.isActive).toList();
     }
   }
 
@@ -124,7 +119,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
 
     _plateNumberController.text = v.plateNumber;
     _typeController.text = v.type;
-    _assignedDriverId.value = v.assignedDriverId;
+    _assignedEmployeeId.value = v.assignedDriverId;
     _currentImageUrl.value = v.imageUrl;
 
     // Trigger updates to available lists based on initial make
@@ -236,7 +231,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
         color: _selectedColor.value!,
         plateNumber: _plateNumberController.text,
         type: _typeController.text,
-        assignedDriverId: _assignedDriverId.value,
+        assignedDriverId: _assignedEmployeeId.value,
         imageUrl: imageUrl,
         isActive: true,
       );
@@ -621,20 +616,19 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
 
   Widget _buildDriverDropdown() {
     return AnimatedBuilder(
-      animation: Listenable.merge([_assignedDriverId, _drivers]),
+      animation: Listenable.merge([_assignedEmployeeId, _employees]),
       builder: (context, _) {
         return DropdownButtonFormField<String>(
-          initialValue: _assignedDriverId.value,
+          initialValue: _assignedEmployeeId.value,
           decoration: InputDecoration(
-            labelText: 'Assigned Driver',
+            labelText: 'Assigned Employee',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8.r),
             ),
           ),
           items: [
             const DropdownMenuItem<String>(value: null, child: Text('None')),
-            ..._drivers.value.map((employee) {
-              final isInternal = employee.driverType == 'Internal';
+            ..._employees.value.map((employee) {
               return DropdownMenuItem<String>(
                 value: employee.id,
                 child: Row(
@@ -647,19 +641,15 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                         vertical: 2.h,
                       ),
                       decoration: BoxDecoration(
-                        color: isInternal
-                            ? Colors.green.withValues(alpha: 0.1)
-                            : Colors.orange.withValues(alpha: 0.1),
+                        color: Colors.blue.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4.r),
-                        border: Border.all(
-                          color: isInternal ? Colors.green : Colors.orange,
-                        ),
+                        border: Border.all(color: Colors.blue),
                       ),
                       child: Text(
-                        employee.driverType ?? 'Unknown',
+                        employee.position,
                         style: TextStyle(
                           fontSize: 10.sp,
-                          color: isInternal ? Colors.green : Colors.orange,
+                          color: Colors.blue,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -670,7 +660,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
             }),
           ],
           onChanged: (value) {
-            _assignedDriverId.value = value;
+            _assignedEmployeeId.value = value;
           },
         );
       },

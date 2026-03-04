@@ -71,6 +71,22 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     DrivingLicenseType.private,
   );
 
+  // Attachment file pickers (one per document)
+  final ValueNotifier<XFile?> _iqamaAttachment = ValueNotifier(null);
+  final ValueNotifier<String?> _iqamaAttachmentUrl = ValueNotifier(null);
+
+  final ValueNotifier<XFile?> _passportAttachment = ValueNotifier(null);
+  final ValueNotifier<String?> _passportAttachmentUrl = ValueNotifier(null);
+
+  final ValueNotifier<XFile?> _saudiVisaAttachment = ValueNotifier(null);
+  final ValueNotifier<String?> _saudiVisaAttachmentUrl = ValueNotifier(null);
+
+  final ValueNotifier<XFile?> _bahrainVisaAttachment = ValueNotifier(null);
+  final ValueNotifier<String?> _bahrainVisaAttachmentUrl = ValueNotifier(null);
+
+  final ValueNotifier<XFile?> _licenseAttachment = ValueNotifier(null);
+  final ValueNotifier<String?> _licenseAttachmentUrl = ValueNotifier(null);
+
   final ValueNotifier<bool> _isSaving = ValueNotifier(false);
   final ValueNotifier<List<VehicleEntity>> _availableVehicles = ValueNotifier(
     [],
@@ -138,6 +154,13 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _licenseExpiryDate.value = e?.drivingLicense?.expiryDate;
     if (e?.drivingLicense?.type != null)
       _selectedLicenseType.value = e!.drivingLicense!.type;
+
+    // Pre-populate attachment URLs from existing employee
+    _iqamaAttachmentUrl.value = e?.iqama?.attachmentUrl;
+    _passportAttachmentUrl.value = e?.passport?.attachmentUrl;
+    _saudiVisaAttachmentUrl.value = e?.saudiVisa?.attachmentUrl;
+    _bahrainVisaAttachmentUrl.value = e?.bahrainVisa?.attachmentUrl;
+    _licenseAttachmentUrl.value = e?.drivingLicense?.attachmentUrl;
 
     if (e != null) {
       if (_positions.contains(e.position)) {
@@ -268,15 +291,58 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
     try {
       final id = widget.employee?.id ?? const Uuid().v4();
+      final provider = context.read<EmployeeProvider>();
 
+      // Upload profile image if changed
       String? imageUrl = _currentImageUrl.value;
-      if (_pickedImage.value != null) {
-        if (mounted) {
-          imageUrl = await context.read<EmployeeProvider>().uploadEmployeeImage(
-            _pickedImage.value!,
-            id,
-          );
-        }
+      if (_pickedImage.value != null && mounted) {
+        imageUrl = await provider.uploadEmployeeImage(_pickedImage.value!, id);
+      }
+
+      // Upload document attachments if new files were picked
+      String? iqamaUrl = _iqamaAttachmentUrl.value;
+      if (_iqamaAttachment.value != null && mounted) {
+        iqamaUrl = await provider.uploadDocumentAttachment(
+          _iqamaAttachment.value!,
+          id,
+          'iqama',
+        );
+      }
+
+      String? passportUrl = _passportAttachmentUrl.value;
+      if (_passportAttachment.value != null && mounted) {
+        passportUrl = await provider.uploadDocumentAttachment(
+          _passportAttachment.value!,
+          id,
+          'passport',
+        );
+      }
+
+      String? saudiVisaUrl = _saudiVisaAttachmentUrl.value;
+      if (_saudiVisaAttachment.value != null && mounted) {
+        saudiVisaUrl = await provider.uploadDocumentAttachment(
+          _saudiVisaAttachment.value!,
+          id,
+          'saudi_visa',
+        );
+      }
+
+      String? bahrainVisaUrl = _bahrainVisaAttachmentUrl.value;
+      if (_bahrainVisaAttachment.value != null && mounted) {
+        bahrainVisaUrl = await provider.uploadDocumentAttachment(
+          _bahrainVisaAttachment.value!,
+          id,
+          'bahrain_visa',
+        );
+      }
+
+      String? licenseUrl = _licenseAttachmentUrl.value;
+      if (_licenseAttachment.value != null && mounted) {
+        licenseUrl = await provider.uploadDocumentAttachment(
+          _licenseAttachment.value!,
+          id,
+          'driving_license',
+        );
       }
 
       final newEmployee = EmployeeEntity(
@@ -303,6 +369,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _iqamaNumberController.text.trim(),
                 expiryDate: _iqamaExpiryDate.value!,
                 insuranceExpiryDate: _insuranceExpiryDate.value,
+                attachmentUrl: iqamaUrl,
               )
             : null,
         passport:
@@ -312,6 +379,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 nameOnPassport: _passportNameController.text.trim(),
                 number: _passportNumberController.text.trim(),
                 expiryDate: _passportExpiryDate.value!,
+                attachmentUrl: passportUrl,
               )
             : null,
         saudiVisa:
@@ -321,6 +389,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _saudiVisaNumberController.text.trim(),
                 expiryDate: _saudiVisaExpiryDate.value!,
                 type: _selectedSaudiVisaType.value,
+                attachmentUrl: saudiVisaUrl,
               )
             : null,
         bahrainVisa:
@@ -330,6 +399,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _bahrainVisaNumberController.text.trim(),
                 expiryDate: _bahrainVisaExpiryDate.value!,
                 type: _selectedBahrainVisaType.value,
+                attachmentUrl: bahrainVisaUrl,
               )
             : null,
         drivingLicense:
@@ -341,26 +411,25 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _licenseNumberController.text.trim(),
                 expiryDate: _licenseExpiryDate.value!,
                 type: _selectedLicenseType.value,
+                attachmentUrl: licenseUrl,
               )
             : null,
       );
 
       if (mounted) {
         if (widget.employee == null) {
-          await context.read<EmployeeProvider>().addEmployee(newEmployee);
+          await provider.addEmployee(newEmployee);
         } else {
-          await context.read<EmployeeProvider>().updateEmployee(newEmployee);
+          await provider.updateEmployee(newEmployee);
         }
       }
 
       // Handle Vehicle Assignment
-      if (_selectedPosition.value == 'Driver') {
-        if (mounted) {
-          await context.read<VehicleProvider>().assignDriver(
-            _selectedVehicleId.value,
-            id, // The employee ID
-          );
-        }
+      if (_selectedPosition.value == 'Driver' && mounted) {
+        await context.read<VehicleProvider>().assignDriver(
+          _selectedVehicleId.value,
+          id,
+        );
       }
 
       if (mounted) {
@@ -804,6 +873,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                             ),
                           ],
                         ),
+                        SizedBox(height: 16.h),
+                        _buildAttachmentPicker(
+                          label: 'Iqama Scan / Copy',
+                          pickedFileNotifier: _iqamaAttachment,
+                          existingUrlNotifier: _iqamaAttachmentUrl,
+                        ),
                       ],
                     ),
                   ),
@@ -868,6 +943,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           controller: _passportNameController,
                           label: 'Name on Passport',
                           icon: Icons.person,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildAttachmentPicker(
+                          label: 'Passport Scan / Copy',
+                          pickedFileNotifier: _passportAttachment,
+                          existingUrlNotifier: _passportAttachmentUrl,
                         ),
                       ],
                     ),
@@ -951,6 +1032,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                             );
                           },
                         ),
+                        SizedBox(height: 16.h),
+                        _buildAttachmentPicker(
+                          label: 'Saudi Visa Scan / Copy',
+                          pickedFileNotifier: _saudiVisaAttachment,
+                          existingUrlNotifier: _saudiVisaAttachmentUrl,
+                        ),
                       ],
                     ),
                   ),
@@ -1032,6 +1119,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               },
                             );
                           },
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildAttachmentPicker(
+                          label: 'Bahrain Visa Scan / Copy',
+                          pickedFileNotifier: _bahrainVisaAttachment,
+                          existingUrlNotifier: _bahrainVisaAttachmentUrl,
                         ),
                       ],
                     ),
@@ -1148,6 +1241,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                       ),
                                 ),
                               ],
+                            ),
+                            SizedBox(height: 16.h),
+                            _buildAttachmentPicker(
+                              label: 'Driving License Scan / Copy',
+                              pickedFileNotifier: _licenseAttachment,
+                              existingUrlNotifier: _licenseAttachmentUrl,
                             ),
                           ],
                         ),
@@ -1286,6 +1385,153 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         child: Text(
           date != null ? DateFormat('yyyy-MM-dd').format(date) : 'Select Date',
           style: TextStyle(color: date != null ? Colors.black : Colors.grey),
+        ),
+      ),
+    );
+  }
+
+  /// A reusable widget that lets the user optionally pick a document scan/image.
+  ///
+  /// [pickedFileNotifier]  – holds the locally picked [XFile] (before upload).
+  /// [existingUrlNotifier] – holds the already-uploaded URL string, if any.
+  Widget _buildAttachmentPicker({
+    required String label,
+    required ValueNotifier<XFile?> pickedFileNotifier,
+    required ValueNotifier<String?> existingUrlNotifier,
+  }) {
+    return ValueListenableBuilder<XFile?>(
+      valueListenable: pickedFileNotifier,
+      builder: (context, pickedFile, _) {
+        return ValueListenableBuilder<String?>(
+          valueListenable: existingUrlNotifier,
+          builder: (context, existingUrl, _) {
+            final hasExisting = existingUrl != null && existingUrl.isNotEmpty;
+            final hasPicked = pickedFile != null;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.attach_file_rounded,
+                      size: 16.sp,
+                      color: Colors.grey[600],
+                    ),
+                    SizedBox(width: 6.w),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const Spacer(),
+                    // Clear button if something is picked/existing
+                    if (hasPicked || hasExisting)
+                      IconButton(
+                        icon: Icon(
+                          Icons.close,
+                          size: 16.sp,
+                          color: Colors.redAccent,
+                        ),
+                        tooltip: 'Remove attachment',
+                        constraints: const BoxConstraints(),
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          pickedFileNotifier.value = null;
+                          existingUrlNotifier.value = null;
+                        },
+                      ),
+                  ],
+                ),
+                SizedBox(height: 6.h),
+                // Status / display area
+                if (hasPicked)
+                  _attachmentChip(
+                    icon: Icons.insert_drive_file_outlined,
+                    text: pickedFile.name,
+                    color: Colors.green.shade700,
+                  )
+                else if (hasExisting)
+                  _attachmentChip(
+                    icon: Icons.cloud_done_outlined,
+                    text: 'View existing scan',
+                    color: Colors.blue.shade700,
+                    onTap: () {
+                      // Could open a web view in a future iteration
+                    },
+                  ),
+                SizedBox(height: 6.h),
+                // Pick button
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    try {
+                      final XFile? file = await _picker.pickImage(
+                        source: ImageSource.gallery,
+                      );
+                      if (file != null) {
+                        pickedFileNotifier.value = file;
+                      }
+                    } catch (_) {
+                      // If picking image fails try picking any file via gallery
+                    }
+                  },
+                  icon: Icon(Icons.upload_file_rounded, size: 16.sp),
+                  label: Text(
+                    hasPicked || hasExisting
+                        ? 'Change File'
+                        : 'Upload Scan (Optional)',
+                    style: TextStyle(fontSize: 12.sp),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12.w,
+                      vertical: 8.h,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _attachmentChip({
+    required IconData icon,
+    required String text,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(6.r),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14.sp, color: color),
+            SizedBox(width: 6.w),
+            Flexible(
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 11.sp,
+                  color: color,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ),
       ),
     );

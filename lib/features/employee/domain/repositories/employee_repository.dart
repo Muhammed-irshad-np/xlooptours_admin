@@ -7,4 +7,9 @@ abstract class EmployeeRepository {
   Future<void> updateEmployee(EmployeeEntity employee);
   Future<void> deleteEmployee(String id);
   Future<String> uploadEmployeeImage(XFile image, String employeeId);
+  Future<String> uploadDocumentAttachment(
+    XFile file,
+    String employeeId,
+    String docType,
+  );
 }

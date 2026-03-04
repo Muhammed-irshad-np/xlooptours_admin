@@ -28,6 +28,7 @@ import 'features/employee/domain/usecases/delete_employee_usecase.dart';
 import 'features/employee/domain/usecases/get_all_employees_usecase.dart';
 import 'features/employee/domain/usecases/insert_employee_usecase.dart';
 import 'features/employee/domain/usecases/update_employee_usecase.dart';
+import 'features/employee/domain/usecases/upload_document_attachment_usecase.dart';
 import 'features/employee/domain/usecases/upload_employee_image_usecase.dart';
 import 'features/employee/presentation/providers/employee_provider.dart';
 
@@ -204,6 +205,7 @@ Future<void> init() async {
       updateEmployeeUseCase: sl(),
       deleteEmployeeUseCase: sl(),
       uploadEmployeeImageUseCase: sl(),
+      uploadDocumentAttachmentUseCase: sl(),
     ),
   );
 
@@ -213,6 +215,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => UpdateEmployeeUseCase(sl()));
   sl.registerLazySingleton(() => DeleteEmployeeUseCase(sl()));
   sl.registerLazySingleton(() => UploadEmployeeImageUseCase(sl()));
+  sl.registerLazySingleton(() => UploadDocumentAttachmentUseCase(sl()));
   sl.registerLazySingleton(() => GetEmployeeExpiryAlertsUseCase(sl()));
 
   // Repositories

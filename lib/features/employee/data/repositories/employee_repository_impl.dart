@@ -35,4 +35,17 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   Future<String> uploadEmployeeImage(XFile image, String employeeId) async {
     return await remoteDataSource.uploadEmployeeImage(image, employeeId);
   }
+
+  @override
+  Future<String> uploadDocumentAttachment(
+    XFile file,
+    String employeeId,
+    String docType,
+  ) async {
+    return await remoteDataSource.uploadDocumentAttachment(
+      file,
+      employeeId,
+      docType,
+    );
+  }
 }

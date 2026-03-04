@@ -211,7 +211,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                 Icon(Icons.person, size: 14.sp, color: Colors.blueGrey),
                 SizedBox(width: 4.w),
                 Text(
-                  driver != null ? driver.fullName : 'No Driver Assigned',
+                  driver != null ? driver.fullName : 'No Employee Assigned',
                   style: TextStyle(
                     color: driver != null ? Colors.black87 : Colors.orange,
                     fontWeight: FontWeight.w500,
@@ -350,7 +350,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                       ),
                       _buildDetailRow('Type', vehicle.type, Icons.category),
                       _buildDetailRow(
-                        'Assigned Driver',
+                        'Assigned Employee',
                         driver != null ? driver.fullName : 'Not Assigned',
                         Icons.person,
                       ),

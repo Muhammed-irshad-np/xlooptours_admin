@@ -50,6 +50,7 @@ class EmployeeModel extends EmployeeEntity {
               number: iqama!.number,
               expiryDate: iqama!.expiryDate,
               insuranceExpiryDate: iqama!.insuranceExpiryDate,
+              attachmentUrl: iqama!.attachmentUrl,
             ).toJson()
           : null,
       'drivingLicense': drivingLicense != null
@@ -58,6 +59,7 @@ class EmployeeModel extends EmployeeEntity {
               number: drivingLicense!.number,
               expiryDate: drivingLicense!.expiryDate,
               type: drivingLicense!.type,
+              attachmentUrl: drivingLicense!.attachmentUrl,
             ).toJson()
           : null,
       'passport': passport != null
@@ -65,6 +67,7 @@ class EmployeeModel extends EmployeeEntity {
               nameOnPassport: passport!.nameOnPassport,
               number: passport!.number,
               expiryDate: passport!.expiryDate,
+              attachmentUrl: passport!.attachmentUrl,
             ).toJson()
           : null,
       'saudiVisa': saudiVisa != null
@@ -84,7 +87,10 @@ class EmployeeModel extends EmployeeEntity {
             ).toJson()
           : null,
       'authorization': authorization != null
-          ? AuthorizationModel(expiryDate: authorization!.expiryDate).toJson()
+          ? AuthorizationModel(
+              expiryDate: authorization!.expiryDate,
+              attachmentUrl: authorization!.attachmentUrl,
+            ).toJson()
           : null,
       'phoneRechargeDate': phoneRechargeDate?.toIso8601String(),
     };
