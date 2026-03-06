@@ -139,9 +139,9 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
             );
           }
 
-          final _companies = provider.companies;
+          final companies = provider.companies;
 
-          if (_companies.isEmpty) {
+          if (companies.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -165,10 +165,10 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
 
           return ResponsiveLayout(
             mobile: ListView.builder(
-              itemCount: _companies.length,
+              itemCount: companies.length,
               padding: const EdgeInsets.all(8),
               itemBuilder: (context, index) =>
-                  _buildCompanyCard(_companies[index]),
+                  _buildCompanyCard(companies[index]),
             ),
             desktop: GridView.builder(
               padding: const EdgeInsets.all(16),
@@ -178,9 +178,9 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
               ),
-              itemCount: _companies.length,
+              itemCount: companies.length,
               itemBuilder: (context, index) =>
-                  _buildCompanyCard(_companies[index]),
+                  _buildCompanyCard(companies[index]),
             ),
           );
         },
@@ -400,11 +400,11 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
                     height: 24,
                     child: Switch(
                       value: isActive,
-                      activeColor: Colors.white,
+                      activeThumbColor: Colors.white,
                       activeTrackColor: Colors.green,
                       inactiveThumbColor: Colors.white,
                       inactiveTrackColor: Colors.grey[300],
-                      trackOutlineColor: MaterialStateProperty.all(
+                      trackOutlineColor: WidgetStateProperty.all(
                         Colors.transparent,
                       ),
                       onChanged: (val) => _toggleCompanyStatus(company, val),

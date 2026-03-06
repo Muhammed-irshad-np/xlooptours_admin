@@ -216,7 +216,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                   ),
                   const SizedBox(height: 20),
                   DropdownButtonFormField<int?>(
-                    value: tempMonth,
+                    initialValue: tempMonth,
                     decoration: const InputDecoration(
                       labelText: 'Month',
                       border: OutlineInputBorder(),
@@ -235,7 +235,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<int?>(
-                    value: tempYear,
+                    initialValue: tempYear,
                     decoration: const InputDecoration(
                       labelText: 'Year',
                       border: OutlineInputBorder(),

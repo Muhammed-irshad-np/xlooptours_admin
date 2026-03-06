@@ -176,7 +176,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     final children = [
       Expanded(
         child: DropdownButtonFormField<int>(
-          value: selectedYear,
+          initialValue: selectedYear,
           decoration: const InputDecoration(
             labelText: 'Year',
             border: OutlineInputBorder(),
@@ -197,7 +197,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       if (!isRow) const SizedBox(height: 16) else const SizedBox(width: 16),
       Expanded(
         child: DropdownButtonFormField<int?>(
-          value: selectedMonth,
+          initialValue: selectedMonth,
           decoration: const InputDecoration(
             labelText: 'Month (Optional)',
             border: OutlineInputBorder(),

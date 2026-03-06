@@ -94,6 +94,54 @@ class GetEmployeeExpiryAlertsUseCase {
           );
         }
       }
+
+      // Dubai Visa: 1 month before
+      if (employee.dubaiVisa != null) {
+        final days = employee.dubaiVisa!.expiryDate.difference(now).inDays;
+        if (days <= 30) {
+          alerts.add(
+            EmployeeExpiryAlert(
+              employeeId: employee.id,
+              employeeName: employee.fullName,
+              documentType: 'Dubai Visa',
+              expiryDate: employee.dubaiVisa!.expiryDate,
+              daysUntilExpiry: days,
+            ),
+          );
+        }
+      }
+
+      // Qatar Visa: 1 month before
+      if (employee.qatarVisa != null) {
+        final days = employee.qatarVisa!.expiryDate.difference(now).inDays;
+        if (days <= 30) {
+          alerts.add(
+            EmployeeExpiryAlert(
+              employeeId: employee.id,
+              employeeName: employee.fullName,
+              documentType: 'Qatar Visa',
+              expiryDate: employee.qatarVisa!.expiryDate,
+              daysUntilExpiry: days,
+            ),
+          );
+        }
+      }
+
+      // Phone Recharge: 1 month before
+      if (employee.phoneRechargeDate != null) {
+        final days = employee.phoneRechargeDate!.difference(now).inDays;
+        if (days <= 30) {
+          alerts.add(
+            EmployeeExpiryAlert(
+              employeeId: employee.id,
+              employeeName: employee.fullName,
+              documentType: 'Phone Recharge',
+              expiryDate: employee.phoneRechargeDate!,
+              daysUntilExpiry: days,
+            ),
+          );
+        }
+      }
     }
 
     // Sort alerts by days until expiry (ascending, so most urgent first)

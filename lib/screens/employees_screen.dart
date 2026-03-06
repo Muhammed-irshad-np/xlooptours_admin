@@ -7,6 +7,7 @@ import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 
 import '../widgets/responsive_layout.dart';
+import 'employee_details_screen.dart';
 import 'employee_form_screen.dart';
 
 class EmployeesScreen extends StatefulWidget {
@@ -548,7 +549,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                 Switch(
                   value: employee.isActive,
                   onChanged: (val) => _toggleStatus(employee, val),
-                  activeColor: Colors.white,
+                  activeThumbColor: Colors.white,
                   activeTrackColor: Colors.green,
                 ),
               ],
@@ -560,150 +561,13 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   }
 
   void _showDetails(EmployeeEntity employee) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          width: 500,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.blue.withOpacity(0.1),
-                    backgroundImage: employee.imageUrl != null
-                        ? NetworkImage(employee.imageUrl!)
-                        : null,
-                    child: employee.imageUrl == null
-                        ? Text(
-                            employee.fullName.isNotEmpty
-                                ? employee.fullName[0].toUpperCase()
-                                : '?',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.blue,
-                            ),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          employee.fullName,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          employee.position,
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 16,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const Divider(height: 32),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (employee.driverType != 'External')
-                        _buildDetailRow('Email', employee.email, Icons.email),
-                      _buildDetailRow(
-                        'Phone',
-                        employee.phoneNumber,
-                        Icons.phone,
-                      ),
-                      _buildDetailRow(
-                        'Nationality',
-                        employee.nationality,
-                        Icons.flag,
-                      ),
-                      _buildDetailRow('Gender', employee.gender, Icons.person),
-                      _buildDetailRow('ID Type', employee.idType, Icons.badge),
-                      _buildDetailRow(
-                        'ID Number',
-                        employee.idNumber,
-                        Icons.numbers,
-                      ),
-                      if (employee.driverType != 'External') ...[
-                        _buildDetailRow(
-                          'Join Date',
-                          employee.joinDate?.toString().split(' ')[0] ?? 'N/A',
-                          Icons.calendar_today,
-                        ),
-                        _buildDetailRow(
-                          'Birth Date',
-                          employee.birthDate?.toString().split(' ')[0] ?? 'N/A',
-                          Icons.cake,
-                        ),
-                      ],
-                      if (employee.driverType != null)
-                        _buildDetailRow(
-                          'Driver Type',
-                          employee.driverType!,
-                          Icons.directions_car,
-                        ),
-                      _buildDetailRow(
-                        'Status',
-                        employee.isActive ? 'Active' : 'Inactive',
-                        Icons.info,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => EmployeeDetailsScreen(
+          employee: employee,
+          assignedVehicle: _assignedVehicles.value[employee.id],
         ),
-      ),
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value, IconData icon) {
-    if (value.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: Colors.grey),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }

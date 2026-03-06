@@ -386,11 +386,11 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                   height: 24,
                   child: Switch(
                     value: isActive,
-                    activeColor: Colors.white,
+                    activeThumbColor: Colors.white,
                     activeTrackColor: Colors.green,
                     inactiveThumbColor: Colors.white,
                     inactiveTrackColor: Colors.grey[300],
-                    trackOutlineColor: MaterialStateProperty.all(
+                    trackOutlineColor: WidgetStateProperty.all(
                       Colors.transparent,
                     ),
                     onChanged: (val) => _toggleCustomerStatus(customer, val),

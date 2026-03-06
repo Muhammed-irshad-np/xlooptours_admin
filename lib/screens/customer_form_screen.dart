@@ -290,7 +290,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         DropdownButtonFormField<CompanyEntity>(
-                          value: selectedCompany,
+                          initialValue: selectedCompany,
                           decoration: const InputDecoration(
                             labelText: 'Select Company',
                             border: OutlineInputBorder(),

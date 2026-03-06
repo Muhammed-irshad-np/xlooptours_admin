@@ -22,6 +22,8 @@ class EmployeeEntity extends Equatable {
   final PassportDocument? passport;
   final VisaDocument? saudiVisa;
   final VisaDocument? bahrainVisa;
+  final VisaDocument? dubaiVisa;
+  final VisaDocument? qatarVisa;
   final AuthorizationDocument? authorization;
   final DateTime? phoneRechargeDate;
 
@@ -46,6 +48,8 @@ class EmployeeEntity extends Equatable {
     this.passport,
     this.saudiVisa,
     this.bahrainVisa,
+    this.dubaiVisa,
+    this.qatarVisa,
     this.authorization,
     this.phoneRechargeDate,
   });
@@ -71,6 +75,8 @@ class EmployeeEntity extends Equatable {
     PassportDocument? passport,
     VisaDocument? saudiVisa,
     VisaDocument? bahrainVisa,
+    VisaDocument? dubaiVisa,
+    VisaDocument? qatarVisa,
     AuthorizationDocument? authorization,
     DateTime? phoneRechargeDate,
   }) {
@@ -95,6 +101,8 @@ class EmployeeEntity extends Equatable {
       passport: passport ?? this.passport,
       saudiVisa: saudiVisa ?? this.saudiVisa,
       bahrainVisa: bahrainVisa ?? this.bahrainVisa,
+      dubaiVisa: dubaiVisa ?? this.dubaiVisa,
+      qatarVisa: qatarVisa ?? this.qatarVisa,
       authorization: authorization ?? this.authorization,
       phoneRechargeDate: phoneRechargeDate ?? this.phoneRechargeDate,
     );
@@ -122,6 +130,8 @@ class EmployeeEntity extends Equatable {
     passport,
     saudiVisa,
     bahrainVisa,
+    dubaiVisa,
+    qatarVisa,
     authorization,
     phoneRechargeDate,
   ];

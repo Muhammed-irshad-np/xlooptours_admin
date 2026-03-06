@@ -107,6 +107,7 @@ class CompanyModel extends CompanyEntity {
     );
   }
 
+  @override
   CompanyModel copyWith({
     String? id,
     String? companyName,

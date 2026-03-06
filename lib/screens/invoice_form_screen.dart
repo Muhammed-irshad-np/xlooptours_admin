@@ -116,8 +116,9 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   }
 
   Future<void> _saveDraft() async {
-    if (widget.invoiceToEdit != null)
+    if (widget.invoiceToEdit != null) {
       return; // Don't save draft if editing existing invoice
+    }
 
     final invoice = InvoiceEntity(
       date: _selectedDate.value,
@@ -523,7 +524,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
                                             ),
                                             const SizedBox(height: 16),
                                             DropdownButtonFormField<String>(
-                                              value: _selectedPaymentTermsOption
+                                              initialValue: _selectedPaymentTermsOption
                                                   .value,
                                               decoration: _buildInputDecoration(
                                                 'Payment Terms',
@@ -722,7 +723,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedPaymentTermsOption.value,
+              initialValue: _selectedPaymentTermsOption.value,
               decoration: _buildInputDecoration('Payment Terms', Icons.payment),
               items: _paymentTermsOptions
                   .map(

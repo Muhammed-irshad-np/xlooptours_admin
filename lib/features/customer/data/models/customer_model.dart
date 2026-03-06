@@ -71,6 +71,7 @@ class CustomerModel extends CustomerEntity {
     );
   }
 
+  @override
   CustomerModel copyWith({
     String? id,
     String? name,

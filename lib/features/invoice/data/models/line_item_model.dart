@@ -43,6 +43,7 @@ class LineItemModel extends LineItemEntity {
     );
   }
 
+  @override
   LineItemModel copyWith({
     String? description,
     String? unit,

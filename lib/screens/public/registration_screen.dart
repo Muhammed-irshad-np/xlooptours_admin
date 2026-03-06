@@ -1670,8 +1670,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                 onPressed: _addCaseCode,
                               ),
                               validator: (v) {
-                                if (_previewCaseCodes.value.isNotEmpty)
+                                if (_previewCaseCodes.value.isNotEmpty) {
                                   return null;
+                                }
                                 if (v == null || v.isEmpty) {
                                   return _tr('required');
                                 }

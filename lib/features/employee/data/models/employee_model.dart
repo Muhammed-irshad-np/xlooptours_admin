@@ -24,6 +24,8 @@ class EmployeeModel extends EmployeeEntity {
     super.passport,
     super.saudiVisa,
     super.bahrainVisa,
+    super.dubaiVisa,
+    super.qatarVisa,
     super.authorization,
     super.phoneRechargeDate,
   });
@@ -86,6 +88,22 @@ class EmployeeModel extends EmployeeEntity {
               attachmentUrl: bahrainVisa!.attachmentUrl,
             ).toJson()
           : null,
+      'dubaiVisa': dubaiVisa != null
+          ? VisaModel(
+              number: dubaiVisa!.number,
+              expiryDate: dubaiVisa!.expiryDate,
+              type: dubaiVisa!.type,
+              attachmentUrl: dubaiVisa!.attachmentUrl,
+            ).toJson()
+          : null,
+      'qatarVisa': qatarVisa != null
+          ? VisaModel(
+              number: qatarVisa!.number,
+              expiryDate: qatarVisa!.expiryDate,
+              type: qatarVisa!.type,
+              attachmentUrl: qatarVisa!.attachmentUrl,
+            ).toJson()
+          : null,
       'authorization': authorization != null
           ? AuthorizationModel(
               expiryDate: authorization!.expiryDate,
@@ -134,6 +152,12 @@ class EmployeeModel extends EmployeeEntity {
       bahrainVisa: json['bahrainVisa'] != null
           ? VisaModel.fromJson(json['bahrainVisa'] as Map<String, dynamic>)
           : null,
+      dubaiVisa: json['dubaiVisa'] != null
+          ? VisaModel.fromJson(json['dubaiVisa'] as Map<String, dynamic>)
+          : null,
+      qatarVisa: json['qatarVisa'] != null
+          ? VisaModel.fromJson(json['qatarVisa'] as Map<String, dynamic>)
+          : null,
       authorization: json['authorization'] != null
           ? AuthorizationModel.fromJson(
               json['authorization'] as Map<String, dynamic>,
@@ -167,6 +191,8 @@ class EmployeeModel extends EmployeeEntity {
       passport: entity.passport,
       saudiVisa: entity.saudiVisa,
       bahrainVisa: entity.bahrainVisa,
+      dubaiVisa: entity.dubaiVisa,
+      qatarVisa: entity.qatarVisa,
       authorization: entity.authorization,
       phoneRechargeDate: entity.phoneRechargeDate,
     );
@@ -194,6 +220,8 @@ class EmployeeModel extends EmployeeEntity {
     PassportDocument? passport,
     VisaDocument? saudiVisa,
     VisaDocument? bahrainVisa,
+    VisaDocument? dubaiVisa,
+    VisaDocument? qatarVisa,
     AuthorizationDocument? authorization,
     DateTime? phoneRechargeDate,
   }) {
@@ -219,6 +247,8 @@ class EmployeeModel extends EmployeeEntity {
       passport: passport ?? this.passport as PassportModel?,
       saudiVisa: saudiVisa ?? this.saudiVisa as VisaModel?,
       bahrainVisa: bahrainVisa ?? this.bahrainVisa as VisaModel?,
+      dubaiVisa: dubaiVisa ?? this.dubaiVisa as VisaModel?,
+      qatarVisa: qatarVisa ?? this.qatarVisa as VisaModel?,
       authorization: authorization ?? this.authorization as AuthorizationModel?,
       phoneRechargeDate: phoneRechargeDate ?? this.phoneRechargeDate,
     );
