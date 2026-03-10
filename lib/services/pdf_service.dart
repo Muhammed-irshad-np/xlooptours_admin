@@ -1024,12 +1024,7 @@ class PDFService {
               ), // Description
               _buildTableCell('', isHeader: true), // Qty
               _buildTableCell('', isHeader: true), // Unit
-              _buildDualLangCell(
-                english: formatNumber(invoice.subtotalAmount),
-                arabic: formatArabicNumber(invoice.subtotalAmount),
-                alignCenter: true,
-                isBold: true,
-              ), // Subtotal
+              _buildTableCell('', isHeader: true), // Unit Amount
               if (showDiscountColumn)
                 _buildDualLangCell(
                   english: formatNumber(invoice.totalDiscount),
