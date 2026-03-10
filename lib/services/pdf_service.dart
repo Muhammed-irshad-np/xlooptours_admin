@@ -926,8 +926,8 @@ class PDFService {
                 alignCenter: true,
               ),
               _buildHeaderCell(
-                'SUBTOTAL AMOUNT',
-                'المجموع الفرعي',
+                'UNIT AMOUNT',
+                'سعر الوحدة',
                 arabicBoldFont,
                 alignCenter: true,
               ),
