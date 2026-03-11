@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
@@ -337,22 +338,39 @@ class _EmployeesScreenState extends State<EmployeesScreen>
           children: [
             Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: Colors.blue.withOpacity(0.1),
-                  backgroundImage: employee.imageUrl != null
-                      ? NetworkImage(employee.imageUrl!)
-                      : null,
-                  child: employee.imageUrl == null
-                      ? Text(
-                          employee.fullName.isNotEmpty
-                              ? employee.fullName[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            color: Colors.blue,
-                            fontWeight: FontWeight.bold,
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: ClipOval(
+                    child: (employee.imageUrl != null && employee.imageUrl!.isNotEmpty)
+                        ? CachedNetworkImage(
+                            imageUrl: employee.imageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.red, size: 20),
+                          )
+                        : Center(
+                            child: Text(
+                              employee.fullName.isNotEmpty
+                                  ? employee.fullName[0].toUpperCase()
+                                  : '?',
+                              style: const TextStyle(
+                                color: Colors.blue,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
-                        )
-                      : null,
+                  ),
                 ),
                 SizedBox(width: 12.w),
                 Expanded(

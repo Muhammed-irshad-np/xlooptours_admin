@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -139,24 +140,36 @@ class EmployeeDetailsScreen extends StatelessWidget {
         padding: EdgeInsets.all(20.w),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 40.r,
-              backgroundColor: Colors.blue.withOpacity(0.1),
-              backgroundImage: employee.imageUrl != null
-                  ? NetworkImage(employee.imageUrl!)
-                  : null,
-              child: employee.imageUrl == null
-                  ? Text(
-                      employee.fullName.isNotEmpty
-                          ? employee.fullName[0].toUpperCase()
-                          : '?',
-                      style: TextStyle(
-                        fontSize: 32.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue,
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: ClipOval(
+                child: (employee.imageUrl != null && employee.imageUrl!.isNotEmpty)
+                    ? CachedNetworkImage(
+                        imageUrl: employee.imageUrl!,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(strokeWidth: 3),
+                        ),
+                        errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.red, size: 40),
+                      )
+                    : Center(
+                        child: Text(
+                          employee.fullName.isNotEmpty
+                              ? employee.fullName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
                       ),
-                    )
-                  : null,
+              ),
             ),
             SizedBox(width: 20.w),
             Expanded(

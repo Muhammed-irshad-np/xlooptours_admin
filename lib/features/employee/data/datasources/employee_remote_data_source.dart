@@ -71,7 +71,10 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
         .child('$employeeId.jpg');
 
     if (kIsWeb) {
-      await storageRef.putData(await image.readAsBytes());
+      await storageRef.putData(
+        await image.readAsBytes(),
+        SettableMetadata(contentType: 'image/jpeg'),
+      );
     } else {
       await storageRef.putFile(File(image.path));
     }
