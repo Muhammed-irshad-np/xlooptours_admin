@@ -148,14 +148,19 @@ class EmployeeDetailsScreen extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: ClipOval(
-                child: (employee.imageUrl != null && employee.imageUrl!.isNotEmpty)
+                child:
+                    (employee.imageUrl != null && employee.imageUrl!.isNotEmpty)
                     ? CachedNetworkImage(
                         imageUrl: employee.imageUrl!,
                         fit: BoxFit.cover,
                         placeholder: (context, url) => const Center(
                           child: CircularProgressIndicator(strokeWidth: 3),
                         ),
-                        errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.red, size: 40),
+                        errorWidget: (context, url, error) => const Icon(
+                          Icons.broken_image,
+                          color: Colors.red,
+                          size: 40,
+                        ),
                       )
                     : Center(
                         child: Text(

@@ -292,7 +292,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                             gridDelegate:
                                 SliverGridDelegateWithMaxCrossAxisExtent(
                                   maxCrossAxisExtent: 430.w,
-                                  childAspectRatio: 1.5,
+                                  childAspectRatio: 1.4,
                                   crossAxisSpacing: 16,
                                   mainAxisSpacing: 16,
                                 ),
@@ -339,8 +339,8 @@ class _EmployeesScreenState extends State<EmployeesScreen>
             Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 56, // Increased from 40
+                  height: 56, // Increased from 40
                   decoration: BoxDecoration(
                     color: Colors.blue.withOpacity(0.1),
                     shape: BoxShape.circle,
@@ -352,12 +352,12 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                             fit: BoxFit.cover,
                             placeholder: (context, url) => const Center(
                               child: SizedBox(
-                                width: 20,
-                                height: 20,
+                                width: 24, // Increased slightly
+                                height: 24, // Increased slightly
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               ),
                             ),
-                            errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.red, size: 20),
+                            errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.red, size: 28), // Increased slightly
                           )
                         : Center(
                             child: Text(
@@ -365,6 +365,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                                   ? employee.fullName[0].toUpperCase()
                                   : '?',
                               style: const TextStyle(
+                                fontSize: 20, // Added larger font size
                                 color: Colors.blue,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -387,9 +388,8 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                         overflow: TextOverflow.ellipsis,
                       ),
                       SizedBox(height: 4.h),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment
-                            .start, // Changed from center to start
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
                             employee.position,
@@ -398,7 +398,6 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                               color: Colors.grey[600],
                               fontWeight: FontWeight.w500,
                             ),
-                            // textAlign: TextAlign.center, // Removed as it's in a Row with start alignment
                           ),
                           if (employee.position == 'Driver' &&
                               employee.driverType != null) ...[
