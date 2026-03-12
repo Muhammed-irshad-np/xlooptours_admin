@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -1755,14 +1756,24 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 OutlinedButton.icon(
                   onPressed: () async {
                     try {
-                      final XFile? file = await _picker.pickImage(
-                        source: ImageSource.gallery,
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.custom,
+                        allowedExtensions: ['jpg', 'png', 'jpeg', 'pdf'],
+                        withData: kIsWeb,
                       );
-                      if (file != null) {
-                        pickedFileNotifier.value = file;
+                      if (result != null) {
+                        final platformFile = result.files.single;
+                        if (kIsWeb && platformFile.bytes != null) {
+                          pickedFileNotifier.value = XFile.fromData(
+                            platformFile.bytes!,
+                            name: platformFile.name,
+                          );
+                        } else if (platformFile.path != null) {
+                          pickedFileNotifier.value = XFile(platformFile.path!);
+                        }
                       }
-                    } catch (_) {
-                      // If picking image fails try picking any file via gallery
+                    } catch (e) {
+                      debugPrint('Error picking file: $e');
                     }
                   },
                   icon: Icon(Icons.upload_file_rounded, size: 16.sp),
@@ -1798,9 +1809,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       child: Container(
         padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.08),
+          color: color.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(6.r),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
