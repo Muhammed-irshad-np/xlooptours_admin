@@ -4,6 +4,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'document_viewer_screen.dart';
+
 import '../features/employee/domain/entities/employee_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
@@ -144,7 +146,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
               width: 80,
               height: 80,
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: ClipOval(
@@ -207,8 +209,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
                         ),
                         decoration: BoxDecoration(
                           color: employee.isActive
-                              ? Colors.green.withOpacity(0.1)
-                              : Colors.grey.withOpacity(0.1),
+                              ? Colors.green.withValues(alpha: 0.1)
+                              : Colors.grey.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8.r),
                           border: Border.all(
                             color: employee.isActive
@@ -236,8 +238,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
                           ),
                           decoration: BoxDecoration(
                             color: employee.driverType == 'Internal'
-                                ? Colors.blue.withOpacity(0.1)
-                                : Colors.orange.withOpacity(0.1),
+                                ? Colors.blue.withValues(alpha: 0.1)
+                                : Colors.orange.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8.r),
                             border: Border.all(
                               color: employee.driverType == 'Internal'
@@ -312,7 +314,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             Container(
               padding: EdgeInsets.all(12.w),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
+                color: Colors.blue.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -548,17 +550,39 @@ class EmployeeDetailsScreen extends StatelessWidget {
               SizedBox(height: 12.h),
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => _launchUrl(attachmentUrl),
-                  icon: const Icon(Icons.download),
-                  label: const Text('View Attachment'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.blue,
-                    backgroundColor: Colors.blue.withOpacity(0.1),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.r),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.visibility),
+                      color: Colors.blue,
+                      tooltip: 'View Document',
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DocumentViewerScreen(
+                              attachmentUrl: attachmentUrl,
+                              title: title,
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  ),
+                    SizedBox(height: 4.h),
+                    TextButton.icon(
+                      onPressed: () => _launchUrl(attachmentUrl),
+                      icon: const Icon(Icons.download),
+                      label: const Text('Download Attachment'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.blue,
+                        backgroundColor: Colors.blue.withValues(alpha: 0.1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

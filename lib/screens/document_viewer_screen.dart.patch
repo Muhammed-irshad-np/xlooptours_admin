@@ -1,0 +1,15 @@
+@@ -37,14 +37,23 @@
+           ? SfPdfViewer.network(
+               widget.attachmentUrl,
+               canShowScrollHead: false,
+               canShowScrollStatus: false,
++              onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
++                ScaffoldMessenger.of(context).showSnackBar(
++                  SnackBar(
++                    content: Text('Failed to load PDF: \${details.description} - \${details.error}'),
++                    backgroundColor: Colors.red,
++                  ),
++                );
++              },
+             )
+           : CachedNetworkImage(

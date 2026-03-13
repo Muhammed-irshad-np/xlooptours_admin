@@ -6,11 +6,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
-import 'package:intl/intl.dart';
+
 import 'package:provider/provider.dart';
 import '../features/employee/domain/entities/employee_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
+import '../widgets/custom_date_picker.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 
@@ -833,11 +834,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                       child: ValueListenableBuilder<DateTime?>(
                                         valueListenable: _birthDate,
                                         builder: (context, birthDate, _) {
-                                          return _buildDatePicker(
+                                          return CustomDatePicker(
                                             label: 'Birth Date',
                                             date: birthDate,
                                             onTap: () =>
                                                 _selectDate(context, false),
+                                            onClear: () => _birthDate.value = null,
                                           );
                                         },
                                       ),
@@ -847,11 +849,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                       child: ValueListenableBuilder<DateTime?>(
                                         valueListenable: _joinDate,
                                         builder: (context, joinDate, _) {
-                                          return _buildDatePicker(
+                                          return CustomDatePicker(
                                             label: 'Join Date',
                                             date: joinDate,
                                             onTap: () =>
                                                 _selectDate(context, true),
+                                            onClear: () => _joinDate.value = null,
                                           );
                                         },
                                       ),
@@ -900,7 +903,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               child: ValueListenableBuilder<DateTime?>(
                                 valueListenable: _iqamaExpiryDate,
                                 builder: (context, date, _) {
-                                  return _buildDatePicker(
+                                  return CustomDatePicker(
                                     label: 'Iqama Expiry',
                                     date: date,
                                     onTap: () async {
@@ -922,7 +925,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _iqamaExpiryDate.value = picked;
                                       }
                                     },
-                                  );
+                                    onClear: () => _iqamaExpiryDate.value = null,
+                                          );
                                 },
                               ),
                             ),
@@ -931,7 +935,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               child: ValueListenableBuilder<DateTime?>(
                                 valueListenable: _insuranceExpiryDate,
                                 builder: (context, date, _) {
-                                  return _buildDatePicker(
+                                  return CustomDatePicker(
                                     label: 'Health Ins. Expiry',
                                     date: date,
                                     onTap: () async {
@@ -953,7 +957,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _insuranceExpiryDate.value = picked;
                                       }
                                     },
-                                  );
+                                    onClear: () => _insuranceExpiryDate.value = null,
+                                          );
                                 },
                               ),
                             ),
@@ -997,7 +1002,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               child: ValueListenableBuilder<DateTime?>(
                                 valueListenable: _passportExpiryDate,
                                 builder: (context, date, _) {
-                                  return _buildDatePicker(
+                                  return CustomDatePicker(
                                     label: 'Expiry',
                                     date: date,
                                     onTap: () async {
@@ -1019,7 +1024,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _passportExpiryDate.value = picked;
                                       }
                                     },
-                                  );
+                                    onClear: () => _passportExpiryDate.value = null,
+                                          );
                                 },
                               ),
                             ),
@@ -1072,7 +1078,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               child: ValueListenableBuilder<DateTime?>(
                                 valueListenable: _saudiVisaExpiryDate,
                                 builder: (context, date, _) {
-                                  return _buildDatePicker(
+                                  return CustomDatePicker(
                                     label: 'Expiry',
                                     date: date,
                                     onTap: () async {
@@ -1094,7 +1100,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _saudiVisaExpiryDate.value = picked;
                                       }
                                     },
-                                  );
+                                    onClear: () => _saudiVisaExpiryDate.value = null,
+                                          );
                                 },
                               ),
                             ),
@@ -1161,7 +1168,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               child: ValueListenableBuilder<DateTime?>(
                                 valueListenable: _bahrainVisaExpiryDate,
                                 builder: (context, date, _) {
-                                  return _buildDatePicker(
+                                  return CustomDatePicker(
                                     label: 'Expiry',
                                     date: date,
                                     onTap: () async {
@@ -1183,7 +1190,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _bahrainVisaExpiryDate.value = picked;
                                       }
                                     },
-                                  );
+                                    onClear: () => _bahrainVisaExpiryDate.value = null,
+                                          );
                                 },
                               ),
                             ),
@@ -1250,7 +1258,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               child: ValueListenableBuilder<DateTime?>(
                                 valueListenable: _dubaiVisaExpiryDate,
                                 builder: (context, date, _) {
-                                  return _buildDatePicker(
+                                  return CustomDatePicker(
                                     label: 'Expiry',
                                     date: date,
                                     onTap: () async {
@@ -1272,7 +1280,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _dubaiVisaExpiryDate.value = picked;
                                       }
                                     },
-                                  );
+                                    onClear: () => _dubaiVisaExpiryDate.value = null,
+                                          );
                                 },
                               ),
                             ),
@@ -1339,7 +1348,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               child: ValueListenableBuilder<DateTime?>(
                                 valueListenable: _qatarVisaExpiryDate,
                                 builder: (context, date, _) {
-                                  return _buildDatePicker(
+                                  return CustomDatePicker(
                                     label: 'Expiry',
                                     date: date,
                                     onTap: () async {
@@ -1361,7 +1370,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _qatarVisaExpiryDate.value = picked;
                                       }
                                     },
-                                  );
+                                    onClear: () => _qatarVisaExpiryDate.value = null,
+                                          );
                                 },
                               ),
                             ),
@@ -1408,7 +1418,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                       child: ValueListenableBuilder<DateTime?>(
                         valueListenable: _phoneRechargeDate,
                         builder: (context, date, _) {
-                          return _buildDatePicker(
+                          return CustomDatePicker(
                             label: 'Mobile Recharge Expiry',
                             date: date,
                             onTap: () async {
@@ -1430,7 +1440,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                 _phoneRechargeDate.value = picked;
                               }
                             },
-                          );
+                            onClear: () => _phoneRechargeDate.value = null,
+                                          );
                         },
                       ),
                     ),
@@ -1467,7 +1478,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               child: ValueListenableBuilder<DateTime?>(
                                 valueListenable: _licenseExpiryDate,
                                 builder: (context, date, _) {
-                                  return _buildDatePicker(
+                                  return CustomDatePicker(
                                     label: 'Expiry',
                                     date: date,
                                     onTap: () async {
@@ -1489,7 +1500,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _licenseExpiryDate.value = picked;
                                       }
                                     },
-                                  );
+                                    onClear: () => _licenseExpiryDate.value = null,
+                                          );
                                 },
                               ),
                             ),
@@ -1653,30 +1665,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     );
   }
 
-  Widget _buildDatePicker({
-    required String label,
-    required DateTime? date,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: InputDecorator(
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: const Icon(Icons.calendar_today, size: 18),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 14,
-          ),
-        ),
-        child: Text(
-          date != null ? DateFormat('yyyy-MM-dd').format(date) : 'Select Date',
-          style: TextStyle(color: date != null ? Colors.black : Colors.grey),
-        ),
-      ),
-    );
-  }
+
 
   /// A reusable widget that lets the user optionally pick a document scan/image.
   ///

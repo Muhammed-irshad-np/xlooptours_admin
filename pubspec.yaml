@@ -73,6 +73,7 @@ dependencies:
   uuid: ^4.5.3
   cached_network_image: ^3.4.1
   file_picker: ^10.3.10
+  syncfusion_flutter_pdfviewer: ^32.2.9
 
 dev_dependencies:
   flutter_test:

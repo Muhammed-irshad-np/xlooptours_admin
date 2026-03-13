@@ -11,6 +11,7 @@ import '../features/invoice/domain/entities/line_item_entity.dart';
 
 import '../widgets/line_item_row_widget.dart';
 import '../widgets/responsive_layout.dart';
+import '../widgets/custom_date_picker.dart';
 
 class InvoiceFormScreen extends StatefulWidget {
   final InvoiceEntity? invoiceToEdit;
@@ -423,25 +424,10 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
                                       Expanded(
                                         child: Column(
                                           children: [
-                                            InkWell(
+                                            CustomDatePicker(
+                                              label: 'Date',
+                                              date: _selectedDate.value,
                                               onTap: _selectDate,
-                                              borderRadius:
-                                                  BorderRadius.circular(12),
-                                              child: InputDecorator(
-                                                decoration:
-                                                    _buildInputDecoration(
-                                                      'Date',
-                                                      Icons.calendar_today,
-                                                    ),
-                                                child: Text(
-                                                  dateFormat.format(
-                                                    _selectedDate.value,
-                                                  ),
-                                                  style: const TextStyle(
-                                                    fontSize: 16,
-                                                  ),
-                                                ),
-                                              ),
                                             ),
                                             const SizedBox(height: 16),
                                             TextFormField(
@@ -656,16 +642,10 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
           title: 'Invoice Details',
           icon: Icons.receipt_long,
           children: [
-            InkWell(
+            CustomDatePicker(
+              label: 'Date',
+              date: _selectedDate.value,
               onTap: _selectDate,
-              borderRadius: BorderRadius.circular(12),
-              child: InputDecorator(
-                decoration: _buildInputDecoration('Date', Icons.calendar_today),
-                child: Text(
-                  dateFormat.format(_selectedDate.value),
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
             ),
             const SizedBox(height: 16),
             TextFormField(
