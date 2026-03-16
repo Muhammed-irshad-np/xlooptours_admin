@@ -31,7 +31,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   @override
   Widget build(BuildContext context) {
     final isPdf = _isPdfUrl(widget.attachmentUrl);
-    
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.title),
@@ -50,11 +50,15 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                   canShowScrollHead: false,
                   canShowScrollStatus: false,
                   onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-                    debugPrint('PDF Load Failed: ${details.error} - ${details.description}');
+                    debugPrint(
+                      'PDF Load Failed: ${details.error} - ${details.description}',
+                    );
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Failed to load PDF: ${details.error}\nThis might be a CORS issue on Web.'),
+                          content: Text(
+                            'Failed to load PDF: ${details.error}\nThis might be a CORS issue on Web.',
+                          ),
                           backgroundColor: Colors.red,
                           duration: const Duration(seconds: 5),
                         ),
@@ -69,13 +73,16 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                   maxScale: 4,
                   child: CachedNetworkImage(
                     imageUrl: widget.attachmentUrl,
-                    placeholder: (context, url) => const CircularProgressIndicator(),
+                    placeholder: (context, url) =>
+                        const CircularProgressIndicator(),
                     errorWidget: (context, url, error) => const Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.error, color: Colors.red, size: 50),
                         SizedBox(height: 10),
-                        Text('Failed to load image or this might be a PDF without .pdf extension'),
+                        Text(
+                          'Failed to load image or this might be a PDF without .pdf extension',
+                        ),
                       ],
                     ),
                   ),

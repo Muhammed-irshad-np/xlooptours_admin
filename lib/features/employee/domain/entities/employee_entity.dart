@@ -26,6 +26,7 @@ class EmployeeEntity extends Equatable {
   final VisaDocument? qatarVisa;
   final AuthorizationDocument? authorization;
   final DateTime? phoneRechargeDate;
+  final int? phoneRechargeNotificationDays;
 
   const EmployeeEntity({
     required this.id,
@@ -52,6 +53,7 @@ class EmployeeEntity extends Equatable {
     this.qatarVisa,
     this.authorization,
     this.phoneRechargeDate,
+    this.phoneRechargeNotificationDays,
   });
 
   EmployeeEntity copyWith({
@@ -79,6 +81,7 @@ class EmployeeEntity extends Equatable {
     VisaDocument? qatarVisa,
     AuthorizationDocument? authorization,
     DateTime? phoneRechargeDate,
+    int? phoneRechargeNotificationDays,
   }) {
     return EmployeeEntity(
       id: id ?? this.id,
@@ -105,6 +108,8 @@ class EmployeeEntity extends Equatable {
       qatarVisa: qatarVisa ?? this.qatarVisa,
       authorization: authorization ?? this.authorization,
       phoneRechargeDate: phoneRechargeDate ?? this.phoneRechargeDate,
+      phoneRechargeNotificationDays:
+          phoneRechargeNotificationDays ?? this.phoneRechargeNotificationDays,
     );
   }
 
@@ -134,5 +139,6 @@ class EmployeeEntity extends Equatable {
     qatarVisa,
     authorization,
     phoneRechargeDate,
+    phoneRechargeNotificationDays,
   ];
 }

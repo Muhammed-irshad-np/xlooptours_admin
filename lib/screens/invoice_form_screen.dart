@@ -510,8 +510,9 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
                                             ),
                                             const SizedBox(height: 16),
                                             DropdownButtonFormField<String>(
-                                              initialValue: _selectedPaymentTermsOption
-                                                  .value,
+                                              initialValue:
+                                                  _selectedPaymentTermsOption
+                                                      .value,
                                               decoration: _buildInputDecoration(
                                                 'Payment Terms',
                                                 Icons.payment,

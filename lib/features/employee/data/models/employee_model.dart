@@ -28,6 +28,7 @@ class EmployeeModel extends EmployeeEntity {
     super.qatarVisa,
     super.authorization,
     super.phoneRechargeDate,
+    super.phoneRechargeNotificationDays,
   });
 
   Map<String, dynamic> toJson() {
@@ -53,6 +54,7 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: iqama!.expiryDate,
               insuranceExpiryDate: iqama!.insuranceExpiryDate,
               attachmentUrl: iqama!.attachmentUrl,
+              notificationDays: iqama!.notificationDays,
             ).toJson()
           : null,
       'drivingLicense': drivingLicense != null
@@ -62,6 +64,7 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: drivingLicense!.expiryDate,
               type: drivingLicense!.type,
               attachmentUrl: drivingLicense!.attachmentUrl,
+              notificationDays: drivingLicense!.notificationDays,
             ).toJson()
           : null,
       'passport': passport != null
@@ -70,6 +73,7 @@ class EmployeeModel extends EmployeeEntity {
               number: passport!.number,
               expiryDate: passport!.expiryDate,
               attachmentUrl: passport!.attachmentUrl,
+              notificationDays: passport!.notificationDays,
             ).toJson()
           : null,
       'saudiVisa': saudiVisa != null
@@ -78,6 +82,7 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: saudiVisa!.expiryDate,
               type: saudiVisa!.type,
               attachmentUrl: saudiVisa!.attachmentUrl,
+              notificationDays: saudiVisa!.notificationDays,
             ).toJson()
           : null,
       'bahrainVisa': bahrainVisa != null
@@ -86,6 +91,7 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: bahrainVisa!.expiryDate,
               type: bahrainVisa!.type,
               attachmentUrl: bahrainVisa!.attachmentUrl,
+              notificationDays: bahrainVisa!.notificationDays,
             ).toJson()
           : null,
       'dubaiVisa': dubaiVisa != null
@@ -94,6 +100,7 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: dubaiVisa!.expiryDate,
               type: dubaiVisa!.type,
               attachmentUrl: dubaiVisa!.attachmentUrl,
+              notificationDays: dubaiVisa!.notificationDays,
             ).toJson()
           : null,
       'qatarVisa': qatarVisa != null
@@ -102,15 +109,18 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: qatarVisa!.expiryDate,
               type: qatarVisa!.type,
               attachmentUrl: qatarVisa!.attachmentUrl,
+              notificationDays: qatarVisa!.notificationDays,
             ).toJson()
           : null,
       'authorization': authorization != null
           ? AuthorizationModel(
               expiryDate: authorization!.expiryDate,
               attachmentUrl: authorization!.attachmentUrl,
+              notificationDays: authorization!.notificationDays,
             ).toJson()
           : null,
       'phoneRechargeDate': phoneRechargeDate?.toIso8601String(),
+      'phoneRechargeNotificationDays': phoneRechargeNotificationDays,
     };
   }
 
@@ -166,6 +176,8 @@ class EmployeeModel extends EmployeeEntity {
       phoneRechargeDate: json['phoneRechargeDate'] != null
           ? DateTime.tryParse(json['phoneRechargeDate'] as String)
           : null,
+      phoneRechargeNotificationDays:
+          json['phoneRechargeNotificationDays'] as int?,
     );
   }
 
@@ -195,6 +207,7 @@ class EmployeeModel extends EmployeeEntity {
       qatarVisa: entity.qatarVisa,
       authorization: entity.authorization,
       phoneRechargeDate: entity.phoneRechargeDate,
+      phoneRechargeNotificationDays: entity.phoneRechargeNotificationDays,
     );
   }
 
@@ -224,6 +237,7 @@ class EmployeeModel extends EmployeeEntity {
     VisaDocument? qatarVisa,
     AuthorizationDocument? authorization,
     DateTime? phoneRechargeDate,
+    int? phoneRechargeNotificationDays,
   }) {
     return EmployeeModel(
       id: id ?? this.id,
@@ -251,6 +265,8 @@ class EmployeeModel extends EmployeeEntity {
       qatarVisa: qatarVisa ?? this.qatarVisa as VisaModel?,
       authorization: authorization ?? this.authorization as AuthorizationModel?,
       phoneRechargeDate: phoneRechargeDate ?? this.phoneRechargeDate,
+      phoneRechargeNotificationDays:
+          phoneRechargeNotificationDays ?? this.phoneRechargeNotificationDays,
     );
   }
 }

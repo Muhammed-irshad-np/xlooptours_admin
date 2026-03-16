@@ -366,6 +366,11 @@ class EmployeeDetailsScreen extends StatelessWidget {
               _formatDate(employee.phoneRechargeDate),
               Icons.phone_android,
             ),
+            _buildDetailRow(
+              'Alert Before',
+              '${employee.phoneRechargeNotificationDays ?? 30} Days',
+              Icons.notifications,
+            ),
           ],
         ),
       ),
@@ -386,6 +391,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             extraInfo: employee.iqama!.insuranceExpiryDate != null
                 ? 'Insurance Expiry: ${_formatDate(employee.iqama!.insuranceExpiryDate)}'
                 : null,
+            notificationDays: employee.iqama!.notificationDays,
           ),
         if (employee.passport != null)
           _buildDocumentCard(
@@ -396,6 +402,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             expiryDate: employee.passport!.expiryDate,
             attachmentUrl: employee.passport!.attachmentUrl,
             extraInfo: 'Name: ${employee.passport!.nameOnPassport}',
+            notificationDays: employee.passport!.notificationDays,
           ),
         if (employee.drivingLicense != null)
           _buildDocumentCard(
@@ -407,6 +414,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             attachmentUrl: employee.drivingLicense!.attachmentUrl,
             extraInfo:
                 'Type: ${employee.drivingLicense!.type.name.toUpperCase()}\nCountry: ${employee.drivingLicense!.countryOfOrigin}',
+            notificationDays: employee.drivingLicense!.notificationDays,
           ),
         if (employee.saudiVisa != null)
           _buildVisaCard(context, 'Saudi Visa', employee.saudiVisa!),
@@ -424,6 +432,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             number: 'N/A',
             expiryDate: employee.authorization!.expiryDate,
             attachmentUrl: employee.authorization!.attachmentUrl,
+            notificationDays: employee.authorization!.notificationDays,
           ),
         if (_hasNoDocuments())
           Padding(
@@ -463,6 +472,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
       attachmentUrl: visa.attachmentUrl,
       extraInfo:
           'Type: ${visa.type == VisaType.singleEntry ? "Single Entry" : "Multiple Entry"}',
+      notificationDays: visa.notificationDays,
     );
   }
 
@@ -474,6 +484,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
     required DateTime expiryDate,
     String? attachmentUrl,
     String? extraInfo,
+    int? notificationDays,
   }) {
     final bool isExpired = expiryDate.isBefore(DateTime.now());
 
@@ -541,6 +552,14 @@ class EmployeeDetailsScreen extends StatelessWidget {
                           ),
                         ),
                       ],
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Alert Before: ${notificationDays ?? 30} Days',
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: Colors.grey[600],
+                        ),
+                      ),
                     ],
                   ),
                 ),

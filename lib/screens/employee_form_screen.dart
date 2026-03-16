@@ -48,32 +48,38 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   // Document Specific Controllers
   late TextEditingController _iqamaNumberController;
+  late TextEditingController _iqamaNotificationDaysController;
   final ValueNotifier<DateTime?> _iqamaExpiryDate = ValueNotifier(null);
   final ValueNotifier<DateTime?> _insuranceExpiryDate = ValueNotifier(null);
 
   late TextEditingController _passportNameController;
   late TextEditingController _passportNumberController;
+  late TextEditingController _passportNotificationDaysController;
   final ValueNotifier<DateTime?> _passportExpiryDate = ValueNotifier(null);
 
   late TextEditingController _saudiVisaNumberController;
+  late TextEditingController _saudiVisaNotificationDaysController;
   final ValueNotifier<DateTime?> _saudiVisaExpiryDate = ValueNotifier(null);
   final ValueNotifier<VisaType> _selectedSaudiVisaType = ValueNotifier(
     VisaType.singleEntry,
   );
 
   late TextEditingController _bahrainVisaNumberController;
+  late TextEditingController _bahrainVisaNotificationDaysController;
   final ValueNotifier<DateTime?> _bahrainVisaExpiryDate = ValueNotifier(null);
   final ValueNotifier<VisaType> _selectedBahrainVisaType = ValueNotifier(
     VisaType.singleEntry,
   );
 
   late TextEditingController _dubaiVisaNumberController;
+  late TextEditingController _dubaiVisaNotificationDaysController;
   final ValueNotifier<DateTime?> _dubaiVisaExpiryDate = ValueNotifier(null);
   final ValueNotifier<VisaType> _selectedDubaiVisaType = ValueNotifier(
     VisaType.singleEntry,
   );
 
   late TextEditingController _qatarVisaNumberController;
+  late TextEditingController _qatarVisaNotificationDaysController;
   final ValueNotifier<DateTime?> _qatarVisaExpiryDate = ValueNotifier(null);
   final ValueNotifier<VisaType> _selectedQatarVisaType = ValueNotifier(
     VisaType.singleEntry,
@@ -81,12 +87,14 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   late TextEditingController _licenseCountryController;
   late TextEditingController _licenseNumberController;
+  late TextEditingController _licenseNotificationDaysController;
   final ValueNotifier<DateTime?> _licenseExpiryDate = ValueNotifier(null);
   final ValueNotifier<DrivingLicenseType> _selectedLicenseType = ValueNotifier(
     DrivingLicenseType.private,
   );
 
   final ValueNotifier<DateTime?> _phoneRechargeDate = ValueNotifier(null);
+  late TextEditingController _phoneRechargeNotificationDaysController;
 
   // Attachment file pickers (one per document)
   final ValueNotifier<XFile?> _iqamaAttachment = ValueNotifier(null);
@@ -143,6 +151,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _iqamaNumberController = TextEditingController(
       text: e?.iqama?.number ?? '',
     );
+    _iqamaNotificationDaysController = TextEditingController(
+      text: e?.iqama?.notificationDays?.toString() ?? '',
+    );
     _iqamaExpiryDate.value = e?.iqama?.expiryDate;
     _insuranceExpiryDate.value = e?.iqama?.insuranceExpiryDate;
 
@@ -152,10 +163,16 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _passportNumberController = TextEditingController(
       text: e?.passport?.number ?? '',
     );
+    _passportNotificationDaysController = TextEditingController(
+      text: e?.passport?.notificationDays?.toString() ?? '',
+    );
     _passportExpiryDate.value = e?.passport?.expiryDate;
 
     _saudiVisaNumberController = TextEditingController(
       text: e?.saudiVisa?.number ?? '',
+    );
+    _saudiVisaNotificationDaysController = TextEditingController(
+      text: e?.saudiVisa?.notificationDays?.toString() ?? '',
     );
     _saudiVisaExpiryDate.value = e?.saudiVisa?.expiryDate;
     if (e?.saudiVisa?.type != null) {
@@ -165,6 +182,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _bahrainVisaNumberController = TextEditingController(
       text: e?.bahrainVisa?.number ?? '',
     );
+    _bahrainVisaNotificationDaysController = TextEditingController(
+      text: e?.bahrainVisa?.notificationDays?.toString() ?? '',
+    );
     _bahrainVisaExpiryDate.value = e?.bahrainVisa?.expiryDate;
     if (e?.bahrainVisa?.type != null) {
       _selectedBahrainVisaType.value = e!.bahrainVisa!.type!;
@@ -173,6 +193,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _dubaiVisaNumberController = TextEditingController(
       text: e?.dubaiVisa?.number ?? '',
     );
+    _dubaiVisaNotificationDaysController = TextEditingController(
+      text: e?.dubaiVisa?.notificationDays?.toString() ?? '',
+    );
     _dubaiVisaExpiryDate.value = e?.dubaiVisa?.expiryDate;
     if (e?.dubaiVisa?.type != null) {
       _selectedDubaiVisaType.value = e!.dubaiVisa!.type!;
@@ -180,6 +203,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
     _qatarVisaNumberController = TextEditingController(
       text: e?.qatarVisa?.number ?? '',
+    );
+    _qatarVisaNotificationDaysController = TextEditingController(
+      text: e?.qatarVisa?.notificationDays?.toString() ?? '',
     );
     _qatarVisaExpiryDate.value = e?.qatarVisa?.expiryDate;
     if (e?.qatarVisa?.type != null) {
@@ -192,12 +218,18 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _licenseNumberController = TextEditingController(
       text: e?.drivingLicense?.number ?? '',
     );
+    _licenseNotificationDaysController = TextEditingController(
+      text: e?.drivingLicense?.notificationDays?.toString() ?? '',
+    );
     _licenseExpiryDate.value = e?.drivingLicense?.expiryDate;
     if (e?.drivingLicense?.type != null) {
       _selectedLicenseType.value = e!.drivingLicense!.type;
     }
 
     _phoneRechargeDate.value = e?.phoneRechargeDate;
+    _phoneRechargeNotificationDaysController = TextEditingController(
+      text: e?.phoneRechargeNotificationDays?.toString() ?? '',
+    );
 
     // Pre-populate attachment URLs from existing employee
     _iqamaAttachmentUrl.value = e?.iqama?.attachmentUrl;
@@ -274,28 +306,36 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _pickedImage.dispose();
 
     _iqamaNumberController.dispose();
+    _iqamaNotificationDaysController.dispose();
     _iqamaExpiryDate.dispose();
     _insuranceExpiryDate.dispose();
     _passportNameController.dispose();
     _passportNumberController.dispose();
+    _passportNotificationDaysController.dispose();
     _passportExpiryDate.dispose();
     _saudiVisaNumberController.dispose();
+    _saudiVisaNotificationDaysController.dispose();
     _saudiVisaExpiryDate.dispose();
     _selectedSaudiVisaType.dispose();
     _bahrainVisaNumberController.dispose();
+    _bahrainVisaNotificationDaysController.dispose();
     _bahrainVisaExpiryDate.dispose();
     _selectedBahrainVisaType.dispose();
     _dubaiVisaNumberController.dispose();
+    _dubaiVisaNotificationDaysController.dispose();
     _dubaiVisaExpiryDate.dispose();
     _selectedDubaiVisaType.dispose();
     _qatarVisaNumberController.dispose();
+    _qatarVisaNotificationDaysController.dispose();
     _qatarVisaExpiryDate.dispose();
     _selectedQatarVisaType.dispose();
     _licenseCountryController.dispose();
     _licenseNumberController.dispose();
+    _licenseNotificationDaysController.dispose();
     _licenseExpiryDate.dispose();
     _selectedLicenseType.dispose();
     _phoneRechargeDate.dispose();
+    _phoneRechargeNotificationDaysController.dispose();
 
     _isSaving.dispose();
     _availableVehicles.dispose();
@@ -440,6 +480,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _iqamaNumberController.text.trim(),
                 expiryDate: _iqamaExpiryDate.value!,
                 insuranceExpiryDate: _insuranceExpiryDate.value,
+                notificationDays:
+                    int.tryParse(
+                      _iqamaNotificationDaysController.text.trim(),
+                    ) ??
+                    30,
                 attachmentUrl: iqamaUrl,
               )
             : null,
@@ -450,6 +495,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 nameOnPassport: _passportNameController.text.trim(),
                 number: _passportNumberController.text.trim(),
                 expiryDate: _passportExpiryDate.value!,
+                notificationDays:
+                    int.tryParse(
+                      _passportNotificationDaysController.text.trim(),
+                    ) ??
+                    30,
                 attachmentUrl: passportUrl,
               )
             : null,
@@ -460,6 +510,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _saudiVisaNumberController.text.trim(),
                 expiryDate: _saudiVisaExpiryDate.value!,
                 type: _selectedSaudiVisaType.value,
+                notificationDays:
+                    int.tryParse(
+                      _saudiVisaNotificationDaysController.text.trim(),
+                    ) ??
+                    30,
                 attachmentUrl: saudiVisaUrl,
               )
             : null,
@@ -470,6 +525,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _bahrainVisaNumberController.text.trim(),
                 expiryDate: _bahrainVisaExpiryDate.value!,
                 type: _selectedBahrainVisaType.value,
+                notificationDays:
+                    int.tryParse(
+                      _bahrainVisaNotificationDaysController.text.trim(),
+                    ) ??
+                    30,
                 attachmentUrl: bahrainVisaUrl,
               )
             : null,
@@ -480,6 +540,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _dubaiVisaNumberController.text.trim(),
                 expiryDate: _dubaiVisaExpiryDate.value!,
                 type: _selectedDubaiVisaType.value,
+                notificationDays:
+                    int.tryParse(
+                      _dubaiVisaNotificationDaysController.text.trim(),
+                    ) ??
+                    30,
                 attachmentUrl: dubaiVisaUrl,
               )
             : null,
@@ -490,6 +555,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _qatarVisaNumberController.text.trim(),
                 expiryDate: _qatarVisaExpiryDate.value!,
                 type: _selectedQatarVisaType.value,
+                notificationDays:
+                    int.tryParse(
+                      _qatarVisaNotificationDaysController.text.trim(),
+                    ) ??
+                    30,
                 attachmentUrl: qatarVisaUrl,
               )
             : null,
@@ -501,10 +571,18 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _licenseNumberController.text.trim(),
                 expiryDate: _licenseExpiryDate.value!,
                 type: _selectedLicenseType.value,
+                notificationDays:
+                    int.tryParse(
+                      _licenseNotificationDaysController.text.trim(),
+                    ) ??
+                    30,
                 attachmentUrl: licenseUrl,
               )
             : null,
         phoneRechargeDate: _phoneRechargeDate.value,
+        phoneRechargeNotificationDays:
+            int.tryParse(_phoneRechargeNotificationDaysController.text.trim()) ??
+            3,
       );
 
       if (mounted) {
@@ -965,6 +1043,13 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           ],
                         ),
                         SizedBox(height: 16.h),
+                        _buildTextField(
+                          controller: _iqamaNotificationDaysController,
+                          label: 'Alert Before (Days)',
+                          icon: Icons.notifications,
+                          keyboardType: TextInputType.number,
+                        ),
+                        SizedBox(height: 16.h),
                         _buildAttachmentPicker(
                           label: 'Iqama Scan / Copy',
                           pickedFileNotifier: _iqamaAttachment,
@@ -1032,10 +1117,25 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           ],
                         ),
                         SizedBox(height: 16.h),
-                        _buildTextField(
-                          controller: _passportNameController,
-                          label: 'Name on Passport',
-                          icon: Icons.person,
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _passportNameController,
+                                label: 'Name on Passport',
+                                icon: Icons.person,
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _passportNotificationDaysController,
+                                label: 'Alert Before (Days)',
+                                icon: Icons.notifications,
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
                         ),
                         SizedBox(height: 16.h),
                         _buildAttachmentPicker(
@@ -1108,24 +1208,39 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           ],
                         ),
                         SizedBox(height: 16.h),
-                        ValueListenableBuilder<VisaType>(
-                          valueListenable: _selectedSaudiVisaType,
-                          builder: (context, type, _) {
-                            return _buildDropdown(
-                              label: 'Visa Type',
-                              value: type.toString().split('.').last,
-                              items: VisaType.values
-                                  .map((e) => e.toString().split('.').last)
-                                  .toList(),
-                              onChanged: (val) {
-                                _selectedSaudiVisaType.value = VisaType.values
-                                    .firstWhere(
-                                      (e) =>
-                                          e.toString().split('.').last == val,
-                                    );
-                              },
-                            );
-                          },
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ValueListenableBuilder<VisaType>(
+                                valueListenable: _selectedSaudiVisaType,
+                                builder: (context, type, _) {
+                                  return _buildDropdown(
+                                    label: 'Visa Type',
+                                    value: type.toString().split('.').last,
+                                    items: VisaType.values
+                                        .map((e) => e.toString().split('.').last)
+                                        .toList(),
+                                    onChanged: (val) {
+                                      _selectedSaudiVisaType.value = VisaType.values
+                                          .firstWhere(
+                                            (e) =>
+                                                e.toString().split('.').last == val,
+                                          );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _saudiVisaNotificationDaysController,
+                                label: 'Alert Before (Days)',
+                                icon: Icons.notifications,
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
                         ),
                         SizedBox(height: 16.h),
                         _buildAttachmentPicker(
@@ -1198,24 +1313,39 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           ],
                         ),
                         SizedBox(height: 16.h),
-                        ValueListenableBuilder<VisaType>(
-                          valueListenable: _selectedBahrainVisaType,
-                          builder: (context, type, _) {
-                            return _buildDropdown(
-                              label: 'Visa Type',
-                              value: type.toString().split('.').last,
-                              items: VisaType.values
-                                  .map((e) => e.toString().split('.').last)
-                                  .toList(),
-                              onChanged: (val) {
-                                _selectedBahrainVisaType.value = VisaType.values
-                                    .firstWhere(
-                                      (e) =>
-                                          e.toString().split('.').last == val,
-                                    );
-                              },
-                            );
-                          },
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ValueListenableBuilder<VisaType>(
+                                valueListenable: _selectedBahrainVisaType,
+                                builder: (context, type, _) {
+                                  return _buildDropdown(
+                                    label: 'Visa Type',
+                                    value: type.toString().split('.').last,
+                                    items: VisaType.values
+                                        .map((e) => e.toString().split('.').last)
+                                        .toList(),
+                                    onChanged: (val) {
+                                      _selectedBahrainVisaType.value = VisaType.values
+                                          .firstWhere(
+                                            (e) =>
+                                                e.toString().split('.').last == val,
+                                          );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _bahrainVisaNotificationDaysController,
+                                label: 'Alert Before (Days)',
+                                icon: Icons.notifications,
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
                         ),
                         SizedBox(height: 16.h),
                         _buildAttachmentPicker(
@@ -1288,24 +1418,39 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           ],
                         ),
                         SizedBox(height: 16.h),
-                        ValueListenableBuilder<VisaType>(
-                          valueListenable: _selectedDubaiVisaType,
-                          builder: (context, type, _) {
-                            return _buildDropdown(
-                              label: 'Visa Type',
-                              value: type.toString().split('.').last,
-                              items: VisaType.values
-                                  .map((e) => e.toString().split('.').last)
-                                  .toList(),
-                              onChanged: (val) {
-                                _selectedDubaiVisaType.value = VisaType.values
-                                    .firstWhere(
-                                      (e) =>
-                                          e.toString().split('.').last == val,
-                                    );
-                              },
-                            );
-                          },
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ValueListenableBuilder<VisaType>(
+                                valueListenable: _selectedDubaiVisaType,
+                                builder: (context, type, _) {
+                                  return _buildDropdown(
+                                    label: 'Visa Type',
+                                    value: type.toString().split('.').last,
+                                    items: VisaType.values
+                                        .map((e) => e.toString().split('.').last)
+                                        .toList(),
+                                    onChanged: (val) {
+                                      _selectedDubaiVisaType.value = VisaType.values
+                                          .firstWhere(
+                                            (e) =>
+                                                e.toString().split('.').last == val,
+                                          );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _dubaiVisaNotificationDaysController,
+                                label: 'Alert Before (Days)',
+                                icon: Icons.notifications,
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
                         ),
                         SizedBox(height: 16.h),
                         _buildAttachmentPicker(
@@ -1378,24 +1523,39 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           ],
                         ),
                         SizedBox(height: 16.h),
-                        ValueListenableBuilder<VisaType>(
-                          valueListenable: _selectedQatarVisaType,
-                          builder: (context, type, _) {
-                            return _buildDropdown(
-                              label: 'Visa Type',
-                              value: type.toString().split('.').last,
-                              items: VisaType.values
-                                  .map((e) => e.toString().split('.').last)
-                                  .toList(),
-                              onChanged: (val) {
-                                _selectedQatarVisaType.value = VisaType.values
-                                    .firstWhere(
-                                      (e) =>
-                                          e.toString().split('.').last == val,
-                                    );
-                              },
-                            );
-                          },
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ValueListenableBuilder<VisaType>(
+                                valueListenable: _selectedQatarVisaType,
+                                builder: (context, type, _) {
+                                  return _buildDropdown(
+                                    label: 'Visa Type',
+                                    value: type.toString().split('.').last,
+                                    items: VisaType.values
+                                        .map((e) => e.toString().split('.').last)
+                                        .toList(),
+                                    onChanged: (val) {
+                                      _selectedQatarVisaType.value = VisaType.values
+                                          .firstWhere(
+                                            (e) =>
+                                                e.toString().split('.').last == val,
+                                          );
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: _qatarVisaNotificationDaysController,
+                                label: 'Alert Before (Days)',
+                                icon: Icons.notifications,
+                                keyboardType: TextInputType.number,
+                              ),
+                            ),
+                          ],
                         ),
                         SizedBox(height: 16.h),
                         _buildAttachmentPicker(
@@ -1418,30 +1578,45 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                       child: ValueListenableBuilder<DateTime?>(
                         valueListenable: _phoneRechargeDate,
                         builder: (context, date, _) {
-                          return CustomDatePicker(
-                            label: 'Mobile Recharge Expiry',
-                            date: date,
-                            onTap: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate:
-                                    date ??
-                                    DateTime.now().add(
-                                      const Duration(days: 30),
-                                    ),
-                                firstDate: DateTime.now().subtract(
-                                  const Duration(days: 365),
+                          return Row(
+                            children: [
+                              Expanded(
+                                child: CustomDatePicker(
+                                  label: 'Mobile Recharge Expiry',
+                                  date: date,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate:
+                                          date ??
+                                          DateTime.now().add(
+                                            const Duration(days: 30),
+                                          ),
+                                      firstDate: DateTime.now().subtract(
+                                        const Duration(days: 365),
+                                      ),
+                                      lastDate: DateTime.now().add(
+                                        const Duration(days: 365 * 2),
+                                      ),
+                                    );
+                                    if (picked != null) {
+                                      _phoneRechargeDate.value = picked;
+                                    }
+                                  },
+                                  onClear: () => _phoneRechargeDate.value = null,
                                 ),
-                                lastDate: DateTime.now().add(
-                                  const Duration(days: 365 * 2),
+                              ),
+                              SizedBox(width: 16.w),
+                              Expanded(
+                                child: _buildTextField(
+                                  controller: _phoneRechargeNotificationDaysController,
+                                  label: 'Alert Before (Days)',
+                                  icon: Icons.notifications,
+                                  keyboardType: TextInputType.number,
                                 ),
-                              );
-                              if (picked != null) {
-                                _phoneRechargeDate.value = picked;
-                              }
-                            },
-                            onClear: () => _phoneRechargeDate.value = null,
-                                          );
+                              ),
+                            ],
+                          );
                         },
                       ),
                     ),
@@ -1543,6 +1718,13 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               ),
                             ),
                           ],
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildTextField(
+                          controller: _licenseNotificationDaysController,
+                          label: 'Alert Before (Days)',
+                          icon: Icons.notifications,
+                          keyboardType: TextInputType.number,
                         ),
                         SizedBox(height: 16.h),
                         _buildAttachmentPicker(

@@ -14,10 +14,11 @@ class GetEmployeeExpiryAlertsUseCase {
     for (var employee in employees) {
       if (!employee.isActive) continue;
 
-      // Iqama: 1 month before
+      // Iqama
       if (employee.iqama != null) {
         final days = employee.iqama!.expiryDate.difference(now).inDays;
-        if (days <= 30) {
+        final alertDays = employee.iqama!.notificationDays ?? 30;
+        if (days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -30,10 +31,11 @@ class GetEmployeeExpiryAlertsUseCase {
         }
       }
 
-      // Driving License: 1 month before
+      // Driving License
       if (employee.drivingLicense != null) {
         final days = employee.drivingLicense!.expiryDate.difference(now).inDays;
-        if (days <= 30) {
+        final alertDays = employee.drivingLicense!.notificationDays ?? 30;
+        if (days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -46,11 +48,11 @@ class GetEmployeeExpiryAlertsUseCase {
         }
       }
 
-      // Passport: 1 month before
+      // Passport
       if (employee.passport != null) {
         final days = employee.passport!.expiryDate.difference(now).inDays;
-        if (days <= 30) {
-          // Alerting anything under 1 month
+        final alertDays = employee.passport!.notificationDays ?? 30;
+        if (days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -63,10 +65,11 @@ class GetEmployeeExpiryAlertsUseCase {
         }
       }
 
-      // Saudi Visa: 1 month before
+      // Saudi Visa
       if (employee.saudiVisa != null) {
         final days = employee.saudiVisa!.expiryDate.difference(now).inDays;
-        if (days <= 30) {
+        final alertDays = employee.saudiVisa!.notificationDays ?? 30;
+        if (days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -79,10 +82,11 @@ class GetEmployeeExpiryAlertsUseCase {
         }
       }
 
-      // Bahrain Visa: 1 month before
+      // Bahrain Visa
       if (employee.bahrainVisa != null) {
         final days = employee.bahrainVisa!.expiryDate.difference(now).inDays;
-        if (days <= 30) {
+        final alertDays = employee.bahrainVisa!.notificationDays ?? 30;
+        if (days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -95,10 +99,11 @@ class GetEmployeeExpiryAlertsUseCase {
         }
       }
 
-      // Dubai Visa: 1 month before
+      // Dubai Visa
       if (employee.dubaiVisa != null) {
         final days = employee.dubaiVisa!.expiryDate.difference(now).inDays;
-        if (days <= 30) {
+        final alertDays = employee.dubaiVisa!.notificationDays ?? 30;
+        if (days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -111,10 +116,11 @@ class GetEmployeeExpiryAlertsUseCase {
         }
       }
 
-      // Qatar Visa: 1 month before
+      // Qatar Visa
       if (employee.qatarVisa != null) {
         final days = employee.qatarVisa!.expiryDate.difference(now).inDays;
-        if (days <= 30) {
+        final alertDays = employee.qatarVisa!.notificationDays ?? 30;
+        if (days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -127,10 +133,11 @@ class GetEmployeeExpiryAlertsUseCase {
         }
       }
 
-      // Phone Recharge: 1 month before
+      // Phone Recharge
       if (employee.phoneRechargeDate != null) {
         final days = employee.phoneRechargeDate!.difference(now).inDays;
-        if (days <= 30) {
+        final alertDays = employee.phoneRechargeNotificationDays ?? 30;
+        if (days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
