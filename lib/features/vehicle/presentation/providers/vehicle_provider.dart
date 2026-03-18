@@ -12,6 +12,7 @@ import '../../domain/usecases/insert_vehicle_make_usecase.dart';
 import '../../domain/usecases/insert_vehicle_usecase.dart';
 import '../../domain/usecases/update_vehicle_make_usecase.dart';
 import '../../domain/usecases/update_vehicle_usecase.dart';
+import '../../domain/usecases/upload_vehicle_document_usecase.dart';
 import '../../domain/usecases/upload_vehicle_image_usecase.dart';
 
 class VehicleProvider extends ChangeNotifier {
@@ -21,6 +22,7 @@ class VehicleProvider extends ChangeNotifier {
   final DeleteVehicleUseCase deleteVehicleUseCase;
   final AssignDriverToVehicleUseCase assignDriverToVehicleUseCase;
   final UploadVehicleImageUseCase uploadVehicleImageUseCase;
+  final UploadVehicleDocumentUseCase uploadVehicleDocumentUseCase;
 
   final GetAllVehicleMakesUseCase getAllVehicleMakesUseCase;
   final InsertVehicleMakeUseCase insertVehicleMakeUseCase;
@@ -39,6 +41,7 @@ class VehicleProvider extends ChangeNotifier {
     required this.deleteVehicleUseCase,
     required this.assignDriverToVehicleUseCase,
     required this.uploadVehicleImageUseCase,
+    required this.uploadVehicleDocumentUseCase,
     required this.getAllVehicleMakesUseCase,
     required this.insertVehicleMakeUseCase,
     required this.updateVehicleMakeUseCase,
@@ -127,6 +130,21 @@ class VehicleProvider extends ChangeNotifier {
       return url;
     } catch (e) {
       _errorMessage = 'Failed to upload image: \$e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
+    }
+  }
+
+  Future<String> uploadVehicleDocument(
+      XFile file, String vehicleId, String docType) async {
+    _setLoading(true);
+    try {
+      final url = await uploadVehicleDocumentUseCase(file, vehicleId, docType);
+      _setLoading(false);
+      return url;
+    } catch (e) {
+      _errorMessage = 'Failed to upload document: \$e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;

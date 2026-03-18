@@ -45,6 +45,19 @@ class VehicleRepositoryImpl implements VehicleRepository {
   }
 
   @override
+  Future<String> uploadDocumentAttachment(
+    XFile file,
+    String vehicleId,
+    String docType,
+  ) async {
+    return await remoteDataSource.uploadDocumentAttachment(
+      file,
+      vehicleId,
+      docType,
+    );
+  }
+
+  @override
   Future<List<VehicleMakeEntity>> getAllVehicleMakes() async {
     return await remoteDataSource.getAllVehicleMakes();
   }

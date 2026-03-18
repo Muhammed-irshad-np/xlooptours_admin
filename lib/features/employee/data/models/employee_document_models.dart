@@ -33,6 +33,39 @@ class IqamaModel extends IqamaDocument {
   }
 }
 
+class BahrainResidenceModel extends BahrainResidenceDocument {
+  const BahrainResidenceModel({
+    required super.number,
+    required super.expiryDate,
+    super.insuranceExpiryDate,
+    super.attachmentUrl,
+    super.notificationDays,
+  });
+
+  factory BahrainResidenceModel.fromJson(Map<String, dynamic> json) {
+    return BahrainResidenceModel(
+      number: json['number'] as String? ?? '',
+      expiryDate: DateTime.parse(json['expiryDate'] as String),
+      insuranceExpiryDate: json['insuranceExpiryDate'] != null
+          ? DateTime.parse(json['insuranceExpiryDate'] as String)
+          : null,
+      attachmentUrl: json['attachmentUrl'] as String?,
+      notificationDays: json['notificationDays'] as int?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'number': number,
+      'expiryDate': expiryDate.toIso8601String(),
+      if (insuranceExpiryDate != null)
+        'insuranceExpiryDate': insuranceExpiryDate!.toIso8601String(),
+      if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
+      if (notificationDays != null) 'notificationDays': notificationDays,
+    };
+  }
+}
+
 class DrivingLicenseModel extends DrivingLicenseDocument {
   const DrivingLicenseModel({
     required super.countryOfOrigin,

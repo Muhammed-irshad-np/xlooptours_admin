@@ -10,7 +10,10 @@ import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/vehicle/domain/entities/vehicle_make_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
+import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../widgets/custom_date_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import '../services/image_service.dart';
 
 class VehicleFormScreen extends StatefulWidget {
@@ -34,6 +37,23 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   final _plateNumberController = TextEditingController();
   final _typeController = TextEditingController();
 
+  // Document Dates
+  final ValueNotifier<DateTime?> _insuranceExpiryDate = ValueNotifier(null);
+  final ValueNotifier<DateTime?> _registrationExpiryDate = ValueNotifier(null);
+  final ValueNotifier<DateTime?> _fahasExpiryDate = ValueNotifier(null);
+
+  // Maintenance Records
+  final ValueNotifier<DateTime?> _tyreChangeDate = ValueNotifier(null);
+  final _tyreChangeKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _gearOilChangeDate = ValueNotifier(null);
+  final _gearOilChangeKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _housingOilChangeDate = ValueNotifier(null);
+  final _housingOilChangeKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _batteryChangeDate = ValueNotifier(null);
+  final _batteryChangeKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _engineOilChangeDate = ValueNotifier(null);
+  final _engineOilChangeKmController = TextEditingController();
+
   final ValueNotifier<String?> _assignedEmployeeId = ValueNotifier(null);
   final ValueNotifier<XFile?> _selectedImage = ValueNotifier(null);
   final ValueNotifier<String?> _currentImageUrl = ValueNotifier(null);
@@ -41,6 +61,9 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   final ValueNotifier<bool> _isUploadingImage = ValueNotifier(false);
   final ValueNotifier<double> _uploadProgress = ValueNotifier(0.0);
   final ValueNotifier<List<EmployeeEntity>> _employees = ValueNotifier([]);
+  final ValueNotifier<XFile?> _isthimaraAttachment = ValueNotifier(null);
+  final ValueNotifier<String?> _isthimaraAttachmentUrl = ValueNotifier(null);
+  final ValueNotifier<bool> _isUploadingIsthimara = ValueNotifier(false);
 
   // Vehicle Master Data
   final ValueNotifier<List<VehicleMakeEntity>> _allMakes = ValueNotifier([]);
@@ -68,6 +91,25 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _availableColors.dispose();
     _plateNumberController.dispose();
     _typeController.dispose();
+
+    _insuranceExpiryDate.dispose();
+    _registrationExpiryDate.dispose();
+    _fahasExpiryDate.dispose();
+
+    _tyreChangeDate.dispose();
+    _tyreChangeKmController.dispose();
+    _gearOilChangeDate.dispose();
+    _gearOilChangeKmController.dispose();
+    _housingOilChangeDate.dispose();
+    _housingOilChangeKmController.dispose();
+    _batteryChangeDate.dispose();
+    _batteryChangeKmController.dispose();
+    _engineOilChangeDate.dispose();
+    _engineOilChangeKmController.dispose();
+    _isthimaraAttachment.dispose();
+    _isthimaraAttachmentUrl.dispose();
+    _isUploadingIsthimara.dispose();
+
     super.dispose();
   }
 
@@ -121,6 +163,26 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _typeController.text = v.type;
     _assignedEmployeeId.value = v.assignedDriverId;
     _currentImageUrl.value = v.imageUrl;
+
+    _insuranceExpiryDate.value = v.insurance?.expiryDate;
+    _registrationExpiryDate.value = v.registration?.expiryDate;
+    _fahasExpiryDate.value = v.fahas?.expiryDate;
+
+    _isthimaraAttachmentUrl.value = v.registration?.attachmentUrl;
+
+    if (v.maintenance != null) {
+      final m = v.maintenance!;
+      _tyreChangeDate.value = m.tyreChange?.date;
+      _tyreChangeKmController.text = m.tyreChange?.mileage.toString() ?? '';
+      _gearOilChangeDate.value = m.gearOil?.date;
+      _gearOilChangeKmController.text = m.gearOil?.mileage.toString() ?? '';
+      _housingOilChangeDate.value = m.housingOil?.date;
+      _housingOilChangeKmController.text = m.housingOil?.mileage.toString() ?? '';
+      _batteryChangeDate.value = m.batteryChange?.date;
+      _batteryChangeKmController.text = m.batteryChange?.mileage.toString() ?? '';
+      _engineOilChangeDate.value = m.engineOil?.date;
+      _engineOilChangeKmController.text = m.engineOil?.mileage.toString() ?? '';
+    }
 
     // Trigger updates to available lists based on initial make
     _updateAvailableOptions(_selectedMake.value);
@@ -180,6 +242,19 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     }
   }
 
+  Future<String?> _uploadIsthimara(XFile file, String vehicleId) async {
+    try {
+      _isUploadingIsthimara.value = true;
+      final url = await context.read<VehicleProvider>().uploadVehicleDocument(file, vehicleId, 'registration');
+      _isUploadingIsthimara.value = false;
+      return url;
+    } catch (e) {
+      debugPrint('Error uploading isthimara: $e');
+      _isUploadingIsthimara.value = false;
+      return null;
+    }
+  }
+
   Future<void> _saveVehicle() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -223,6 +298,20 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
         }
       }
 
+      // Upload Isthimara if picked
+      String? registrationUrl = _isthimaraAttachmentUrl.value;
+      if (_isthimaraAttachment.value != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Uploading Isthimara...')),
+          );
+        }
+        final url = await _uploadIsthimara(_isthimaraAttachment.value!, vehicleId);
+        if (url != null) {
+          registrationUrl = url;
+        }
+      }
+
       final vehicle = VehicleEntity(
         id: vehicleId,
         make: _selectedMake.value!,
@@ -234,6 +323,61 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
         assignedDriverId: _assignedEmployeeId.value,
         imageUrl: imageUrl,
         isActive: true,
+        insurance: _insuranceExpiryDate.value != null
+            ? VehicleDocument(
+                expiryDate: _insuranceExpiryDate.value!,
+                attachmentUrl: widget.vehicle?.insurance?.attachmentUrl,
+              )
+            : null,
+        registration: _registrationExpiryDate.value != null
+            ? VehicleDocument(
+                expiryDate: _registrationExpiryDate.value!,
+                attachmentUrl: registrationUrl,
+              )
+            : null,
+        fahas: _fahasExpiryDate.value != null
+            ? VehicleDocument(
+                expiryDate: _fahasExpiryDate.value!,
+                attachmentUrl: widget.vehicle?.fahas?.attachmentUrl,
+              )
+            : null,
+        maintenance: VehicleMaintenance(
+          engineOil: _engineOilChangeDate.value != null
+              ? MaintenanceRecord(
+                  date: _engineOilChangeDate.value!,
+                  mileage: int.tryParse(_engineOilChangeKmController.text) ?? 0,
+                  attachmentUrl: widget.vehicle?.maintenance?.engineOil?.attachmentUrl,
+                )
+              : null,
+          gearOil: _gearOilChangeDate.value != null
+              ? MaintenanceRecord(
+                  date: _gearOilChangeDate.value!,
+                  mileage: int.tryParse(_gearOilChangeKmController.text) ?? 0,
+                  attachmentUrl: widget.vehicle?.maintenance?.gearOil?.attachmentUrl,
+                )
+              : null,
+          housingOil: _housingOilChangeDate.value != null
+              ? MaintenanceRecord(
+                  date: _housingOilChangeDate.value!,
+                  mileage: int.tryParse(_housingOilChangeKmController.text) ?? 0,
+                  attachmentUrl: widget.vehicle?.maintenance?.housingOil?.attachmentUrl,
+                )
+              : null,
+          tyreChange: _tyreChangeDate.value != null
+              ? MaintenanceRecord(
+                  date: _tyreChangeDate.value!,
+                  mileage: int.tryParse(_tyreChangeKmController.text) ?? 0,
+                  attachmentUrl: widget.vehicle?.maintenance?.tyreChange?.attachmentUrl,
+                )
+              : null,
+          batteryChange: _batteryChangeDate.value != null
+              ? MaintenanceRecord(
+                  date: _batteryChangeDate.value!,
+                  mileage: int.tryParse(_batteryChangeKmController.text) ?? 0,
+                  attachmentUrl: widget.vehicle?.maintenance?.batteryChange?.attachmentUrl,
+                )
+              : null,
+        ),
       );
 
       debugPrint('VehicleFormScreen: Saving vehicle data to Firestore...');
@@ -325,6 +469,8 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                       children: [
                         _buildImagePicker(),
                         SizedBox(height: 24.h),
+                        _buildSectionHeader('Basic Details'),
+                        SizedBox(height: 16.h),
                         // Make & Model Row
                         Row(
                           children: [
@@ -360,9 +506,124 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                             ),
                           ],
                         ),
-
                         SizedBox(height: 16.h),
                         _buildDriverDropdown(),
+
+                        SizedBox(height: 32.h),
+                        _buildSectionHeader('Documents (Expiry Dates)'),
+                        SizedBox(height: 16.h),
+                        ValueListenableBuilder<DateTime?>(
+                          valueListenable: _registrationExpiryDate,
+                          builder: (context, date, _) {
+                            return CustomDatePicker(
+                              label: 'Isthimara (Registration) Expiry',
+                              date: date,
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: date ?? DateTime.now(),
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2050),
+                                );
+                                if (picked != null) {
+                                  _registrationExpiryDate.value = picked;
+                                }
+                              },
+                              onClear: () =>
+                                  _registrationExpiryDate.value = null,
+                            );
+                          },
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildAttachmentPicker(
+                          label: 'Isthimara Scan / Copy',
+                          pickedFileNotifier: _isthimaraAttachment,
+                          existingUrlNotifier: _isthimaraAttachmentUrl,
+                        ),
+                        SizedBox(height: 16.h),
+                        ValueListenableBuilder<DateTime?>(
+                          valueListenable: _insuranceExpiryDate,
+                          builder: (context, date, _) {
+                            return CustomDatePicker(
+                              label: 'Insurance Expiry',
+                              date: date,
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: date ?? DateTime.now(),
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2050),
+                                );
+                                if (picked != null) {
+                                  _insuranceExpiryDate.value = picked;
+                                }
+                              },
+                              onClear: () =>
+                                  _insuranceExpiryDate.value = null,
+                            );
+                          },
+                        ),
+                        SizedBox(height: 16.h),
+                        ValueListenableBuilder<DateTime?>(
+                          valueListenable: _fahasExpiryDate,
+                          builder: (context, date, _) {
+                            return CustomDatePicker(
+                              label: 'Fahas Inspection Expiry',
+                              date: date,
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: date ?? DateTime.now(),
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2050),
+                                );
+                                if (picked != null) {
+                                  _fahasExpiryDate.value = picked;
+                                }
+                              },
+                              onClear: () => _fahasExpiryDate.value = null,
+                            );
+                          },
+                        ),
+
+                        SizedBox(height: 32.h),
+                        _buildSectionHeader('Maintenance Records'),
+                        SizedBox(height: 16.h),
+                        // Engine Oil
+                        _buildMaintenanceRow(
+                          'Engine Oil',
+                          _engineOilChangeDate,
+                          _engineOilChangeKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        // Gear Oil
+                        _buildMaintenanceRow(
+                          'Gear Oil',
+                          _gearOilChangeDate,
+                          _gearOilChangeKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        // Housing Oil
+                        _buildMaintenanceRow(
+                          'Housing (Diff) Oil',
+                          _housingOilChangeDate,
+                          _housingOilChangeKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        // Tyre Change
+                        _buildMaintenanceRow(
+                          'Tyre Change',
+                          _tyreChangeDate,
+                          _tyreChangeKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        // Battery Change
+                        _buildMaintenanceRow(
+                          'Battery Change',
+                          _batteryChangeDate,
+                          _batteryChangeKmController,
+                        ),
+
                         SizedBox(height: 32.h),
                         SizedBox(
                           width: double.infinity,
@@ -380,6 +641,214 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                   ),
                 );
         },
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 18.sp,
+            fontWeight: FontWeight.bold,
+            color: Theme.of(context).primaryColor,
+          ),
+        ),
+        Divider(thickness: 1.h),
+      ],
+    );
+  }
+
+  Widget _buildMaintenanceRow(
+    String label,
+    ValueNotifier<DateTime?> dateNotifier,
+    TextEditingController kmController,
+  ) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 2,
+          child: ValueListenableBuilder<DateTime?>(
+            valueListenable: dateNotifier,
+            builder: (context, date, _) {
+              return CustomDatePicker(
+                label: '$label Date',
+                date: date,
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: date ?? DateTime.now(),
+                    firstDate: DateTime(2000),
+                    lastDate: DateTime(2050),
+                  );
+                  if (picked != null) {
+                    dateNotifier.value = picked;
+                  }
+                },
+                onClear: () => dateNotifier.value = null,
+              );
+            },
+          ),
+        ),
+        SizedBox(width: 16.w),
+        Expanded(
+          flex: 1,
+          child: _buildTextField('$label KM', kmController, isNumber: true, required: false),
+        ),
+      ],
+    );
+  }
+
+  /// A reusable widget that lets the user optionally pick a document scan/image.
+  Widget _buildAttachmentPicker({
+    required String label,
+    required ValueNotifier<XFile?> pickedFileNotifier,
+    required ValueNotifier<String?> existingUrlNotifier,
+  }) {
+    return ValueListenableBuilder<XFile?>(
+      valueListenable: pickedFileNotifier,
+      builder: (context, pickedFile, _) {
+        return ValueListenableBuilder<String?>(
+          valueListenable: existingUrlNotifier,
+          builder: (context, existingUrl, _) {
+            final hasExisting = existingUrl != null && existingUrl.isNotEmpty;
+            final hasPicked = pickedFile != null;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.attach_file_rounded,
+                      size: 16.sp,
+                      color: Colors.grey[600],
+                    ),
+                    SizedBox(width: 6.w),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        color: Colors.grey[700],
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (hasPicked || hasExisting)
+                      IconButton(
+                        icon: Icon(
+                          Icons.close,
+                          size: 16.sp,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                        tooltip: 'Remove attachment',
+                        constraints: const BoxConstraints(),
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          pickedFileNotifier.value = null;
+                          existingUrlNotifier.value = null;
+                        },
+                      ),
+                  ],
+                ),
+                SizedBox(height: 6.h),
+                if (hasPicked)
+                  _attachmentChip(
+                    icon: Icons.insert_drive_file_outlined,
+                    text: pickedFile.name,
+                    color: Colors.green.shade700,
+                  )
+                else if (hasExisting)
+                  _attachmentChip(
+                    icon: Icons.cloud_done_outlined,
+                    text: 'View existing scan',
+                    color: Colors.blue.shade700,
+                    onTap: () {
+                      // Logic to view existing scan if needed
+                    },
+                  ),
+                SizedBox(height: 6.h),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    try {
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.custom,
+                        allowedExtensions: ['jpg', 'png', 'jpeg', 'pdf'],
+                        withData: kIsWeb,
+                      );
+                      if (result != null) {
+                        final platformFile = result.files.single;
+                        if (kIsWeb && platformFile.bytes != null) {
+                          pickedFileNotifier.value = XFile.fromData(
+                            platformFile.bytes!,
+                            name: platformFile.name,
+                          );
+                        } else if (platformFile.path != null) {
+                          pickedFileNotifier.value = XFile(platformFile.path!);
+                        }
+                      }
+                    } catch (e) {
+                      debugPrint('Error picking file: $e');
+                    }
+                  },
+                  icon: Icon(Icons.upload_file_rounded, size: 16.sp),
+                  label: Text(
+                    hasPicked || hasExisting
+                        ? 'Change File'
+                        : 'Upload Scan (Optional)',
+                    style: TextStyle(fontSize: 12.sp),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12.w,
+                      vertical: 8.h,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _attachmentChip({
+    required IconData icon,
+    required String text,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(6.r),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14.sp, color: color),
+            SizedBox(width: 6.w),
+            Flexible(
+              child: Text(
+                text,
+                style: TextStyle(
+                  fontSize: 11.sp,
+                  color: color,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

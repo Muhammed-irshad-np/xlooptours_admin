@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'vehicle_documents.dart';
 
 class VehicleEntity extends Equatable {
   final String id;
@@ -11,6 +12,10 @@ class VehicleEntity extends Equatable {
   final String? assignedDriverId; // Reference to Employee ID
   final String? imageUrl;
   final bool isActive;
+  final VehicleDocument? insurance;
+  final VehicleDocument? registration;
+  final VehicleDocument? fahas;
+  final VehicleMaintenance? maintenance;
 
   const VehicleEntity({
     required this.id,
@@ -23,6 +28,10 @@ class VehicleEntity extends Equatable {
     this.assignedDriverId,
     this.imageUrl,
     this.isActive = true,
+    this.insurance,
+    this.registration,
+    this.fahas,
+    this.maintenance,
   });
 
   @override
@@ -37,6 +46,10 @@ class VehicleEntity extends Equatable {
     assignedDriverId,
     imageUrl,
     isActive,
+    insurance,
+    registration,
+    fahas,
+    maintenance,
   ];
 
   VehicleEntity copyWith({
@@ -50,6 +63,10 @@ class VehicleEntity extends Equatable {
     String? assignedDriverId,
     String? imageUrl,
     bool? isActive,
+    VehicleDocument? insurance,
+    VehicleDocument? registration,
+    VehicleDocument? fahas,
+    VehicleMaintenance? maintenance,
   }) {
     return VehicleEntity(
       id: id ?? this.id,
@@ -62,6 +79,10 @@ class VehicleEntity extends Equatable {
       assignedDriverId: assignedDriverId ?? this.assignedDriverId,
       imageUrl: imageUrl ?? this.imageUrl,
       isActive: isActive ?? this.isActive,
+      insurance: insurance ?? this.insurance,
+      registration: registration ?? this.registration,
+      fahas: fahas ?? this.fahas,
+      maintenance: maintenance ?? this.maintenance,
     );
   }
 }

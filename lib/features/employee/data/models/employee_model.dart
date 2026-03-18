@@ -20,6 +20,7 @@ class EmployeeModel extends EmployeeEntity {
     super.imageUrl,
     super.assignedVehicleId,
     super.iqama,
+    super.bahrainResidence,
     super.drivingLicense,
     super.passport,
     super.saudiVisa,
@@ -55,6 +56,15 @@ class EmployeeModel extends EmployeeEntity {
               insuranceExpiryDate: iqama!.insuranceExpiryDate,
               attachmentUrl: iqama!.attachmentUrl,
               notificationDays: iqama!.notificationDays,
+            ).toJson()
+          : null,
+      'bahrainResidence': bahrainResidence != null
+          ? BahrainResidenceModel(
+              number: bahrainResidence!.number,
+              expiryDate: bahrainResidence!.expiryDate,
+              insuranceExpiryDate: bahrainResidence!.insuranceExpiryDate,
+              attachmentUrl: bahrainResidence!.attachmentUrl,
+              notificationDays: bahrainResidence!.notificationDays,
             ).toJson()
           : null,
       'drivingLicense': drivingLicense != null
@@ -148,6 +158,9 @@ class EmployeeModel extends EmployeeEntity {
       iqama: json['iqama'] != null
           ? IqamaModel.fromJson(json['iqama'] as Map<String, dynamic>)
           : null,
+      bahrainResidence: json['bahrainResidence'] != null
+          ? BahrainResidenceModel.fromJson(json['bahrainResidence'] as Map<String, dynamic>)
+          : null,
       drivingLicense: json['drivingLicense'] != null
           ? DrivingLicenseModel.fromJson(
               json['drivingLicense'] as Map<String, dynamic>,
@@ -199,6 +212,7 @@ class EmployeeModel extends EmployeeEntity {
       imageUrl: entity.imageUrl,
       assignedVehicleId: entity.assignedVehicleId,
       iqama: entity.iqama,
+      bahrainResidence: entity.bahrainResidence,
       drivingLicense: entity.drivingLicense,
       passport: entity.passport,
       saudiVisa: entity.saudiVisa,
@@ -229,6 +243,7 @@ class EmployeeModel extends EmployeeEntity {
     String? imageUrl,
     String? assignedVehicleId,
     IqamaDocument? iqama,
+    BahrainResidenceDocument? bahrainResidence,
     DrivingLicenseDocument? drivingLicense,
     PassportDocument? passport,
     VisaDocument? saudiVisa,
@@ -256,6 +271,7 @@ class EmployeeModel extends EmployeeEntity {
       imageUrl: imageUrl ?? this.imageUrl,
       assignedVehicleId: assignedVehicleId ?? this.assignedVehicleId,
       iqama: iqama ?? this.iqama as IqamaModel?,
+      bahrainResidence: bahrainResidence ?? this.bahrainResidence as BahrainResidenceModel?,
       drivingLicense:
           drivingLicense ?? this.drivingLicense as DrivingLicenseModel?,
       passport: passport ?? this.passport as PassportModel?,

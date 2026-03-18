@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:xloop_invoice/screens/vehicle_master_screen.dart'; // Added
 import 'package:provider/provider.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
@@ -354,6 +355,71 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                         driver != null ? driver.fullName : 'Not Assigned',
                         Icons.person,
                       ),
+                      const Divider(height: 32),
+                      _buildSectionHeader('Documents'),
+                       _buildDetailRow(
+                        'Insurance Expiry',
+                        vehicle.insurance?.expiryDate != null
+                            ? DateFormat('yyyy-MM-dd').format(vehicle.insurance!.expiryDate)
+                            : 'N/A',
+                        Icons.security_outlined,
+                        attachmentUrl: vehicle.insurance?.attachmentUrl,
+                      ),
+                       _buildDetailRow(
+                        'Isthimara (Registration) Expiry',
+                        vehicle.registration?.expiryDate != null
+                            ? DateFormat('yyyy-MM-dd').format(vehicle.registration!.expiryDate)
+                            : 'N/A',
+                        Icons.description_outlined,
+                        attachmentUrl: vehicle.registration?.attachmentUrl,
+                      ),
+                       _buildDetailRow(
+                        'Fahas Expiry',
+                        vehicle.fahas?.expiryDate != null
+                            ? DateFormat('yyyy-MM-dd').format(vehicle.fahas!.expiryDate)
+                            : 'N/A',
+                        Icons.fact_check_outlined,
+                        attachmentUrl: vehicle.fahas?.attachmentUrl,
+                      ),
+                      const Divider(height: 32),
+                      _buildSectionHeader('Maintenance Records'),
+                      if (vehicle.maintenance != null) ...[
+                        _buildMaintenanceDetail(
+                          'Engine Oil',
+                          vehicle.maintenance!.engineOil,
+                          Icons.oil_barrel,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Gear Oil',
+                          vehicle.maintenance!.gearOil,
+                          Icons.settings_suggest,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Housing Oil',
+                          vehicle.maintenance!.housingOil,
+                          Icons.format_color_fill,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Tyre Change',
+                          vehicle.maintenance!.tyreChange,
+                          Icons.tire_repair,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Battery Change',
+                          vehicle.maintenance!.batteryChange,
+                          Icons.battery_charging_full,
+                        ),
+                      ] else
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: Text(
+                            'No maintenance records available',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -365,29 +431,80 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, IconData icon) {
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Colors.blue,
+        ),
+      ),
+    );
+  }
+
+   Widget _buildMaintenanceDetail(
+    String label,
+    dynamic record, // MaintenanceRecord?
+    IconData icon,
+  ) {
+    if (record == null) {
+      return _buildDetailRow(label, 'No record', icon);
+    }
+
+    final dateStr = DateFormat('yyyy-MM-dd').format(record.date);
+    return _buildDetailRow(
+      label,
+      '$dateStr at ${record.mileage} KM',
+      icon,
+      attachmentUrl: record.attachmentUrl,
+    );
+  }
+
+  Widget _buildDetailRow(
+    String label,
+    String value,
+    IconData icon, {
+    String? attachmentUrl,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Row(
         children: [
           Icon(icon, size: 20, color: Colors.grey),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
-              ),
-            ],
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ),
+          if (attachmentUrl != null)
+            IconButton(
+              icon: const Icon(Icons.remove_red_eye_outlined, color: Colors.blue),
+              onPressed: () {
+                // TODO: Implement viewing (similar to employee details if available)
+                // For now, we can just show a Snackbar or open URL if we had a service
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Viewing attachment: $attachmentUrl')),
+                );
+              },
+              tooltip: 'View Attachment',
+            ),
         ],
       ),
     );

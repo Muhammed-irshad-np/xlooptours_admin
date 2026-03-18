@@ -52,6 +52,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   final ValueNotifier<DateTime?> _iqamaExpiryDate = ValueNotifier(null);
   final ValueNotifier<DateTime?> _insuranceExpiryDate = ValueNotifier(null);
 
+  late TextEditingController _bahrainResidenceNumberController;
+  late TextEditingController _bahrainResidenceNotificationDaysController;
+  final ValueNotifier<DateTime?> _bahrainResidenceExpiryDate = ValueNotifier(null);
+  final ValueNotifier<DateTime?> _bahrainInsuranceExpiryDate = ValueNotifier(null);
+
   late TextEditingController _passportNameController;
   late TextEditingController _passportNumberController;
   late TextEditingController _passportNotificationDaysController;
@@ -99,6 +104,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   // Attachment file pickers (one per document)
   final ValueNotifier<XFile?> _iqamaAttachment = ValueNotifier(null);
   final ValueNotifier<String?> _iqamaAttachmentUrl = ValueNotifier(null);
+
+  final ValueNotifier<XFile?> _bahrainResidenceAttachment = ValueNotifier(null);
+  final ValueNotifier<String?> _bahrainResidenceAttachmentUrl = ValueNotifier(null);
 
   final ValueNotifier<XFile?> _passportAttachment = ValueNotifier(null);
   final ValueNotifier<String?> _passportAttachmentUrl = ValueNotifier(null);
@@ -156,6 +164,15 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     );
     _iqamaExpiryDate.value = e?.iqama?.expiryDate;
     _insuranceExpiryDate.value = e?.iqama?.insuranceExpiryDate;
+
+    _bahrainResidenceNumberController = TextEditingController(
+      text: e?.bahrainResidence?.number ?? '',
+    );
+    _bahrainResidenceNotificationDaysController = TextEditingController(
+      text: e?.bahrainResidence?.notificationDays?.toString() ?? '',
+    );
+    _bahrainResidenceExpiryDate.value = e?.bahrainResidence?.expiryDate;
+    _bahrainInsuranceExpiryDate.value = e?.bahrainResidence?.insuranceExpiryDate;
 
     _passportNameController = TextEditingController(
       text: e?.passport?.nameOnPassport ?? '',
@@ -233,6 +250,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
     // Pre-populate attachment URLs from existing employee
     _iqamaAttachmentUrl.value = e?.iqama?.attachmentUrl;
+    _bahrainResidenceAttachmentUrl.value = e?.bahrainResidence?.attachmentUrl;
     _passportAttachmentUrl.value = e?.passport?.attachmentUrl;
     _saudiVisaAttachmentUrl.value = e?.saudiVisa?.attachmentUrl;
     _bahrainVisaAttachmentUrl.value = e?.bahrainVisa?.attachmentUrl;
@@ -309,6 +327,10 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _iqamaNotificationDaysController.dispose();
     _iqamaExpiryDate.dispose();
     _insuranceExpiryDate.dispose();
+    _bahrainResidenceNumberController.dispose();
+    _bahrainResidenceNotificationDaysController.dispose();
+    _bahrainResidenceExpiryDate.dispose();
+    _bahrainInsuranceExpiryDate.dispose();
     _passportNameController.dispose();
     _passportNumberController.dispose();
     _passportNotificationDaysController.dispose();
@@ -402,6 +424,15 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         );
       }
 
+      String? bahrainResidenceUrl = _bahrainResidenceAttachmentUrl.value;
+      if (_bahrainResidenceAttachment.value != null && mounted) {
+        bahrainResidenceUrl = await provider.uploadDocumentAttachment(
+          _bahrainResidenceAttachment.value!,
+          id,
+          'bahrain_residence',
+        );
+      }
+
       String? passportUrl = _passportAttachmentUrl.value;
       if (_passportAttachment.value != null && mounted) {
         passportUrl = await provider.uploadDocumentAttachment(
@@ -486,6 +517,21 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                     ) ??
                     30,
                 attachmentUrl: iqamaUrl,
+              )
+            : null,
+        bahrainResidence:
+            _bahrainResidenceNumberController.text.isNotEmpty &&
+                _bahrainResidenceExpiryDate.value != null
+            ? BahrainResidenceDocument(
+                number: _bahrainResidenceNumberController.text.trim(),
+                expiryDate: _bahrainResidenceExpiryDate.value!,
+                insuranceExpiryDate: _bahrainInsuranceExpiryDate.value,
+                notificationDays:
+                    int.tryParse(
+                      _bahrainResidenceNotificationDaysController.text.trim(),
+                    ) ??
+                    30,
+                attachmentUrl: bahrainResidenceUrl,
               )
             : null,
         passport:
@@ -1054,6 +1100,111 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           label: 'Iqama Scan / Copy',
                           pickedFileNotifier: _iqamaAttachment,
                           existingUrlNotifier: _iqamaAttachmentUrl,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Bahrain Residence Card
+                  Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ExpansionTile(
+                      title: const Text(
+                        'Bahrain Residence Details',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      leading: const Icon(Icons.badge, color: Colors.indigo),
+                      childrenPadding: const EdgeInsets.all(16),
+                      children: [
+                        _buildTextField(
+                          controller: _bahrainResidenceNumberController,
+                          label: 'Residence ID Number',
+                          icon: Icons.numbers,
+                          keyboardType: TextInputType.number,
+                        ),
+                        SizedBox(height: 16.h),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ValueListenableBuilder<DateTime?>(
+                                valueListenable: _bahrainResidenceExpiryDate,
+                                builder: (context, date, _) {
+                                  return CustomDatePicker(
+                                    label: 'ID Expiry',
+                                    date: date,
+                                    onTap: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate:
+                                            date ??
+                                            DateTime.now().add(
+                                              const Duration(days: 365),
+                                            ),
+                                        firstDate: DateTime.now().subtract(
+                                          const Duration(days: 365 * 5),
+                                        ),
+                                        lastDate: DateTime.now().add(
+                                          const Duration(days: 365 * 10),
+                                        ),
+                                      );
+                                      if (picked != null) {
+                                        _bahrainResidenceExpiryDate.value = picked;
+                                      }
+                                    },
+                                    onClear: () => _bahrainResidenceExpiryDate.value = null,
+                                  );
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: ValueListenableBuilder<DateTime?>(
+                                valueListenable: _bahrainInsuranceExpiryDate,
+                                builder: (context, date, _) {
+                                  return CustomDatePicker(
+                                    label: 'Health Ins. Expiry',
+                                    date: date,
+                                    onTap: () async {
+                                      final picked = await showDatePicker(
+                                        context: context,
+                                        initialDate:
+                                            date ??
+                                            DateTime.now().add(
+                                              const Duration(days: 365),
+                                            ),
+                                        firstDate: DateTime.now().subtract(
+                                          const Duration(days: 365 * 5),
+                                        ),
+                                        lastDate: DateTime.now().add(
+                                          const Duration(days: 365 * 10),
+                                        ),
+                                      );
+                                      if (picked != null) {
+                                        _bahrainInsuranceExpiryDate.value = picked;
+                                      }
+                                    },
+                                    onClear: () => _bahrainInsuranceExpiryDate.value = null,
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildTextField(
+                          controller: _bahrainResidenceNotificationDaysController,
+                          label: 'Alert Before (Days)',
+                          icon: Icons.notifications,
+                          keyboardType: TextInputType.number,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildAttachmentPicker(
+                          label: 'Residence ID Scan / Copy',
+                          pickedFileNotifier: _bahrainResidenceAttachment,
+                          existingUrlNotifier: _bahrainResidenceAttachmentUrl,
                         ),
                       ],
                     ),

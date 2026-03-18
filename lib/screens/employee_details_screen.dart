@@ -393,6 +393,19 @@ class EmployeeDetailsScreen extends StatelessWidget {
                 : null,
             notificationDays: employee.iqama!.notificationDays,
           ),
+        if (employee.bahrainResidence != null)
+          _buildDocumentCard(
+            context,
+            title: 'Bahrain Residence ID',
+            icon: Icons.badge,
+            number: employee.bahrainResidence!.number,
+            expiryDate: employee.bahrainResidence!.expiryDate,
+            attachmentUrl: employee.bahrainResidence!.attachmentUrl,
+            extraInfo: employee.bahrainResidence!.insuranceExpiryDate != null
+                ? 'Insurance Expiry: ${_formatDate(employee.bahrainResidence!.insuranceExpiryDate)}'
+                : null,
+            notificationDays: employee.bahrainResidence!.notificationDays,
+          ),
         if (employee.passport != null)
           _buildDocumentCard(
             context,
@@ -453,6 +466,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
 
   bool _hasNoDocuments() {
     return employee.iqama == null &&
+        employee.bahrainResidence == null &&
         employee.passport == null &&
         employee.drivingLicense == null &&
         employee.saudiVisa == null &&

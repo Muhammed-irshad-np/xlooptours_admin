@@ -25,6 +25,31 @@ class IqamaDocument extends Equatable {
   ];
 }
 
+class BahrainResidenceDocument extends Equatable {
+  final String number;
+  final DateTime expiryDate;
+  final DateTime? insuranceExpiryDate;
+  final String? attachmentUrl;
+  final int? notificationDays;
+
+  const BahrainResidenceDocument({
+    required this.number,
+    required this.expiryDate,
+    this.insuranceExpiryDate,
+    this.attachmentUrl,
+    this.notificationDays,
+  });
+
+  @override
+  List<Object?> get props => [
+    number,
+    expiryDate,
+    insuranceExpiryDate,
+    attachmentUrl,
+    notificationDays,
+  ];
+}
+
 enum DrivingLicenseType { private, heavy }
 
 class DrivingLicenseDocument extends Equatable {

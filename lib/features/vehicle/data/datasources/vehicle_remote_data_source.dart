@@ -21,6 +21,13 @@ abstract class VehicleRemoteDataSource {
   Future<void> insertVehicleMake(VehicleMakeModel make);
   Future<void> updateVehicleMake(VehicleMakeModel make);
   Future<void> deleteVehicleMake(String id);
+
+  /// Uploads a scanned document attachment to Firebase Storage.
+  Future<String> uploadDocumentAttachment(
+    XFile file,
+    String vehicleId,
+    String docType,
+  );
 }
 
 class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
@@ -104,12 +111,37 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
     final storageRef = storage
         .ref()
         .child('vehicle_images')
-        .child('\$vehicleId.jpg');
+        .child('$vehicleId.jpg');
 
     if (kIsWeb) {
       await storageRef.putData(await image.readAsBytes());
     } else {
       await storageRef.putFile(File(image.path));
+    }
+
+    return await storageRef.getDownloadURL();
+  }
+
+  @override
+  Future<String> uploadDocumentAttachment(
+    XFile file,
+    String vehicleId,
+    String docType,
+  ) async {
+    final ext = file.name.split('.').last.toLowerCase();
+    final storageRef = storage
+        .ref()
+        .child('vehicle_documents')
+        .child(vehicleId)
+        .child('$docType.$ext');
+
+    if (kIsWeb) {
+      await storageRef.putData(
+        await file.readAsBytes(),
+        SettableMetadata(contentType: 'application/octet-stream'),
+      );
+    } else {
+      await storageRef.putFile(File(file.path));
     }
 
     return await storageRef.getDownloadURL();

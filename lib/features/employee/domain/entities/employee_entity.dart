@@ -18,6 +18,7 @@ class EmployeeEntity extends Equatable {
   final String? imageUrl;
   final String? assignedVehicleId;
   final IqamaDocument? iqama;
+  final BahrainResidenceDocument? bahrainResidence;
   final DrivingLicenseDocument? drivingLicense;
   final PassportDocument? passport;
   final VisaDocument? saudiVisa;
@@ -45,6 +46,7 @@ class EmployeeEntity extends Equatable {
     this.imageUrl,
     this.assignedVehicleId,
     this.iqama,
+    this.bahrainResidence,
     this.drivingLicense,
     this.passport,
     this.saudiVisa,
@@ -73,6 +75,7 @@ class EmployeeEntity extends Equatable {
     String? imageUrl,
     String? assignedVehicleId,
     IqamaDocument? iqama,
+    BahrainResidenceDocument? bahrainResidence,
     DrivingLicenseDocument? drivingLicense,
     PassportDocument? passport,
     VisaDocument? saudiVisa,
@@ -100,6 +103,7 @@ class EmployeeEntity extends Equatable {
       imageUrl: imageUrl ?? this.imageUrl,
       assignedVehicleId: assignedVehicleId ?? this.assignedVehicleId,
       iqama: iqama ?? this.iqama,
+      bahrainResidence: bahrainResidence ?? this.bahrainResidence,
       drivingLicense: drivingLicense ?? this.drivingLicense,
       passport: passport ?? this.passport,
       saudiVisa: saudiVisa ?? this.saudiVisa,
@@ -131,6 +135,7 @@ class EmployeeEntity extends Equatable {
     imageUrl,
     assignedVehicleId,
     iqama,
+    bahrainResidence,
     drivingLicense,
     passport,
     saudiVisa,
