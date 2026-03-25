@@ -33,6 +33,7 @@ class ShareDialog extends StatelessWidget {
     _launchUrl(emailUrl);
   }
 
+  /*
   void _copyToClipboard(BuildContext context) {
     Clipboard.setData(ClipboardData(text: url));
     Navigator.pop(context);
@@ -43,6 +44,7 @@ class ShareDialog extends StatelessWidget {
       ),
     );
   }
+  */
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +99,7 @@ class ShareDialog extends StatelessWidget {
               onTap: _shareViaEmail,
               color: Colors.redAccent,
             ),
+            /*
             SizedBox(height: 12.h),
             _buildShareOption(
               context,
@@ -105,6 +108,7 @@ class ShareDialog extends StatelessWidget {
               onTap: () => _copyToClipboard(context),
               color: brandColor,
             ),
+            */
           ],
         ),
       ),
