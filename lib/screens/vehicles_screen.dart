@@ -3,6 +3,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:xloop_invoice/screens/vehicle_master_screen.dart'; // Added
+import 'package:xloop_invoice/screens/document_viewer_screen.dart';
+import 'package:xloop_invoice/core/utils/share_helper.dart';
 import 'package:provider/provider.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
@@ -493,18 +495,34 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
               ],
             ),
           ),
-          if (attachmentUrl != null)
+          if (attachmentUrl != null && attachmentUrl.isNotEmpty) ...[
+            IconButton(
+              icon: const Icon(Icons.share, color: Color(0xFF13b1f2)),
+              onPressed: () {
+                ShareHelper.shareDocument(
+                  context,
+                  url: attachmentUrl,
+                  title: label,
+                );
+              },
+              tooltip: 'Share Attachment',
+            ),
             IconButton(
               icon: const Icon(Icons.remove_red_eye_outlined, color: Colors.blue),
               onPressed: () {
-                // TODO: Implement viewing (similar to employee details if available)
-                // For now, we can just show a Snackbar or open URL if we had a service
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Viewing attachment: $attachmentUrl')),
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DocumentViewerScreen(
+                      attachmentUrl: attachmentUrl,
+                      title: label,
+                    ),
+                  ),
                 );
               },
               tooltip: 'View Attachment',
             ),
+          ],
         ],
       ),
     );

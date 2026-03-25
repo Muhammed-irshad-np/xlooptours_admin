@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'document_viewer_screen.dart';
+import 'package:xloop_invoice/core/utils/share_helper.dart';
 
 import '../features/employee/domain/entities/employee_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
@@ -586,6 +587,18 @@ class EmployeeDetailsScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    IconButton(
+                      icon: const Icon(Icons.share),
+                      color: const Color(0xFF13b1f2),
+                      tooltip: 'Share Document',
+                      onPressed: () {
+                        ShareHelper.shareDocument(
+                          context,
+                          url: attachmentUrl,
+                          title: title,
+                        );
+                      },
+                    ),
                     IconButton(
                       icon: const Icon(Icons.visibility),
                       color: Colors.blue,

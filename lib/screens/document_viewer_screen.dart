@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:xloop_invoice/core/utils/share_helper.dart';
 
 class DocumentViewerScreen extends StatefulWidget {
   final String attachmentUrl;
@@ -36,6 +37,17 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       appBar: AppBar(
         title: Text(widget.title),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.share),
+            onPressed: () {
+              ShareHelper.shareDocument(
+                context,
+                url: widget.attachmentUrl,
+                title: widget.title,
+              );
+            },
+            tooltip: 'Share',
+          ),
           IconButton(
             icon: const Icon(Icons.close),
             onPressed: () => Navigator.of(context).pop(),
