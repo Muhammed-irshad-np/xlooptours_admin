@@ -102,6 +102,25 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   final ValueNotifier<DateTime?> _fuelFilterDate = ValueNotifier(null);
   final _fuelFilterKmController = TextEditingController();
 
+  
+  // Maintenance Intervals
+  final _engineOilIntervalController = TextEditingController();
+  final _gearOilIntervalController = TextEditingController();
+  final _housingOilIntervalController = TextEditingController();
+  final _tyreChangeIntervalController = TextEditingController();
+  final _batteryChangeIntervalController = TextEditingController();
+  final _brakePadsIntervalController = TextEditingController();
+  final _airFilterIntervalController = TextEditingController();
+  final _acServiceIntervalController = TextEditingController();
+  final _wheelAlignmentIntervalController = TextEditingController();
+  final _sparkPlugsIntervalController = TextEditingController();
+  final _coolantFlushIntervalController = TextEditingController();
+  final _wiperBladesIntervalController = TextEditingController();
+  final _timingBeltIntervalController = TextEditingController();
+  final _transmissionFluidIntervalController = TextEditingController();
+  final _brakeFluidIntervalController = TextEditingController();
+  final _fuelFilterIntervalController = TextEditingController();
+
   // Vehicle Master Data
   final ValueNotifier<List<VehicleMakeEntity>> _allMakes = ValueNotifier([]);
   final ValueNotifier<List<VehicleModelDetailEntity>> _availableModels =
@@ -181,6 +200,23 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _brakeFluidKmController.dispose();
     _fuelFilterDate.dispose();
     _fuelFilterKmController.dispose();
+
+    _engineOilIntervalController.dispose();
+    _gearOilIntervalController.dispose();
+    _housingOilIntervalController.dispose();
+    _tyreChangeIntervalController.dispose();
+    _batteryChangeIntervalController.dispose();
+    _brakePadsIntervalController.dispose();
+    _airFilterIntervalController.dispose();
+    _acServiceIntervalController.dispose();
+    _wheelAlignmentIntervalController.dispose();
+    _sparkPlugsIntervalController.dispose();
+    _coolantFlushIntervalController.dispose();
+    _wiperBladesIntervalController.dispose();
+    _timingBeltIntervalController.dispose();
+    _transmissionFluidIntervalController.dispose();
+    _brakeFluidIntervalController.dispose();
+    _fuelFilterIntervalController.dispose();
 
     super.dispose();
   }
@@ -280,6 +316,27 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       _fuelFilterDate.value = m.fuelFilter?.date;
       _fuelFilterKmController.text = m.fuelFilter?.mileage.toString() ?? '';
     }
+
+    if (v.maintenanceIntervals != null) {
+      final i = v.maintenanceIntervals!;
+      _engineOilIntervalController.text = i['engineOil']?.toString() ?? '';
+      _gearOilIntervalController.text = i['gearOil']?.toString() ?? '';
+      _housingOilIntervalController.text = i['housingOil']?.toString() ?? '';
+      _tyreChangeIntervalController.text = i['tyreChange']?.toString() ?? '';
+      _batteryChangeIntervalController.text = i['batteryChange']?.toString() ?? '';
+      _brakePadsIntervalController.text = i['brakePads']?.toString() ?? '';
+      _airFilterIntervalController.text = i['airFilter']?.toString() ?? '';
+      _acServiceIntervalController.text = i['acService']?.toString() ?? '';
+      _wheelAlignmentIntervalController.text = i['wheelAlignment']?.toString() ?? '';
+      _sparkPlugsIntervalController.text = i['sparkPlugs']?.toString() ?? '';
+      _coolantFlushIntervalController.text = i['coolantFlush']?.toString() ?? '';
+      _wiperBladesIntervalController.text = i['wiperBlades']?.toString() ?? '';
+      _timingBeltIntervalController.text = i['timingBelt']?.toString() ?? '';
+      _transmissionFluidIntervalController.text = i['transmissionFluid']?.toString() ?? '';
+      _brakeFluidIntervalController.text = i['brakeFluid']?.toString() ?? '';
+      _fuelFilterIntervalController.text = i['fuelFilter']?.toString() ?? '';
+    }
+
 
     _vinNumberController.text = v.vinNumber ?? '';
     _engineNumberController.text = v.engineNumber ?? '';
@@ -576,7 +633,26 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
         department: _departmentController.text.isNotEmpty
             ? _departmentController.text
             : null,
-        status: _status.value,
+        
+        maintenanceIntervals: {
+          if (_engineOilIntervalController.text.isNotEmpty) 'engineOil': int.parse(_engineOilIntervalController.text),
+          if (_gearOilIntervalController.text.isNotEmpty) 'gearOil': int.parse(_gearOilIntervalController.text),
+          if (_housingOilIntervalController.text.isNotEmpty) 'housingOil': int.parse(_housingOilIntervalController.text),
+          if (_tyreChangeIntervalController.text.isNotEmpty) 'tyreChange': int.parse(_tyreChangeIntervalController.text),
+          if (_batteryChangeIntervalController.text.isNotEmpty) 'batteryChange': int.parse(_batteryChangeIntervalController.text),
+          if (_brakePadsIntervalController.text.isNotEmpty) 'brakePads': int.parse(_brakePadsIntervalController.text),
+          if (_airFilterIntervalController.text.isNotEmpty) 'airFilter': int.parse(_airFilterIntervalController.text),
+          if (_acServiceIntervalController.text.isNotEmpty) 'acService': int.parse(_acServiceIntervalController.text),
+          if (_wheelAlignmentIntervalController.text.isNotEmpty) 'wheelAlignment': int.parse(_wheelAlignmentIntervalController.text),
+          if (_sparkPlugsIntervalController.text.isNotEmpty) 'sparkPlugs': int.parse(_sparkPlugsIntervalController.text),
+          if (_coolantFlushIntervalController.text.isNotEmpty) 'coolantFlush': int.parse(_coolantFlushIntervalController.text),
+          if (_wiperBladesIntervalController.text.isNotEmpty) 'wiperBlades': int.parse(_wiperBladesIntervalController.text),
+          if (_timingBeltIntervalController.text.isNotEmpty) 'timingBelt': int.parse(_timingBeltIntervalController.text),
+          if (_transmissionFluidIntervalController.text.isNotEmpty) 'transmissionFluid': int.parse(_transmissionFluidIntervalController.text),
+          if (_brakeFluidIntervalController.text.isNotEmpty) 'brakeFluid': int.parse(_brakeFluidIntervalController.text),
+          if (_fuelFilterIntervalController.text.isNotEmpty) 'fuelFilter': int.parse(_fuelFilterIntervalController.text),
+        },
+status: _status.value,
       );
 
       debugPrint('VehicleFormScreen: Saving vehicle data to Firestore...');
@@ -883,6 +959,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                           'Engine Oil',
                           _engineOilChangeDate,
                           _engineOilChangeKmController,
+                          _engineOilIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         // Gear Oil
@@ -890,6 +967,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                           'Gear Oil',
                           _gearOilChangeDate,
                           _gearOilChangeKmController,
+                          _gearOilIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         // Housing Oil
@@ -897,6 +975,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                           'Housing (Diff) Oil',
                           _housingOilChangeDate,
                           _housingOilChangeKmController,
+                          _housingOilIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         // Tyre Change
@@ -904,6 +983,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                           'Tyre Change',
                           _tyreChangeDate,
                           _tyreChangeKmController,
+                          _tyreChangeIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         // Battery Change
@@ -911,72 +991,84 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                           'Battery Change',
                           _batteryChangeDate,
                           _batteryChangeKmController,
+                          _batteryChangeIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         _buildMaintenanceRow(
                           'Brake Pads',
                           _brakePadsDate,
                           _brakePadsKmController,
+                          _brakePadsIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         _buildMaintenanceRow(
                           'Air Filter',
                           _airFilterDate,
                           _airFilterKmController,
+                          _airFilterIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         _buildMaintenanceRow(
                           'AC Service',
                           _acServiceDate,
                           _acServiceKmController,
+                          _acServiceIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         _buildMaintenanceRow(
                           'Wheel Alignment',
                           _wheelAlignmentDate,
                           _wheelAlignmentKmController,
+                          _wheelAlignmentIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         _buildMaintenanceRow(
                           'Spark Plugs',
                           _sparkPlugsDate,
                           _sparkPlugsKmController,
+                          _sparkPlugsIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         _buildMaintenanceRow(
                           'Coolant Flush',
                           _coolantFlushDate,
                           _coolantFlushKmController,
+                          _coolantFlushIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         _buildMaintenanceRow(
                           'Wiper Blades',
                           _wiperBladesDate,
                           _wiperBladesKmController,
+                          _wiperBladesIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         _buildMaintenanceRow(
                           'Timing Belt',
                           _timingBeltDate,
                           _timingBeltKmController,
+                          _timingBeltIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         _buildMaintenanceRow(
                           'Transmission Fluid',
                           _transmissionFluidDate,
                           _transmissionFluidKmController,
+                          _transmissionFluidIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         _buildMaintenanceRow(
                           'Brake Fluid',
                           _brakeFluidDate,
                           _brakeFluidKmController,
+                          _brakeFluidIntervalController,
                         ),
                         SizedBox(height: 16.h),
                         _buildMaintenanceRow(
                           'Fuel Filter',
                           _fuelFilterDate,
                           _fuelFilterKmController,
+                          _fuelFilterIntervalController,
                         ),
 
                         SizedBox(height: 32.h),
@@ -1021,37 +1113,60 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     String label,
     ValueNotifier<DateTime?> dateNotifier,
     TextEditingController kmController,
+    TextEditingController intervalController,
   ) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          flex: 2,
-          child: ValueListenableBuilder<DateTime?>(
-            valueListenable: dateNotifier,
-            builder: (context, date, _) {
-              return CustomDatePicker(
-                label: '$label Date',
-                date: date,
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: date ?? DateTime.now(),
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2050),
-                  );
-                  if (picked != null) {
-                    dateNotifier.value = picked;
-                  }
-                },
-                onClear: () => dateNotifier.value = null,
-              );
-            },
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14.sp,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey[800],
           ),
         ),
-        SizedBox(width: 16.w),
-        Expanded(
-          flex: 1,
-          child: _buildTextField('$label KM', kmController, isNumber: true, required: false),
+        SizedBox(height: 8.h),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 4,
+              child: ValueListenableBuilder<DateTime?>(
+                valueListenable: dateNotifier,
+                builder: (context, date, _) {
+                  return CustomDatePicker(
+                    label: 'Last Date',
+                    date: date,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: date ?? DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2050),
+                      );
+                      if (picked != null) {
+                        dateNotifier.value = picked;
+                      }
+                    },
+                    onClear: () => dateNotifier.value = null,
+                  );
+                },
+              ),
+            ),
+            SizedBox(width: 8.w),
+            Expanded(
+              flex: 3,
+              child: _buildTextField('Last Service KM', kmController,
+                  isNumber: true, required: false),
+            ),
+            SizedBox(width: 8.w),
+            Expanded(
+              flex: 3,
+              child: _buildTextField('Interval KM', intervalController,
+                  isNumber: true, required: false),
+            ),
+          ],
         ),
       ],
     );

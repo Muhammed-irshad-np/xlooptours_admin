@@ -28,6 +28,8 @@ class VehicleEntity extends Equatable {
   final String? tireSize;
   final String? department;
   final String? status;
+  final Map<String, int>? maintenanceIntervals;
+  final List<MaintenanceRecord>? maintenanceHistory;
 
   const VehicleEntity({
     required this.id,
@@ -56,6 +58,8 @@ class VehicleEntity extends Equatable {
     this.tireSize,
     this.department,
     this.status,
+    this.maintenanceIntervals,
+    this.maintenanceHistory,
   });
 
   @override
@@ -86,6 +90,8 @@ class VehicleEntity extends Equatable {
         tireSize,
         department,
         status,
+        maintenanceIntervals,
+        maintenanceHistory,
       ];
 
   VehicleEntity copyWith({
@@ -115,6 +121,8 @@ class VehicleEntity extends Equatable {
     String? tireSize,
     String? department,
     String? status,
+    Map<String, int>? maintenanceIntervals,
+    List<MaintenanceRecord>? maintenanceHistory,
   }) {
     return VehicleEntity(
       id: id ?? this.id,
@@ -144,6 +152,8 @@ class VehicleEntity extends Equatable {
       tireSize: tireSize ?? this.tireSize,
       department: department ?? this.department,
       status: status ?? this.status,
+      maintenanceIntervals: maintenanceIntervals ?? this.maintenanceIntervals,
+      maintenanceHistory: maintenanceHistory ?? this.maintenanceHistory,
     );
   }
 }

@@ -29,6 +29,8 @@ class VehicleModel extends VehicleEntity {
     super.tireSize,
     super.department,
     super.status,
+    super.maintenanceIntervals,
+    super.maintenanceHistory,
   });
 
   Map<String, dynamic> toJson() {
@@ -61,6 +63,9 @@ class VehicleModel extends VehicleEntity {
       'tireSize': tireSize,
       'department': department,
       'status': status,
+      'maintenanceIntervals': maintenanceIntervals,
+      'maintenanceHistory':
+          maintenanceHistory?.map((e) => _recordToJson(e)).toList(),
     };
   }
 
@@ -170,6 +175,14 @@ class VehicleModel extends VehicleEntity {
       tireSize: json['tireSize'] as String?,
       department: json['department'] as String?,
       status: json['status'] as String?,
+      maintenanceIntervals: json['maintenanceIntervals'] != null
+          ? Map<String, int>.from(json['maintenanceIntervals'] as Map)
+          : null,
+      maintenanceHistory: json['maintenanceHistory'] != null
+          ? (json['maintenanceHistory'] as List)
+              .map((e) => _recordFromJson(e as Map<String, dynamic>))
+              .toList()
+          : null,
     );
   }
 
@@ -283,6 +296,8 @@ class VehicleModel extends VehicleEntity {
       tireSize: entity.tireSize,
       department: entity.department,
       status: entity.status,
+      maintenanceIntervals: entity.maintenanceIntervals,
+      maintenanceHistory: entity.maintenanceHistory,
     );
   }
 
@@ -314,6 +329,8 @@ class VehicleModel extends VehicleEntity {
     String? tireSize,
     String? department,
     String? status,
+    Map<String, int>? maintenanceIntervals,
+    List<MaintenanceRecord>? maintenanceHistory,
   }) {
     return VehicleModel(
       id: id ?? this.id,
@@ -343,6 +360,8 @@ class VehicleModel extends VehicleEntity {
       tireSize: tireSize ?? this.tireSize,
       department: department ?? this.department,
       status: status ?? this.status,
+      maintenanceIntervals: maintenanceIntervals ?? this.maintenanceIntervals,
+      maintenanceHistory: maintenanceHistory ?? this.maintenanceHistory,
     );
   }
 }
