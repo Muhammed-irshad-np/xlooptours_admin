@@ -3,12 +3,16 @@ import 'package:flutter/foundation.dart';
 import '../../domain/entities/notification_entity.dart';
 import '../../domain/usecases/notification_usecases.dart';
 import '../../../employee/domain/usecases/get_employee_expiry_alerts_usecase.dart';
+import '../../../vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
+import '../../../vehicle/presentation/providers/vehicle_provider.dart';
+import 'package:get_it/get_it.dart';
 
 class NotificationProvider extends ChangeNotifier {
   final GetNotifications _getNotifications;
   final InsertNotification _insertNotification;
   final MarkNotificationAsRead _markNotificationAsRead;
   final GetEmployeeExpiryAlertsUseCase _getEmployeeExpiryAlerts;
+  final GetVehicleMaintenanceAlertsUseCase _getVehicleMaintenanceAlerts;
 
   List<NotificationEntity> _notifications = [];
   bool _isLoading = false;
@@ -20,10 +24,12 @@ class NotificationProvider extends ChangeNotifier {
     required InsertNotification insertNotification,
     required MarkNotificationAsRead markNotificationAsRead,
     required GetEmployeeExpiryAlertsUseCase getEmployeeExpiryAlerts,
+    required GetVehicleMaintenanceAlertsUseCase getVehicleMaintenanceAlerts,
   }) : _getNotifications = getNotifications,
        _insertNotification = insertNotification,
        _markNotificationAsRead = markNotificationAsRead,
-       _getEmployeeExpiryAlerts = getEmployeeExpiryAlerts {
+       _getEmployeeExpiryAlerts = getEmployeeExpiryAlerts,
+       _getVehicleMaintenanceAlerts = getVehicleMaintenanceAlerts {
     _init();
   }
 
@@ -58,6 +64,21 @@ class NotificationProvider extends ChangeNotifier {
               .toList();
 
           _notifications.addAll(expiryNotifications);
+
+          // Add Vehicle Maintenance Alerts
+          final vehicleProvider = GetIt.instance<VehicleProvider>();
+          final maintenanceAlerts = _getVehicleMaintenanceAlerts(vehicleProvider.vehicles);
+          final maintenanceNotifications = maintenanceAlerts.map((alert) => NotificationEntity(
+                id: 'maintenance_${alert.vehicle.id}_${alert.category.replaceAll(' ', '_')}',
+                title: 'Maintenance Due: ${alert.category}',
+                message: '${alert.vehicle.make} ${alert.vehicle.model} (${alert.vehicle.plateNumber}) needs ${alert.category}. Current: ${alert.currentMileage}km, Due: ${alert.nextServiceMileage}km',
+                timestamp: DateTime.now(),
+                isRead: false,
+                type: NotificationType.expiry, // Reusing expiry type for now as it shows in Action Items
+                relatedId: alert.vehicle.id,
+              )).toList();
+          
+          _notifications.addAll(maintenanceNotifications);
           _notifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
         } catch (e) {
           debugPrint('Failed to fetch expiry alerts: $e');

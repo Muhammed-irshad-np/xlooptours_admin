@@ -65,6 +65,43 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   final ValueNotifier<String?> _isthimaraAttachmentUrl = ValueNotifier(null);
   final ValueNotifier<bool> _isUploadingIsthimara = ValueNotifier(false);
 
+  // New Vehicle Fields
+  final _vinNumberController = TextEditingController();
+  final _engineNumberController = TextEditingController();
+  final ValueNotifier<String?> _fuelType = ValueNotifier(null);
+  final ValueNotifier<String?> _transmission = ValueNotifier(null);
+  final ValueNotifier<DateTime?> _purchaseDate = ValueNotifier(null);
+  final _purchasePriceController = TextEditingController();
+  final _currentOdometerController = TextEditingController();
+  final _gvwrController = TextEditingController();
+  final _tireSizeController = TextEditingController();
+  final _departmentController = TextEditingController();
+  final ValueNotifier<String> _status = ValueNotifier('Active');
+
+  // New Maintenance Records
+  final ValueNotifier<DateTime?> _brakePadsDate = ValueNotifier(null);
+  final _brakePadsKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _airFilterDate = ValueNotifier(null);
+  final _airFilterKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _acServiceDate = ValueNotifier(null);
+  final _acServiceKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _wheelAlignmentDate = ValueNotifier(null);
+  final _wheelAlignmentKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _sparkPlugsDate = ValueNotifier(null);
+  final _sparkPlugsKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _coolantFlushDate = ValueNotifier(null);
+  final _coolantFlushKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _wiperBladesDate = ValueNotifier(null);
+  final _wiperBladesKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _timingBeltDate = ValueNotifier(null);
+  final _timingBeltKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _transmissionFluidDate = ValueNotifier(null);
+  final _transmissionFluidKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _brakeFluidDate = ValueNotifier(null);
+  final _brakeFluidKmController = TextEditingController();
+  final ValueNotifier<DateTime?> _fuelFilterDate = ValueNotifier(null);
+  final _fuelFilterKmController = TextEditingController();
+
   // Vehicle Master Data
   final ValueNotifier<List<VehicleMakeEntity>> _allMakes = ValueNotifier([]);
   final ValueNotifier<List<VehicleModelDetailEntity>> _availableModels =
@@ -109,6 +146,41 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _isthimaraAttachment.dispose();
     _isthimaraAttachmentUrl.dispose();
     _isUploadingIsthimara.dispose();
+
+    _vinNumberController.dispose();
+    _engineNumberController.dispose();
+    _fuelType.dispose();
+    _transmission.dispose();
+    _purchaseDate.dispose();
+    _purchasePriceController.dispose();
+    _currentOdometerController.dispose();
+    _gvwrController.dispose();
+    _tireSizeController.dispose();
+    _departmentController.dispose();
+    _status.dispose();
+
+    _brakePadsDate.dispose();
+    _brakePadsKmController.dispose();
+    _airFilterDate.dispose();
+    _airFilterKmController.dispose();
+    _acServiceDate.dispose();
+    _acServiceKmController.dispose();
+    _wheelAlignmentDate.dispose();
+    _wheelAlignmentKmController.dispose();
+    _sparkPlugsDate.dispose();
+    _sparkPlugsKmController.dispose();
+    _coolantFlushDate.dispose();
+    _coolantFlushKmController.dispose();
+    _wiperBladesDate.dispose();
+    _wiperBladesKmController.dispose();
+    _timingBeltDate.dispose();
+    _timingBeltKmController.dispose();
+    _transmissionFluidDate.dispose();
+    _transmissionFluidKmController.dispose();
+    _brakeFluidDate.dispose();
+    _brakeFluidKmController.dispose();
+    _fuelFilterDate.dispose();
+    _fuelFilterKmController.dispose();
 
     super.dispose();
   }
@@ -182,7 +254,44 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       _batteryChangeKmController.text = m.batteryChange?.mileage.toString() ?? '';
       _engineOilChangeDate.value = m.engineOil?.date;
       _engineOilChangeKmController.text = m.engineOil?.mileage.toString() ?? '';
+
+      _brakePadsDate.value = m.brakePads?.date;
+      _brakePadsKmController.text = m.brakePads?.mileage.toString() ?? '';
+      _airFilterDate.value = m.airFilter?.date;
+      _airFilterKmController.text = m.airFilter?.mileage.toString() ?? '';
+      _acServiceDate.value = m.acService?.date;
+      _acServiceKmController.text = m.acService?.mileage.toString() ?? '';
+      _wheelAlignmentDate.value = m.wheelAlignment?.date;
+      _wheelAlignmentKmController.text =
+          m.wheelAlignment?.mileage.toString() ?? '';
+      _sparkPlugsDate.value = m.sparkPlugs?.date;
+      _sparkPlugsKmController.text = m.sparkPlugs?.mileage.toString() ?? '';
+      _coolantFlushDate.value = m.coolantFlush?.date;
+      _coolantFlushKmController.text = m.coolantFlush?.mileage.toString() ?? '';
+      _wiperBladesDate.value = m.wiperBlades?.date;
+      _wiperBladesKmController.text = m.wiperBlades?.mileage.toString() ?? '';
+      _timingBeltDate.value = m.timingBelt?.date;
+      _timingBeltKmController.text = m.timingBelt?.mileage.toString() ?? '';
+      _transmissionFluidDate.value = m.transmissionFluid?.date;
+      _transmissionFluidKmController.text =
+          m.transmissionFluid?.mileage.toString() ?? '';
+      _brakeFluidDate.value = m.brakeFluid?.date;
+      _brakeFluidKmController.text = m.brakeFluid?.mileage.toString() ?? '';
+      _fuelFilterDate.value = m.fuelFilter?.date;
+      _fuelFilterKmController.text = m.fuelFilter?.mileage.toString() ?? '';
     }
+
+    _vinNumberController.text = v.vinNumber ?? '';
+    _engineNumberController.text = v.engineNumber ?? '';
+    _fuelType.value = v.fuelType;
+    _transmission.value = v.transmission;
+    _purchaseDate.value = v.purchaseDate;
+    _purchasePriceController.text = v.purchasePrice?.toString() ?? '';
+    _currentOdometerController.text = v.currentOdometer?.toString() ?? '';
+    _gvwrController.text = v.gvwr?.toString() ?? '';
+    _tireSizeController.text = v.tireSize ?? '';
+    _departmentController.text = v.department ?? '';
+    _status.value = v.status ?? 'Active';
 
     // Trigger updates to available lists based on initial make
     _updateAvailableOptions(_selectedMake.value);
@@ -346,38 +455,128 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
               ? MaintenanceRecord(
                   date: _engineOilChangeDate.value!,
                   mileage: int.tryParse(_engineOilChangeKmController.text) ?? 0,
-                  attachmentUrl: widget.vehicle?.maintenance?.engineOil?.attachmentUrl,
+                  attachmentUrl:
+                      widget.vehicle?.maintenance?.engineOil?.attachmentUrl,
                 )
               : null,
           gearOil: _gearOilChangeDate.value != null
               ? MaintenanceRecord(
                   date: _gearOilChangeDate.value!,
                   mileage: int.tryParse(_gearOilChangeKmController.text) ?? 0,
-                  attachmentUrl: widget.vehicle?.maintenance?.gearOil?.attachmentUrl,
+                  attachmentUrl:
+                      widget.vehicle?.maintenance?.gearOil?.attachmentUrl,
                 )
               : null,
           housingOil: _housingOilChangeDate.value != null
               ? MaintenanceRecord(
                   date: _housingOilChangeDate.value!,
                   mileage: int.tryParse(_housingOilChangeKmController.text) ?? 0,
-                  attachmentUrl: widget.vehicle?.maintenance?.housingOil?.attachmentUrl,
+                  attachmentUrl:
+                      widget.vehicle?.maintenance?.housingOil?.attachmentUrl,
                 )
               : null,
           tyreChange: _tyreChangeDate.value != null
               ? MaintenanceRecord(
                   date: _tyreChangeDate.value!,
                   mileage: int.tryParse(_tyreChangeKmController.text) ?? 0,
-                  attachmentUrl: widget.vehicle?.maintenance?.tyreChange?.attachmentUrl,
+                  attachmentUrl:
+                      widget.vehicle?.maintenance?.tyreChange?.attachmentUrl,
                 )
               : null,
           batteryChange: _batteryChangeDate.value != null
               ? MaintenanceRecord(
                   date: _batteryChangeDate.value!,
                   mileage: int.tryParse(_batteryChangeKmController.text) ?? 0,
-                  attachmentUrl: widget.vehicle?.maintenance?.batteryChange?.attachmentUrl,
+                  attachmentUrl:
+                      widget.vehicle?.maintenance?.batteryChange?.attachmentUrl,
+                )
+              : null,
+          brakePads: _brakePadsDate.value != null
+              ? MaintenanceRecord(
+                  date: _brakePadsDate.value!,
+                  mileage: int.tryParse(_brakePadsKmController.text) ?? 0,
+                )
+              : null,
+          airFilter: _airFilterDate.value != null
+              ? MaintenanceRecord(
+                  date: _airFilterDate.value!,
+                  mileage: int.tryParse(_airFilterKmController.text) ?? 0,
+                )
+              : null,
+          acService: _acServiceDate.value != null
+              ? MaintenanceRecord(
+                  date: _acServiceDate.value!,
+                  mileage: int.tryParse(_acServiceKmController.text) ?? 0,
+                )
+              : null,
+          wheelAlignment: _wheelAlignmentDate.value != null
+              ? MaintenanceRecord(
+                  date: _wheelAlignmentDate.value!,
+                  mileage: int.tryParse(_wheelAlignmentKmController.text) ?? 0,
+                )
+              : null,
+          sparkPlugs: _sparkPlugsDate.value != null
+              ? MaintenanceRecord(
+                  date: _sparkPlugsDate.value!,
+                  mileage: int.tryParse(_sparkPlugsKmController.text) ?? 0,
+                )
+              : null,
+          coolantFlush: _coolantFlushDate.value != null
+              ? MaintenanceRecord(
+                  date: _coolantFlushDate.value!,
+                  mileage: int.tryParse(_coolantFlushKmController.text) ?? 0,
+                )
+              : null,
+          wiperBlades: _wiperBladesDate.value != null
+              ? MaintenanceRecord(
+                  date: _wiperBladesDate.value!,
+                  mileage: int.tryParse(_wiperBladesKmController.text) ?? 0,
+                )
+              : null,
+          timingBelt: _timingBeltDate.value != null
+              ? MaintenanceRecord(
+                  date: _timingBeltDate.value!,
+                  mileage: int.tryParse(_timingBeltKmController.text) ?? 0,
+                )
+              : null,
+          transmissionFluid: _transmissionFluidDate.value != null
+              ? MaintenanceRecord(
+                  date: _transmissionFluidDate.value!,
+                  mileage:
+                      int.tryParse(_transmissionFluidKmController.text) ?? 0,
+                )
+              : null,
+          brakeFluid: _brakeFluidDate.value != null
+              ? MaintenanceRecord(
+                  date: _brakeFluidDate.value!,
+                  mileage: int.tryParse(_brakeFluidKmController.text) ?? 0,
+                )
+              : null,
+          fuelFilter: _fuelFilterDate.value != null
+              ? MaintenanceRecord(
+                  date: _fuelFilterDate.value!,
+                  mileage: int.tryParse(_fuelFilterKmController.text) ?? 0,
                 )
               : null,
         ),
+        vinNumber: _vinNumberController.text.isNotEmpty
+            ? _vinNumberController.text
+            : null,
+        engineNumber: _engineNumberController.text.isNotEmpty
+            ? _engineNumberController.text
+            : null,
+        fuelType: _fuelType.value,
+        transmission: _transmission.value,
+        purchaseDate: _purchaseDate.value,
+        purchasePrice: double.tryParse(_purchasePriceController.text),
+        currentOdometer: int.tryParse(_currentOdometerController.text),
+        gvwr: _gvwrController.text.isNotEmpty ? _gvwrController.text : null,
+        tireSize:
+            _tireSizeController.text.isNotEmpty ? _tireSizeController.text : null,
+        department: _departmentController.text.isNotEmpty
+            ? _departmentController.text
+            : null,
+        status: _status.value,
       );
 
       debugPrint('VehicleFormScreen: Saving vehicle data to Firestore...');
@@ -507,7 +706,97 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                           ],
                         ),
                         SizedBox(height: 16.h),
-                        _buildDriverDropdown(),
+                        Row(
+                          children: [
+                            Expanded(child: _buildDriverDropdown()),
+                            SizedBox(width: 16.w),
+                            Expanded(child: _buildStatusDropdown()),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildTextField('Department', _departmentController,
+                            required: false),
+
+                        SizedBox(height: 32.h),
+                        _buildSectionHeader('Vehicle Specifications'),
+                        SizedBox(height: 16.h),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField('VIN Number', _vinNumberController,
+                                  required: false),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: _buildTextField(
+                                  'Engine Number', _engineNumberController,
+                                  required: false),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                        Row(
+                          children: [
+                            Expanded(child: _buildFuelTypeDropdown()),
+                            SizedBox(width: 16.w),
+                            Expanded(child: _buildTransmissionDropdown()),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField('GVWR', _gvwrController,
+                                  required: false),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: _buildTextField('Tire Size', _tireSizeController,
+                                  required: false),
+                            ),
+                          ],
+                        ),
+
+                        SizedBox(height: 32.h),
+                        _buildSectionHeader('Purchase Information'),
+                        SizedBox(height: 16.h),
+                        ValueListenableBuilder<DateTime?>(
+                          valueListenable: _purchaseDate,
+                          builder: (context, date, _) {
+                            return CustomDatePicker(
+                              label: 'Purchase Date',
+                              date: date,
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: date ?? DateTime.now(),
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime.now(),
+                                );
+                                if (picked != null) {
+                                  _purchaseDate.value = picked;
+                                }
+                              },
+                              onClear: () => _purchaseDate.value = null,
+                            );
+                          },
+                        ),
+                        SizedBox(height: 16.h),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                  'Purchase Price', _purchasePriceController,
+                                  isNumber: true, required: false),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: _buildTextField(
+                                  'Current Odometer', _currentOdometerController,
+                                  isNumber: true, required: false),
+                            ),
+                          ],
+                        ),
 
                         SizedBox(height: 32.h),
                         _buildSectionHeader('Documents (Expiry Dates)'),
@@ -622,6 +911,72 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                           'Battery Change',
                           _batteryChangeDate,
                           _batteryChangeKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildMaintenanceRow(
+                          'Brake Pads',
+                          _brakePadsDate,
+                          _brakePadsKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildMaintenanceRow(
+                          'Air Filter',
+                          _airFilterDate,
+                          _airFilterKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildMaintenanceRow(
+                          'AC Service',
+                          _acServiceDate,
+                          _acServiceKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildMaintenanceRow(
+                          'Wheel Alignment',
+                          _wheelAlignmentDate,
+                          _wheelAlignmentKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildMaintenanceRow(
+                          'Spark Plugs',
+                          _sparkPlugsDate,
+                          _sparkPlugsKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildMaintenanceRow(
+                          'Coolant Flush',
+                          _coolantFlushDate,
+                          _coolantFlushKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildMaintenanceRow(
+                          'Wiper Blades',
+                          _wiperBladesDate,
+                          _wiperBladesKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildMaintenanceRow(
+                          'Timing Belt',
+                          _timingBeltDate,
+                          _timingBeltKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildMaintenanceRow(
+                          'Transmission Fluid',
+                          _transmissionFluidDate,
+                          _transmissionFluidKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildMaintenanceRow(
+                          'Brake Fluid',
+                          _brakeFluidDate,
+                          _brakeFluidKmController,
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildMaintenanceRow(
+                          'Fuel Filter',
+                          _fuelFilterDate,
+                          _fuelFilterKmController,
                         ),
 
                         SizedBox(height: 32.h),
@@ -1088,7 +1443,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       animation: Listenable.merge([_assignedEmployeeId, _employees]),
       builder: (context, _) {
         return DropdownButtonFormField<String>(
-          initialValue: _assignedEmployeeId.value,
+          value: _assignedEmployeeId.value,
           decoration: InputDecoration(
             labelText: 'Assigned Employee',
             border: OutlineInputBorder(
@@ -1131,6 +1486,67 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           onChanged: (value) {
             _assignedEmployeeId.value = value;
           },
+        );
+      },
+    );
+  }
+
+  Widget _buildFuelTypeDropdown() {
+    return ValueListenableBuilder<String?>(
+      valueListenable: _fuelType,
+      builder: (context, val, _) {
+        return DropdownButtonFormField<String>(
+          value: val,
+          decoration: InputDecoration(
+            labelText: 'Fuel Type',
+            border:
+                OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+          ),
+          items: ['Petrol', 'Diesel', 'Electric', 'Hybrid', 'LPG', 'CNG']
+              .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+              .toList(),
+          onChanged: (v) => _fuelType.value = v,
+        );
+      },
+    );
+  }
+
+  Widget _buildTransmissionDropdown() {
+    return ValueListenableBuilder<String?>(
+      valueListenable: _transmission,
+      builder: (context, val, _) {
+        return DropdownButtonFormField<String>(
+          value: val,
+          decoration: InputDecoration(
+            labelText: 'Transmission',
+            border:
+                OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+          ),
+          items: ['Manual', 'Automatic']
+              .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+              .toList(),
+          onChanged: (v) => _transmission.value = v,
+        );
+      },
+    );
+  }
+
+  Widget _buildStatusDropdown() {
+    return ValueListenableBuilder<String>(
+      valueListenable: _status,
+      builder: (context, val, _) {
+        return DropdownButtonFormField<String>(
+          value: val,
+          decoration: InputDecoration(
+            labelText: 'Status',
+            border:
+                OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+          ),
+          items: ['Active', 'In-Shop', 'Out-of-Service', 'Retired']
+              .map((status) =>
+                  DropdownMenuItem(value: status, child: Text(status)))
+              .toList(),
+          onChanged: (v) => _status.value = v ?? 'Active',
         );
       },
     );

@@ -9,7 +9,10 @@ import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../features/customer/presentation/providers/customer_provider.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../features/notifications/domain/entities/notification_entity.dart';
+import '../features/vehicle/domain/usecases/get_vehicles_needing_odo_update_usecase.dart';
+import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../widgets/responsive_layout.dart';
+import '../injection_container.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -22,7 +25,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    // Fetch initial data if necessary, though providers usually handle their own streams.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<EmployeeProvider>().fetchAllEmployees();
+        context.read<VehicleProvider>().fetchAllVehicles();
+        context.read<CustomerProvider>().fetchAllCustomers();
+      }
+    });
   }
 
   @override
@@ -55,14 +64,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   _buildExpiriesSection(),
                   SizedBox(height: 32.h),
                   _buildRecentActivitySection(),
+                  SizedBox(height: 32.h),
+                  _buildOdometerUpdateSection(),
                 ],
               ),
               desktop: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(flex: 3, child: _buildExpiriesSection()),
+                  Expanded(
+                    flex: 3,
+                    child: Column(
+                      children: [
+                        _buildExpiriesSection(),
+                        SizedBox(height: 32.h),
+                        _buildRecentActivitySection(),
+                      ],
+                    ),
+                  ),
                   SizedBox(width: 32.w),
-                  Expanded(flex: 2, child: _buildRecentActivitySection()),
+                  Expanded(flex: 2, child: _buildOdometerUpdateSection()),
                 ],
               ),
             ),
@@ -431,6 +451,133 @@ class _DashboardScreenState extends State<DashboardScreen> {
       trailing: Text(
         timeago.format(activity.timestamp),
         style: GoogleFonts.inter(fontSize: 12.sp, color: Colors.grey[400]),
+      ),
+    );
+  }
+
+  Widget _buildOdometerUpdateSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader('Weekly Odometer Updates', Icons.speed),
+        SizedBox(height: 16.h),
+        Consumer<VehicleProvider>(
+          builder: (context, provider, child) {
+            final useCase = sl<GetVehiclesNeedingOdometerUpdateUseCase>();
+            final vehiclesNeedingUpdate = useCase(provider.vehicles);
+
+            if (vehiclesNeedingUpdate.isEmpty) {
+              return _buildEmptyState(
+                'All vehicle odometers up to date',
+                Icons.check_circle_outline,
+                Colors.green,
+              );
+            }
+
+            return ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: vehiclesNeedingUpdate.length,
+              separatorBuilder: (_, __) => SizedBox(height: 12.h),
+              itemBuilder: (context, index) {
+                final vehicle = vehiclesNeedingUpdate[index];
+                return _buildOdometerUpdateCard(vehicle);
+              },
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildOdometerUpdateCard(VehicleEntity vehicle) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.orange[50],
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: Colors.orange.withOpacity(0.2)),
+      ),
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 8.h),
+        leading: Container(
+          padding: EdgeInsets.all(12.w),
+          decoration: BoxDecoration(
+            color: Colors.orange.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(Icons.speed, color: Colors.orange, size: 24.sp),
+        ),
+        title: Text(
+          'Update Odometer',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.bold,
+            fontSize: 16.sp,
+            color: Colors.orange[900],
+          ),
+        ),
+        subtitle: Padding(
+          padding: EdgeInsets.only(top: 4.h),
+          child: Text(
+            '${vehicle.make} ${vehicle.model} (${vehicle.plateNumber})\nLast updated: ${vehicle.lastOdometerUpdateDate != null ? timeago.format(vehicle.lastOdometerUpdateDate!) : "Never"}',
+            style: GoogleFonts.inter(fontSize: 14.sp, color: Colors.orange[800]),
+          ),
+        ),
+        trailing: ElevatedButton(
+          onPressed: () => _showOdometerUpdateDialog(vehicle),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.orange[700],
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+          ),
+          child: const Text('Capture'),
+        ),
+      ),
+    );
+  }
+
+  void _showOdometerUpdateDialog(VehicleEntity vehicle) {
+    final controller = TextEditingController(text: vehicle.currentOdometer?.toString() ?? '');
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Update Odometer: ${vehicle.plateNumber}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Enter current mileage for ${vehicle.make} ${vehicle.model}'),
+            SizedBox(height: 16.h),
+            TextField(
+              controller: controller,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: 'Current Odometer (km)',
+                border: OutlineInputBorder(),
+                suffixText: 'km',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final newMileage = int.tryParse(controller.text);
+              if (newMileage != null) {
+                context.read<VehicleProvider>().updateVehicleOdometer(vehicle.id, newMileage);
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Odometer updated successfully')),
+                );
+              }
+            },
+            child: const Text('Update'),
+          ),
+        ],
       ),
     );
   }

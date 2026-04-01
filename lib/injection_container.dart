@@ -46,6 +46,8 @@ import 'features/vehicle/domain/usecases/update_vehicle_make_usecase.dart';
 import 'features/vehicle/domain/usecases/update_vehicle_usecase.dart';
 import 'features/vehicle/domain/usecases/upload_vehicle_document_usecase.dart';
 import 'features/vehicle/domain/usecases/upload_vehicle_image_usecase.dart';
+import 'features/vehicle/domain/usecases/get_vehicles_needing_odo_update_usecase.dart';
+import 'features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
 import 'features/vehicle/presentation/providers/vehicle_provider.dart';
 
 import 'features/company/data/datasources/company_remote_data_source.dart';
@@ -121,6 +123,7 @@ Future<void> init() async {
       insertNotification: sl(),
       markNotificationAsRead: sl(),
       getEmployeeExpiryAlerts: sl(),
+      getVehicleMaintenanceAlerts: sl(),
     ),
   );
 
@@ -255,6 +258,8 @@ Future<void> init() async {
   sl.registerLazySingleton(() => AssignDriverToVehicleUseCase(sl()));
   sl.registerLazySingleton(() => UploadVehicleImageUseCase(sl()));
   sl.registerLazySingleton(() => UploadVehicleDocumentUseCase(sl()));
+  sl.registerLazySingleton(() => GetVehiclesNeedingOdometerUpdateUseCase());
+  sl.registerLazySingleton(() => GetVehicleMaintenanceAlertsUseCase());
 
   sl.registerLazySingleton(() => GetAllVehicleMakesUseCase(sl()));
   sl.registerLazySingleton(() => InsertVehicleMakeUseCase(sl()));

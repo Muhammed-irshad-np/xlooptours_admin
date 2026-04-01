@@ -351,11 +351,76 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                         vehicle.plateNumber,
                         Icons.confirmation_number,
                       ),
-                      _buildDetailRow('Type', vehicle.type, Icons.category),
                       _buildDetailRow(
                         'Assigned Employee',
                         driver != null ? driver.fullName : 'Not Assigned',
                         Icons.person,
+                      ),
+                      _buildDetailRow('Status', vehicle.status ?? 'Active',
+                          Icons.info_outline),
+                      _buildDetailRow('Department', vehicle.department ?? 'N/A',
+                          Icons.business_outlined),
+                      const Divider(height: 32),
+                      _buildSectionHeader('Vehicle Specifications'),
+                      _buildDetailRow('VIN Number', vehicle.vinNumber ?? 'N/A',
+                          Icons.fingerprint),
+                      _buildDetailRow('Engine Number',
+                          vehicle.engineNumber ?? 'N/A', Icons.engineering),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDetailRow('Fuel Type',
+                                vehicle.fuelType ?? 'N/A', Icons.local_gas_station),
+                          ),
+                          Expanded(
+                            child: _buildDetailRow('Transmission',
+                                vehicle.transmission ?? 'N/A', Icons.settings_input_component),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDetailRow('GVWR', vehicle.gvwr ?? 'N/A',
+                                Icons.monitor_weight),
+                          ),
+                          Expanded(
+                            child: _buildDetailRow('Tire Size',
+                                vehicle.tireSize ?? 'N/A', Icons.tire_repair),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 32),
+                      _buildSectionHeader('Purchase Information'),
+                      _buildDetailRow(
+                        'Purchase Date',
+                        vehicle.purchaseDate != null
+                            ? DateFormat('yyyy-MM-dd')
+                                .format(vehicle.purchaseDate!)
+                            : 'N/A',
+                        Icons.shopping_bag_outlined,
+                      ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDetailRow(
+                              'Purchase Price',
+                              vehicle.purchasePrice != null
+                                  ? vehicle.purchasePrice!.toStringAsFixed(2)
+                                  : 'N/A',
+                              Icons.money,
+                            ),
+                          ),
+                          Expanded(
+                            child: _buildDetailRow(
+                              'Current Odometer',
+                              vehicle.currentOdometer != null
+                                  ? '${vehicle.currentOdometer} KM'
+                                  : 'N/A',
+                              Icons.speed,
+                            ),
+                          ),
+                        ],
                       ),
                       const Divider(height: 32),
                       _buildSectionHeader('Documents'),
@@ -410,6 +475,61 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                           'Battery Change',
                           vehicle.maintenance!.batteryChange,
                           Icons.battery_charging_full,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Brake Pads',
+                          vehicle.maintenance!.brakePads,
+                          Icons.settings_backup_restore,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Air Filter',
+                          vehicle.maintenance!.airFilter,
+                          Icons.air,
+                        ),
+                        _buildMaintenanceDetail(
+                          'AC Service',
+                          vehicle.maintenance!.acService,
+                          Icons.ac_unit,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Wheel Alignment',
+                          vehicle.maintenance!.wheelAlignment,
+                          Icons.align_horizontal_center,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Spark Plugs',
+                          vehicle.maintenance!.sparkPlugs,
+                          Icons.electric_bolt,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Coolant Flush',
+                          vehicle.maintenance!.coolantFlush,
+                          Icons.water_drop,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Wiper Blades',
+                          vehicle.maintenance!.wiperBlades,
+                          Icons.cleaning_services,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Timing Belt',
+                          vehicle.maintenance!.timingBelt,
+                          Icons.conveyor_belt,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Transmission Fluid',
+                          vehicle.maintenance!.transmissionFluid,
+                          Icons.opacity,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Brake Fluid',
+                          vehicle.maintenance!.brakeFluid,
+                          Icons.invert_colors,
+                        ),
+                        _buildMaintenanceDetail(
+                          'Fuel Filter',
+                          vehicle.maintenance!.fuelFilter,
+                          Icons.filter_alt,
                         ),
                       ] else
                         Padding(

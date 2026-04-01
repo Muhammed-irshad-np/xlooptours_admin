@@ -96,6 +96,26 @@ class VehicleProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> updateVehicleOdometer(String vehicleId, int newMileage) async {
+    _setLoading(true);
+    try {
+      final vehicleIndex = _vehicles.indexWhere((v) => v.id == vehicleId);
+      if (vehicleIndex != -1) {
+        final updatedVehicle = _vehicles[vehicleIndex].copyWith(
+          currentOdometer: newMileage,
+          lastOdometerUpdateDate: DateTime.now(),
+        );
+        await updateVehicleUseCase(updatedVehicle);
+        await fetchAllVehicles();
+      }
+    } catch (e) {
+      _errorMessage = 'Failed to update odometer: \$e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
+    }
+  }
+
   Future<void> deleteVehicle(String id) async {
     _setLoading(true);
     try {
