@@ -31,4 +31,24 @@ class NotificationEntity extends Equatable {
     type,
     relatedId,
   ];
+
+  NotificationEntity copyWith({
+    String? id,
+    String? title,
+    String? message,
+    DateTime? timestamp,
+    bool? isRead,
+    NotificationType? type,
+    String? relatedId,
+  }) {
+    return NotificationEntity(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      message: message ?? this.message,
+      timestamp: timestamp ?? this.timestamp,
+      isRead: isRead ?? this.isRead,
+      type: type ?? this.type,
+      relatedId: relatedId ?? this.relatedId,
+    );
+  }
 }

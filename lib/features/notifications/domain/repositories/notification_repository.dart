@@ -10,4 +10,5 @@ abstract class NotificationRepository {
   );
 
   Future<Either<Failure, void>> markAsRead(String id);
+  Future<Either<Failure, void>> markAllAsRead();
 }

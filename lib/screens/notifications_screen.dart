@@ -27,6 +27,27 @@ class NotificationsScreen extends StatelessWidget {
         elevation: 0,
         centerTitle: false,
         iconTheme: IconThemeData(color: Colors.indigo[900]),
+        actions: [
+          Consumer<NotificationProvider>(
+            builder: (context, provider, child) {
+              final unreadCount = provider.notifications.where((n) => !n.isRead).length;
+              if (unreadCount == 0) return const SizedBox.shrink();
+              
+              return TextButton.icon(
+                onPressed: () => provider.markAllAsRead(),
+                icon: const Icon(Icons.done_all, color: Colors.indigo),
+                label: Text(
+                  'Mark all as read',
+                  style: GoogleFonts.inter(
+                    color: Colors.indigo,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              );
+            },
+          ),
+          SizedBox(width: 8.w),
+        ],
       ),
       body: Consumer<NotificationProvider>(
         builder: (context, provider, child) {

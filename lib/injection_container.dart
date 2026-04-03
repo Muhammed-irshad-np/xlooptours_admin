@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'features/auth/data/datasources/auth_remote_data_source.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
@@ -17,6 +18,7 @@ import 'features/notifications/data/datasources/notification_remote_data_source.
 import 'features/notifications/data/repositories/notification_repository_impl.dart';
 import 'features/notifications/domain/repositories/notification_repository.dart';
 import 'features/notifications/domain/usecases/notification_usecases.dart';
+import 'features/notifications/domain/usecases/mark_all_notifications_as_read.dart';
 import 'features/notifications/presentation/providers/notification_provider.dart';
 
 import 'features/employee/domain/usecases/get_employee_expiry_alerts_usecase.dart';
@@ -126,8 +128,10 @@ Future<void> init() async {
       getNotifications: sl(),
       insertNotification: sl(),
       markNotificationAsRead: sl(),
+      markAllNotificationsAsRead: sl(),
       getEmployeeExpiryAlerts: sl(),
       getVehicleMaintenanceAlerts: sl(),
+      sharedPreferences: sl(),
     ),
   );
 
@@ -135,6 +139,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetNotifications(sl()));
   sl.registerLazySingleton(() => InsertNotification(sl()));
   sl.registerLazySingleton(() => MarkNotificationAsRead(sl()));
+  sl.registerLazySingleton(() => MarkAllNotificationsAsRead(sl()));
 
   // Repositories
   sl.registerLazySingleton<NotificationRepository>(
@@ -333,9 +338,11 @@ Future<void> init() async {
   final firestore = FirebaseFirestore.instance;
   final googleSignIn = GoogleSignIn();
   final storage = FirebaseStorage.instance;
+  final sharedPreferences = await SharedPreferences.getInstance();
 
   sl.registerLazySingleton(() => auth);
   sl.registerLazySingleton(() => firestore);
   sl.registerLazySingleton(() => googleSignIn);
   sl.registerLazySingleton(() => storage);
+  sl.registerLazySingleton(() => sharedPreferences);
 }
