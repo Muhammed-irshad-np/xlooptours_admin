@@ -9,6 +9,7 @@ import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
 
@@ -51,6 +52,11 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
 
       if (mounted) {
         _driversMap.value = driversMap;
+        // Refresh alerts whenever data changes
+        context.read<NotificationProvider>().refreshAlerts(
+          vehicles: context.read<VehicleProvider>().vehicles,
+          maintenanceTypes: context.read<VehicleProvider>().maintenanceTypes,
+        );
       }
     } catch (e) {
       debugPrint('Error loading vehicles: \$e');
@@ -229,6 +235,20 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                   driver != null ? driver.fullName : 'No Employee Assigned',
                   style: TextStyle(
                     color: driver != null ? Colors.black87 : Colors.orange,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 4.h),
+            Row(
+              children: [
+                Icon(Icons.speed, size: 14.sp, color: Colors.blueGrey),
+                SizedBox(width: 4.w),
+                Text(
+                  'Odometer: ${vehicle.currentOdometer ?? 0} KM',
+                  style: TextStyle(
+                    color: Colors.black87,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

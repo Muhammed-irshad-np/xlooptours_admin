@@ -4,8 +4,8 @@ import '../../domain/entities/notification_entity.dart';
 import '../../domain/usecases/notification_usecases.dart';
 import '../../../employee/domain/usecases/get_employee_expiry_alerts_usecase.dart';
 import '../../../vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
-import '../../../vehicle/presentation/providers/vehicle_provider.dart';
-import 'package:get_it/get_it.dart';
+import '../../../vehicle/domain/entities/vehicle_entity.dart';
+import '../../../vehicle/domain/entities/maintenance_type_entity.dart';
 
 class NotificationProvider extends ChangeNotifier {
   final GetNotifications _getNotifications;
@@ -14,6 +14,8 @@ class NotificationProvider extends ChangeNotifier {
   final GetEmployeeExpiryAlertsUseCase _getEmployeeExpiryAlerts;
   final GetVehicleMaintenanceAlertsUseCase _getVehicleMaintenanceAlerts;
 
+  List<NotificationEntity> _dbNotifications = [];
+  List<NotificationEntity> _computedNotifications = [];
   List<NotificationEntity> _notifications = [];
   bool _isLoading = false;
   String? _errorMessage;
@@ -42,57 +44,9 @@ class NotificationProvider extends ChangeNotifier {
   void _init() {
     _setLoading(true);
     _subscription = _getNotifications().listen(
-      (data) async {
-        _notifications = List.from(data);
-
-        try {
-          final expiryAlerts = await _getEmployeeExpiryAlerts();
-          final expiryNotifications = expiryAlerts
-              .map(
-                (alert) => NotificationEntity(
-                  id: 'expiry_${alert.employeeId}_${alert.documentType.replaceAll(' ', '_')}',
-                  title: '${alert.documentType} Expiring Soon',
-                  message:
-                      '${alert.employeeName}\'s ${alert.documentType} is expiring on ${alert.expiryDate.toLocal().toString().split(' ')[0]} (${alert.daysUntilExpiry} days left).',
-                  timestamp:
-                      DateTime.now(), // Use current time or a fixed time so it sorts properly, or maybe alert.expiryDate? Let's use current time so it shows at the top.
-                  isRead: false,
-                  type: NotificationType.expiry,
-                  relatedId: alert.employeeId,
-                ),
-              )
-              .toList();
-
-          _notifications.addAll(expiryNotifications);
-
-          // Add Vehicle Maintenance Alerts
-          final vehicleProvider = GetIt.instance<VehicleProvider>();
-          final maintenanceAlerts = _getVehicleMaintenanceAlerts(
-            vehicles: vehicleProvider.vehicles,
-            maintenanceTypes: vehicleProvider.maintenanceTypes,
-          );
-          final maintenanceNotifications = maintenanceAlerts
-              .map(
-                (alert) => NotificationEntity(
-                  id: 'maintenance_${alert.vehicle.id}_${alert.category.replaceAll(' ', '_')}',
-                  title: 'Maintenance Due: ${alert.category}',
-                  message:
-                      '${alert.vehicle.make} ${alert.vehicle.model} (${alert.vehicle.plateNumber}) needs ${alert.category}. Current: ${alert.currentMileage}km, Due: ${alert.nextServiceMileage}km',
-                  timestamp: DateTime.now(),
-                  isRead: false,
-                  type: NotificationType
-                      .expiry, // Reusing expiry type for now as it shows in Action Items
-                  relatedId: alert.vehicle.id,
-                ),
-              )
-              .toList();
-
-          _notifications.addAll(maintenanceNotifications);
-          _notifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-        } catch (e) {
-          debugPrint('Failed to fetch expiry alerts: $e');
-        }
-
+      (data) {
+        _dbNotifications = List.from(data);
+        _combineAndSort();
         _errorMessage = null;
         _setLoading(false);
       },
@@ -101,6 +55,82 @@ class NotificationProvider extends ChangeNotifier {
         _setLoading(false);
       },
     );
+  }
+
+  void _combineAndSort() {
+    _notifications = [..._dbNotifications, ..._computedNotifications];
+    _notifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    notifyListeners();
+  }
+
+  /// Re-computes employee expiry + vehicle maintenance alerts and merges them
+  /// into the notification list. Call this after vehicle/employee data loads.
+  Future<void> refreshAlerts({
+    required List<VehicleEntity> vehicles,
+    required List<MaintenanceTypeEntity> maintenanceTypes,
+  }) async {
+    // Clear previous computed alerts
+    _computedNotifications.clear();
+    await _appendComputedAlerts(
+      vehicles: vehicles,
+      maintenanceTypes: maintenanceTypes,
+    );
+    _combineAndSort();
+  }
+
+  Future<void> _appendComputedAlerts({
+    required List<VehicleEntity> vehicles,
+    required List<MaintenanceTypeEntity> maintenanceTypes,
+  }) async {
+    try {
+      // ── Employee expiry alerts ──────────────────────────────────────────────
+      final expiryAlerts = await _getEmployeeExpiryAlerts();
+      final expiryNotifications = expiryAlerts
+          .map(
+            (alert) => NotificationEntity(
+              id: 'expiry_${alert.employeeId}_${alert.documentType.replaceAll(' ', '_')}',
+              title: '${alert.documentType} Expiring Soon',
+              message:
+                  '${alert.employeeName}\'s ${alert.documentType} is expiring on '
+                  '${alert.expiryDate.toLocal().toString().split(' ')[0]} '
+                  '(${alert.daysUntilExpiry} days left).',
+              timestamp: DateTime.now(),
+              isRead: false,
+              type: NotificationType.expiry,
+              relatedId: alert.employeeId,
+            ),
+          )
+          .toList();
+
+      _computedNotifications.addAll(expiryNotifications);
+
+      // ── Vehicle maintenance alerts ──────────────────────────────────────────
+      final maintenanceAlerts = _getVehicleMaintenanceAlerts(
+        vehicles: vehicles,
+        maintenanceTypes: maintenanceTypes,
+      );
+      final maintenanceNotifications = maintenanceAlerts
+          .map(
+            (alert) => NotificationEntity(
+              id: 'maintenance_${alert.vehicle.id}_${alert.category.replaceAll(' ', '_')}',
+              title: '⚠️ ${alert.category} Overdue',
+              message:
+                  '${alert.vehicle.make} ${alert.vehicle.model} '
+                  '(${alert.vehicle.plateNumber}): last serviced at '
+                  '${alert.lastServiceMileage} km, due at ${alert.nextServiceMileage} km — '
+                  '${alert.kmOverdue} km overdue (current: ${alert.currentMileage} km)',
+              timestamp: DateTime.now(),
+              isRead: false,
+              type: NotificationType.expiry, // shows in Action Items section
+              relatedId: alert.vehicle.id,
+            ),
+          )
+          .toList();
+
+      _computedNotifications.addAll(maintenanceNotifications);
+    } catch (e) {
+      debugPrint('Failed to compute alerts: $e');
+    }
   }
 
   @override

@@ -25,19 +25,19 @@ class _DT {
   static const bgCardDark = Color(0xFF1E2235);
 
   // Brand
-  static const brand = Color(0xFF4F46E5);      // indigo-600
-  static const brandDark = Color(0xFF312E81);   // indigo-900
+  static const brand = Color(0xFF4F46E5); // indigo-600
+  static const brandDark = Color(0xFF312E81); // indigo-900
 
   // Semantic
-  static const danger = Color(0xFFDC2626);      // red-600
+  static const danger = Color(0xFFDC2626); // red-600
   static const dangerBg = Color(0xFFFFF1F2);
   static const dangerBorder = Color(0xFFFFCDD2);
 
-  static const warning = Color(0xFFD97706);     // amber-600
+  static const warning = Color(0xFFD97706); // amber-600
   static const warningBg = Color(0xFFFFFBEB);
   static const warningBorder = Color(0xFFFDE68A);
 
-  static const success = Color(0xFF16A34A);     // green-600
+  static const success = Color(0xFF16A34A); // green-600
   static const successBg = Color(0xFFF0FDF4);
 
   // Text
@@ -91,11 +91,22 @@ class _DashboardScreenState extends State<DashboardScreen>
     _fadeIn = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      final vehicleProvider = context.read<VehicleProvider>();
+      // Fetch vehicles + maintenance types (needed for interval config) together,
+      // then refresh alerts so NotificationProvider has all data it needs.
       context.read<EmployeeProvider>().fetchAllEmployees();
-      context.read<VehicleProvider>().fetchAllVehicles();
       context.read<CustomerProvider>().fetchAllCustomers();
+      await Future.wait([
+        vehicleProvider.fetchAllVehicles(),
+        vehicleProvider.fetchAllMaintenanceTypes(),
+      ]);
+      if (!mounted) return;
+      await context.read<NotificationProvider>().refreshAlerts(
+        vehicles: vehicleProvider.vehicles,
+        maintenanceTypes: vehicleProvider.maintenanceTypes,
+      );
     });
   }
 
@@ -177,7 +188,11 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
               borderRadius: BorderRadius.circular(10.r),
             ),
-            child: Icon(Icons.dashboard_rounded, color: Colors.white, size: 20.sp),
+            child: Icon(
+              Icons.dashboard_rounded,
+              color: Colors.white,
+              size: 20.sp,
+            ),
           ),
           SizedBox(width: 12.w),
           Text(
@@ -308,27 +323,37 @@ class _DashboardScreenState extends State<DashboardScreen>
             return ResponsiveLayout(
               mobile: Column(
                 children: stats
-                    .map((s) => Padding(
-                          padding: EdgeInsets.only(bottom: 16.h),
-                          child: _StatCard(data: s),
-                        ))
+                    .map(
+                      (s) => Padding(
+                        padding: EdgeInsets.only(bottom: 16.h),
+                        child: _StatCard(data: s),
+                      ),
+                    )
                     .toList(),
               ),
               tablet: Wrap(
                 spacing: 16.w,
                 runSpacing: 16.h,
                 children: stats
-                    .map((s) => SizedBox(width: 240.w, child: _StatCard(data: s)))
+                    .map(
+                      (s) => SizedBox(
+                        width: 240.w,
+                        child: _StatCard(data: s),
+                      ),
+                    )
                     .toList(),
               ),
               desktop: Row(
-                children: stats
-                    .expand((s) => [
-                          Expanded(child: _StatCard(data: s)),
-                          SizedBox(width: 20.w),
-                        ])
-                    .toList()
-                  ..removeLast(),
+                children:
+                    stats
+                        .expand(
+                          (s) => [
+                            Expanded(child: _StatCard(data: s)),
+                            SizedBox(width: 20.w),
+                          ],
+                        )
+                        .toList()
+                      ..removeLast(),
               ),
             );
           },
@@ -342,36 +367,46 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel(
-          label: 'Action Items / Expiries',
-          icon: Icons.warning_amber_rounded,
-          iconColor: _DT.danger,
-        ),
-        SizedBox(height: 16.h),
         Consumer<NotificationProvider>(
           builder: (context, provider, _) {
             final expiries = provider.notifications
                 .where((n) => n.type == NotificationType.expiry)
                 .toList();
 
-            if (expiries.isEmpty) {
-              return _DashboardEmptyState(
-                message: 'All clear — no urgent action items',
-                icon: Icons.check_circle_outline_rounded,
-                color: _DT.success,
-              );
-            }
-
-            return ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: expiries.length > 5 ? 5 : expiries.length,
-              separatorBuilder: (_, __) => SizedBox(height: 12.h),
-              itemBuilder: (context, i) => _ExpiryCard(
-                alert: expiries[i],
-                onUpdate: () =>
-                    UpdateDialogHelper.showUpdateDialog(context, expiries[i]),
-              ),
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionLabel(
+                  label: 'Action Items / Expiries',
+                  icon: Icons.warning_amber_rounded,
+                  iconColor: _DT.danger,
+                  count: expiries.length,
+                ),
+                SizedBox(height: 16.h),
+                if (expiries.isEmpty)
+                  _DashboardEmptyState(
+                    message: 'All clear — no urgent action items',
+                    icon: Icons.check_circle_outline_rounded,
+                    color: _DT.success,
+                  )
+                else
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: 500.h),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      physics: const ClampingScrollPhysics(),
+                      itemCount: expiries.length,
+                      separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                      itemBuilder: (context, i) => _ExpiryCard(
+                        alert: expiries[i],
+                        onUpdate: () => UpdateDialogHelper.showUpdateDialog(
+                          context,
+                          expiries[i],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
         ),
@@ -384,40 +419,47 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel(
-          label: 'Recent Activity',
-          icon: Icons.history_rounded,
-          iconColor: _DT.brand,
-        ),
-        SizedBox(height: 16.h),
         Consumer<NotificationProvider>(
           builder: (context, provider, _) {
             final activities = provider.notifications
                 .where((n) => n.type != NotificationType.expiry)
                 .toList();
 
-            if (activities.isEmpty) {
-              return const _DashboardEmptyState(
-                message: 'No recent activity yet',
-                icon: Icons.hourglass_empty_rounded,
-                color: _DT.textMuted,
-              );
-            }
-
-            final items = activities.length > 5 ? activities.sublist(0, 5) : activities;
-
-            return _DashboardCard(
-              child: ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: items.length,
-                separatorBuilder: (_, __) => Container(
-                  height: 1.h,
-                  margin: EdgeInsets.symmetric(horizontal: 20.w),
-                  color: _DT.borderLight,
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _SectionLabel(
+                  label: 'Recent Activity',
+                  icon: Icons.history_rounded,
+                  iconColor: _DT.brand,
+                  count: activities.length,
                 ),
-                itemBuilder: (context, i) => _ActivityTile(activity: items[i]),
-              ),
+                SizedBox(height: 16.h),
+                if (activities.isEmpty)
+                  const _DashboardEmptyState(
+                    message: 'No recent activity yet',
+                    icon: Icons.hourglass_empty_rounded,
+                    color: _DT.textMuted,
+                  )
+                else
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: 500.h),
+                    child: _DashboardCard(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const ClampingScrollPhysics(),
+                        itemCount: activities.length,
+                        separatorBuilder: (_, __) => Container(
+                          height: 1.h,
+                          margin: EdgeInsets.symmetric(horizontal: 20.w),
+                          color: _DT.borderLight,
+                        ),
+                        itemBuilder: (context, i) =>
+                            _ActivityTile(activity: activities[i]),
+                      ),
+                    ),
+                  ),
+              ],
             );
           },
         ),
@@ -482,7 +524,8 @@ class _DashboardScreenState extends State<DashboardScreen>
             SnackBar(
               behavior: SnackBarBehavior.floating,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.r)),
+                borderRadius: BorderRadius.circular(12.r),
+              ),
               backgroundColor: _DT.success,
               content: Text(
                 'Odometer updated successfully',
@@ -526,7 +569,13 @@ class _SectionLabel extends StatelessWidget {
   final String label;
   final IconData? icon;
   final Color? iconColor;
-  const _SectionLabel({required this.label, this.icon, this.iconColor});
+  final int? count;
+  const _SectionLabel({
+    required this.label,
+    this.icon,
+    this.iconColor,
+    this.count,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -545,6 +594,27 @@ class _SectionLabel extends StatelessWidget {
             letterSpacing: -0.2,
           ),
         ),
+        if (count != null && count! > 0) ...[
+          SizedBox(width: 8.w),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+            decoration: BoxDecoration(
+              color: (iconColor ?? _DT.brand).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12.r),
+              border: Border.all(
+                color: (iconColor ?? _DT.brand).withOpacity(0.3),
+              ),
+            ),
+            child: Text(
+              count.toString(),
+              style: GoogleFonts.inter(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w700,
+                color: iconColor ?? _DT.brand,
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -625,8 +695,18 @@ class _DateLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = DateTime.now();
     final months = [
-      'Jan','Feb','Mar','Apr','May','Jun',
-      'Jul','Aug','Sep','Oct','Nov','Dec',
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     return Text(
       '${now.day} ${months[now.month - 1]} ${now.year}',
@@ -968,7 +1048,24 @@ class _OdometerCardState extends State<_OdometerCard> {
                     Row(
                       children: [
                         _Tag(label: v.plateNumber, color: _DT.warning),
-                        SizedBox(width: 6.w),
+                        SizedBox(width: 8.w),
+                        Icon(
+                          Icons.speed,
+                          size: 12.sp,
+                          color: _DT.textSecondary,
+                        ),
+                        SizedBox(width: 4.w),
+                        Text(
+                          '${v.currentOdometer ?? 0} KM',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                            color: _DT.textPrimary,
+                          ),
+                        ),
+                        SizedBox(width: 8.w),
+                        Container(width: 1, height: 12.h, color: _DT.border),
+                        SizedBox(width: 8.w),
                         Text(
                           'Last: $lastUpdated',
                           style: GoogleFonts.inter(
@@ -1113,7 +1210,11 @@ class _OdometerDialog extends StatelessWidget {
                     color: _DT.warning.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10.r),
                   ),
-                  child: Icon(Icons.speed_rounded, color: _DT.warning, size: 22.sp),
+                  child: Icon(
+                    Icons.speed_rounded,
+                    color: _DT.warning,
+                    size: 22.sp,
+                  ),
                 ),
                 SizedBox(width: 14.w),
                 Expanded(
@@ -1172,8 +1273,10 @@ class _OdometerDialog extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12.r),
                   borderSide: const BorderSide(color: _DT.brand, width: 2),
                 ),
-                contentPadding:
-                    EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 16.w,
+                  vertical: 14.h,
+                ),
               ),
             ),
             SizedBox(height: 24.h),
@@ -1201,7 +1304,9 @@ class _OdometerDialog extends StatelessWidget {
                     foregroundColor: Colors.white,
                     elevation: 0,
                     padding: EdgeInsets.symmetric(
-                        horizontal: 24.w, vertical: 14.h),
+                      horizontal: 24.w,
+                      vertical: 14.h,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12.r),
                     ),

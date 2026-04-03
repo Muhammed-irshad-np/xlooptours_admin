@@ -81,23 +81,38 @@ class _AddMaintenanceRecordDialogState
           (t) => t.id == entry.maintenanceTypeId,
         );
 
-        return MaintenanceRecord(
-          date: DateTime.now(),
-          mileage: int.tryParse(entry.serviceKmController.text) ?? 0,
-          cost: double.tryParse(entry.costController.text),
-          serviceProvider: '', // Could be added if needed
-          notes: entry.notesController.text,
-          serviceType: type.name, // Using name since serviceType is String
+        return (
+          typeId: entry.maintenanceTypeId!,
+          record: MaintenanceRecord(
+            date: DateTime.now(),
+            mileage: int.tryParse(entry.serviceKmController.text) ?? 0,
+            cost: double.tryParse(entry.costController.text),
+            serviceProvider: '',
+            notes: entry.notesController.text,
+            serviceType: type.name,
+          ),
         );
       }).toList();
 
-      List<MaintenanceRecord> updatedHistory = List.from(
+      // Append to flat history list
+      final List<MaintenanceRecord> updatedHistory = List.from(
         widget.vehicle.maintenanceHistory ?? [],
       );
-      updatedHistory.addAll(recordsToAdd);
+      for (final e in recordsToAdd) {
+        updatedHistory.add(e.record);
+      }
+
+      // Also update the typed VehicleMaintenance fields so the alert checker
+      // (GetVehicleMaintenanceAlertsUseCase) can find the latest service record.
+      final existing = widget.vehicle.maintenance ?? const VehicleMaintenance();
+      VehicleMaintenance updatedMaintenance = existing;
+      for (final e in recordsToAdd) {
+        updatedMaintenance = _applyTypedRecord(updatedMaintenance, e.typeId, e.record);
+      }
 
       final updatedVehicle = widget.vehicle.copyWith(
         maintenanceHistory: updatedHistory,
+        maintenance: updatedMaintenance,
       );
 
       await provider.updateVehicle(updatedVehicle);
@@ -122,6 +137,178 @@ class _AddMaintenanceRecordDialogState
           _isSaving = false;
         });
       }
+    }
+  }
+
+  /// Maps a [typeId] to the correct named field on [VehicleMaintenance].
+  VehicleMaintenance _applyTypedRecord(
+    VehicleMaintenance m,
+    String typeId,
+    MaintenanceRecord record,
+  ) {
+    switch (typeId) {
+      case 'engine_oil':
+        return VehicleMaintenance(
+          engineOil: record, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'gear_oil':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: record, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'housing_oil':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: record,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'tyre_change':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: record, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'battery_change':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: record,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'brake_pads':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: record, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'air_filter':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: record, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'ac_service':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: record,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'wheel_alignment':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: record, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'spark_plugs':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: record,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'coolant_flush':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: record, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'wiper_blades':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: record,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'timing_belt':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: record, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'transmission_fluid':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: record,
+          brakeFluid: m.brakeFluid, fuelFilter: m.fuelFilter,
+        );
+      case 'brake_fluid':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: record, fuelFilter: m.fuelFilter,
+        );
+      case 'fuel_filter':
+        return VehicleMaintenance(
+          engineOil: m.engineOil, gearOil: m.gearOil, housingOil: m.housingOil,
+          tyreChange: m.tyreChange, batteryChange: m.batteryChange,
+          brakePads: m.brakePads, airFilter: m.airFilter, acService: m.acService,
+          wheelAlignment: m.wheelAlignment, sparkPlugs: m.sparkPlugs,
+          coolantFlush: m.coolantFlush, wiperBlades: m.wiperBlades,
+          timingBelt: m.timingBelt, transmissionFluid: m.transmissionFluid,
+          brakeFluid: m.brakeFluid, fuelFilter: record,
+        );
+      default:
+        return m; // Unknown type — leave unchanged
     }
   }
 

@@ -160,6 +160,11 @@ class UpdateDialogHelper {
                     await employeeProvider.updateEmployee(updatedEmployee);
                     if (context.mounted) {
                       await context.read<NotificationProvider>().markAsRead(notification.id);
+                      final vehicleProvider = context.read<VehicleProvider>();
+                      await context.read<NotificationProvider>().refreshAlerts(
+                        vehicles: vehicleProvider.vehicles,
+                        maintenanceTypes: vehicleProvider.maintenanceTypes,
+                      );
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Updated successfully')),
@@ -194,7 +199,9 @@ class UpdateDialogHelper {
 
     DateTime? selectedDate = DateTime.now();
     final mileageController = TextEditingController();
-    
+    final costController = TextEditingController();
+    final notesController = TextEditingController();
+
     // Suggest current odometer if available
     if (vehicle.currentOdometer != null) {
       mileageController.text = vehicle.currentOdometer.toString();
@@ -236,6 +243,24 @@ class UpdateDialogHelper {
                     ),
                     keyboardType: TextInputType.number,
                   ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: costController,
+                    decoration: const InputDecoration(
+                      labelText: 'Cost (Optional)',
+                      prefixText: '\$ ',
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: notesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Notes',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
                 ],
               ),
               actions: [
@@ -262,6 +287,9 @@ class UpdateDialogHelper {
                     final newRecord = MaintenanceRecord(
                       date: selectedDate!,
                       mileage: newMileage,
+                      cost: double.tryParse(costController.text),
+                      notes: notesController.text,
+                      serviceType: category,
                     );
 
                     final currentMaintenance = vehicle.maintenance ?? const VehicleMaintenance();
@@ -292,15 +320,26 @@ class UpdateDialogHelper {
                       updatedOdometer = newMileage;
                     }
 
+                    final updatedHistory = List<MaintenanceRecord>.from(vehicle.maintenanceHistory ?? []);
+                    updatedHistory.add(newRecord);
+
                     final updatedVehicle = vehicle.copyWith(
                       maintenance: updatedMaintenance,
                       currentOdometer: updatedOdometer,
-                      lastOdometerUpdateDate: newMileage > (vehicle.currentOdometer ?? 0) ? DateTime.now() : vehicle.lastOdometerUpdateDate,
+                      lastOdometerUpdateDate:
+                          newMileage > (vehicle.currentOdometer ?? 0)
+                              ? DateTime.now()
+                              : vehicle.lastOdometerUpdateDate,
+                      maintenanceHistory: updatedHistory,
                     );
 
                     await vehicleProvider.updateVehicle(updatedVehicle);
                     if (context.mounted) {
                       await context.read<NotificationProvider>().markAsRead(notification.id);
+                      await context.read<NotificationProvider>().refreshAlerts(
+                        vehicles: vehicleProvider.vehicles,
+                        maintenanceTypes: vehicleProvider.maintenanceTypes,
+                      );
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Updated successfully')),

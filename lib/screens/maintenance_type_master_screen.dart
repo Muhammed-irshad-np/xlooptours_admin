@@ -126,7 +126,7 @@ class _MaintenanceTypeMasterScreenState
                     ),
                   ),
                   subtitle: Text(
-                    'Interval: \${type.defaultIntervalKm} KM',
+                    'Interval: ${type.defaultIntervalKm} KM',
                     style: TextStyle(color: Colors.grey[600], fontSize: 14.sp),
                   ),
                   trailing: Row(

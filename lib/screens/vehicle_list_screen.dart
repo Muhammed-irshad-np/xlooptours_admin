@@ -203,6 +203,24 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                                 ),
                               ],
                             ),
+                            SizedBox(height: 4.h),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.speed,
+                                  size: 14.sp,
+                                  color: Colors.blueGrey,
+                                ),
+                                SizedBox(width: 4.w),
+                                Text(
+                                  'Odometer: ${vehicle.currentOdometer ?? 0} KM',
+                                  style: TextStyle(
+                                    color: Colors.black87,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ],
                         ),
                         trailing: Row(
