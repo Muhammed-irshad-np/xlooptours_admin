@@ -37,10 +37,7 @@ void main() {
           attachmentUrl: 'http://example.com/oil.pdf',
           notificationDays: 10,
         ),
-        gearOil: MaintenanceRecord(
-          date: mDate,
-          mileage: 40000,
-        ),
+        gearOil: MaintenanceRecord(date: mDate, mileage: 40000),
       ),
     );
 
@@ -95,7 +92,10 @@ void main() {
       // assert
       expect(result.id, tVehicleModel.id);
       expect(result.insurance?.expiryDate, tVehicleModel.insurance?.expiryDate);
-      expect(result.maintenance?.engineOil?.mileage, tVehicleModel.maintenance?.engineOil?.mileage);
+      expect(
+        result.maintenance?.engineOil?.mileage,
+        tVehicleModel.maintenance?.engineOil?.mileage,
+      );
     });
 
     test('should return a JSON map containing proper data', () {

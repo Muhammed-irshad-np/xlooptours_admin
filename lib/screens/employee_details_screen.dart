@@ -10,6 +10,8 @@ import 'package:xloop_invoice/core/utils/share_helper.dart';
 import '../features/employee/domain/entities/employee_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
+import '../core/widgets/modern_app_bar.dart';
+import '../core/widgets/modern_tab_bar.dart';
 
 class EmployeeDetailsScreen extends StatelessWidget {
   final EmployeeEntity employee;
@@ -39,14 +41,13 @@ class EmployeeDetailsScreen extends StatelessWidget {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Employee Details'),
-          elevation: 0,
-          bottom: const TabBar(
+        appBar: const ModernAppBar(
+          title: 'Employee Details',
+          bottom: ModernTabBar(
             tabs: [
-              Tab(text: 'Personal', icon: Icon(Icons.person)),
-              Tab(text: 'Documents & IDs', icon: Icon(Icons.folder_shared)),
-              Tab(text: 'Others', icon: Icon(Icons.more_horiz)),
+              Tab(text: 'Personal'),
+              Tab(text: 'Documents & IDs'),
+              Tab(text: 'Others'),
             ],
           ),
         ),

@@ -3,6 +3,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../domain/entities/vehicle_entity.dart';
 import '../../domain/entities/vehicle_make_entity.dart';
+import '../../domain/entities/maintenance_type_entity.dart';
+import '../../domain/entities/vehicle_documents.dart';
 import '../../domain/usecases/assign_driver_to_vehicle_usecase.dart';
 import '../../domain/usecases/delete_vehicle_make_usecase.dart';
 import '../../domain/usecases/delete_vehicle_usecase.dart';
@@ -14,6 +16,10 @@ import '../../domain/usecases/update_vehicle_make_usecase.dart';
 import '../../domain/usecases/update_vehicle_usecase.dart';
 import '../../domain/usecases/upload_vehicle_document_usecase.dart';
 import '../../domain/usecases/upload_vehicle_image_usecase.dart';
+import '../../domain/usecases/get_all_maintenance_types_usecase.dart';
+import '../../domain/usecases/insert_maintenance_type_usecase.dart';
+import '../../domain/usecases/update_maintenance_type_usecase.dart';
+import '../../domain/usecases/delete_maintenance_type_usecase.dart';
 
 class VehicleProvider extends ChangeNotifier {
   final GetAllVehiclesUseCase getAllVehiclesUseCase;
@@ -29,8 +35,14 @@ class VehicleProvider extends ChangeNotifier {
   final UpdateVehicleMakeUseCase updateVehicleMakeUseCase;
   final DeleteVehicleMakeUseCase deleteVehicleMakeUseCase;
 
+  final GetAllMaintenanceTypesUseCase getAllMaintenanceTypesUseCase;
+  final InsertMaintenanceTypeUseCase insertMaintenanceTypeUseCase;
+  final UpdateMaintenanceTypeUseCase updateMaintenanceTypeUseCase;
+  final DeleteMaintenanceTypeUseCase deleteMaintenanceTypeUseCase;
+
   List<VehicleEntity> _vehicles = [];
   List<VehicleMakeEntity> _vehicleMakes = [];
+  List<MaintenanceTypeEntity> _maintenanceTypes = [];
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -46,10 +58,15 @@ class VehicleProvider extends ChangeNotifier {
     required this.insertVehicleMakeUseCase,
     required this.updateVehicleMakeUseCase,
     required this.deleteVehicleMakeUseCase,
+    required this.getAllMaintenanceTypesUseCase,
+    required this.insertMaintenanceTypeUseCase,
+    required this.updateMaintenanceTypeUseCase,
+    required this.deleteMaintenanceTypeUseCase,
   });
 
   List<VehicleEntity> get vehicles => _vehicles;
   List<VehicleMakeEntity> get vehicleMakes => _vehicleMakes;
+  List<MaintenanceTypeEntity> get maintenanceTypes => _maintenanceTypes;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -122,7 +139,32 @@ class VehicleProvider extends ChangeNotifier {
       await deleteVehicleUseCase(id);
       await fetchAllVehicles();
     } catch (e) {
-      _errorMessage = 'Failed to delete vehicle: \$e';
+      _errorMessage = 'Failed to delete vehicle: $e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteMaintenanceRecord(
+    VehicleEntity vehicle,
+    MaintenanceRecord record,
+  ) async {
+    _setLoading(true);
+    try {
+      final List<MaintenanceRecord> updatedHistory = List.from(
+        vehicle.maintenanceHistory ?? [],
+      );
+      updatedHistory.remove(record);
+
+      final updatedVehicle = vehicle.copyWith(
+        maintenanceHistory: updatedHistory,
+      );
+
+      await updateVehicleUseCase(updatedVehicle);
+      await fetchAllVehicles();
+    } catch (e) {
+      _errorMessage = 'Failed to delete maintenance record: $e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;
@@ -157,7 +199,10 @@ class VehicleProvider extends ChangeNotifier {
   }
 
   Future<String> uploadVehicleDocument(
-      XFile file, String vehicleId, String docType) async {
+    XFile file,
+    String vehicleId,
+    String docType,
+  ) async {
     _setLoading(true);
     try {
       final url = await uploadVehicleDocumentUseCase(file, vehicleId, docType);
@@ -221,6 +266,62 @@ class VehicleProvider extends ChangeNotifier {
       await fetchAllVehicleMakes();
     } catch (e) {
       _errorMessage = 'Failed to delete vehicle make: \$e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
+    }
+  }
+
+  // ======================
+  // Maintenance Type Methods
+  // ======================
+
+  Future<void> fetchAllMaintenanceTypes() async {
+    _setLoading(true);
+    try {
+      _maintenanceTypes = await getAllMaintenanceTypesUseCase();
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = 'Failed to fetch maintenance types: \$e';
+      debugPrint(_errorMessage);
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> addMaintenanceType(MaintenanceTypeEntity type) async {
+    _setLoading(true);
+    try {
+      await insertMaintenanceTypeUseCase(type);
+      await fetchAllMaintenanceTypes();
+    } catch (e) {
+      _errorMessage = 'Failed to add maintenance type: \$e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
+    }
+  }
+
+  Future<void> updateMaintenanceType(MaintenanceTypeEntity type) async {
+    _setLoading(true);
+    try {
+      await updateMaintenanceTypeUseCase(type);
+      await fetchAllMaintenanceTypes();
+    } catch (e) {
+      _errorMessage = 'Failed to update maintenance type: \$e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteMaintenanceType(String id) async {
+    _setLoading(true);
+    try {
+      await deleteMaintenanceTypeUseCase(id);
+      await fetchAllMaintenanceTypes();
+    } catch (e) {
+      _errorMessage = 'Failed to delete maintenance type: \$e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;

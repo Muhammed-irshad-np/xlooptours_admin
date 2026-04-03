@@ -48,6 +48,10 @@ import 'features/vehicle/domain/usecases/upload_vehicle_document_usecase.dart';
 import 'features/vehicle/domain/usecases/upload_vehicle_image_usecase.dart';
 import 'features/vehicle/domain/usecases/get_vehicles_needing_odo_update_usecase.dart';
 import 'features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
+import 'features/vehicle/domain/usecases/get_all_maintenance_types_usecase.dart';
+import 'features/vehicle/domain/usecases/insert_maintenance_type_usecase.dart';
+import 'features/vehicle/domain/usecases/update_maintenance_type_usecase.dart';
+import 'features/vehicle/domain/usecases/delete_maintenance_type_usecase.dart';
 import 'features/vehicle/presentation/providers/vehicle_provider.dart';
 
 import 'features/company/data/datasources/company_remote_data_source.dart';
@@ -247,6 +251,10 @@ Future<void> init() async {
       insertVehicleMakeUseCase: sl(),
       updateVehicleMakeUseCase: sl(),
       deleteVehicleMakeUseCase: sl(),
+      getAllMaintenanceTypesUseCase: sl(),
+      insertMaintenanceTypeUseCase: sl(),
+      updateMaintenanceTypeUseCase: sl(),
+      deleteMaintenanceTypeUseCase: sl(),
     ),
   );
 
@@ -265,6 +273,11 @@ Future<void> init() async {
   sl.registerLazySingleton(() => InsertVehicleMakeUseCase(sl()));
   sl.registerLazySingleton(() => UpdateVehicleMakeUseCase(sl()));
   sl.registerLazySingleton(() => DeleteVehicleMakeUseCase(sl()));
+
+  sl.registerLazySingleton(() => GetAllMaintenanceTypesUseCase(sl()));
+  sl.registerLazySingleton(() => InsertMaintenanceTypeUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateMaintenanceTypeUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteMaintenanceTypeUseCase(sl()));
 
   // Repositories
   sl.registerLazySingleton<VehicleRepository>(

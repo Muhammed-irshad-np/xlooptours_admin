@@ -6,6 +6,8 @@ import '../../domain/repositories/vehicle_repository.dart';
 import '../datasources/vehicle_remote_data_source.dart';
 import '../models/vehicle_model.dart';
 import '../models/vehicle_make_model.dart';
+import '../../domain/entities/maintenance_type_entity.dart';
+import '../models/maintenance_type_model.dart';
 
 class VehicleRepositoryImpl implements VehicleRepository {
   final VehicleRemoteDataSource remoteDataSource;
@@ -77,5 +79,27 @@ class VehicleRepositoryImpl implements VehicleRepository {
   @override
   Future<void> deleteVehicleMake(String id) async {
     return await remoteDataSource.deleteVehicleMake(id);
+  }
+
+  @override
+  Future<List<MaintenanceTypeEntity>> getAllMaintenanceTypes() async {
+    return await remoteDataSource.getAllMaintenanceTypes();
+  }
+
+  @override
+  Future<void> insertMaintenanceType(MaintenanceTypeEntity type) async {
+    final typeModel = MaintenanceTypeModel.fromEntity(type);
+    return await remoteDataSource.insertMaintenanceType(typeModel);
+  }
+
+  @override
+  Future<void> updateMaintenanceType(MaintenanceTypeEntity type) async {
+    final typeModel = MaintenanceTypeModel.fromEntity(type);
+    return await remoteDataSource.updateMaintenanceType(typeModel);
+  }
+
+  @override
+  Future<void> deleteMaintenanceType(String id) async {
+    return await remoteDataSource.deleteMaintenanceType(id);
   }
 }

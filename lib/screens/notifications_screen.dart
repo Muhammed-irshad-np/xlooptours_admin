@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../features/notifications/domain/entities/notification_entity.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
+import '../core/utils/update_dialog_helper.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 class NotificationsScreen extends StatelessWidget {
@@ -146,17 +147,36 @@ class NotificationsScreen extends StatelessWidget {
             ),
           ],
         ),
-        trailing: !notification.isRead
-            ? IconButton(
+        trailing: Wrap(
+          spacing: 8,
+          children: [
+            if (notification.type == NotificationType.expiry)
+              ElevatedButton(
+                onPressed: () => UpdateDialogHelper.showUpdateDialog(
+                  context,
+                  notification,
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                ),
+                child: const Text('Update'),
+              ),
+            if (!notification.isRead)
+              IconButton(
                 icon: const Icon(Icons.mark_email_read, color: Colors.blue),
                 tooltip: 'Mark as read',
                 onPressed: () {
                   context.read<NotificationProvider>().markAsRead(
-                    notification.id,
-                  );
+                        notification.id,
+                      );
                 },
-              )
-            : null,
+              ),
+          ],
+        ),
       ),
     );
   }

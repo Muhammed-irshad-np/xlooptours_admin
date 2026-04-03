@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/widgets/modern_app_bar.dart';
 
 class DriversScreen extends StatelessWidget {
   const DriversScreen({super.key});
@@ -7,7 +8,7 @@ class DriversScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Drivers & Employees')),
+      appBar: const ModernAppBar(title: 'Drivers & Employees'),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

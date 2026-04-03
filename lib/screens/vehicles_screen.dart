@@ -4,10 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:xloop_invoice/screens/vehicle_master_screen.dart'; // Added
 import 'package:xloop_invoice/screens/vehicle_detail_screen.dart';
 import 'package:provider/provider.dart';
+import '../widgets/add_maintenance_record_dialog.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../core/widgets/modern_app_bar.dart';
+import '../core/widgets/modern_tab_bar.dart';
 
 class VehiclesScreen extends StatefulWidget {
   const VehiclesScreen({super.key});
@@ -61,6 +64,17 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     }
   }
 
+  Future<void> _showAddMaintenance(VehicleEntity vehicle) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AddMaintenanceRecordDialog(vehicle: vehicle),
+    );
+    if (result == true) {
+      _loadData();
+    }
+  }
+
   Future<void> _deleteVehicle(String id) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -96,21 +110,21 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     return DefaultTabController(
       length: 2,
       child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Fleet Management'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'Fleet List', icon: Icon(Icons.directions_car)),
-              Tab(text: 'Vehicle Master', icon: Icon(Icons.settings)),
-            ],
-          ),
+        appBar: ModernAppBar(
+          title: 'Fleet Management',
           actions: [
             IconButton(
               onPressed: () => _navigateToAddEdit(),
-              icon: const Icon(Icons.add),
+              icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
               tooltip: 'Add Vehicle',
             ),
           ],
+          bottom: const ModernTabBar(
+            tabs: [
+              Tab(text: 'Fleet List'),
+              Tab(text: 'Vehicle Master'),
+            ],
+          ),
         ),
         body: TabBarView(
           children: [
@@ -236,6 +250,20 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
             PopupMenuButton(
               itemBuilder: (context) => [
                 const PopupMenuItem(
+                  value: 'add_maintenance',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.build_circle_outlined,
+                        size: 20,
+                        color: Colors.blueGrey,
+                      ),
+                      SizedBox(width: 8),
+                      Text('Add Maintenance'),
+                    ],
+                  ),
+                ),
+                const PopupMenuItem(
                   value: 'edit',
                   child: Row(
                     children: [
@@ -257,7 +285,9 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                 ),
               ],
               onSelected: (value) {
-                if (value == 'edit') {
+                if (value == 'add_maintenance') {
+                  _showAddMaintenance(vehicle);
+                } else if (value == 'edit') {
                   _navigateToAddEdit(vehicle: vehicle);
                 } else if (value == 'delete') {
                   _deleteVehicle(vehicle.id);
@@ -275,10 +305,8 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => VehicleDetailScreen(
-          vehicle: vehicle,
-          driver: driver,
-        ),
+        builder: (context) =>
+            VehicleDetailScreen(vehicle: vehicle, driver: driver),
       ),
     );
   }

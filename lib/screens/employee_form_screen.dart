@@ -14,6 +14,7 @@ import '../features/employee/presentation/providers/employee_provider.dart';
 import '../widgets/custom_date_picker.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../core/widgets/modern_app_bar.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
   // ... (rest of class)
@@ -54,8 +55,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   late TextEditingController _bahrainResidenceNumberController;
   late TextEditingController _bahrainResidenceNotificationDaysController;
-  final ValueNotifier<DateTime?> _bahrainResidenceExpiryDate = ValueNotifier(null);
-  final ValueNotifier<DateTime?> _bahrainInsuranceExpiryDate = ValueNotifier(null);
+  final ValueNotifier<DateTime?> _bahrainResidenceExpiryDate = ValueNotifier(
+    null,
+  );
+  final ValueNotifier<DateTime?> _bahrainInsuranceExpiryDate = ValueNotifier(
+    null,
+  );
 
   late TextEditingController _passportNameController;
   late TextEditingController _passportNumberController;
@@ -106,7 +111,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   final ValueNotifier<String?> _iqamaAttachmentUrl = ValueNotifier(null);
 
   final ValueNotifier<XFile?> _bahrainResidenceAttachment = ValueNotifier(null);
-  final ValueNotifier<String?> _bahrainResidenceAttachmentUrl = ValueNotifier(null);
+  final ValueNotifier<String?> _bahrainResidenceAttachmentUrl = ValueNotifier(
+    null,
+  );
 
   final ValueNotifier<XFile?> _passportAttachment = ValueNotifier(null);
   final ValueNotifier<String?> _passportAttachmentUrl = ValueNotifier(null);
@@ -172,7 +179,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       text: e?.bahrainResidence?.notificationDays?.toString() ?? '',
     );
     _bahrainResidenceExpiryDate.value = e?.bahrainResidence?.expiryDate;
-    _bahrainInsuranceExpiryDate.value = e?.bahrainResidence?.insuranceExpiryDate;
+    _bahrainInsuranceExpiryDate.value =
+        e?.bahrainResidence?.insuranceExpiryDate;
 
     _passportNameController = TextEditingController(
       text: e?.passport?.nameOnPassport ?? '',
@@ -627,7 +635,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
             : null,
         phoneRechargeDate: _phoneRechargeDate.value,
         phoneRechargeNotificationDays:
-            int.tryParse(_phoneRechargeNotificationDaysController.text.trim()) ??
+            int.tryParse(
+              _phoneRechargeNotificationDaysController.text.trim(),
+            ) ??
             3,
       );
 
@@ -669,10 +679,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          widget.employee == null ? 'Add New Employee' : 'Edit Employee',
-        ),
+      appBar: ModernAppBar(
+        title: widget.employee == null ? 'Add New Employee' : 'Edit Employee',
       ),
       body: Form(
         key: _formKey,
@@ -707,7 +715,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                             : FileImage(File(pickedImage.path))
                                                   as ImageProvider)
                                       : (currentImageUrl != null
-                                            ? CachedNetworkImageProvider(currentImageUrl)
+                                            ? CachedNetworkImageProvider(
+                                                currentImageUrl,
+                                              )
                                             : null),
                                   child:
                                       (pickedImage == null &&
@@ -963,7 +973,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                             date: birthDate,
                                             onTap: () =>
                                                 _selectDate(context, false),
-                                            onClear: () => _birthDate.value = null,
+                                            onClear: () =>
+                                                _birthDate.value = null,
                                           );
                                         },
                                       ),
@@ -978,7 +989,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                             date: joinDate,
                                             onTap: () =>
                                                 _selectDate(context, true),
-                                            onClear: () => _joinDate.value = null,
+                                            onClear: () =>
+                                                _joinDate.value = null,
                                           );
                                         },
                                       ),
@@ -1049,8 +1061,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _iqamaExpiryDate.value = picked;
                                       }
                                     },
-                                    onClear: () => _iqamaExpiryDate.value = null,
-                                          );
+                                    onClear: () =>
+                                        _iqamaExpiryDate.value = null,
+                                  );
                                 },
                               ),
                             ),
@@ -1081,8 +1094,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _insuranceExpiryDate.value = picked;
                                       }
                                     },
-                                    onClear: () => _insuranceExpiryDate.value = null,
-                                          );
+                                    onClear: () =>
+                                        _insuranceExpiryDate.value = null,
+                                  );
                                 },
                               ),
                             ),
@@ -1151,10 +1165,13 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         ),
                                       );
                                       if (picked != null) {
-                                        _bahrainResidenceExpiryDate.value = picked;
+                                        _bahrainResidenceExpiryDate.value =
+                                            picked;
                                       }
                                     },
-                                    onClear: () => _bahrainResidenceExpiryDate.value = null,
+                                    onClear: () =>
+                                        _bahrainResidenceExpiryDate.value =
+                                            null,
                                   );
                                 },
                               ),
@@ -1183,10 +1200,13 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         ),
                                       );
                                       if (picked != null) {
-                                        _bahrainInsuranceExpiryDate.value = picked;
+                                        _bahrainInsuranceExpiryDate.value =
+                                            picked;
                                       }
                                     },
-                                    onClear: () => _bahrainInsuranceExpiryDate.value = null,
+                                    onClear: () =>
+                                        _bahrainInsuranceExpiryDate.value =
+                                            null,
                                   );
                                 },
                               ),
@@ -1195,7 +1215,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                         ),
                         SizedBox(height: 16.h),
                         _buildTextField(
-                          controller: _bahrainResidenceNotificationDaysController,
+                          controller:
+                              _bahrainResidenceNotificationDaysController,
                           label: 'Alert Before (Days)',
                           icon: Icons.notifications,
                           keyboardType: TextInputType.number,
@@ -1260,8 +1281,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _passportExpiryDate.value = picked;
                                       }
                                     },
-                                    onClear: () => _passportExpiryDate.value = null,
-                                          );
+                                    onClear: () =>
+                                        _passportExpiryDate.value = null,
+                                  );
                                 },
                               ),
                             ),
@@ -1351,8 +1373,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _saudiVisaExpiryDate.value = picked;
                                       }
                                     },
-                                    onClear: () => _saudiVisaExpiryDate.value = null,
-                                          );
+                                    onClear: () =>
+                                        _saudiVisaExpiryDate.value = null,
+                                  );
                                 },
                               ),
                             ),
@@ -1369,13 +1392,17 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     label: 'Visa Type',
                                     value: type.toString().split('.').last,
                                     items: VisaType.values
-                                        .map((e) => e.toString().split('.').last)
+                                        .map(
+                                          (e) => e.toString().split('.').last,
+                                        )
                                         .toList(),
                                     onChanged: (val) {
-                                      _selectedSaudiVisaType.value = VisaType.values
+                                      _selectedSaudiVisaType.value = VisaType
+                                          .values
                                           .firstWhere(
                                             (e) =>
-                                                e.toString().split('.').last == val,
+                                                e.toString().split('.').last ==
+                                                val,
                                           );
                                     },
                                   );
@@ -1385,7 +1412,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                             SizedBox(width: 16.w),
                             Expanded(
                               child: _buildTextField(
-                                controller: _saudiVisaNotificationDaysController,
+                                controller:
+                                    _saudiVisaNotificationDaysController,
                                 label: 'Alert Before (Days)',
                                 icon: Icons.notifications,
                                 keyboardType: TextInputType.number,
@@ -1456,8 +1484,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _bahrainVisaExpiryDate.value = picked;
                                       }
                                     },
-                                    onClear: () => _bahrainVisaExpiryDate.value = null,
-                                          );
+                                    onClear: () =>
+                                        _bahrainVisaExpiryDate.value = null,
+                                  );
                                 },
                               ),
                             ),
@@ -1474,13 +1503,17 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     label: 'Visa Type',
                                     value: type.toString().split('.').last,
                                     items: VisaType.values
-                                        .map((e) => e.toString().split('.').last)
+                                        .map(
+                                          (e) => e.toString().split('.').last,
+                                        )
                                         .toList(),
                                     onChanged: (val) {
-                                      _selectedBahrainVisaType.value = VisaType.values
+                                      _selectedBahrainVisaType.value = VisaType
+                                          .values
                                           .firstWhere(
                                             (e) =>
-                                                e.toString().split('.').last == val,
+                                                e.toString().split('.').last ==
+                                                val,
                                           );
                                     },
                                   );
@@ -1490,7 +1523,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                             SizedBox(width: 16.w),
                             Expanded(
                               child: _buildTextField(
-                                controller: _bahrainVisaNotificationDaysController,
+                                controller:
+                                    _bahrainVisaNotificationDaysController,
                                 label: 'Alert Before (Days)',
                                 icon: Icons.notifications,
                                 keyboardType: TextInputType.number,
@@ -1561,8 +1595,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _dubaiVisaExpiryDate.value = picked;
                                       }
                                     },
-                                    onClear: () => _dubaiVisaExpiryDate.value = null,
-                                          );
+                                    onClear: () =>
+                                        _dubaiVisaExpiryDate.value = null,
+                                  );
                                 },
                               ),
                             ),
@@ -1579,13 +1614,17 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     label: 'Visa Type',
                                     value: type.toString().split('.').last,
                                     items: VisaType.values
-                                        .map((e) => e.toString().split('.').last)
+                                        .map(
+                                          (e) => e.toString().split('.').last,
+                                        )
                                         .toList(),
                                     onChanged: (val) {
-                                      _selectedDubaiVisaType.value = VisaType.values
+                                      _selectedDubaiVisaType.value = VisaType
+                                          .values
                                           .firstWhere(
                                             (e) =>
-                                                e.toString().split('.').last == val,
+                                                e.toString().split('.').last ==
+                                                val,
                                           );
                                     },
                                   );
@@ -1595,7 +1634,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                             SizedBox(width: 16.w),
                             Expanded(
                               child: _buildTextField(
-                                controller: _dubaiVisaNotificationDaysController,
+                                controller:
+                                    _dubaiVisaNotificationDaysController,
                                 label: 'Alert Before (Days)',
                                 icon: Icons.notifications,
                                 keyboardType: TextInputType.number,
@@ -1666,8 +1706,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _qatarVisaExpiryDate.value = picked;
                                       }
                                     },
-                                    onClear: () => _qatarVisaExpiryDate.value = null,
-                                          );
+                                    onClear: () =>
+                                        _qatarVisaExpiryDate.value = null,
+                                  );
                                 },
                               ),
                             ),
@@ -1684,13 +1725,17 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     label: 'Visa Type',
                                     value: type.toString().split('.').last,
                                     items: VisaType.values
-                                        .map((e) => e.toString().split('.').last)
+                                        .map(
+                                          (e) => e.toString().split('.').last,
+                                        )
                                         .toList(),
                                     onChanged: (val) {
-                                      _selectedQatarVisaType.value = VisaType.values
+                                      _selectedQatarVisaType.value = VisaType
+                                          .values
                                           .firstWhere(
                                             (e) =>
-                                                e.toString().split('.').last == val,
+                                                e.toString().split('.').last ==
+                                                val,
                                           );
                                     },
                                   );
@@ -1700,7 +1745,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                             SizedBox(width: 16.w),
                             Expanded(
                               child: _buildTextField(
-                                controller: _qatarVisaNotificationDaysController,
+                                controller:
+                                    _qatarVisaNotificationDaysController,
                                 label: 'Alert Before (Days)',
                                 icon: Icons.notifications,
                                 keyboardType: TextInputType.number,
@@ -1754,13 +1800,15 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                       _phoneRechargeDate.value = picked;
                                     }
                                   },
-                                  onClear: () => _phoneRechargeDate.value = null,
+                                  onClear: () =>
+                                      _phoneRechargeDate.value = null,
                                 ),
                               ),
                               SizedBox(width: 16.w),
                               Expanded(
                                 child: _buildTextField(
-                                  controller: _phoneRechargeNotificationDaysController,
+                                  controller:
+                                      _phoneRechargeNotificationDaysController,
                                   label: 'Alert Before (Days)',
                                   icon: Icons.notifications,
                                   keyboardType: TextInputType.number,
@@ -1826,8 +1874,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         _licenseExpiryDate.value = picked;
                                       }
                                     },
-                                    onClear: () => _licenseExpiryDate.value = null,
-                                          );
+                                    onClear: () =>
+                                        _licenseExpiryDate.value = null,
+                                  );
                                 },
                               ),
                             ),
@@ -1997,8 +2046,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       onChanged: onChanged,
     );
   }
-
-
 
   /// A reusable widget that lets the user optionally pick a document scan/image.
   ///

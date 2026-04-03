@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.dart';
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_documents.dart';
+import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
+import 'package:xloop_invoice/core/widgets/modern_app_bar.dart';
 import 'package:xloop_invoice/screens/document_viewer_screen.dart';
 
 class VehicleMaintenanceHistoryScreen extends StatelessWidget {
@@ -11,36 +14,50 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<MaintenanceRecord> history = _gatherAllHistory(vehicle);
+    return Consumer<VehicleProvider>(
+      builder: (context, vehicleProvider, child) {
+        final matches = vehicleProvider.vehicles.where(
+          (v) => v.id == vehicle.id,
+        );
+        final VehicleEntity currentVehicle = matches.isNotEmpty
+            ? matches.first
+            : vehicle;
 
-    history.sort((a, b) => b.date.compareTo(a.date));
+        final List<MaintenanceRecord> history = _gatherAllHistory(
+          currentVehicle,
+        );
+        history.sort((a, b) => b.date.compareTo(a.date));
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('${vehicle.make} ${vehicle.model} - History'),
-        elevation: 0,
-      ),
-      body: history.isEmpty
-          ? const Center(
-              child: Text(
-                'No maintenance history available.',
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              ),
-            )
-          : ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: history.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                final record = history[index];
-                return _buildHistoryCard(context, record);
-              },
-            ),
+        return Scaffold(
+          appBar: ModernAppBar(
+            title: '${currentVehicle.make} ${currentVehicle.model} - History',
+          ),
+          body: history.isEmpty
+              ? const Center(
+                  child: Text(
+                    'No maintenance history available.',
+                    style: TextStyle(fontSize: 16, color: Colors.grey),
+                  ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: history.length,
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 16),
+                  itemBuilder: (context, index) {
+                    final record = history[index];
+                    return _buildHistoryCard(context, currentVehicle, record);
+                  },
+                ),
+        );
+      },
     );
   }
 
   List<MaintenanceRecord> _gatherAllHistory(VehicleEntity vehicle) {
-    final List<MaintenanceRecord> history = List.from(vehicle.maintenanceHistory ?? []);
+    final List<MaintenanceRecord> history = List.from(
+      vehicle.maintenanceHistory ?? [],
+    );
 
     // For backwards compatibility, if maintenanceHistory is empty, extract from Maintenance objects
     if (history.isEmpty && vehicle.maintenance != null) {
@@ -66,7 +83,11 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
     return history;
   }
 
-  void _addRecordIfNotNull(List<MaintenanceRecord> history, MaintenanceRecord? record, String overrideType) {
+  void _addRecordIfNotNull(
+    List<MaintenanceRecord> history,
+    MaintenanceRecord? record,
+    String overrideType,
+  ) {
     if (record != null) {
       history.add(
         MaintenanceRecord(
@@ -89,9 +110,13 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
     }
   }
 
-  Widget _buildHistoryCard(BuildContext context, MaintenanceRecord record) {
+  Widget _buildHistoryCard(
+    BuildContext context,
+    VehicleEntity currentVehicle,
+    MaintenanceRecord record,
+  ) {
     final dateStr = DateFormat('MMM dd, yyyy').format(record.date);
-    
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -113,28 +138,62 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                Text(
-                  dateStr,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      dateStr,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.red,
+                        size: 20,
+                      ),
+                      onPressed: () => _showDeleteConfirmation(
+                        context,
+                        currentVehicle,
+                        record,
+                      ),
+                      constraints: const BoxConstraints(),
+                      padding: EdgeInsets.zero,
+                    ),
+                  ],
                 ),
               ],
             ),
             const Divider(height: 24),
             _buildInfoRow(Icons.speed, 'Mileage', '${record.mileage} KM'),
-            if (record.serviceProvider != null && record.serviceProvider!.isNotEmpty)
-              _buildInfoRow(Icons.build_circle, 'Provider', record.serviceProvider!),
-            if (record.workOrderNumber != null && record.workOrderNumber!.isNotEmpty)
-              _buildInfoRow(Icons.receipt_long, 'Work Order', record.workOrderNumber!),
+            if (record.serviceProvider != null &&
+                record.serviceProvider!.isNotEmpty)
+              _buildInfoRow(
+                Icons.build_circle,
+                'Provider',
+                record.serviceProvider!,
+              ),
+            if (record.workOrderNumber != null &&
+                record.workOrderNumber!.isNotEmpty)
+              _buildInfoRow(
+                Icons.receipt_long,
+                'Work Order',
+                record.workOrderNumber!,
+              ),
             if (record.cost != null)
-              _buildInfoRow(Icons.attach_money, 'Total Cost', '\$${record.cost!.toStringAsFixed(2)}'),
+              _buildInfoRow(
+                Icons.attach_money,
+                'Total Cost',
+                '\$${record.cost!.toStringAsFixed(2)}',
+              ),
             if (record.notes != null && record.notes!.isNotEmpty)
               _buildInfoRow(Icons.notes, 'Notes', record.notes!),
-            
-            if (record.attachmentUrl != null && record.attachmentUrl!.isNotEmpty) ...[
+            if (record.attachmentUrl != null &&
+                record.attachmentUrl!.isNotEmpty) ...[
               const SizedBox(height: 12),
               SizedBox(
                 width: double.infinity,
@@ -152,16 +211,49 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (context) => DocumentViewerScreen(
                           attachmentUrl: record.attachmentUrl!,
-                          title: '${record.serviceType ?? 'Maintenance'} Document',
+                          title:
+                              '${record.serviceType ?? 'Maintenance'} Document',
                         ),
                       ),
                     );
                   },
                 ),
               ),
-            ]
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  void _showDeleteConfirmation(
+    BuildContext context,
+    VehicleEntity currentVehicle,
+    MaintenanceRecord record,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Record'),
+        content: const Text(
+          'Are you sure you want to delete this maintenance record? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('CANCEL'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<VehicleProvider>().deleteMaintenanceRecord(
+                currentVehicle,
+                record,
+              );
+            },
+            child: const Text('DELETE', style: TextStyle(color: Colors.red)),
+          ),
+        ],
       ),
     );
   }

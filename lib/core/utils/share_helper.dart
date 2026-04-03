@@ -20,7 +20,9 @@ class ShareHelper {
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode != 200) {
-        throw Exception('Failed to download document. Status: ${response.statusCode}');
+        throw Exception(
+          'Failed to download document. Status: ${response.statusCode}',
+        );
       }
 
       // Extract filename from URL or use a default one
@@ -29,15 +31,15 @@ class ShareHelper {
         final uri = Uri.parse(url);
         final pathSegments = uri.pathSegments;
         if (pathSegments.isNotEmpty) {
-           final lastSegment = pathSegments.last.split('?').first;
-           if (lastSegment.contains('.')) {
-             filename = Uri.decodeComponent(lastSegment);
-           }
+          final lastSegment = pathSegments.last.split('?').first;
+          if (lastSegment.contains('.')) {
+            filename = Uri.decodeComponent(lastSegment);
+          }
         }
       } catch (_) {}
 
       final mimeType = _getMimeType(filename);
-      
+
       final xFile = XFile.fromData(
         response.bodyBytes,
         name: filename,
@@ -45,12 +47,7 @@ class ShareHelper {
       );
 
       // We pass the Subject and Text to pre-fill the share action (like Email subject)
-      await Share.shareXFiles(
-        [xFile],
-        text: 'Sharing: $title',
-        subject: title,
-      );
-
+      await Share.shareXFiles([xFile], text: 'Sharing: $title', subject: title);
     } catch (e) {
       debugPrint('Share error: $e');
       if (context.mounted) {
@@ -67,7 +64,8 @@ class ShareHelper {
   static String? _getMimeType(String filename) {
     final lowerCaseName = filename.toLowerCase();
     if (lowerCaseName.endsWith('.pdf')) return 'application/pdf';
-    if (lowerCaseName.endsWith('.jpg') || lowerCaseName.endsWith('.jpeg')) return 'image/jpeg';
+    if (lowerCaseName.endsWith('.jpg') || lowerCaseName.endsWith('.jpeg'))
+      return 'image/jpeg';
     if (lowerCaseName.endsWith('.png')) return 'image/png';
     return null;
   }

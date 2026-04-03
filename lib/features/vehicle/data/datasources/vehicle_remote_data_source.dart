@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../models/vehicle_model.dart';
 import '../models/vehicle_make_model.dart';
+import '../models/maintenance_type_model.dart';
 
 abstract class VehicleRemoteDataSource {
   // Vehicle
@@ -21,6 +22,12 @@ abstract class VehicleRemoteDataSource {
   Future<void> insertVehicleMake(VehicleMakeModel make);
   Future<void> updateVehicleMake(VehicleMakeModel make);
   Future<void> deleteVehicleMake(String id);
+
+  // Maintenance Types
+  Future<List<MaintenanceTypeModel>> getAllMaintenanceTypes();
+  Future<void> insertMaintenanceType(MaintenanceTypeModel type);
+  Future<void> updateMaintenanceType(MaintenanceTypeModel type);
+  Future<void> deleteMaintenanceType(String id);
 
   /// Uploads a scanned document attachment to Firebase Storage.
   Future<String> uploadDocumentAttachment(
@@ -174,5 +181,41 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
   @override
   Future<void> deleteVehicleMake(String id) async {
     await firestore.collection('vehicle_makes').doc(id).delete();
+  }
+
+  @override
+  Future<List<MaintenanceTypeModel>> getAllMaintenanceTypes() async {
+    final snapshot = await firestore
+        .collection('maintenance_types')
+        .orderBy('name')
+        .get();
+    return snapshot.docs
+        .map(
+          (doc) => MaintenanceTypeModel.fromJson(
+            doc.data()..['documentId'] = doc.id,
+          ),
+        )
+        .toList();
+  }
+
+  @override
+  Future<void> insertMaintenanceType(MaintenanceTypeModel type) async {
+    await firestore
+        .collection('maintenance_types')
+        .doc(type.id)
+        .set(type.toJson());
+  }
+
+  @override
+  Future<void> updateMaintenanceType(MaintenanceTypeModel type) async {
+    await firestore
+        .collection('maintenance_types')
+        .doc(type.id)
+        .update(type.toJson());
+  }
+
+  @override
+  Future<void> deleteMaintenanceType(String id) async {
+    await firestore.collection('maintenance_types').doc(id).delete();
   }
 }

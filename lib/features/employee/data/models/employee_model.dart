@@ -159,7 +159,9 @@ class EmployeeModel extends EmployeeEntity {
           ? IqamaModel.fromJson(json['iqama'] as Map<String, dynamic>)
           : null,
       bahrainResidence: json['bahrainResidence'] != null
-          ? BahrainResidenceModel.fromJson(json['bahrainResidence'] as Map<String, dynamic>)
+          ? BahrainResidenceModel.fromJson(
+              json['bahrainResidence'] as Map<String, dynamic>,
+            )
           : null,
       drivingLicense: json['drivingLicense'] != null
           ? DrivingLicenseModel.fromJson(
@@ -271,7 +273,8 @@ class EmployeeModel extends EmployeeEntity {
       imageUrl: imageUrl ?? this.imageUrl,
       assignedVehicleId: assignedVehicleId ?? this.assignedVehicleId,
       iqama: iqama ?? this.iqama as IqamaModel?,
-      bahrainResidence: bahrainResidence ?? this.bahrainResidence as BahrainResidenceModel?,
+      bahrainResidence:
+          bahrainResidence ?? this.bahrainResidence as BahrainResidenceModel?,
       drivingLicense:
           drivingLicense ?? this.drivingLicense as DrivingLicenseModel?,
       passport: passport ?? this.passport as PassportModel?,

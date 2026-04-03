@@ -28,7 +28,6 @@ class VehicleEntity extends Equatable {
   final String? tireSize;
   final String? department;
   final String? status;
-  final Map<String, int>? maintenanceIntervals;
   final List<MaintenanceRecord>? maintenanceHistory;
 
   const VehicleEntity({
@@ -58,41 +57,39 @@ class VehicleEntity extends Equatable {
     this.tireSize,
     this.department,
     this.status,
-    this.maintenanceIntervals,
     this.maintenanceHistory,
   });
 
   @override
   List<Object?> get props => [
-        id,
-        make,
-        model,
-        year,
-        color,
-        plateNumber,
-        type,
-        assignedDriverId,
-        imageUrl,
-        isActive,
-        insurance,
-        registration,
-        fahas,
-        maintenance,
-        vinNumber,
-        engineNumber,
-        fuelType,
-        transmission,
-        purchaseDate,
-        purchasePrice,
-        currentOdometer,
-        lastOdometerUpdateDate,
-        gvwr,
-        tireSize,
-        department,
-        status,
-        maintenanceIntervals,
-        maintenanceHistory,
-      ];
+    id,
+    make,
+    model,
+    year,
+    color,
+    plateNumber,
+    type,
+    assignedDriverId,
+    imageUrl,
+    isActive,
+    insurance,
+    registration,
+    fahas,
+    maintenance,
+    vinNumber,
+    engineNumber,
+    fuelType,
+    transmission,
+    purchaseDate,
+    purchasePrice,
+    currentOdometer,
+    lastOdometerUpdateDate,
+    gvwr,
+    tireSize,
+    department,
+    status,
+    maintenanceHistory,
+  ];
 
   VehicleEntity copyWith({
     String? id,
@@ -121,7 +118,6 @@ class VehicleEntity extends Equatable {
     String? tireSize,
     String? department,
     String? status,
-    Map<String, int>? maintenanceIntervals,
     List<MaintenanceRecord>? maintenanceHistory,
   }) {
     return VehicleEntity(
@@ -152,7 +148,6 @@ class VehicleEntity extends Equatable {
       tireSize: tireSize ?? this.tireSize,
       department: department ?? this.department,
       status: status ?? this.status,
-      maintenanceIntervals: maintenanceIntervals ?? this.maintenanceIntervals,
       maintenanceHistory: maintenanceHistory ?? this.maintenanceHistory,
     );
   }

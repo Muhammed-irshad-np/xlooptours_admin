@@ -7,11 +7,7 @@ class ShareDialog extends StatelessWidget {
   final String url;
   final String title;
 
-  const ShareDialog({
-    super.key,
-    required this.url,
-    required this.title,
-  });
+  const ShareDialog({super.key, required this.url, required this.title});
 
   Future<void> _launchUrl(String urlString) async {
     final Uri uri = Uri.parse(urlString);
@@ -28,7 +24,9 @@ class ShareDialog extends StatelessWidget {
 
   void _shareViaEmail() {
     final subject = Uri.encodeComponent('Document: $title');
-    final body = Uri.encodeComponent('Hi,\n\nPlease find the document below:\n\n$title\n$url');
+    final body = Uri.encodeComponent(
+      'Hi,\n\nPlease find the document below:\n\n$title\n$url',
+    );
     final emailUrl = 'mailto:?subject=$subject&body=$body';
     _launchUrl(emailUrl);
   }
@@ -79,7 +77,9 @@ class ShareDialog extends StatelessWidget {
             SizedBox(height: 8.h),
             Text(
               title,
-              style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[600],
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -144,9 +144,9 @@ class ShareDialog extends StatelessWidget {
             SizedBox(width: 16.w),
             Text(
               label,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
             const Spacer(),
             Icon(Icons.chevron_right, color: Colors.grey[400]),

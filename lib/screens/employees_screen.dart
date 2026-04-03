@@ -10,6 +10,8 @@ import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../widgets/responsive_layout.dart';
 import 'employee_details_screen.dart';
 import 'employee_form_screen.dart';
+import '../core/widgets/modern_app_bar.dart';
+import '../core/widgets/modern_tab_bar.dart';
 
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({super.key});
@@ -182,43 +184,44 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Employees'),
-        bottom: TabBar(
-          controller: _tabController,
-          isScrollable: true,
-          tabs: _tabs.map((t) => Tab(text: t)).toList(),
-        ),
+      appBar: ModernAppBar(
+        title: 'Employees',
         actions: [
           // Filter Toggle
           Row(
             children: [
               Text(
                 'Show Inactive',
-                style: TextStyle(fontSize: 12.sp, color: Colors.grey[700]),
+                style: TextStyle(fontSize: 10.sp, color: Colors.grey[600]),
               ),
               ValueListenableBuilder<bool>(
                 valueListenable: _showInactive,
                 builder: (context, showInactive, _) {
-                  return Switch(
-                    value: showInactive,
-                    onChanged: (val) {
-                      _showInactive.value = val;
-                      _filterEmployees();
-                    },
+                  return Transform.scale(
+                    scale: 0.7,
+                    child: Switch(
+                      value: showInactive,
+                      onChanged: (val) {
+                        _showInactive.value = val;
+                        _filterEmployees();
+                      },
+                    ),
                   );
                 },
               ),
             ],
           ),
-          SizedBox(width: 16.w),
           IconButton(
-            icon: const Icon(Icons.add),
+            icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
             onPressed: () => _navigateToForm(null),
             tooltip: 'Add Employee',
           ),
-          SizedBox(width: 16.w),
         ],
+        bottom: ModernTabBar(
+          controller: _tabController,
+          isScrollable: true,
+          tabs: _tabs.map((t) => Tab(text: t)).toList(),
+        ),
       ),
       body: Column(
         children: [

@@ -50,21 +50,21 @@ class MaintenanceRecord extends Equatable {
 
   @override
   List<Object?> get props => [
-        date,
-        mileage,
-        attachmentUrl,
-        notificationDays,
-        cost,
-        partsCost,
-        laborCost,
-        serviceProvider,
-        workOrderNumber,
-        serviceType,
-        partsReplaced,
-        notes,
-        nextServiceMileage,
-        nextServiceDate,
-      ];
+    date,
+    mileage,
+    attachmentUrl,
+    notificationDays,
+    cost,
+    partsCost,
+    laborCost,
+    serviceProvider,
+    workOrderNumber,
+    serviceType,
+    partsReplaced,
+    notes,
+    nextServiceMileage,
+    nextServiceDate,
+  ];
 }
 
 class VehicleMaintenance extends Equatable {
@@ -106,21 +106,21 @@ class VehicleMaintenance extends Equatable {
 
   @override
   List<Object?> get props => [
-        engineOil,
-        gearOil,
-        housingOil,
-        tyreChange,
-        batteryChange,
-        brakePads,
-        airFilter,
-        acService,
-        wheelAlignment,
-        sparkPlugs,
-        coolantFlush,
-        wiperBlades,
-        timingBelt,
-        transmissionFluid,
-        brakeFluid,
-        fuelFilter,
-      ];
+    engineOil,
+    gearOil,
+    housingOil,
+    tyreChange,
+    batteryChange,
+    brakePads,
+    airFilter,
+    acService,
+    wheelAlignment,
+    sparkPlugs,
+    coolantFlush,
+    wiperBlades,
+    timingBelt,
+    transmissionFluid,
+    brakeFluid,
+    fuelFilter,
+  ];
 }

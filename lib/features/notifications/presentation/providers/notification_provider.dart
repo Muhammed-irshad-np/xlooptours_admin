@@ -67,17 +67,26 @@ class NotificationProvider extends ChangeNotifier {
 
           // Add Vehicle Maintenance Alerts
           final vehicleProvider = GetIt.instance<VehicleProvider>();
-          final maintenanceAlerts = _getVehicleMaintenanceAlerts(vehicleProvider.vehicles);
-          final maintenanceNotifications = maintenanceAlerts.map((alert) => NotificationEntity(
-                id: 'maintenance_${alert.vehicle.id}_${alert.category.replaceAll(' ', '_')}',
-                title: 'Maintenance Due: ${alert.category}',
-                message: '${alert.vehicle.make} ${alert.vehicle.model} (${alert.vehicle.plateNumber}) needs ${alert.category}. Current: ${alert.currentMileage}km, Due: ${alert.nextServiceMileage}km',
-                timestamp: DateTime.now(),
-                isRead: false,
-                type: NotificationType.expiry, // Reusing expiry type for now as it shows in Action Items
-                relatedId: alert.vehicle.id,
-              )).toList();
-          
+          final maintenanceAlerts = _getVehicleMaintenanceAlerts(
+            vehicles: vehicleProvider.vehicles,
+            maintenanceTypes: vehicleProvider.maintenanceTypes,
+          );
+          final maintenanceNotifications = maintenanceAlerts
+              .map(
+                (alert) => NotificationEntity(
+                  id: 'maintenance_${alert.vehicle.id}_${alert.category.replaceAll(' ', '_')}',
+                  title: 'Maintenance Due: ${alert.category}',
+                  message:
+                      '${alert.vehicle.make} ${alert.vehicle.model} (${alert.vehicle.plateNumber}) needs ${alert.category}. Current: ${alert.currentMileage}km, Due: ${alert.nextServiceMileage}km',
+                  timestamp: DateTime.now(),
+                  isRead: false,
+                  type: NotificationType
+                      .expiry, // Reusing expiry type for now as it shows in Action Items
+                  relatedId: alert.vehicle.id,
+                ),
+              )
+              .toList();
+
           _notifications.addAll(maintenanceNotifications);
           _notifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
         } catch (e) {

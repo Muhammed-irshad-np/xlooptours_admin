@@ -29,7 +29,6 @@ class VehicleModel extends VehicleEntity {
     super.tireSize,
     super.department,
     super.status,
-    super.maintenanceIntervals,
     super.maintenanceHistory,
   });
 
@@ -46,11 +45,13 @@ class VehicleModel extends VehicleEntity {
       'imageUrl': imageUrl,
       'isActive': isActive,
       'insurance': insurance != null ? _documentToJson(insurance!) : null,
-      'registration':
-          registration != null ? _documentToJson(registration!) : null,
+      'registration': registration != null
+          ? _documentToJson(registration!)
+          : null,
       'fahas': fahas != null ? _documentToJson(fahas!) : null,
-      'maintenance':
-          maintenance != null ? _maintenanceToJson(maintenance!) : null,
+      'maintenance': maintenance != null
+          ? _maintenanceToJson(maintenance!)
+          : null,
       'vinNumber': vinNumber,
       'engineNumber': engineNumber,
       'fuelType': fuelType,
@@ -63,9 +64,9 @@ class VehicleModel extends VehicleEntity {
       'tireSize': tireSize,
       'department': department,
       'status': status,
-      'maintenanceIntervals': maintenanceIntervals,
-      'maintenanceHistory':
-          maintenanceHistory?.map((e) => _recordToJson(e)).toList(),
+      'maintenanceHistory': maintenanceHistory
+          ?.map((e) => _recordToJson(e))
+          .toList(),
     };
   }
 
@@ -79,40 +80,52 @@ class VehicleModel extends VehicleEntity {
 
   static Map<String, dynamic> _maintenanceToJson(VehicleMaintenance maint) {
     return {
-      'engineOil':
-          maint.engineOil != null ? _recordToJson(maint.engineOil!) : null,
+      'engineOil': maint.engineOil != null
+          ? _recordToJson(maint.engineOil!)
+          : null,
       'gearOil': maint.gearOil != null ? _recordToJson(maint.gearOil!) : null,
-      'housingOil':
-          maint.housingOil != null ? _recordToJson(maint.housingOil!) : null,
-      'tyreChange':
-          maint.tyreChange != null ? _recordToJson(maint.tyreChange!) : null,
+      'housingOil': maint.housingOil != null
+          ? _recordToJson(maint.housingOil!)
+          : null,
+      'tyreChange': maint.tyreChange != null
+          ? _recordToJson(maint.tyreChange!)
+          : null,
       'batteryChange': maint.batteryChange != null
           ? _recordToJson(maint.batteryChange!)
           : null,
-      'brakePads':
-          maint.brakePads != null ? _recordToJson(maint.brakePads!) : null,
-      'airFilter':
-          maint.airFilter != null ? _recordToJson(maint.airFilter!) : null,
-      'acService':
-          maint.acService != null ? _recordToJson(maint.acService!) : null,
+      'brakePads': maint.brakePads != null
+          ? _recordToJson(maint.brakePads!)
+          : null,
+      'airFilter': maint.airFilter != null
+          ? _recordToJson(maint.airFilter!)
+          : null,
+      'acService': maint.acService != null
+          ? _recordToJson(maint.acService!)
+          : null,
       'wheelAlignment': maint.wheelAlignment != null
           ? _recordToJson(maint.wheelAlignment!)
           : null,
-      'sparkPlugs':
-          maint.sparkPlugs != null ? _recordToJson(maint.sparkPlugs!) : null,
-      'coolantFlush':
-          maint.coolantFlush != null ? _recordToJson(maint.coolantFlush!) : null,
-      'wiperBlades':
-          maint.wiperBlades != null ? _recordToJson(maint.wiperBlades!) : null,
-      'timingBelt':
-          maint.timingBelt != null ? _recordToJson(maint.timingBelt!) : null,
+      'sparkPlugs': maint.sparkPlugs != null
+          ? _recordToJson(maint.sparkPlugs!)
+          : null,
+      'coolantFlush': maint.coolantFlush != null
+          ? _recordToJson(maint.coolantFlush!)
+          : null,
+      'wiperBlades': maint.wiperBlades != null
+          ? _recordToJson(maint.wiperBlades!)
+          : null,
+      'timingBelt': maint.timingBelt != null
+          ? _recordToJson(maint.timingBelt!)
+          : null,
       'transmissionFluid': maint.transmissionFluid != null
           ? _recordToJson(maint.transmissionFluid!)
           : null,
-      'brakeFluid':
-          maint.brakeFluid != null ? _recordToJson(maint.brakeFluid!) : null,
-      'fuelFilter':
-          maint.fuelFilter != null ? _recordToJson(maint.fuelFilter!) : null,
+      'brakeFluid': maint.brakeFluid != null
+          ? _recordToJson(maint.brakeFluid!)
+          : null,
+      'fuelFilter': maint.fuelFilter != null
+          ? _recordToJson(maint.fuelFilter!)
+          : null,
     };
   }
 
@@ -175,13 +188,10 @@ class VehicleModel extends VehicleEntity {
       tireSize: json['tireSize'] as String?,
       department: json['department'] as String?,
       status: json['status'] as String?,
-      maintenanceIntervals: json['maintenanceIntervals'] != null
-          ? Map<String, int>.from(json['maintenanceIntervals'] as Map)
-          : null,
       maintenanceHistory: json['maintenanceHistory'] != null
           ? (json['maintenanceHistory'] as List)
-              .map((e) => _recordFromJson(e as Map<String, dynamic>))
-              .toList()
+                .map((e) => _recordFromJson(e as Map<String, dynamic>))
+                .toList()
           : null,
     );
   }
@@ -296,7 +306,6 @@ class VehicleModel extends VehicleEntity {
       tireSize: entity.tireSize,
       department: entity.department,
       status: entity.status,
-      maintenanceIntervals: entity.maintenanceIntervals,
       maintenanceHistory: entity.maintenanceHistory,
     );
   }
@@ -329,7 +338,6 @@ class VehicleModel extends VehicleEntity {
     String? tireSize,
     String? department,
     String? status,
-    Map<String, int>? maintenanceIntervals,
     List<MaintenanceRecord>? maintenanceHistory,
   }) {
     return VehicleModel(
@@ -360,7 +368,6 @@ class VehicleModel extends VehicleEntity {
       tireSize: tireSize ?? this.tireSize,
       department: department ?? this.department,
       status: status ?? this.status,
-      maintenanceIntervals: maintenanceIntervals ?? this.maintenanceIntervals,
       maintenanceHistory: maintenanceHistory ?? this.maintenanceHistory,
     );
   }
