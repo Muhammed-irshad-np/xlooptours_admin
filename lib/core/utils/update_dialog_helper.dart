@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+// import 'package:intl/intl.dart';
 import '../../features/notifications/domain/entities/notification_entity.dart';
 import '../../features/employee/presentation/providers/employee_provider.dart';
 import '../../features/vehicle/presentation/providers/vehicle_provider.dart';
@@ -31,8 +32,6 @@ class UpdateDialogHelper {
 
     if (employee == null) return;
 
-    // The id is structured as: expiry_EMPLID_Document_Type
-    // The prefix length is 'expiry_${relatedId}_'.length
     final prefix = 'expiry_${relatedId}_';
     final documentTypeEncoded = notification.id.substring(prefix.length);
     final documentType = documentTypeEncoded.replaceAll('_', ' ');
@@ -158,15 +157,21 @@ class UpdateDialogHelper {
                     }
 
                     await employeeProvider.updateEmployee(updatedEmployee);
+                    
                     if (context.mounted) {
-                      await context.read<NotificationProvider>().markAsRead(notification.id);
+                      final notificationProvider = context.read<NotificationProvider>();
                       final vehicleProvider = context.read<VehicleProvider>();
-                      await context.read<NotificationProvider>().refreshAlerts(
+                      final messenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(context);
+
+                      await notificationProvider.markAsRead(notification.id);
+                      await notificationProvider.refreshAlerts(
                         vehicles: vehicleProvider.vehicles,
                         maintenanceTypes: vehicleProvider.maintenanceTypes,
                       );
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      
+                      navigator.pop();
+                      messenger.showSnackBar(
                         const SnackBar(content: Text('Updated successfully')),
                       );
                     }
@@ -202,7 +207,6 @@ class UpdateDialogHelper {
     final costController = TextEditingController();
     final notesController = TextEditingController();
 
-    // Suggest current odometer if available
     if (vehicle.currentOdometer != null) {
       mileageController.text = vehicle.currentOdometer.toString();
     }
@@ -214,54 +218,64 @@ class UpdateDialogHelper {
           builder: (context, setState) {
             return AlertDialog(
               title: Text('Update $category'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CustomDatePicker(
-                    label: 'Date of Maintenance',
-                    date: selectedDate,
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: selectedDate ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        setState(() {
-                          selectedDate = picked;
-                        });
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: mileageController,
-                    decoration: const InputDecoration(
-                      labelText: 'Odometer Reading (KM)',
-                      border: OutlineInputBorder(),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Vehicle: ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber})',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: costController,
-                    decoration: const InputDecoration(
-                      labelText: 'Cost (Optional)',
-                      prefixText: '\$ ',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 8),
+                    Text('Maintenance Category: $category'),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: mileageController,
+                      decoration: const InputDecoration(
+                        labelText: 'Odometer Reading (KM)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
                     ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: notesController,
-                    decoration: const InputDecoration(
-                      labelText: 'Notes',
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 16),
+                    CustomDatePicker(
+                      label: 'Service Date',
+                      date: selectedDate,
+                      onTap: () async {
+                        final DateTime? picked = await showDatePicker(
+                          context: context,
+                          initialDate: selectedDate ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            selectedDate = picked;
+                          });
+                        }
+                      },
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: costController,
+                      decoration: const InputDecoration(
+                        labelText: 'Cost (Optional)',
+                        prefixText: 'SAR ',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: notesController,
+                      decoration: const InputDecoration(
+                        labelText: 'Notes',
+                        border: OutlineInputBorder(),
+                      ),
+                      maxLines: 3,
+                    ),
+                  ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -296,25 +310,24 @@ class UpdateDialogHelper {
                     VehicleMaintenance updatedMaintenance = currentMaintenance;
 
                     switch (category) {
-                      case 'Engine Oil': updatedMaintenance = VehicleMaintenance(engineOil: newRecord, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Gear Oil': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: newRecord, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Housing Oil': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: newRecord, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Tyre Change': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: newRecord, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Battery Change': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: newRecord, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Brake Pads': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: newRecord, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Air Filter': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: newRecord, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'AC Service': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: newRecord, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Wheel Alignment': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: newRecord, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Spark Plugs': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: newRecord, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Coolant Flush': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: newRecord, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Wiper Blades': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: newRecord, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Timing Belt': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: newRecord, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Transmission Fluid': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: newRecord, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Brake Fluid': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: newRecord, fuelFilter: currentMaintenance.fuelFilter); break;
-                      case 'Fuel Filter': updatedMaintenance = VehicleMaintenance(engineOil: currentMaintenance.engineOil, gearOil: currentMaintenance.gearOil, housingOil: currentMaintenance.housingOil, tyreChange: currentMaintenance.tyreChange, batteryChange: currentMaintenance.batteryChange, brakePads: currentMaintenance.brakePads, airFilter: currentMaintenance.airFilter, acService: currentMaintenance.acService, wheelAlignment: currentMaintenance.wheelAlignment, sparkPlugs: currentMaintenance.sparkPlugs, coolantFlush: currentMaintenance.coolantFlush, wiperBlades: currentMaintenance.wiperBlades, timingBelt: currentMaintenance.timingBelt, transmissionFluid: currentMaintenance.transmissionFluid, brakeFluid: currentMaintenance.brakeFluid, fuelFilter: newRecord); break;
+                      case 'Engine Oil': updatedMaintenance = currentMaintenance.copyWith(engineOil: newRecord); break;
+                      case 'Gear Oil': updatedMaintenance = currentMaintenance.copyWith(gearOil: newRecord); break;
+                      case 'Housing Oil': updatedMaintenance = currentMaintenance.copyWith(housingOil: newRecord); break;
+                      case 'Tyre Change': updatedMaintenance = currentMaintenance.copyWith(tyreChange: newRecord); break;
+                      case 'Battery Change': updatedMaintenance = currentMaintenance.copyWith(batteryChange: newRecord); break;
+                      case 'Brake Pads': updatedMaintenance = currentMaintenance.copyWith(brakePads: newRecord); break;
+                      case 'Air Filter': updatedMaintenance = currentMaintenance.copyWith(airFilter: newRecord); break;
+                      case 'AC Service': updatedMaintenance = currentMaintenance.copyWith(acService: newRecord); break;
+                      case 'Wheel Alignment': updatedMaintenance = currentMaintenance.copyWith(wheelAlignment: newRecord); break;
+                      case 'Spark Plugs': updatedMaintenance = currentMaintenance.copyWith(sparkPlugs: newRecord); break;
+                      case 'Coolant Flush': updatedMaintenance = currentMaintenance.copyWith(coolantFlush: newRecord); break;
+                      case 'Wiper Blades': updatedMaintenance = currentMaintenance.copyWith(wiperBlades: newRecord); break;
+                      case 'Timing Belt': updatedMaintenance = currentMaintenance.copyWith(timingBelt: newRecord); break;
+                      case 'Transmission Fluid': updatedMaintenance = currentMaintenance.copyWith(transmissionFluid: newRecord); break;
+                      case 'Brake Fluid': updatedMaintenance = currentMaintenance.copyWith(brakeFluid: newRecord); break;
+                      case 'Fuel Filter': updatedMaintenance = currentMaintenance.copyWith(fuelFilter: newRecord); break;
                     }
 
-                    // For the vehicle, we should also update the current odometer if the newly provided one is greater
                     int updatedOdometer = vehicle.currentOdometer ?? 0;
                     if (newMileage > updatedOdometer) {
                       updatedOdometer = newMileage;
@@ -334,14 +347,20 @@ class UpdateDialogHelper {
                     );
 
                     await vehicleProvider.updateVehicle(updatedVehicle);
+                    
                     if (context.mounted) {
-                      await context.read<NotificationProvider>().markAsRead(notification.id);
-                      await context.read<NotificationProvider>().refreshAlerts(
+                      final notificationProvider = context.read<NotificationProvider>();
+                      final messenger = ScaffoldMessenger.of(context);
+                      final navigator = Navigator.of(context);
+
+                      await notificationProvider.markAsRead(notification.id);
+                      await notificationProvider.refreshAlerts(
                         vehicles: vehicleProvider.vehicles,
                         maintenanceTypes: vehicleProvider.maintenanceTypes,
                       );
-                      Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
+                      
+                      navigator.pop();
+                      messenger.showSnackBar(
                         const SnackBar(content: Text('Updated successfully')),
                       );
                     }

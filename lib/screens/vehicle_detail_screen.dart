@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
+import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import 'vehicle_maintenance_history_screen.dart';
-import 'package:provider/provider.dart';
 import 'document_viewer_screen.dart';
-import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/utils/share_helper.dart';
 import '../core/widgets/modern_app_bar.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class VehicleDetailScreen extends StatelessWidget {
   final VehicleEntity vehicle;
@@ -219,7 +220,7 @@ class VehicleDetailScreen extends StatelessWidget {
                 _buildSectionHeader('Maintenance Records'),
                 TextButton.icon(
                   icon: const Icon(Icons.history, size: 20),
-                  label: const Text('View History'),
+                  label: const Text('View All History'),
                   onPressed: () {
                     Navigator.push(
                       context,
@@ -232,143 +233,29 @@ class VehicleDetailScreen extends StatelessWidget {
                 ),
               ],
             ),
-            if (vehicle.maintenance != null) ...[
-              _buildMaintenanceDetail(
-                context,
-                'Engine Oil',
-                vehicle.maintenance!.engineOil,
-                Icons.oil_barrel,
-                vehicle.currentOdometer,
-                _getInterval(context, 'engine_oil'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Gear Oil',
-                vehicle.maintenance!.gearOil,
-                Icons.settings_suggest,
-                vehicle.currentOdometer,
-                _getInterval(context, 'gear_oil'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Housing Oil',
-                vehicle.maintenance!.housingOil,
-                Icons.format_color_fill,
-                vehicle.currentOdometer,
-                _getInterval(context, 'housing_oil'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Tyre Change',
-                vehicle.maintenance!.tyreChange,
-                Icons.tire_repair,
-                vehicle.currentOdometer,
-                _getInterval(context, 'tyre_change'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Battery Change',
-                vehicle.maintenance!.batteryChange,
-                Icons.battery_charging_full,
-                vehicle.currentOdometer,
-                _getInterval(context, 'battery_change'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Brake Pads',
-                vehicle.maintenance!.brakePads,
-                Icons.settings_backup_restore,
-                vehicle.currentOdometer,
-                _getInterval(context, 'brake_pads'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Air Filter',
-                vehicle.maintenance!.airFilter,
-                Icons.air,
-                vehicle.currentOdometer,
-                _getInterval(context, 'air_filter'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'AC Service',
-                vehicle.maintenance!.acService,
-                Icons.ac_unit,
-                vehicle.currentOdometer,
-                _getInterval(context, 'ac_service'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Wheel Alignment',
-                vehicle.maintenance!.wheelAlignment,
-                Icons.align_horizontal_center,
-                vehicle.currentOdometer,
-                _getInterval(context, 'wheel_alignment'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Spark Plugs',
-                vehicle.maintenance!.sparkPlugs,
-                Icons.electric_bolt,
-                vehicle.currentOdometer,
-                _getInterval(context, 'spark_plugs'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Coolant Flush',
-                vehicle.maintenance!.coolantFlush,
-                Icons.water_drop,
-                vehicle.currentOdometer,
-                _getInterval(context, 'coolant_flush'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Wiper Blades',
-                vehicle.maintenance!.wiperBlades,
-                Icons.cleaning_services,
-                vehicle.currentOdometer,
-                _getInterval(context, 'wiper_blades'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Timing Belt',
-                vehicle.maintenance!.timingBelt,
-                Icons.conveyor_belt,
-                vehicle.currentOdometer,
-                _getInterval(context, 'timing_belt'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Transmission Fluid',
-                vehicle.maintenance!.transmissionFluid,
-                Icons.opacity,
-                vehicle.currentOdometer,
-                _getInterval(context, 'transmission_fluid'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Brake Fluid',
-                vehicle.maintenance!.brakeFluid,
-                Icons.invert_colors,
-                vehicle.currentOdometer,
-                _getInterval(context, 'brake_fluid'),
-              ),
-              _buildMaintenanceDetail(
-                context,
-                'Fuel Filter',
-                vehicle.maintenance!.fuelFilter,
-                Icons.filter_alt,
-                vehicle.currentOdometer,
-                _getInterval(context, 'fuel_filter'),
-              ),
+            if (vehicle.maintenanceHistory != null &&
+                vehicle.maintenanceHistory!.isNotEmpty) ...[
+              ...((List<MaintenanceRecord>.from(vehicle.maintenanceHistory!))
+                    ..sort((a, b) => b.date.compareTo(a.date)))
+                  .take(5)
+                  .map((record) => _buildHistoryItem(context, record)),
             ] else
               Padding(
-                padding: const EdgeInsets.only(bottom: 12.0),
-                child: Text(
-                  'No maintenance records available',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontStyle: FontStyle.italic,
+                padding: const EdgeInsets.all(16.0),
+                child: Center(
+                  child: Column(
+                    children: [
+                      Icon(Icons.history_outlined,
+                          size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 8),
+                      Text(
+                        'No maintenance history available',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -378,14 +265,88 @@ class VehicleDetailScreen extends StatelessWidget {
     );
   }
 
-  int? _getInterval(BuildContext context, String typeId) {
-    try {
-      final types = context.read<VehicleProvider>().maintenanceTypes;
-      final type = types.firstWhere((t) => t.id == typeId);
-      return type.defaultIntervalKm;
-    } catch (e) {
-      return null;
-    }
+  Widget _buildHistoryItem(BuildContext context, MaintenanceRecord record) {
+    final dateStr = DateFormat('yyyy-MM-dd').format(record.date);
+    
+    // Attempt to find a suitable icon based on service type
+    IconData icon = Icons.build_circle_outlined;
+    final type = record.serviceType?.toLowerCase() ?? '';
+    if (type.contains('oil')) icon = Icons.oil_barrel_outlined;
+    if (type.contains('tyre') || type.contains('tire')) icon = Icons.tire_repair_outlined;
+    if (type.contains('battery')) icon = Icons.battery_charging_full_outlined;
+    if (type.contains('brake')) icon = Icons.settings_backup_restore_outlined;
+    if (type.contains('filter')) icon = Icons.filter_alt_outlined;
+    if (type.contains('ac')) icon = Icons.ac_unit_outlined;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.blue, size: 20),
+        ),
+        title: Text(
+          record.serviceType ?? 'General Maintenance',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.bold,
+            fontSize: 15.sp,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(height: 4.h),
+            Text(
+              '$dateStr • ${record.mileage} KM',
+              style: GoogleFonts.inter(
+                fontSize: 13.sp,
+                color: Colors.grey[600],
+              ),
+            ),
+            if (record.notes != null && record.notes!.isNotEmpty) ...[
+              SizedBox(height: 4.h),
+              Text(
+                record.notes!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  color: Colors.grey[500],
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ],
+          ],
+        ),
+        trailing: record.cost != null
+            ? Text(
+                '${record.cost} SAR',
+                style: GoogleFonts.inter(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green[700],
+                  fontSize: 14.sp,
+                ),
+              )
+            : null,
+      ),
+    );
   }
 
   Widget _buildSectionHeader(String title) {
@@ -402,122 +363,6 @@ class VehicleDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMaintenanceDetail(
-    BuildContext context,
-    String label,
-    dynamic record, // MaintenanceRecord?
-    IconData icon,
-    int? currentOdometer,
-    int? intervalKm,
-  ) {
-    if (record == null) {
-      return _buildDetailRow(context, label, 'No record', icon);
-    }
-
-    final dateStr = DateFormat('yyyy-MM-dd').format(record.date);
-    String valueStr = '$dateStr at ${record.mileage} KM';
-
-    if (currentOdometer != null && intervalKm != null) {
-      final int remainingKm = (record.mileage + intervalKm) - currentOdometer;
-      String statusStr = 'Healthy';
-      Color statusColor = Colors.green;
-
-      if (remainingKm <= 0) {
-        statusStr = 'Overdue';
-        statusColor = Colors.red;
-      } else if (remainingKm <= 1000) {
-        statusStr = 'Due Soon';
-        statusColor = Colors.orange;
-      }
-
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 12.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 20, color: Colors.grey),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: const TextStyle(color: Colors.grey, fontSize: 14),
-                  ),
-                  const SizedBox(height: 4),
-                  Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 8,
-                    children: [
-                      Text(
-                        valueStr,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: statusColor.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: statusColor.withValues(alpha: 0.5),
-                          ),
-                        ),
-                        child: Text(
-                          '$statusStr ($remainingKm KM left)',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: statusColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            if (record.attachmentUrl != null &&
-                record.attachmentUrl!.isNotEmpty)
-              IconButton(
-                icon: const Icon(
-                  Icons.remove_red_eye,
-                  color: Colors.blue,
-                  size: 20,
-                ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => DocumentViewerScreen(
-                        attachmentUrl: record.attachmentUrl!,
-                        title: '$label Document',
-                      ),
-                    ),
-                  );
-                },
-                tooltip: 'View Document',
-              ),
-          ],
-        ),
-      );
-    }
-
-    // Default row if no interval/odometer
-    return _buildDetailRow(
-      context,
-      label,
-      valueStr,
-      icon,
-      attachmentUrl: record.attachmentUrl,
-    );
-  }
 
   Widget _buildDetailRow(
     BuildContext context,

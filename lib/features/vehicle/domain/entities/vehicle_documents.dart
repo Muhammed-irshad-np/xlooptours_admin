@@ -48,6 +48,40 @@ class MaintenanceRecord extends Equatable {
     this.nextServiceDate,
   });
 
+  MaintenanceRecord copyWith({
+    DateTime? date,
+    int? mileage,
+    String? attachmentUrl,
+    int? notificationDays,
+    double? cost,
+    double? partsCost,
+    double? laborCost,
+    String? serviceProvider,
+    String? workOrderNumber,
+    String? serviceType,
+    String? partsReplaced,
+    String? notes,
+    int? nextServiceMileage,
+    DateTime? nextServiceDate,
+  }) {
+    return MaintenanceRecord(
+      date: date ?? this.date,
+      mileage: mileage ?? this.mileage,
+      attachmentUrl: attachmentUrl ?? this.attachmentUrl,
+      notificationDays: notificationDays ?? this.notificationDays,
+      cost: cost ?? this.cost,
+      partsCost: partsCost ?? this.partsCost,
+      laborCost: laborCost ?? this.laborCost,
+      serviceProvider: serviceProvider ?? this.serviceProvider,
+      workOrderNumber: workOrderNumber ?? this.workOrderNumber,
+      serviceType: serviceType ?? this.serviceType,
+      partsReplaced: partsReplaced ?? this.partsReplaced,
+      notes: notes ?? this.notes,
+      nextServiceMileage: nextServiceMileage ?? this.nextServiceMileage,
+      nextServiceDate: nextServiceDate ?? this.nextServiceDate,
+    );
+  }
+
   @override
   List<Object?> get props => [
     date,
@@ -103,6 +137,44 @@ class VehicleMaintenance extends Equatable {
     this.brakeFluid,
     this.fuelFilter,
   });
+
+  VehicleMaintenance copyWith({
+    MaintenanceRecord? engineOil,
+    MaintenanceRecord? gearOil,
+    MaintenanceRecord? housingOil,
+    MaintenanceRecord? tyreChange,
+    MaintenanceRecord? batteryChange,
+    MaintenanceRecord? brakePads,
+    MaintenanceRecord? airFilter,
+    MaintenanceRecord? acService,
+    MaintenanceRecord? wheelAlignment,
+    MaintenanceRecord? sparkPlugs,
+    MaintenanceRecord? coolantFlush,
+    MaintenanceRecord? wiperBlades,
+    MaintenanceRecord? timingBelt,
+    MaintenanceRecord? transmissionFluid,
+    MaintenanceRecord? brakeFluid,
+    MaintenanceRecord? fuelFilter,
+  }) {
+    return VehicleMaintenance(
+      engineOil: engineOil ?? this.engineOil,
+      gearOil: gearOil ?? this.gearOil,
+      housingOil: housingOil ?? this.housingOil,
+      tyreChange: tyreChange ?? this.tyreChange,
+      batteryChange: batteryChange ?? this.batteryChange,
+      brakePads: brakePads ?? this.brakePads,
+      airFilter: airFilter ?? this.airFilter,
+      acService: acService ?? this.acService,
+      wheelAlignment: wheelAlignment ?? this.wheelAlignment,
+      sparkPlugs: sparkPlugs ?? this.sparkPlugs,
+      coolantFlush: coolantFlush ?? this.coolantFlush,
+      wiperBlades: wiperBlades ?? this.wiperBlades,
+      timingBelt: timingBelt ?? this.timingBelt,
+      transmissionFluid: transmissionFluid ?? this.transmissionFluid,
+      brakeFluid: brakeFluid ?? this.brakeFluid,
+      fuelFilter: fuelFilter ?? this.fuelFilter,
+    );
+  }
 
   @override
   List<Object?> get props => [

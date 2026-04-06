@@ -76,11 +76,20 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
       }
       await batch.commit();
     }
+
+    final Map<String, dynamic> vehicleData = vehicle.toJson();
+
+    // CRITICAL: Filter out null values to prevent Firestore from clearing existing fields
+    // that are not provided in this update (partial update pattern).
+    vehicleData.removeWhere((key, value) => value == null);
+
+
     await firestore
         .collection('vehicles')
         .doc(vehicle.id)
-        .update(vehicle.toJson());
+        .update(vehicleData);
   }
+
 
   @override
   Future<void> deleteVehicle(String id) async {

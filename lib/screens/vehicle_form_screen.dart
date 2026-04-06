@@ -329,57 +329,110 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
         }
       }
 
-      final vehicle = VehicleEntity(
-        id: vehicleId,
-        make: _selectedMake.value!,
-        model: _selectedModel.value!,
-        year: _selectedYear.value!,
-        color: _selectedColor.value!,
-        plateNumber: _plateNumberController.text,
-        type: _typeController.text,
-        assignedDriverId: _assignedEmployeeId.value,
-        imageUrl: imageUrl,
-        isActive: true,
-        insurance: _insuranceExpiryDate.value != null
-            ? VehicleDocument(
-                expiryDate: _insuranceExpiryDate.value!,
-                attachmentUrl: widget.vehicle?.insurance?.attachmentUrl,
-              )
-            : null,
-        registration: _registrationExpiryDate.value != null
-            ? VehicleDocument(
-                expiryDate: _registrationExpiryDate.value!,
-                attachmentUrl: registrationUrl,
-              )
-            : null,
-        fahas: _fahasExpiryDate.value != null
-            ? VehicleDocument(
-                expiryDate: _fahasExpiryDate.value!,
-                attachmentUrl: widget.vehicle?.fahas?.attachmentUrl,
-              )
-            : null,
-        maintenance: null,
-        vinNumber: _vinNumberController.text.isNotEmpty
-            ? _vinNumberController.text
-            : null,
-        engineNumber: _engineNumberController.text.isNotEmpty
-            ? _engineNumberController.text
-            : null,
-        fuelType: _fuelType.value,
-        transmission: _transmission.value,
-        purchaseDate: _purchaseDate.value,
-        purchasePrice: double.tryParse(_purchasePriceController.text),
-        currentOdometer: int.tryParse(_currentOdometerController.text),
-        gvwr: _gvwrController.text.isNotEmpty ? _gvwrController.text : null,
-        tireSize: _tireSizeController.text.isNotEmpty
-            ? _tireSizeController.text
-            : null,
-        department: _departmentController.text.isNotEmpty
-            ? _departmentController.text
-            : null,
-
-        status: _status.value,
-      );
+      final VehicleEntity vehicle;
+      if (widget.vehicle != null) {
+        // When editing, preserve fields like maintenance and maintenanceHistory
+        vehicle = widget.vehicle!.copyWith(
+          make: _selectedMake.value!,
+          model: _selectedModel.value!,
+          year: _selectedYear.value!,
+          color: _selectedColor.value!,
+          plateNumber: _plateNumberController.text,
+          type: _typeController.text,
+          assignedDriverId: _assignedEmployeeId.value,
+          imageUrl: imageUrl,
+          insurance: _insuranceExpiryDate.value != null
+              ? VehicleDocument(
+                  expiryDate: _insuranceExpiryDate.value!,
+                  attachmentUrl: registrationUrl == _isthimaraAttachmentUrl.value
+                      ? widget.vehicle?.insurance?.attachmentUrl
+                      : widget.vehicle?.insurance?.attachmentUrl, // Insurance didn't change attachment logic here yet
+                )
+              : null,
+          registration: _registrationExpiryDate.value != null
+              ? VehicleDocument(
+                  expiryDate: _registrationExpiryDate.value!,
+                  attachmentUrl: registrationUrl,
+                )
+              : null,
+          fahas: _fahasExpiryDate.value != null
+              ? VehicleDocument(
+                  expiryDate: _fahasExpiryDate.value!,
+                  attachmentUrl: widget.vehicle?.fahas?.attachmentUrl,
+                )
+              : null,
+          vinNumber: _vinNumberController.text.isNotEmpty
+              ? _vinNumberController.text
+              : null,
+          engineNumber: _engineNumberController.text.isNotEmpty
+              ? _engineNumberController.text
+              : null,
+          fuelType: _fuelType.value,
+          transmission: _transmission.value,
+          purchaseDate: _purchaseDate.value,
+          purchasePrice: double.tryParse(_purchasePriceController.text),
+          currentOdometer: int.tryParse(_currentOdometerController.text),
+          gvwr: _gvwrController.text.isNotEmpty ? _gvwrController.text : null,
+          tireSize: _tireSizeController.text.isNotEmpty
+              ? _tireSizeController.text
+              : null,
+          department: _departmentController.text.isNotEmpty
+              ? _departmentController.text
+              : null,
+          status: _status.value,
+        );
+      } else {
+        // When creating new, set maintenance to null and history to empty
+        vehicle = VehicleEntity(
+          id: vehicleId,
+          make: _selectedMake.value!,
+          model: _selectedModel.value!,
+          year: _selectedYear.value!,
+          color: _selectedColor.value!,
+          plateNumber: _plateNumberController.text,
+          type: _typeController.text,
+          assignedDriverId: _assignedEmployeeId.value,
+          imageUrl: imageUrl,
+          isActive: true,
+          insurance: _insuranceExpiryDate.value != null
+              ? VehicleDocument(
+                  expiryDate: _insuranceExpiryDate.value!,
+                )
+              : null,
+          registration: _registrationExpiryDate.value != null
+              ? VehicleDocument(
+                  expiryDate: _registrationExpiryDate.value!,
+                  attachmentUrl: registrationUrl,
+                )
+              : null,
+          fahas: _fahasExpiryDate.value != null
+              ? VehicleDocument(
+                  expiryDate: _fahasExpiryDate.value!,
+                )
+              : null,
+          maintenance: null,
+          maintenanceHistory: [],
+          vinNumber: _vinNumberController.text.isNotEmpty
+              ? _vinNumberController.text
+              : null,
+          engineNumber: _engineNumberController.text.isNotEmpty
+              ? _engineNumberController.text
+              : null,
+          fuelType: _fuelType.value,
+          transmission: _transmission.value,
+          purchaseDate: _purchaseDate.value,
+          purchasePrice: double.tryParse(_purchasePriceController.text),
+          currentOdometer: int.tryParse(_currentOdometerController.text),
+          gvwr: _gvwrController.text.isNotEmpty ? _gvwrController.text : null,
+          tireSize: _tireSizeController.text.isNotEmpty
+              ? _tireSizeController.text
+              : null,
+          department: _departmentController.text.isNotEmpty
+              ? _departmentController.text
+              : null,
+          status: _status.value,
+        );
+      }
 
       debugPrint('VehicleFormScreen: Saving vehicle data to Firestore...');
       if (mounted) {
