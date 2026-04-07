@@ -3,12 +3,16 @@ import 'package:intl/intl.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
+import '../features/vehicle/domain/entities/maintenance_type_entity.dart';
+import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'vehicle_maintenance_history_screen.dart';
 import 'document_viewer_screen.dart';
 import '../core/utils/share_helper.dart';
 import '../core/widgets/modern_app_bar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:provider/provider.dart';
+import '../widgets/add_maintenance_record_dialog.dart';
 
 class VehicleDetailScreen extends StatelessWidget {
   final VehicleEntity vehicle;
@@ -18,6 +22,24 @@ class VehicleDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final provider = Provider.of<VehicleProvider>(context);
+    
+    // Find the latest version of this vehicle in the provider's list
+    // to ensure the UI refreshes when maintenance records are added.
+    final currentVehicle = provider.vehicles.cast<VehicleEntity>().firstWhere(
+      (v) => v.id == vehicle.id, 
+      orElse: () => vehicle
+    );
+
+    final missingTypes = provider.maintenanceTypes.where((type) {
+      final wasPerformed = currentVehicle.maintenanceHistory?.any(
+            (record) =>
+                record.serviceType?.toLowerCase() == type.name.toLowerCase(),
+          ) ??
+          false;
+      return !wasPerformed;
+    }).toList();
+
     return Scaffold(
       appBar: const ModernAppBar(title: 'Vehicle Details'),
       body: SingleChildScrollView(
@@ -25,7 +47,7 @@ class VehicleDetailScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (vehicle.imageUrl != null)
+            if (currentVehicle.imageUrl != null)
               Container(
                 height: 200,
                 width: double.infinity,
@@ -36,7 +58,7 @@ class VehicleDetailScreen extends StatelessWidget {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Image.network(
-                  vehicle.imageUrl!,
+                  currentVehicle.imageUrl!,
                   fit: BoxFit.cover,
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
@@ -57,20 +79,20 @@ class VehicleDetailScreen extends StatelessWidget {
             _buildDetailRow(
               context,
               'Make & Model',
-              '${vehicle.make} ${vehicle.model}',
+              '${currentVehicle.make} ${currentVehicle.model}',
               Icons.directions_car,
             ),
             _buildDetailRow(
               context,
               'Year',
-              vehicle.year.toString(),
+              currentVehicle.year.toString(),
               Icons.calendar_today,
             ),
-            _buildDetailRow(context, 'Color', vehicle.color, Icons.color_lens),
+            _buildDetailRow(context, 'Color', currentVehicle.color, Icons.color_lens),
             _buildDetailRow(
               context,
               'Plate Number',
-              vehicle.plateNumber,
+              currentVehicle.plateNumber,
               Icons.confirmation_number,
             ),
             _buildDetailRow(
@@ -82,13 +104,13 @@ class VehicleDetailScreen extends StatelessWidget {
             _buildDetailRow(
               context,
               'Status',
-              vehicle.status ?? 'Active',
+              currentVehicle.status ?? 'Active',
               Icons.info_outline,
             ),
             _buildDetailRow(
               context,
               'Department',
-              vehicle.department ?? 'N/A',
+              currentVehicle.department ?? 'N/A',
               Icons.business_outlined,
             ),
             const Divider(height: 32),
@@ -96,13 +118,13 @@ class VehicleDetailScreen extends StatelessWidget {
             _buildDetailRow(
               context,
               'VIN Number',
-              vehicle.vinNumber ?? 'N/A',
+              currentVehicle.vinNumber ?? 'N/A',
               Icons.fingerprint,
             ),
             _buildDetailRow(
               context,
               'Engine Number',
-              vehicle.engineNumber ?? 'N/A',
+              currentVehicle.engineNumber ?? 'N/A',
               Icons.engineering,
             ),
             Row(
@@ -111,7 +133,7 @@ class VehicleDetailScreen extends StatelessWidget {
                   child: _buildDetailRow(
                     context,
                     'Fuel Type',
-                    vehicle.fuelType ?? 'N/A',
+                    currentVehicle.fuelType ?? 'N/A',
                     Icons.local_gas_station,
                   ),
                 ),
@@ -119,7 +141,7 @@ class VehicleDetailScreen extends StatelessWidget {
                   child: _buildDetailRow(
                     context,
                     'Transmission',
-                    vehicle.transmission ?? 'N/A',
+                    currentVehicle.transmission ?? 'N/A',
                     Icons.settings_input_component,
                   ),
                 ),
@@ -131,7 +153,7 @@ class VehicleDetailScreen extends StatelessWidget {
                   child: _buildDetailRow(
                     context,
                     'GVWR',
-                    vehicle.gvwr ?? 'N/A',
+                    currentVehicle.gvwr ?? 'N/A',
                     Icons.monitor_weight,
                   ),
                 ),
@@ -139,7 +161,7 @@ class VehicleDetailScreen extends StatelessWidget {
                   child: _buildDetailRow(
                     context,
                     'Tire Size',
-                    vehicle.tireSize ?? 'N/A',
+                    currentVehicle.tireSize ?? 'N/A',
                     Icons.tire_repair,
                   ),
                 ),
@@ -150,8 +172,8 @@ class VehicleDetailScreen extends StatelessWidget {
             _buildDetailRow(
               context,
               'Purchase Date',
-              vehicle.purchaseDate != null
-                  ? DateFormat('yyyy-MM-dd').format(vehicle.purchaseDate!)
+              currentVehicle.purchaseDate != null
+                  ? DateFormat('yyyy-MM-dd').format(currentVehicle.purchaseDate!)
                   : 'N/A',
               Icons.shopping_bag_outlined,
             ),
@@ -161,8 +183,8 @@ class VehicleDetailScreen extends StatelessWidget {
                   child: _buildDetailRow(
                     context,
                     'Purchase Price',
-                    vehicle.purchasePrice != null
-                        ? vehicle.purchasePrice!.toStringAsFixed(2)
+                    currentVehicle.purchasePrice != null
+                        ? currentVehicle.purchasePrice!.toStringAsFixed(2)
                         : 'N/A',
                     Icons.money,
                   ),
@@ -171,8 +193,8 @@ class VehicleDetailScreen extends StatelessWidget {
                   child: _buildDetailRow(
                     context,
                     'Current Odometer',
-                    vehicle.currentOdometer != null
-                        ? '${vehicle.currentOdometer} KM'
+                    currentVehicle.currentOdometer != null
+                        ? '${currentVehicle.currentOdometer} KM'
                         : 'N/A',
                     Icons.speed,
                   ),
@@ -184,83 +206,182 @@ class VehicleDetailScreen extends StatelessWidget {
             _buildDetailRow(
               context,
               'Insurance Expiry',
-              vehicle.insurance?.expiryDate != null
+              currentVehicle.insurance?.expiryDate != null
                   ? DateFormat(
-                      'yyyy-MM-dd',
-                    ).format(vehicle.insurance!.expiryDate)
+                    'yyyy-MM-dd',
+                  ).format(currentVehicle.insurance!.expiryDate)
                   : 'N/A',
               Icons.security_outlined,
-              attachmentUrl: vehicle.insurance?.attachmentUrl,
+              attachmentUrl: currentVehicle.insurance?.attachmentUrl,
             ),
             _buildDetailRow(
               context,
               'Isthimara (Registration) Expiry',
-              vehicle.registration?.expiryDate != null
+              currentVehicle.registration?.expiryDate != null
                   ? DateFormat(
-                      'yyyy-MM-dd',
-                    ).format(vehicle.registration!.expiryDate)
+                    'yyyy-MM-dd',
+                  ).format(currentVehicle.registration!.expiryDate)
                   : 'N/A',
               Icons.description_outlined,
-              attachmentUrl: vehicle.registration?.attachmentUrl,
+              attachmentUrl: currentVehicle.registration?.attachmentUrl,
             ),
             _buildDetailRow(
               context,
               'Fahas Expiry',
-              vehicle.fahas?.expiryDate != null
-                  ? DateFormat('yyyy-MM-dd').format(vehicle.fahas!.expiryDate)
+              currentVehicle.fahas?.expiryDate != null
+                  ? DateFormat('yyyy-MM-dd').format(currentVehicle.fahas!.expiryDate)
                   : 'N/A',
               Icons.fact_check_outlined,
-              attachmentUrl: vehicle.fahas?.attachmentUrl,
+              attachmentUrl: currentVehicle.fahas?.attachmentUrl,
             ),
             const Divider(height: 32),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildSectionHeader('Maintenance Records'),
-                TextButton.icon(
-                  icon: const Icon(Icons.history, size: 20),
-                  label: const Text('View All History'),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            VehicleMaintenanceHistoryScreen(vehicle: vehicle),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            ),
-            if (vehicle.maintenanceHistory != null &&
-                vehicle.maintenanceHistory!.isNotEmpty) ...[
-              ...((List<MaintenanceRecord>.from(vehicle.maintenanceHistory!))
-                    ..sort((a, b) => b.date.compareTo(a.date)))
-                  .take(5)
-                  .map((record) => _buildHistoryItem(context, record)),
-            ] else
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Center(
+                // Left Column: Maintenance History
+                Expanded(
+                  flex: 3,
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.history_outlined,
-                          size: 48, color: Colors.grey[300]),
-                      const SizedBox(height: 8),
-                      Text(
-                        'No maintenance history available',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontStyle: FontStyle.italic,
-                        ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildSectionHeader('Maintenance Records'),
+                          TextButton.icon(
+                            icon: const Icon(Icons.history, size: 20),
+                            label: const Text('View All History'),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder:
+                                      (context) =>
+                                          VehicleMaintenanceHistoryScreen(
+                                            vehicle: currentVehicle,
+                                          ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
                       ),
+                      if (currentVehicle.maintenanceHistory != null &&
+                          currentVehicle.maintenanceHistory!.isNotEmpty) ...[
+                        ...((List<MaintenanceRecord>.from(
+                                  currentVehicle.maintenanceHistory!,
+                                ))
+                                ..sort((a, b) => b.date.compareTo(a.date)))
+                            .take(5)
+                            .map(
+                              (record) => _buildHistoryItem(context, record),
+                            ),
+                      ] else
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Center(
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.history_outlined,
+                                  size: 48,
+                                  color: Colors.grey[300],
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'No maintenance history available',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontStyle: FontStyle.italic,
+                                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
-              ),
+                SizedBox(width: 24.w),
+                // Right Column: Not Entered Types
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSectionHeader('Not Recorded Yet'),
+                      if (missingTypes.isNotEmpty)
+                        ...missingTypes.map((type) => _buildMissingTypeItem(context, currentVehicle, type))
+                      else
+                        Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Center(
+                            child: Text(
+                              'All maintenance types recorded.',
+                              style: TextStyle(
+                                color: Colors.green[600],
+                                fontStyle: FontStyle.italic,
+                                fontSize: 13.sp,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMissingTypeItem(BuildContext context, VehicleEntity currentVehicle, MaintenanceTypeEntity type) {
+    return Container(
+      width: double.infinity,
+      margin: EdgeInsets.only(bottom: 8.h),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.1)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.orange[700],
+            size: 16.sp,
+          ),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Text(
+              type.name,
+              style: GoogleFonts.inter(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w500,
+                color: Colors.orange[900],
+              ),
+            ),
+          ),
+          IconButton(
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder:
+                    (context) => AddMaintenanceRecordDialog(
+                      vehicle: currentVehicle,
+                      initialMaintenanceTypeId: type.id,
+                    ),
+              );
+            },
+            icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
+            tooltip: 'Add ${type.name}',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
       ),
     );
   }
@@ -283,10 +404,10 @@ class VehicleDetailScreen extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -297,7 +418,7 @@ class VehicleDetailScreen extends StatelessWidget {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
+            color: Colors.blue.withValues(alpha: 0.1),
             shape: BoxShape.circle,
           ),
           child: Icon(icon, color: Colors.blue, size: 20),
@@ -362,7 +483,6 @@ class VehicleDetailScreen extends StatelessWidget {
       ),
     );
   }
-
 
   Widget _buildDetailRow(
     BuildContext context,

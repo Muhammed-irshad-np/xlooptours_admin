@@ -20,8 +20,13 @@ class _MaintenanceEntry {
 
 class AddMaintenanceRecordDialog extends StatefulWidget {
   final VehicleEntity vehicle;
+  final String? initialMaintenanceTypeId;
 
-  const AddMaintenanceRecordDialog({super.key, required this.vehicle});
+  const AddMaintenanceRecordDialog({
+    super.key,
+    required this.vehicle,
+    this.initialMaintenanceTypeId,
+  });
 
   @override
   State<AddMaintenanceRecordDialog> createState() =>
@@ -31,8 +36,16 @@ class AddMaintenanceRecordDialog extends StatefulWidget {
 class _AddMaintenanceRecordDialogState
     extends State<AddMaintenanceRecordDialog> {
   final _formKey = GlobalKey<FormState>();
-  final List<_MaintenanceEntry> _entries = [_MaintenanceEntry()];
+  late final List<_MaintenanceEntry> _entries;
   bool _isSaving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _entries = [
+      _MaintenanceEntry()..maintenanceTypeId = widget.initialMaintenanceTypeId,
+    ];
+  }
 
   @override
   void dispose() {
