@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
@@ -7,11 +8,16 @@ import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 
 class _MaintenanceEntry {
   String? maintenanceTypeId;
+  DateTime date = DateTime.now();
+  final TextEditingController dateController = TextEditingController(
+    text: DateFormat('MMM dd, yyyy').format(DateTime.now()),
+  );
   final TextEditingController serviceKmController = TextEditingController();
   final TextEditingController costController = TextEditingController();
   final TextEditingController notesController = TextEditingController();
 
   void dispose() {
+    dateController.dispose();
     serviceKmController.dispose();
     costController.dispose();
     notesController.dispose();
@@ -68,6 +74,21 @@ class _AddMaintenanceRecordDialogState
     });
   }
 
+  Future<void> _selectDate(BuildContext context, _MaintenanceEntry entry) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: entry.date,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != entry.date) {
+      setState(() {
+        entry.date = picked;
+        entry.dateController.text = DateFormat('MMM dd, yyyy').format(picked);
+      });
+    }
+  }
+
   Future<void> _saveRecords() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -97,7 +118,7 @@ class _AddMaintenanceRecordDialogState
         return (
           typeId: entry.maintenanceTypeId!,
           record: MaintenanceRecord(
-            date: DateTime.now(),
+            date: entry.date,
             mileage: int.tryParse(entry.serviceKmController.text) ?? 0,
             cost: double.tryParse(entry.costController.text),
             serviceProvider: '',
@@ -384,6 +405,21 @@ class _AddMaintenanceRecordDialogState
                               });
                             },
                             validator: (v) => v == null ? 'Required' : null,
+                          ),
+                        ),
+                        SizedBox(width: 16.w),
+                        Expanded(
+                          child: TextFormField(
+                            controller: entry.dateController,
+                            readOnly: true,
+                            onTap: () => _selectDate(context, entry),
+                            decoration: InputDecoration(
+                              labelText: 'Date',
+                              suffixIcon: const Icon(Icons.calendar_today),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                            ),
                           ),
                         ),
                         SizedBox(width: 16.w),
