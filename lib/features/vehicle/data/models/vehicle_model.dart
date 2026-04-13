@@ -17,6 +17,8 @@ class VehicleModel extends VehicleEntity {
     super.registration,
     super.fahas,
     super.maintenance,
+    super.tafweed,
+    super.currentTafweedDriverId,
     super.vinNumber,
     super.engineNumber,
     super.fuelType,
@@ -52,6 +54,8 @@ class VehicleModel extends VehicleEntity {
       'maintenance': maintenance != null
           ? _maintenanceToJson(maintenance!)
           : null,
+      'tafweed': tafweed != null ? _documentToJson(tafweed!) : null,
+      'currentTafweedDriverId': currentTafweedDriverId,
       'vinNumber': vinNumber,
       'engineNumber': engineNumber,
       'fuelType': fuelType,
@@ -172,6 +176,10 @@ class VehicleModel extends VehicleEntity {
       maintenance: json['maintenance'] != null
           ? _maintenanceFromJson(json['maintenance'] as Map<String, dynamic>)
           : null,
+      tafweed: json['tafweed'] != null
+          ? _documentFromJson(json['tafweed'] as Map<String, dynamic>)
+          : null,
+      currentTafweedDriverId: json['currentTafweedDriverId'] as String?,
       vinNumber: json['vinNumber'] as String?,
       engineNumber: json['engineNumber'] as String?,
       fuelType: json['fuelType'] as String?,
@@ -294,6 +302,8 @@ class VehicleModel extends VehicleEntity {
       registration: entity.registration,
       fahas: entity.fahas,
       maintenance: entity.maintenance,
+      tafweed: entity.tafweed,
+      currentTafweedDriverId: entity.currentTafweedDriverId,
       vinNumber: entity.vinNumber,
       engineNumber: entity.engineNumber,
       fuelType: entity.fuelType,
@@ -326,6 +336,8 @@ class VehicleModel extends VehicleEntity {
     VehicleDocument? registration,
     VehicleDocument? fahas,
     VehicleMaintenance? maintenance,
+    VehicleDocument? tafweed,
+    String? currentTafweedDriverId,
     String? vinNumber,
     String? engineNumber,
     String? fuelType,
@@ -355,6 +367,8 @@ class VehicleModel extends VehicleEntity {
       registration: registration ?? this.registration,
       fahas: fahas ?? this.fahas,
       maintenance: maintenance ?? this.maintenance,
+      tafweed: tafweed ?? this.tafweed,
+      currentTafweedDriverId: currentTafweedDriverId ?? this.currentTafweedDriverId,
       vinNumber: vinNumber ?? this.vinNumber,
       engineNumber: engineNumber ?? this.engineNumber,
       fuelType: fuelType ?? this.fuelType,

@@ -16,6 +16,8 @@ class VehicleEntity extends Equatable {
   final VehicleDocument? registration;
   final VehicleDocument? fahas;
   final VehicleMaintenance? maintenance;
+  final VehicleDocument? tafweed;
+  final String? currentTafweedDriverId;
   final String? vinNumber;
   final String? engineNumber;
   final String? fuelType;
@@ -45,6 +47,8 @@ class VehicleEntity extends Equatable {
     this.registration,
     this.fahas,
     this.maintenance,
+    this.tafweed,
+    this.currentTafweedDriverId,
     this.vinNumber,
     this.engineNumber,
     this.fuelType,
@@ -76,6 +80,8 @@ class VehicleEntity extends Equatable {
     registration,
     fahas,
     maintenance,
+    tafweed,
+    currentTafweedDriverId,
     vinNumber,
     engineNumber,
     fuelType,
@@ -106,6 +112,8 @@ class VehicleEntity extends Equatable {
     VehicleDocument? registration,
     VehicleDocument? fahas,
     VehicleMaintenance? maintenance,
+    VehicleDocument? tafweed,
+    String? currentTafweedDriverId,
     String? vinNumber,
     String? engineNumber,
     String? fuelType,
@@ -135,6 +143,8 @@ class VehicleEntity extends Equatable {
       registration: registration ?? this.registration,
       fahas: fahas ?? this.fahas,
       maintenance: maintenance ?? this.maintenance,
+      tafweed: tafweed ?? this.tafweed,
+      currentTafweedDriverId: currentTafweedDriverId ?? this.currentTafweedDriverId,
       vinNumber: vinNumber ?? this.vinNumber,
       engineNumber: engineNumber ?? this.engineNumber,
       fuelType: fuelType ?? this.fuelType,

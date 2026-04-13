@@ -65,6 +65,23 @@ class GetVehicleExpiryAlertsUseCase {
           );
         }
       }
+
+      // Tafweed
+      if (vehicle.tafweed != null) {
+        final days = vehicle.tafweed!.expiryDate.difference(now).inDays;
+        final alertDays = vehicle.tafweed!.notificationDays ?? settings.tafweedAlertDays;
+        if (days <= alertDays) {
+          alerts.add(
+            VehicleExpiryAlert(
+              vehicleId: vehicle.id,
+              plateNumber: vehicle.plateNumber,
+              documentType: 'Tafweed',
+              expiryDate: vehicle.tafweed!.expiryDate,
+              daysUntilExpiry: days,
+            ),
+          );
+        }
+      }
     }
 
     // Sort alerts by days until expiry (ascending)

@@ -5,6 +5,7 @@ import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/vehicle/domain/entities/maintenance_type_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../features/employee/presentation/providers/employee_provider.dart';
 import 'vehicle_maintenance_history_screen.dart';
 import 'document_viewer_screen.dart';
 import '../core/utils/share_helper.dart';
@@ -13,6 +14,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../widgets/add_maintenance_record_dialog.dart';
+import '../features/vehicle/presentation/widgets/update_tafweed_dialog.dart';
 
 class VehicleDetailScreen extends StatelessWidget {
   final VehicleEntity vehicle;
@@ -243,6 +245,35 @@ class VehicleDetailScreen extends StatelessWidget {
                   : 'N/A',
               Icons.fact_check_outlined,
               attachmentUrl: currentVehicle.fahas?.attachmentUrl,
+            ),
+            Consumer<EmployeeProvider>(
+              builder: (context, empProvider, child) {
+                final tafweedDriver = empProvider.employees.cast<EmployeeEntity?>().firstWhere(
+                  (e) => e?.id == currentVehicle.currentTafweedDriverId,
+                  orElse: () => null,
+                );
+                final tafweedValue = currentVehicle.tafweed?.expiryDate != null
+                    ? '${tafweedDriver?.fullName ?? 'Unknown Driver'} (Exp: ${DateFormat('yyyy-MM-dd').format(currentVehicle.tafweed!.expiryDate)})'
+                    : 'Not Setup';
+                    
+                return _buildDetailRow(
+                  context,
+                  'Tafweed Authorization',
+                  tafweedValue,
+                  Icons.admin_panel_settings_outlined,
+                  attachmentUrl: currentVehicle.tafweed?.attachmentUrl,
+                  actionWidget: TextButton.icon(
+                    icon: const Icon(Icons.swap_horiz, size: 18),
+                    label: const Text('Update'),
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => UpdateTafweedDialog(vehicle: currentVehicle),
+                      );
+                    },
+                  ),
+                );
+              },
             ),
             const Divider(height: 32),
             Row(
@@ -508,6 +539,7 @@ class VehicleDetailScreen extends StatelessWidget {
     String value,
     IconData icon, {
     String? attachmentUrl,
+    Widget? actionWidget,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
@@ -533,6 +565,7 @@ class VehicleDetailScreen extends StatelessWidget {
               ],
             ),
           ),
+          if (actionWidget != null) actionWidget,
           if (attachmentUrl != null && attachmentUrl.isNotEmpty) ...[
             IconButton(
               icon: const Icon(Icons.share, color: Color(0xFF13b1f2)),
