@@ -133,20 +133,26 @@ class GetEmployeeExpiryAlertsUseCase {
         }
       }
 
-      // Phone Recharge
-      if (employee.phoneRechargeDate != null) {
-        final days = employee.phoneRechargeDate!.difference(now).inDays;
-        final alertDays = employee.phoneRechargeNotificationDays ?? 30;
-        if (days <= alertDays) {
-          alerts.add(
-            EmployeeExpiryAlert(
-              employeeId: employee.id,
-              employeeName: employee.fullName,
-              documentType: 'Phone Recharge',
-              expiryDate: employee.phoneRechargeDate!,
-              daysUntilExpiry: days,
-            ),
-          );
+      // Phone Recharge – per contact
+      for (final contact in employee.contacts) {
+        if (contact.rechargeExpiryDate != null) {
+          final days = contact.rechargeExpiryDate!.difference(now).inDays;
+          final alertDays = contact.notificationDays ?? 30;
+          if (days <= alertDays) {
+            // Tag alert to the current holder if SIM is swapped
+            final holderId = contact.currentHolderId ?? employee.id;
+            final holderName = contact.currentHolderName ?? employee.fullName;
+            alerts.add(
+              EmployeeExpiryAlert(
+                employeeId: holderId,
+                employeeName: holderName,
+                documentType:
+                    'Phone Recharge (${contact.countryCode} ${contact.phoneNumber})',
+                expiryDate: contact.rechargeExpiryDate!,
+                daysUntilExpiry: days,
+              ),
+            );
+          }
         }
       }
     }

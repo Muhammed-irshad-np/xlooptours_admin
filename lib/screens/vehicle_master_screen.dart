@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'vehicle_makes_screen.dart';
 import 'maintenance_type_master_screen.dart';
+import 'vehicle_expiry_alert_settings_screen.dart';
 
 class VehicleMasterScreen extends StatelessWidget {
   const VehicleMasterScreen({super.key});
@@ -38,6 +39,20 @@ class VehicleMasterScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (_) => const MaintenanceTypeMasterScreen(),
+                ),
+              );
+            },
+          ),
+          _buildMenuCard(
+            context,
+            title: 'Alert Settings',
+            icon: Icons.notifications_active,
+            color: Colors.red,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const VehicleExpiryAlertSettingsScreen(),
                 ),
               );
             },

@@ -2,6 +2,7 @@ import 'package:image_picker/image_picker.dart';
 import '../entities/vehicle_entity.dart';
 import '../entities/vehicle_make_entity.dart';
 import '../entities/maintenance_type_entity.dart';
+import '../entities/vehicle_settings_entity.dart';
 
 abstract class VehicleRepository {
   // Vehicle Methods
@@ -28,4 +29,8 @@ abstract class VehicleRepository {
   Future<void> insertMaintenanceType(MaintenanceTypeEntity type);
   Future<void> updateMaintenanceType(MaintenanceTypeEntity type);
   Future<void> deleteMaintenanceType(String id);
+
+  // Settings Methods
+  Future<VehicleSettingsEntity> getVehicleSettings();
+  Future<void> updateVehicleSettings(VehicleSettingsEntity settings);
 }

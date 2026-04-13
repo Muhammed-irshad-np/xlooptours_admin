@@ -344,9 +344,13 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           insurance: _insuranceExpiryDate.value != null
               ? VehicleDocument(
                   expiryDate: _insuranceExpiryDate.value!,
-                  attachmentUrl: registrationUrl == _isthimaraAttachmentUrl.value
+                  attachmentUrl:
+                      registrationUrl == _isthimaraAttachmentUrl.value
                       ? widget.vehicle?.insurance?.attachmentUrl
-                      : widget.vehicle?.insurance?.attachmentUrl, // Insurance didn't change attachment logic here yet
+                      : widget
+                            .vehicle
+                            ?.insurance
+                            ?.attachmentUrl, // Insurance didn't change attachment logic here yet
                 )
               : null,
           registration: _registrationExpiryDate.value != null
@@ -395,9 +399,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           imageUrl: imageUrl,
           isActive: true,
           insurance: _insuranceExpiryDate.value != null
-              ? VehicleDocument(
-                  expiryDate: _insuranceExpiryDate.value!,
-                )
+              ? VehicleDocument(expiryDate: _insuranceExpiryDate.value!)
               : null,
           registration: _registrationExpiryDate.value != null
               ? VehicleDocument(
@@ -406,9 +408,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                 )
               : null,
           fahas: _fahasExpiryDate.value != null
-              ? VehicleDocument(
-                  expiryDate: _fahasExpiryDate.value!,
-                )
+              ? VehicleDocument(expiryDate: _fahasExpiryDate.value!)
               : null,
           maintenance: null,
           maintenanceHistory: [],

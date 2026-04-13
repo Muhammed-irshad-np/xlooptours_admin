@@ -7,6 +7,7 @@ import '../../domain/usecases/notification_usecases.dart';
 import '../../domain/usecases/mark_all_notifications_as_read.dart';
 import '../../../employee/domain/usecases/get_employee_expiry_alerts_usecase.dart';
 import '../../../vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
+import '../../../vehicle/domain/usecases/get_vehicle_expiry_alerts_usecase.dart';
 import '../../../vehicle/domain/entities/vehicle_entity.dart';
 import '../../../vehicle/domain/entities/maintenance_type_entity.dart';
 
@@ -17,6 +18,7 @@ class NotificationProvider extends ChangeNotifier {
   final MarkAllNotificationsAsRead _markAllNotificationsAsRead;
   final GetEmployeeExpiryAlertsUseCase _getEmployeeExpiryAlerts;
   final GetVehicleMaintenanceAlertsUseCase _getVehicleMaintenanceAlerts;
+  final GetVehicleExpiryAlertsUseCase _getVehicleExpiryAlerts;
   final SharedPreferences _prefs;
 
   static const String _readVirtualIdsKey = 'read_virtual_notification_ids';
@@ -36,6 +38,7 @@ class NotificationProvider extends ChangeNotifier {
     required MarkAllNotificationsAsRead markAllNotificationsAsRead,
     required GetEmployeeExpiryAlertsUseCase getEmployeeExpiryAlerts,
     required GetVehicleMaintenanceAlertsUseCase getVehicleMaintenanceAlerts,
+    required GetVehicleExpiryAlertsUseCase getVehicleExpiryAlerts,
     required SharedPreferences sharedPreferences,
   }) : _getNotifications = getNotifications,
        _insertNotification = insertNotification,
@@ -43,6 +46,7 @@ class NotificationProvider extends ChangeNotifier {
        _markAllNotificationsAsRead = markAllNotificationsAsRead,
        _getEmployeeExpiryAlerts = getEmployeeExpiryAlerts,
        _getVehicleMaintenanceAlerts = getVehicleMaintenanceAlerts,
+       _getVehicleExpiryAlerts = getVehicleExpiryAlerts,
        _prefs = sharedPreferences {
     _init();
   }
@@ -104,11 +108,13 @@ class NotificationProvider extends ChangeNotifier {
       // ── Employee expiry alerts ──────────────────────────────────────────────
       final expiryAlerts = await _getEmployeeExpiryAlerts();
       final expiryNotifications = expiryAlerts.map((alert) {
-        final id = 'expiry_${alert.employeeId}_${alert.documentType.replaceAll(' ', '_')}';
+        final id =
+            'expiry_${alert.employeeId}_${alert.documentType.replaceAll(' ', '_')}';
         return NotificationEntity(
           id: id,
           title: '${alert.documentType} Expiring Soon',
-          message: '${alert.employeeName}\'s ${alert.documentType} is expiring on '
+          message:
+              '${alert.employeeName}\'s ${alert.documentType} is expiring on '
               '${alert.expiryDate.toLocal().toString().split(' ')[0]} '
               '(${alert.daysUntilExpiry} days left).',
           timestamp: DateTime.now(),
@@ -126,11 +132,13 @@ class NotificationProvider extends ChangeNotifier {
         maintenanceTypes: maintenanceTypes,
       );
       final maintenanceNotifications = maintenanceAlerts.map((alert) {
-        final id = 'maintenance_${alert.vehicle.id}_${alert.category.replaceAll(' ', '_')}';
+        final id =
+            'maintenance_${alert.vehicle.id}_${alert.category.replaceAll(' ', '_')}';
         return NotificationEntity(
           id: id,
           title: '⚠️ ${alert.category} Overdue',
-          message: '${alert.vehicle.make} ${alert.vehicle.model} '
+          message:
+              '${alert.vehicle.make} ${alert.vehicle.model} '
               '(${alert.vehicle.plateNumber}): last serviced at '
               '${alert.lastServiceMileage} km, due at ${alert.nextServiceMileage} km — '
               '${alert.kmOverdue} km overdue (current: ${alert.currentMileage} km)',
@@ -142,6 +150,27 @@ class NotificationProvider extends ChangeNotifier {
       }).toList();
 
       _computedNotifications.addAll(maintenanceNotifications);
+
+      // ── Vehicle expiry alerts ──────────────────────────────────────────────
+      final vehicleExpiryAlerts = await _getVehicleExpiryAlerts();
+      final vehicleExpiryNotifications = vehicleExpiryAlerts.map((alert) {
+        final id =
+            'v_expiry_${alert.vehicleId}_${alert.documentType.replaceAll(' ', '_')}';
+        return NotificationEntity(
+          id: id,
+          title: 'Vehicle ${alert.documentType} Expiring',
+          message:
+              'Vehicle ${alert.plateNumber}\'s ${alert.documentType} is expiring on '
+              '${alert.expiryDate.toLocal().toString().split(' ')[0]} '
+              '(${alert.daysUntilExpiry} days left).',
+          timestamp: DateTime.now(),
+          isRead: _readVirtualIds.contains(id),
+          type: NotificationType.expiry,
+          relatedId: alert.vehicleId,
+        );
+      }).toList();
+
+      _computedNotifications.addAll(vehicleExpiryNotifications);
     } catch (e) {
       debugPrint('Failed to compute alerts: $e');
     }
@@ -163,18 +192,22 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   bool _isVirtualId(String id) {
-    return id.startsWith('expiry_') || id.startsWith('maintenance_');
+    return id.startsWith('expiry_') ||
+           id.startsWith('maintenance_') ||
+           id.startsWith('v_expiry_');
   }
 
   Future<bool> markAsRead(String id) async {
     if (_isVirtualId(id)) {
       _readVirtualIds.add(id);
       await _prefs.setStringList(_readVirtualIdsKey, _readVirtualIds.toList());
-      
+
       // Update in-memory computed notifications
       final index = _computedNotifications.indexWhere((n) => n.id == id);
       if (index != -1) {
-        _computedNotifications[index] = _computedNotifications[index].copyWith(isRead: true);
+        _computedNotifications[index] = _computedNotifications[index].copyWith(
+          isRead: true,
+        );
         _combineAndSort();
       }
       return true;
@@ -209,17 +242,20 @@ class NotificationProvider extends ChangeNotifier {
 
     // 2. Mark all DB notifications as read
     final result = await _markAllNotificationsAsRead(NoParams());
-    
+
     _setLoading(false);
-    
-    return result.fold((failure) {
-      _errorMessage = failure.message;
-      notifyListeners();
-      return false;
-    }, (_) {
-      _combineAndSort();
-      return true;
-    });
+
+    return result.fold(
+      (failure) {
+        _errorMessage = failure.message;
+        notifyListeners();
+        return false;
+      },
+      (_) {
+        _combineAndSort();
+        return true;
+      },
+    );
   }
 
   void clearError() {

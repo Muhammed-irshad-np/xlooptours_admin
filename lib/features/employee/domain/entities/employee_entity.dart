@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'employee_contact.dart';
 import 'employee_documents.dart';
 
 class EmployeeEntity extends Equatable {
@@ -7,6 +8,7 @@ class EmployeeEntity extends Equatable {
   final String position;
   final String email;
   final String phoneNumber;
+  final String? countryCode;
   final String nationality;
   final String idType;
   final String idNumber;
@@ -26,8 +28,7 @@ class EmployeeEntity extends Equatable {
   final VisaDocument? dubaiVisa;
   final VisaDocument? qatarVisa;
   final AuthorizationDocument? authorization;
-  final DateTime? phoneRechargeDate;
-  final int? phoneRechargeNotificationDays;
+  final List<EmployeeContact> contacts;
 
   const EmployeeEntity({
     required this.id,
@@ -35,6 +36,7 @@ class EmployeeEntity extends Equatable {
     required this.position,
     required this.email,
     required this.phoneNumber,
+    this.countryCode,
     required this.nationality,
     required this.idType,
     required this.idNumber,
@@ -54,8 +56,7 @@ class EmployeeEntity extends Equatable {
     this.dubaiVisa,
     this.qatarVisa,
     this.authorization,
-    this.phoneRechargeDate,
-    this.phoneRechargeNotificationDays,
+    this.contacts = const [],
   });
 
   EmployeeEntity copyWith({
@@ -64,6 +65,7 @@ class EmployeeEntity extends Equatable {
     String? position,
     String? email,
     String? phoneNumber,
+    String? countryCode,
     String? nationality,
     String? idType,
     String? idNumber,
@@ -83,8 +85,7 @@ class EmployeeEntity extends Equatable {
     VisaDocument? dubaiVisa,
     VisaDocument? qatarVisa,
     AuthorizationDocument? authorization,
-    DateTime? phoneRechargeDate,
-    int? phoneRechargeNotificationDays,
+    List<EmployeeContact>? contacts,
   }) {
     return EmployeeEntity(
       id: id ?? this.id,
@@ -92,6 +93,7 @@ class EmployeeEntity extends Equatable {
       position: position ?? this.position,
       email: email ?? this.email,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      countryCode: countryCode ?? this.countryCode,
       nationality: nationality ?? this.nationality,
       idType: idType ?? this.idType,
       idNumber: idNumber ?? this.idNumber,
@@ -111,9 +113,7 @@ class EmployeeEntity extends Equatable {
       dubaiVisa: dubaiVisa ?? this.dubaiVisa,
       qatarVisa: qatarVisa ?? this.qatarVisa,
       authorization: authorization ?? this.authorization,
-      phoneRechargeDate: phoneRechargeDate ?? this.phoneRechargeDate,
-      phoneRechargeNotificationDays:
-          phoneRechargeNotificationDays ?? this.phoneRechargeNotificationDays,
+      contacts: contacts ?? this.contacts,
     );
   }
 
@@ -124,6 +124,7 @@ class EmployeeEntity extends Equatable {
     position,
     email,
     phoneNumber,
+    countryCode,
     nationality,
     idType,
     idNumber,
@@ -143,7 +144,6 @@ class EmployeeEntity extends Equatable {
     dubaiVisa,
     qatarVisa,
     authorization,
-    phoneRechargeDate,
-    phoneRechargeNotificationDays,
+    contacts,
   ];
 }

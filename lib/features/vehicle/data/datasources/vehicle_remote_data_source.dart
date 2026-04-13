@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models/vehicle_model.dart';
 import '../models/vehicle_make_model.dart';
 import '../models/maintenance_type_model.dart';
+import '../models/vehicle_settings_model.dart';
 
 abstract class VehicleRemoteDataSource {
   // Vehicle
@@ -35,6 +36,10 @@ abstract class VehicleRemoteDataSource {
     String vehicleId,
     String docType,
   );
+
+  // Settings
+  Future<VehicleSettingsModel> getVehicleSettings();
+  Future<void> updateVehicleSettings(VehicleSettingsModel settings);
 }
 
 class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
@@ -83,13 +88,8 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
     // that are not provided in this update (partial update pattern).
     vehicleData.removeWhere((key, value) => value == null);
 
-
-    await firestore
-        .collection('vehicles')
-        .doc(vehicle.id)
-        .update(vehicleData);
+    await firestore.collection('vehicles').doc(vehicle.id).update(vehicleData);
   }
-
 
   @override
   Future<void> deleteVehicle(String id) async {
@@ -226,5 +226,22 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
   @override
   Future<void> deleteMaintenanceType(String id) async {
     await firestore.collection('maintenance_types').doc(id).delete();
+  }
+
+  @override
+  Future<VehicleSettingsModel> getVehicleSettings() async {
+    final doc = await firestore.collection('settings').doc('vehicle_alerts').get();
+    if (doc.exists) {
+      return VehicleSettingsModel.fromJson(doc.data()!);
+    }
+    return const VehicleSettingsModel();
+  }
+
+  @override
+  Future<void> updateVehicleSettings(VehicleSettingsModel settings) async {
+    await firestore
+        .collection('settings')
+        .doc('vehicle_alerts')
+        .set(settings.toJson());
   }
 }

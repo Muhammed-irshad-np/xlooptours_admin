@@ -20,6 +20,9 @@ import '../../domain/usecases/get_all_maintenance_types_usecase.dart';
 import '../../domain/usecases/insert_maintenance_type_usecase.dart';
 import '../../domain/usecases/update_maintenance_type_usecase.dart';
 import '../../domain/usecases/delete_maintenance_type_usecase.dart';
+import '../../domain/usecases/get_vehicle_settings_usecase.dart';
+import '../../domain/usecases/update_vehicle_settings_usecase.dart';
+import '../../domain/entities/vehicle_settings_entity.dart';
 
 class VehicleProvider extends ChangeNotifier {
   final GetAllVehiclesUseCase getAllVehiclesUseCase;
@@ -40,9 +43,13 @@ class VehicleProvider extends ChangeNotifier {
   final UpdateMaintenanceTypeUseCase updateMaintenanceTypeUseCase;
   final DeleteMaintenanceTypeUseCase deleteMaintenanceTypeUseCase;
 
+  final GetVehicleSettingsUseCase getVehicleSettingsUseCase;
+  final UpdateVehicleSettingsUseCase updateVehicleSettingsUseCase;
+
   List<VehicleEntity> _vehicles = [];
   List<VehicleMakeEntity> _vehicleMakes = [];
   List<MaintenanceTypeEntity> _maintenanceTypes = [];
+  VehicleSettingsEntity? _settings;
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -62,11 +69,14 @@ class VehicleProvider extends ChangeNotifier {
     required this.insertMaintenanceTypeUseCase,
     required this.updateMaintenanceTypeUseCase,
     required this.deleteMaintenanceTypeUseCase,
+    required this.getVehicleSettingsUseCase,
+    required this.updateVehicleSettingsUseCase,
   });
 
   List<VehicleEntity> get vehicles => _vehicles;
   List<VehicleMakeEntity> get vehicleMakes => _vehicleMakes;
   List<MaintenanceTypeEntity> get maintenanceTypes => _maintenanceTypes;
+  VehicleSettingsEntity? get settings => _settings;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
@@ -323,8 +333,43 @@ class VehicleProvider extends ChangeNotifier {
     } catch (e) {
       _errorMessage = 'Failed to delete maintenance type: \$e';
       debugPrint(_errorMessage);
+      _errorMessage = 'Failed to delete maintenance type: $e';
+      debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;
+    }
+  }
+
+  // ======================
+  // Settings Methods
+  // ======================
+
+  Future<void> fetchVehicleSettings() async {
+    _setLoading(true);
+    try {
+      _settings = await getVehicleSettingsUseCase();
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = 'Failed to fetch settings: $e';
+      debugPrint(_errorMessage);
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> updateVehicleSettings(VehicleSettingsEntity settings) async {
+    _setLoading(true);
+    try {
+      await updateVehicleSettingsUseCase(settings);
+      _settings = settings;
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = 'Failed to update settings: $e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 

@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'document_viewer_screen.dart';
 import 'package:xloop_invoice/core/utils/share_helper.dart';
 
+import '../features/employee/domain/entities/employee_contact.dart';
 import '../features/employee/domain/entities/employee_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
@@ -87,21 +88,23 @@ class EmployeeDetailsScreen extends StatelessWidget {
                   ),
                 ),
 
-                // Tab 3: Others
+                // Tab 3: Others (Contacts & Recharge)
                 SingleChildScrollView(
                   padding: EdgeInsets.all(16.w),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (employee.phoneRechargeDate != null) ...[
-                        _buildSectionHeader('Other Details'),
-                        _buildOtherDetailsCard(),
+                      if (employee.contacts.isNotEmpty) ...[
+                        _buildSectionHeader('SIM / Contact Numbers'),
+                        ...employee.contacts.map(
+                          (contact) => _buildContactCard(contact),
+                        ),
                       ] else ...[
                         Padding(
                           padding: EdgeInsets.symmetric(vertical: 40.h),
                           child: Center(
                             child: Text(
-                              'No other details available.',
+                              'No contacts added yet.',
                               style: TextStyle(
                                 fontSize: 16.sp,
                                 color: Colors.grey,
@@ -355,22 +358,121 @@ class EmployeeDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildOtherDetailsCard() {
+  Widget _buildContactCard(EmployeeContact contact) {
+    final bool isExpired =
+        contact.rechargeExpiryDate != null &&
+        contact.rechargeExpiryDate!.isBefore(DateTime.now());
+    final bool isSwapped =
+        contact.currentHolderId != null &&
+        contact.currentHolderId != employee.id;
+
     return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+      elevation: 1,
+      margin: EdgeInsets.only(bottom: 12.h),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
       child: Padding(
-        padding: EdgeInsets.all(20.w),
+        padding: EdgeInsets.all(16.w),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildDetailRow(
-              'Phone Recharge Date',
-              _formatDate(employee.phoneRechargeDate),
-              Icons.phone_android,
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(10.w),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.sim_card,
+                    color: Colors.blue[700],
+                    size: 24.sp,
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${contact.countryCode} ${contact.phoneNumber}',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (contact.label.isNotEmpty) ...[
+                        SizedBox(height: 2.h),
+                        Text(
+                          contact.label,
+                          style: TextStyle(
+                            fontSize: 13.sp,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (isSwapped)
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 4.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8.r),
+                      border: Border.all(color: Colors.orange),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.swap_horiz,
+                          size: 14.sp,
+                          color: Colors.orange,
+                        ),
+                        SizedBox(width: 4.w),
+                        Text(
+                          contact.currentHolderName ?? 'Swapped',
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            color: Colors.orange,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            SizedBox(height: 12.h),
+            Divider(height: 1, color: Colors.grey[200]),
+            SizedBox(height: 12.h),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildDetailRow(
+                    'Recharge Expiry',
+                    _formatDate(contact.rechargeExpiryDate),
+                    isExpired ? Icons.warning : Icons.event,
+                  ),
+                ),
+                Expanded(
+                  child: _buildDetailRow(
+                    'Recharge Cost',
+                    contact.rechargeCost != null
+                        ? '${contact.rechargeCost!.toStringAsFixed(2)}'
+                        : 'N/A',
+                    Icons.attach_money,
+                  ),
+                ),
+              ],
             ),
             _buildDetailRow(
               'Alert Before',
-              '${employee.phoneRechargeNotificationDays ?? 30} Days',
+              '${contact.notificationDays ?? 30} Days',
               Icons.notifications,
             ),
           ],

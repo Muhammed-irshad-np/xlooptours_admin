@@ -8,6 +8,8 @@ import '../models/vehicle_model.dart';
 import '../models/vehicle_make_model.dart';
 import '../../domain/entities/maintenance_type_entity.dart';
 import '../models/maintenance_type_model.dart';
+import '../models/vehicle_settings_model.dart';
+import '../../domain/entities/vehicle_settings_entity.dart';
 
 class VehicleRepositoryImpl implements VehicleRepository {
   final VehicleRemoteDataSource remoteDataSource;
@@ -101,5 +103,16 @@ class VehicleRepositoryImpl implements VehicleRepository {
   @override
   Future<void> deleteMaintenanceType(String id) async {
     return await remoteDataSource.deleteMaintenanceType(id);
+  }
+
+  @override
+  Future<VehicleSettingsEntity> getVehicleSettings() async {
+    return await remoteDataSource.getVehicleSettings();
+  }
+
+  @override
+  Future<void> updateVehicleSettings(VehicleSettingsEntity settings) async {
+    final settingsModel = VehicleSettingsModel.fromEntity(settings);
+    return await remoteDataSource.updateVehicleSettings(settingsModel);
   }
 }

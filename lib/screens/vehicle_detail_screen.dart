@@ -23,16 +23,17 @@ class VehicleDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<VehicleProvider>(context);
-    
+
     // Find the latest version of this vehicle in the provider's list
     // to ensure the UI refreshes when maintenance records are added.
     final currentVehicle = provider.vehicles.cast<VehicleEntity>().firstWhere(
-      (v) => v.id == vehicle.id, 
-      orElse: () => vehicle
+      (v) => v.id == vehicle.id,
+      orElse: () => vehicle,
     );
 
     final missingTypes = provider.maintenanceTypes.where((type) {
-      final wasPerformed = currentVehicle.maintenanceHistory?.any(
+      final wasPerformed =
+          currentVehicle.maintenanceHistory?.any(
             (record) =>
                 record.serviceType?.toLowerCase() == type.name.toLowerCase(),
           ) ??
@@ -88,7 +89,12 @@ class VehicleDetailScreen extends StatelessWidget {
               currentVehicle.year.toString(),
               Icons.calendar_today,
             ),
-            _buildDetailRow(context, 'Color', currentVehicle.color, Icons.color_lens),
+            _buildDetailRow(
+              context,
+              'Color',
+              currentVehicle.color,
+              Icons.color_lens,
+            ),
             _buildDetailRow(
               context,
               'Plate Number',
@@ -173,7 +179,9 @@ class VehicleDetailScreen extends StatelessWidget {
               context,
               'Purchase Date',
               currentVehicle.purchaseDate != null
-                  ? DateFormat('yyyy-MM-dd').format(currentVehicle.purchaseDate!)
+                  ? DateFormat(
+                      'yyyy-MM-dd',
+                    ).format(currentVehicle.purchaseDate!)
                   : 'N/A',
               Icons.shopping_bag_outlined,
             ),
@@ -208,8 +216,8 @@ class VehicleDetailScreen extends StatelessWidget {
               'Insurance Expiry',
               currentVehicle.insurance?.expiryDate != null
                   ? DateFormat(
-                    'yyyy-MM-dd',
-                  ).format(currentVehicle.insurance!.expiryDate)
+                      'yyyy-MM-dd',
+                    ).format(currentVehicle.insurance!.expiryDate)
                   : 'N/A',
               Icons.security_outlined,
               attachmentUrl: currentVehicle.insurance?.attachmentUrl,
@@ -219,8 +227,8 @@ class VehicleDetailScreen extends StatelessWidget {
               'Isthimara (Registration) Expiry',
               currentVehicle.registration?.expiryDate != null
                   ? DateFormat(
-                    'yyyy-MM-dd',
-                  ).format(currentVehicle.registration!.expiryDate)
+                      'yyyy-MM-dd',
+                    ).format(currentVehicle.registration!.expiryDate)
                   : 'N/A',
               Icons.description_outlined,
               attachmentUrl: currentVehicle.registration?.attachmentUrl,
@@ -229,7 +237,9 @@ class VehicleDetailScreen extends StatelessWidget {
               context,
               'Fahas Expiry',
               currentVehicle.fahas?.expiryDate != null
-                  ? DateFormat('yyyy-MM-dd').format(currentVehicle.fahas!.expiryDate)
+                  ? DateFormat(
+                      'yyyy-MM-dd',
+                    ).format(currentVehicle.fahas!.expiryDate)
                   : 'N/A',
               Icons.fact_check_outlined,
               attachmentUrl: currentVehicle.fahas?.attachmentUrl,
@@ -255,11 +265,10 @@ class VehicleDetailScreen extends StatelessWidget {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder:
-                                      (context) =>
-                                          VehicleMaintenanceHistoryScreen(
-                                            vehicle: currentVehicle,
-                                          ),
+                                  builder: (context) =>
+                                      VehicleMaintenanceHistoryScreen(
+                                        vehicle: currentVehicle,
+                                      ),
                                 ),
                               );
                             },
@@ -269,9 +278,8 @@ class VehicleDetailScreen extends StatelessWidget {
                       if (currentVehicle.maintenanceHistory != null &&
                           currentVehicle.maintenanceHistory!.isNotEmpty) ...[
                         ...((List<MaintenanceRecord>.from(
-                                  currentVehicle.maintenanceHistory!,
-                                ))
-                                ..sort((a, b) => b.date.compareTo(a.date)))
+                              currentVehicle.maintenanceHistory!,
+                            ))..sort((a, b) => b.date.compareTo(a.date)))
                             .take(5)
                             .map(
                               (record) => _buildHistoryItem(context, record),
@@ -293,7 +301,7 @@ class VehicleDetailScreen extends StatelessWidget {
                                   style: TextStyle(
                                     color: Colors.grey[600],
                                     fontStyle: FontStyle.italic,
-                                                  ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -311,7 +319,13 @@ class VehicleDetailScreen extends StatelessWidget {
                     children: [
                       _buildSectionHeader('Not Recorded Yet'),
                       if (missingTypes.isNotEmpty)
-                        ...missingTypes.map((type) => _buildMissingTypeItem(context, currentVehicle, type))
+                        ...missingTypes.map(
+                          (type) => _buildMissingTypeItem(
+                            context,
+                            currentVehicle,
+                            type,
+                          ),
+                        )
                       else
                         Padding(
                           padding: const EdgeInsets.all(16.0),
@@ -337,7 +351,11 @@ class VehicleDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildMissingTypeItem(BuildContext context, VehicleEntity currentVehicle, MaintenanceTypeEntity type) {
+  Widget _buildMissingTypeItem(
+    BuildContext context,
+    VehicleEntity currentVehicle,
+    MaintenanceTypeEntity type,
+  ) {
     return Container(
       width: double.infinity,
       margin: EdgeInsets.only(bottom: 8.h),
@@ -369,11 +387,10 @@ class VehicleDetailScreen extends StatelessWidget {
             onPressed: () {
               showDialog(
                 context: context,
-                builder:
-                    (context) => AddMaintenanceRecordDialog(
-                      vehicle: currentVehicle,
-                      initialMaintenanceTypeId: type.id,
-                    ),
+                builder: (context) => AddMaintenanceRecordDialog(
+                  vehicle: currentVehicle,
+                  initialMaintenanceTypeId: type.id,
+                ),
               );
             },
             icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
@@ -388,12 +405,13 @@ class VehicleDetailScreen extends StatelessWidget {
 
   Widget _buildHistoryItem(BuildContext context, MaintenanceRecord record) {
     final dateStr = DateFormat('yyyy-MM-dd').format(record.date);
-    
+
     // Attempt to find a suitable icon based on service type
     IconData icon = Icons.build_circle_outlined;
     final type = record.serviceType?.toLowerCase() ?? '';
     if (type.contains('oil')) icon = Icons.oil_barrel_outlined;
-    if (type.contains('tyre') || type.contains('tire')) icon = Icons.tire_repair_outlined;
+    if (type.contains('tyre') || type.contains('tire'))
+      icon = Icons.tire_repair_outlined;
     if (type.contains('battery')) icon = Icons.battery_charging_full_outlined;
     if (type.contains('brake')) icon = Icons.settings_backup_restore_outlined;
     if (type.contains('filter')) icon = Icons.filter_alt_outlined;

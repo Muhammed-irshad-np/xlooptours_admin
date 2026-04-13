@@ -30,9 +30,11 @@ class NotificationsScreen extends StatelessWidget {
         actions: [
           Consumer<NotificationProvider>(
             builder: (context, provider, child) {
-              final unreadCount = provider.notifications.where((n) => !n.isRead).length;
+              final unreadCount = provider.notifications
+                  .where((n) => !n.isRead)
+                  .length;
               if (unreadCount == 0) return const SizedBox.shrink();
-              
+
               return TextButton.icon(
                 onPressed: () => provider.markAllAsRead(),
                 icon: const Icon(Icons.done_all, color: Colors.indigo),
@@ -173,10 +175,8 @@ class NotificationsScreen extends StatelessWidget {
           children: [
             if (notification.type == NotificationType.expiry)
               ElevatedButton(
-                onPressed: () => UpdateDialogHelper.showUpdateDialog(
-                  context,
-                  notification,
-                ),
+                onPressed: () =>
+                    UpdateDialogHelper.showUpdateDialog(context, notification),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: color,
                   foregroundColor: Colors.white,
@@ -192,8 +192,8 @@ class NotificationsScreen extends StatelessWidget {
                 tooltip: 'Mark as read',
                 onPressed: () {
                   context.read<NotificationProvider>().markAsRead(
-                        notification.id,
-                      );
+                    notification.id,
+                  );
                 },
               ),
           ],

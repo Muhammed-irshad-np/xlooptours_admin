@@ -6,6 +6,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:uuid/uuid.dart';
+import '../features/employee/domain/entities/employee_contact.dart';
 
 import 'package:provider/provider.dart';
 import '../features/employee/domain/entities/employee_documents.dart';
@@ -103,8 +104,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     DrivingLicenseType.private,
   );
 
-  final ValueNotifier<DateTime?> _phoneRechargeDate = ValueNotifier(null);
-  late TextEditingController _phoneRechargeNotificationDaysController;
+  // Contacts state – each entry is a mutable map of controllers/value notifiers
+  final ValueNotifier<List<_ContactEntry>> _contactEntries = ValueNotifier([]);
 
   // Attachment file pickers (one per document)
   final ValueNotifier<XFile?> _iqamaAttachment = ValueNotifier(null);
@@ -138,6 +139,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     [],
   );
   final ValueNotifier<String?> _selectedVehicleId = ValueNotifier(null);
+  late final ValueNotifier<String> _primaryCountryCode;
 
   final List<String> _positions = [
     'CEO',
@@ -162,6 +164,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _phoneController = TextEditingController(text: e?.phoneNumber ?? '');
     _idNumberController = TextEditingController(text: e?.idNumber ?? '');
     _nationalityController = TextEditingController(text: e?.nationality ?? '');
+    _primaryCountryCode = ValueNotifier(e?.countryCode ?? '+966');
 
     _iqamaNumberController = TextEditingController(
       text: e?.iqama?.number ?? '',
@@ -251,10 +254,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       _selectedLicenseType.value = e!.drivingLicense!.type;
     }
 
-    _phoneRechargeDate.value = e?.phoneRechargeDate;
-    _phoneRechargeNotificationDaysController = TextEditingController(
-      text: e?.phoneRechargeNotificationDays?.toString() ?? '',
-    );
+    // Populate contacts from existing employee
+    if (e != null && e.contacts.isNotEmpty) {
+      _contactEntries.value = e.contacts
+          .map((c) => _ContactEntry.fromContact(c))
+          .toList();
+    }
 
     // Pre-populate attachment URLs from existing employee
     _iqamaAttachmentUrl.value = e?.iqama?.attachmentUrl;
@@ -321,6 +326,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _phoneController.dispose();
     _idNumberController.dispose();
     _nationalityController.dispose();
+    _primaryCountryCode.dispose();
     _selectedPosition.dispose();
     _selectedIdType.dispose();
     _selectedGender.dispose();
@@ -364,8 +370,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _licenseNotificationDaysController.dispose();
     _licenseExpiryDate.dispose();
     _selectedLicenseType.dispose();
-    _phoneRechargeDate.dispose();
-    _phoneRechargeNotificationDaysController.dispose();
+
+    // Dispose contact entries
+    for (final entry in _contactEntries.value) {
+      entry.dispose();
+    }
+    _contactEntries.dispose();
 
     _isSaving.dispose();
     _availableVehicles.dispose();
@@ -501,6 +511,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         position: _selectedPosition.value,
         email: _emailController.text.trim(),
         phoneNumber: _phoneController.text.trim(),
+        countryCode: _primaryCountryCode.value,
         nationality: _nationalityController.text.trim(),
         idType: _selectedIdType.value,
         idNumber: _idNumberController.text.trim(),
@@ -633,12 +644,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 attachmentUrl: licenseUrl,
               )
             : null,
-        phoneRechargeDate: _phoneRechargeDate.value,
-        phoneRechargeNotificationDays:
-            int.tryParse(
-              _phoneRechargeNotificationDaysController.text.trim(),
-            ) ??
-            3,
+        contacts: _contactEntries.value
+            .map((entry) => entry.toContact())
+            .toList(),
       );
 
       if (mounted) {
@@ -868,10 +876,64 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                         builder: (context, selectedDriverType, _) {
                           return Row(
                             children: [
+                              SizedBox(
+                                width: 120.w,
+                                child: ValueListenableBuilder<String>(
+                                  valueListenable: _primaryCountryCode,
+                                  builder: (context, code, _) {
+                                    return DropdownButtonFormField<String>(
+                                      value: code,
+                                      decoration: InputDecoration(
+                                        labelText: 'Code',
+                                        isDense: true,
+                                        contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 8.w,
+                                          vertical: 10.h,
+                                        ),
+                                      ),
+                                      items: const [
+                                        DropdownMenuItem(
+                                          value: '+966',
+                                          child: Text('+966 🇸🇦'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: '+973',
+                                          child: Text('+973 🇧🇭'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: '+971',
+                                          child: Text('+971 🇦🇪'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: '+974',
+                                          child: Text('+974 🇶🇦'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: '+968',
+                                          child: Text('+968 🇴🇲'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: '+965',
+                                          child: Text('+965 🇰🇼'),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: '+91',
+                                          child: Text('+91 🇮🇳'),
+                                        ),
+                                      ],
+                                      onChanged: (val) {
+                                        if (val != null)
+                                          _primaryCountryCode.value = val;
+                                      },
+                                    );
+                                  },
+                                ),
+                              ),
+                              SizedBox(width: 8.w),
                               Expanded(
                                 child: _buildTextField(
                                   controller: _phoneController,
-                                  label: 'Phone Number',
+                                  label: 'Primary Contact',
                                   icon: Icons.phone,
                                   validator: (v) => v!.isEmpty
                                       ? 'Please enter phone number'
@@ -895,6 +957,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                       );
                     },
                   ),
+                  SizedBox(height: 16.h),
+                  _buildContactsSection(),
                   SizedBox(height: 16.h),
 
                   // Personal Details
@@ -1764,63 +1828,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                     ),
                   ),
 
-                  // Phone Recharge Date
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: ValueListenableBuilder<DateTime?>(
-                        valueListenable: _phoneRechargeDate,
-                        builder: (context, date, _) {
-                          return Row(
-                            children: [
-                              Expanded(
-                                child: CustomDatePicker(
-                                  label: 'Mobile Recharge Expiry',
-                                  date: date,
-                                  onTap: () async {
-                                    final picked = await showDatePicker(
-                                      context: context,
-                                      initialDate:
-                                          date ??
-                                          DateTime.now().add(
-                                            const Duration(days: 30),
-                                          ),
-                                      firstDate: DateTime.now().subtract(
-                                        const Duration(days: 365),
-                                      ),
-                                      lastDate: DateTime.now().add(
-                                        const Duration(days: 365 * 2),
-                                      ),
-                                    );
-                                    if (picked != null) {
-                                      _phoneRechargeDate.value = picked;
-                                    }
-                                  },
-                                  onClear: () =>
-                                      _phoneRechargeDate.value = null,
-                                ),
-                              ),
-                              SizedBox(width: 16.w),
-                              Expanded(
-                                child: _buildTextField(
-                                  controller:
-                                      _phoneRechargeNotificationDaysController,
-                                  label: 'Alert Before (Days)',
-                                  icon: Icons.notifications,
-                                  keyboardType: TextInputType.number,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-
                   // Driving License Card
                   Card(
                     elevation: 1,
@@ -2202,5 +2209,276 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildContactsSection() {
+    return ValueListenableBuilder<List<_ContactEntry>>(
+      valueListenable: _contactEntries,
+      builder: (context, entries, _) {
+        return Card(
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(16.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.sim_card,
+                          color: Colors.blue[700],
+                          size: 20.sp,
+                        ),
+                        SizedBox(width: 8.w),
+                        Text(
+                          'Secondary SIM Cards',
+                          style: TextStyle(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    TextButton.icon(
+                      onPressed: () {
+                        final updated = List<_ContactEntry>.from(entries)
+                          ..add(_ContactEntry.empty());
+                        _contactEntries.value = updated;
+                      },
+                      icon: Icon(Icons.add, size: 18.sp),
+                      label: Text('Add', style: TextStyle(fontSize: 13.sp)),
+                    ),
+                  ],
+                ),
+                if (entries.isEmpty)
+                  Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20.h),
+                    child: Center(
+                      child: Text(
+                        'No contacts added. Tap "Add" to add a SIM.',
+                        style: TextStyle(fontSize: 13.sp, color: Colors.grey),
+                      ),
+                    ),
+                  ),
+                ...entries.asMap().entries.map((mapEntry) {
+                  final index = mapEntry.key;
+                  final entry = mapEntry.value;
+                  return _buildContactEntryCard(entry, index);
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildContactEntryCard(_ContactEntry entry, int index) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey[300]!),
+        borderRadius: BorderRadius.circular(10.r),
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Text(
+                '#${index + 1}',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[700],
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                onPressed: () {
+                  final updated = List<_ContactEntry>.from(
+                    _contactEntries.value,
+                  )..removeAt(index);
+                  entry.dispose();
+                  _contactEntries.value = updated;
+                },
+                icon: Icon(Icons.delete, color: Colors.red, size: 20.sp),
+                tooltip: 'Remove Contact',
+              ),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          Row(
+            children: [
+              SizedBox(
+                width: 120.w,
+                child: DropdownButtonFormField<String>(
+                  value: entry.countryCode.value,
+                  decoration: InputDecoration(
+                    labelText: 'Code',
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 10.h,
+                    ),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: '+966', child: Text('+966 🇸🇦')),
+                    DropdownMenuItem(value: '+973', child: Text('+973 🇧🇭')),
+                    DropdownMenuItem(value: '+971', child: Text('+971 🇦🇪')),
+                    DropdownMenuItem(value: '+974', child: Text('+974 🇶🇦')),
+                    DropdownMenuItem(value: '+968', child: Text('+968 🇴🇲')),
+                    DropdownMenuItem(value: '+965', child: Text('+965 🇰🇼')),
+                    DropdownMenuItem(value: '+91', child: Text('+91 🇮🇳')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) entry.countryCode.value = val;
+                  },
+                ),
+              ),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: _buildTextField(
+                  controller: entry.phoneController,
+                  label: 'Phone Number',
+                  icon: Icons.phone,
+                  keyboardType: TextInputType.phone,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          _buildTextField(
+            controller: entry.labelController,
+            label: 'Label (e.g. Saudi SIM, Bahrain SIM)',
+            icon: Icons.label,
+          ),
+          SizedBox(height: 8.h),
+          Row(
+            children: [
+              Expanded(
+                child: ValueListenableBuilder<DateTime?>(
+                  valueListenable: entry.rechargeExpiry,
+                  builder: (context, date, _) {
+                    return CustomDatePicker(
+                      label: 'Recharge Expiry',
+                      date: date,
+                      onTap: () async {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate:
+                              date ??
+                              DateTime.now().add(const Duration(days: 30)),
+                          firstDate: DateTime.now().subtract(
+                            const Duration(days: 365),
+                          ),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365 * 2),
+                          ),
+                        );
+                        if (picked != null) {
+                          entry.rechargeExpiry.value = picked;
+                        }
+                      },
+                      onClear: () => entry.rechargeExpiry.value = null,
+                    );
+                  },
+                ),
+              ),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: _buildTextField(
+                  controller: entry.notificationDaysController,
+                  label: 'Alert Before (Days)',
+                  icon: Icons.notifications,
+                  keyboardType: TextInputType.number,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Helper class to manage form state for each contact entry.
+class _ContactEntry {
+  final String id;
+  final TextEditingController phoneController;
+  final TextEditingController labelController;
+  final TextEditingController notificationDaysController;
+  final ValueNotifier<String> countryCode;
+  final ValueNotifier<DateTime?> rechargeExpiry;
+  String? currentHolderId;
+  String? currentHolderName;
+  double? rechargeCost;
+
+  _ContactEntry({
+    required this.id,
+    required this.phoneController,
+    required this.labelController,
+    required this.notificationDaysController,
+    required this.countryCode,
+    required this.rechargeExpiry,
+    this.currentHolderId,
+    this.currentHolderName,
+    this.rechargeCost,
+  });
+
+  factory _ContactEntry.empty() {
+    return _ContactEntry(
+      id: const Uuid().v4(),
+      phoneController: TextEditingController(),
+      labelController: TextEditingController(),
+      notificationDaysController: TextEditingController(text: '30'),
+      countryCode: ValueNotifier('+966'),
+      rechargeExpiry: ValueNotifier(null),
+    );
+  }
+
+  factory _ContactEntry.fromContact(EmployeeContact contact) {
+    return _ContactEntry(
+      id: contact.id,
+      phoneController: TextEditingController(text: contact.phoneNumber),
+      labelController: TextEditingController(text: contact.label),
+      notificationDaysController: TextEditingController(
+        text: (contact.notificationDays ?? 30).toString(),
+      ),
+      countryCode: ValueNotifier(contact.countryCode),
+      rechargeExpiry: ValueNotifier(contact.rechargeExpiryDate),
+      currentHolderId: contact.currentHolderId,
+      currentHolderName: contact.currentHolderName,
+      rechargeCost: contact.rechargeCost,
+    );
+  }
+
+  EmployeeContact toContact() {
+    return EmployeeContact(
+      id: id,
+      phoneNumber: phoneController.text.trim(),
+      countryCode: countryCode.value,
+      label: labelController.text.trim(),
+      rechargeExpiryDate: rechargeExpiry.value,
+      rechargeCost: rechargeCost,
+      notificationDays:
+          int.tryParse(notificationDaysController.text.trim()) ?? 30,
+      currentHolderId: currentHolderId,
+      currentHolderName: currentHolderName,
+    );
+  }
+
+  void dispose() {
+    phoneController.dispose();
+    labelController.dispose();
+    notificationDaysController.dispose();
+    countryCode.dispose();
+    rechargeExpiry.dispose();
   }
 }

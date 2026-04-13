@@ -1,5 +1,7 @@
+import '../../domain/entities/employee_contact.dart';
 import '../../domain/entities/employee_entity.dart';
 import '../../domain/entities/employee_documents.dart';
+import 'employee_contact_model.dart';
 import 'employee_document_models.dart';
 
 class EmployeeModel extends EmployeeEntity {
@@ -9,6 +11,7 @@ class EmployeeModel extends EmployeeEntity {
     required super.position,
     required super.email,
     required super.phoneNumber,
+    super.countryCode,
     required super.nationality,
     required super.idType,
     required super.idNumber,
@@ -28,8 +31,7 @@ class EmployeeModel extends EmployeeEntity {
     super.dubaiVisa,
     super.qatarVisa,
     super.authorization,
-    super.phoneRechargeDate,
-    super.phoneRechargeNotificationDays,
+    super.contacts,
   });
 
   Map<String, dynamic> toJson() {
@@ -39,6 +41,7 @@ class EmployeeModel extends EmployeeEntity {
       'position': position,
       'email': email,
       'phoneNumber': phoneNumber,
+      'countryCode': countryCode,
       'nationality': nationality,
       'idType': idType,
       'idNumber': idNumber,
@@ -129,8 +132,9 @@ class EmployeeModel extends EmployeeEntity {
               notificationDays: authorization!.notificationDays,
             ).toJson()
           : null,
-      'phoneRechargeDate': phoneRechargeDate?.toIso8601String(),
-      'phoneRechargeNotificationDays': phoneRechargeNotificationDays,
+      'contacts': contacts
+          .map((c) => EmployeeContactModel.fromEntity(c).toJson())
+          .toList(),
     };
   }
 
@@ -141,6 +145,7 @@ class EmployeeModel extends EmployeeEntity {
       position: json['position'] as String,
       email: json['email'] as String? ?? '',
       phoneNumber: json['phoneNumber'] as String? ?? '',
+      countryCode: json['countryCode'] as String?,
       nationality: json['nationality'] as String? ?? '',
       idType: json['idType'] as String? ?? '',
       idNumber: json['idNumber'] as String? ?? '',
@@ -188,12 +193,36 @@ class EmployeeModel extends EmployeeEntity {
               json['authorization'] as Map<String, dynamic>,
             )
           : null,
-      phoneRechargeDate: json['phoneRechargeDate'] != null
-          ? DateTime.tryParse(json['phoneRechargeDate'] as String)
-          : null,
-      phoneRechargeNotificationDays:
-          json['phoneRechargeNotificationDays'] as int?,
+      contacts: _parseContacts(json),
     );
+  }
+
+  /// Parses contacts from JSON, with backward compatibility for old
+  /// `phoneRechargeDate` field.
+  static List<EmployeeContact> _parseContacts(Map<String, dynamic> json) {
+    if (json['contacts'] != null && json['contacts'] is List) {
+      return (json['contacts'] as List)
+          .map((c) => EmployeeContactModel.fromJson(c as Map<String, dynamic>))
+          .toList();
+    }
+    // Backward compatibility: migrate old flat phoneRechargeDate
+    if (json['phoneRechargeDate'] != null) {
+      final legacyDate = DateTime.tryParse(json['phoneRechargeDate'] as String);
+      if (legacyDate != null) {
+        return [
+          EmployeeContactModel(
+            id: 'legacy_recharge',
+            phoneNumber: json['phoneNumber'] as String? ?? '',
+            countryCode: '+966',
+            label: 'Primary',
+            rechargeExpiryDate: legacyDate,
+            notificationDays:
+                json['phoneRechargeNotificationDays'] as int? ?? 30,
+          ),
+        ];
+      }
+    }
+    return [];
   }
 
   factory EmployeeModel.fromEntity(EmployeeEntity entity) {
@@ -203,6 +232,7 @@ class EmployeeModel extends EmployeeEntity {
       position: entity.position,
       email: entity.email,
       phoneNumber: entity.phoneNumber,
+      countryCode: entity.countryCode,
       nationality: entity.nationality,
       idType: entity.idType,
       idNumber: entity.idNumber,
@@ -222,8 +252,7 @@ class EmployeeModel extends EmployeeEntity {
       dubaiVisa: entity.dubaiVisa,
       qatarVisa: entity.qatarVisa,
       authorization: entity.authorization,
-      phoneRechargeDate: entity.phoneRechargeDate,
-      phoneRechargeNotificationDays: entity.phoneRechargeNotificationDays,
+      contacts: entity.contacts,
     );
   }
 
@@ -234,6 +263,7 @@ class EmployeeModel extends EmployeeEntity {
     String? position,
     String? email,
     String? phoneNumber,
+    String? countryCode,
     String? nationality,
     String? idType,
     String? idNumber,
@@ -253,8 +283,7 @@ class EmployeeModel extends EmployeeEntity {
     VisaDocument? dubaiVisa,
     VisaDocument? qatarVisa,
     AuthorizationDocument? authorization,
-    DateTime? phoneRechargeDate,
-    int? phoneRechargeNotificationDays,
+    List<EmployeeContact>? contacts,
   }) {
     return EmployeeModel(
       id: id ?? this.id,
@@ -262,6 +291,7 @@ class EmployeeModel extends EmployeeEntity {
       position: position ?? this.position,
       email: email ?? this.email,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      countryCode: countryCode ?? this.countryCode,
       nationality: nationality ?? this.nationality,
       idType: idType ?? this.idType,
       idNumber: idNumber ?? this.idNumber,
@@ -283,9 +313,7 @@ class EmployeeModel extends EmployeeEntity {
       dubaiVisa: dubaiVisa ?? this.dubaiVisa as VisaModel?,
       qatarVisa: qatarVisa ?? this.qatarVisa as VisaModel?,
       authorization: authorization ?? this.authorization as AuthorizationModel?,
-      phoneRechargeDate: phoneRechargeDate ?? this.phoneRechargeDate,
-      phoneRechargeNotificationDays:
-          phoneRechargeNotificationDays ?? this.phoneRechargeNotificationDays,
+      contacts: contacts ?? this.contacts,
     );
   }
 }
