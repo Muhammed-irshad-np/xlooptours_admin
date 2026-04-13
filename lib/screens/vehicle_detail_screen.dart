@@ -246,32 +246,58 @@ class VehicleDetailScreen extends StatelessWidget {
               Icons.fact_check_outlined,
               attachmentUrl: currentVehicle.fahas?.attachmentUrl,
             ),
+            _buildSectionHeader('Tafweed Authorizations'),
             Consumer<EmployeeProvider>(
               builder: (context, empProvider, child) {
-                final tafweedDriver = empProvider.employees.cast<EmployeeEntity?>().firstWhere(
-                  (e) => e?.id == currentVehicle.currentTafweedDriverId,
-                  orElse: () => null,
-                );
-                final tafweedValue = currentVehicle.tafweed?.expiryDate != null
-                    ? '${tafweedDriver?.fullName ?? 'Unknown Driver'} (Exp: ${DateFormat('yyyy-MM-dd').format(currentVehicle.tafweed!.expiryDate)})'
-                    : 'Not Setup';
-                    
-                return _buildDetailRow(
-                  context,
-                  'Tafweed Authorization',
-                  tafweedValue,
-                  Icons.admin_panel_settings_outlined,
-                  attachmentUrl: currentVehicle.tafweed?.attachmentUrl,
-                  actionWidget: TextButton.icon(
-                    icon: const Icon(Icons.swap_horiz, size: 18),
-                    label: const Text('Update'),
-                    onPressed: () {
-                      showDialog(
-                        context: context,
-                        builder: (context) => UpdateTafweedDialog(vehicle: currentVehicle),
+                if (currentVehicle.tafweeds == null || currentVehicle.tafweeds!.isEmpty) {
+                  return _buildDetailRow(
+                    context,
+                    'Tafweed',
+                    'No Authorized Drivers',
+                    Icons.admin_panel_settings_outlined,
+                    actionWidget: TextButton.icon(
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add'),
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => UpdateTafweedDialog(vehicle: currentVehicle),
+                        );
+                      },
+                    ),
+                  );
+                }
+
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ...currentVehicle.tafweeds!.map((tafweed) {
+                      final driver = empProvider.employees.cast<EmployeeEntity?>().firstWhere(
+                        (e) => e?.id == tafweed.driverId,
+                        orElse: () => null,
                       );
-                    },
-                  ),
+                      return _buildDetailRow(
+                        context,
+                        driver?.fullName ?? 'Unknown Driver',
+                        'Exp: ${DateFormat('yyyy-MM-dd').format(tafweed.expiryDate)}',
+                        Icons.admin_panel_settings_outlined,
+                        attachmentUrl: tafweed.attachmentUrl,
+                      );
+                    }),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.add, size: 18),
+                        label: const Text('Add / Update Driver'),
+                        onPressed: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => UpdateTafweedDialog(vehicle: currentVehicle),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 );
               },
             ),

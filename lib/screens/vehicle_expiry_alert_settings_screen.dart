@@ -16,6 +16,7 @@ class _VehicleExpiryAlertSettingsScreenState extends State<VehicleExpiryAlertSet
   late TextEditingController _isthimaraController;
   late TextEditingController _fahasController;
   late TextEditingController _insuranceController;
+  late TextEditingController _tafweedController;
 
   @override
   void initState() {
@@ -23,16 +24,19 @@ class _VehicleExpiryAlertSettingsScreenState extends State<VehicleExpiryAlertSet
     _isthimaraController = TextEditingController();
     _fahasController = TextEditingController();
     _insuranceController = TextEditingController();
+    _tafweedController = TextEditingController();
 
     // Fetch settings on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<VehicleProvider>().fetchVehicleSettings().then((_) {
+        if (!mounted) return;
         final settings = context.read<VehicleProvider>().settings;
-        if (settings != null) {
-          _isthimaraController.text = settings.isthimaraAlertDays.toString();
-          _fahasController.text = settings.fahasAlertDays.toString();
-          _insuranceController.text = settings.insuranceAlertDays.toString();
-        }
+          if (settings != null) {
+            _isthimaraController.text = settings.isthimaraAlertDays.toString();
+            _fahasController.text = settings.fahasAlertDays.toString();
+            _insuranceController.text = settings.insuranceAlertDays.toString();
+            _tafweedController.text = settings.tafweedAlertDays.toString();
+          }
       });
     });
   }
@@ -42,6 +46,7 @@ class _VehicleExpiryAlertSettingsScreenState extends State<VehicleExpiryAlertSet
     _isthimaraController.dispose();
     _fahasController.dispose();
     _insuranceController.dispose();
+    _tafweedController.dispose();
     super.dispose();
   }
 
@@ -52,6 +57,7 @@ class _VehicleExpiryAlertSettingsScreenState extends State<VehicleExpiryAlertSet
         isthimaraAlertDays: int.parse(_isthimaraController.text),
         fahasAlertDays: int.parse(_fahasController.text),
         insuranceAlertDays: int.parse(_insuranceController.text),
+        tafweedAlertDays: int.parse(_tafweedController.text),
       );
 
       try {
@@ -116,6 +122,13 @@ class _VehicleExpiryAlertSettingsScreenState extends State<VehicleExpiryAlertSet
                     controller: _insuranceController,
                     icon: Icons.verified_user,
                     color: Colors.green,
+                  ),
+                  SizedBox(height: 24.h),
+                  _buildSettingField(
+                    label: 'Tafweed (Authorization) Alert',
+                    controller: _tafweedController,
+                    icon: Icons.admin_panel_settings,
+                    color: Colors.purple,
                   ),
                   SizedBox(height: 48.h),
                   SizedBox(

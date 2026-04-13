@@ -17,8 +17,7 @@ class VehicleModel extends VehicleEntity {
     super.registration,
     super.fahas,
     super.maintenance,
-    super.tafweed,
-    super.currentTafweedDriverId,
+    super.tafweeds,
     super.vinNumber,
     super.engineNumber,
     super.fuelType,
@@ -54,8 +53,7 @@ class VehicleModel extends VehicleEntity {
       'maintenance': maintenance != null
           ? _maintenanceToJson(maintenance!)
           : null,
-      'tafweed': tafweed != null ? _documentToJson(tafweed!) : null,
-      'currentTafweedDriverId': currentTafweedDriverId,
+      'tafweeds': tafweeds?.map((e) => _tafweedRecordToJson(e)).toList(),
       'vinNumber': vinNumber,
       'engineNumber': engineNumber,
       'fuelType': fuelType,
@@ -79,6 +77,15 @@ class VehicleModel extends VehicleEntity {
       'expiryDate': doc.expiryDate.toIso8601String(),
       'attachmentUrl': doc.attachmentUrl,
       'notificationDays': doc.notificationDays,
+    };
+  }
+
+  static Map<String, dynamic> _tafweedRecordToJson(TafweedRecord record) {
+    return {
+      'driverId': record.driverId,
+      'expiryDate': record.expiryDate.toIso8601String(),
+      'attachmentUrl': record.attachmentUrl,
+      'notificationDays': record.notificationDays,
     };
   }
 
@@ -176,10 +183,11 @@ class VehicleModel extends VehicleEntity {
       maintenance: json['maintenance'] != null
           ? _maintenanceFromJson(json['maintenance'] as Map<String, dynamic>)
           : null,
-      tafweed: json['tafweed'] != null
-          ? _documentFromJson(json['tafweed'] as Map<String, dynamic>)
+      tafweeds: json['tafweeds'] != null
+          ? (json['tafweeds'] as List)
+                .map((e) => _tafweedRecordFromJson(e as Map<String, dynamic>))
+                .toList()
           : null,
-      currentTafweedDriverId: json['currentTafweedDriverId'] as String?,
       vinNumber: json['vinNumber'] as String?,
       engineNumber: json['engineNumber'] as String?,
       fuelType: json['fuelType'] as String?,
@@ -206,6 +214,15 @@ class VehicleModel extends VehicleEntity {
 
   static VehicleDocument _documentFromJson(Map<String, dynamic> json) {
     return VehicleDocument(
+      expiryDate: DateTime.parse(json['expiryDate'] as String),
+      attachmentUrl: json['attachmentUrl'] as String?,
+      notificationDays: json['notificationDays'] as int?,
+    );
+  }
+
+  static TafweedRecord _tafweedRecordFromJson(Map<String, dynamic> json) {
+    return TafweedRecord(
+      driverId: json['driverId'] as String,
       expiryDate: DateTime.parse(json['expiryDate'] as String),
       attachmentUrl: json['attachmentUrl'] as String?,
       notificationDays: json['notificationDays'] as int?,
@@ -302,8 +319,7 @@ class VehicleModel extends VehicleEntity {
       registration: entity.registration,
       fahas: entity.fahas,
       maintenance: entity.maintenance,
-      tafweed: entity.tafweed,
-      currentTafweedDriverId: entity.currentTafweedDriverId,
+      tafweeds: entity.tafweeds,
       vinNumber: entity.vinNumber,
       engineNumber: entity.engineNumber,
       fuelType: entity.fuelType,
@@ -336,8 +352,7 @@ class VehicleModel extends VehicleEntity {
     VehicleDocument? registration,
     VehicleDocument? fahas,
     VehicleMaintenance? maintenance,
-    VehicleDocument? tafweed,
-    String? currentTafweedDriverId,
+    List<TafweedRecord>? tafweeds,
     String? vinNumber,
     String? engineNumber,
     String? fuelType,
@@ -367,8 +382,7 @@ class VehicleModel extends VehicleEntity {
       registration: registration ?? this.registration,
       fahas: fahas ?? this.fahas,
       maintenance: maintenance ?? this.maintenance,
-      tafweed: tafweed ?? this.tafweed,
-      currentTafweedDriverId: currentTafweedDriverId ?? this.currentTafweedDriverId,
+      tafweeds: tafweeds ?? this.tafweeds,
       vinNumber: vinNumber ?? this.vinNumber,
       engineNumber: engineNumber ?? this.engineNumber,
       fuelType: fuelType ?? this.fuelType,

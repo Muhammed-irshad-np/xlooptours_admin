@@ -67,19 +67,21 @@ class GetVehicleExpiryAlertsUseCase {
       }
 
       // Tafweed
-      if (vehicle.tafweed != null) {
-        final days = vehicle.tafweed!.expiryDate.difference(now).inDays;
-        final alertDays = vehicle.tafweed!.notificationDays ?? settings.tafweedAlertDays;
-        if (days <= alertDays) {
-          alerts.add(
-            VehicleExpiryAlert(
-              vehicleId: vehicle.id,
-              plateNumber: vehicle.plateNumber,
-              documentType: 'Tafweed',
-              expiryDate: vehicle.tafweed!.expiryDate,
-              daysUntilExpiry: days,
-            ),
-          );
+      if (vehicle.tafweeds != null) {
+        for (var tafweed in vehicle.tafweeds!) {
+          final days = tafweed.expiryDate.difference(now).inDays;
+          final alertDays = tafweed.notificationDays ?? settings.tafweedAlertDays;
+          if (days <= alertDays) {
+            alerts.add(
+              VehicleExpiryAlert(
+                vehicleId: vehicle.id,
+                plateNumber: vehicle.plateNumber,
+                documentType: 'Tafweed',
+                expiryDate: tafweed.expiryDate,
+                daysUntilExpiry: days,
+              ),
+            );
+          }
         }
       }
     }

@@ -11,6 +11,9 @@ import '../features/employee/domain/entities/employee_contact.dart';
 import '../features/employee/domain/entities/employee_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
+import 'package:xloop_invoice/features/employee/presentation/widgets/authorize_vehicle_dialog.dart';
+import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
+import 'package:provider/provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
 
@@ -72,6 +75,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
                         _buildSectionHeader('Assigned Vehicle'),
                         _buildVehicleCard(),
                       ],
+                      _buildAuthorizedVehiclesCard(context),
                     ],
                   ),
                 ),
@@ -358,6 +362,152 @@ class EmployeeDetailsScreen extends StatelessWidget {
     );
   }
 
+  Widget _buildAuthorizedVehiclesCard(BuildContext context) {
+    final vehicles = context.watch<VehicleProvider>().vehicles;
+    final authorizedVehicles = vehicles.where((v) {
+      if (v.tafweeds == null) return false;
+      return v.tafweeds!.any((t) => t.driverId == employee.id);
+    }).toList();
+
+    if (authorizedVehicles.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(height: 24.h),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildSectionHeader('Tafweed (Authorized Vehicles)'),
+              TextButton.icon(
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AuthorizeVehicleDialog(employee: employee),
+                  );
+                },
+                icon: const Icon(Icons.add_circle_outline, size: 20),
+                label: const Text('Authorize'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.blue[900],
+                  padding: EdgeInsets.symmetric(horizontal: 12.w),
+                ),
+              ),
+            ],
+          ),
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+            child: Padding(
+              padding: EdgeInsets.all(20.w),
+              child: Text(
+                'No vehicles currently authorized for this employee.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(height: 24.h),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildSectionHeader('Tafweed (Authorized Vehicles)'),
+            TextButton.icon(
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AuthorizeVehicleDialog(employee: employee),
+                );
+              },
+              icon: const Icon(Icons.add_circle_outline, size: 20),
+              label: const Text('Authorize'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.blue[900],
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
+              ),
+            ),
+          ],
+        ),
+        ...authorizedVehicles.map((vehicle) {
+          final tafweedsForEmployee = vehicle.tafweeds?.where((t) => t.driverId == employee.id).toList();
+          final employeeTafweed = (tafweedsForEmployee != null && tafweedsForEmployee.isNotEmpty) ? tafweedsForEmployee.first : null;
+          
+          return Card(
+              elevation: 2,
+              margin: EdgeInsets.only(bottom: 12.h),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+              child: Padding(
+                padding: EdgeInsets.all(20.w),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(12.w),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        Icons.admin_panel_settings,
+                        color: Colors.purple,
+                        size: 30.sp,
+                      ),
+                    ),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${vehicle.make} ${vehicle.model}',
+                            style: TextStyle(
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Text(
+                            'Plate: ${vehicle.plateNumber}',
+                            style: TextStyle(fontSize: 14.sp, color: Colors.grey[700]),
+                          ),
+                          if (employeeTafweed != null) ...[
+                            SizedBox(height: 4.h),
+                            Row(
+                              children: [
+                                Text(
+                                  'Tafweed Expiry: ',
+                                  style: TextStyle(fontSize: 14.sp, color: Colors.grey[700]),
+                                ),
+                                Text(
+                                  _formatDate(employeeTafweed.expiryDate),
+                                  style: TextStyle(
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.bold,
+                                    color: employeeTafweed.expiryDate.isBefore(DateTime.now())
+                                        ? Colors.red
+                                        : Colors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ]
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+        }),
+      ],
+    );
+  }
+
   Widget _buildContactCard(EmployeeContact contact) {
     final bool isExpired =
         contact.rechargeExpiryDate != null &&
@@ -463,7 +613,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
                   child: _buildDetailRow(
                     'Recharge Cost',
                     contact.rechargeCost != null
-                        ? '${contact.rechargeCost!.toStringAsFixed(2)}'
+                        ? contact.rechargeCost!.toStringAsFixed(2)
                         : 'N/A',
                     Icons.attach_money,
                   ),

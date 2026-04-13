@@ -23,9 +23,9 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
   @override
   void initState() {
     super.initState();
-    _selectedDate = widget.vehicle.tafweed?.expiryDate;
-    _selectedDriverId = widget.vehicle.currentTafweedDriverId;
-    
+    _selectedDate = null;
+    _selectedDriverId = null;
+
     // Fetch employees if not already loaded
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final empProvider = context.read<EmployeeProvider>();
@@ -38,7 +38,9 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
   Future<void> _saveTafweed() async {
     if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an expiry date for Tafweed')),
+        const SnackBar(
+          content: Text('Please select an expiry date for Tafweed'),
+        ),
       );
       return;
     }
@@ -56,19 +58,91 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
 
     try {
       final vehicleProvider = context.read<VehicleProvider>();
-      
-      final updatedTafweed = widget.vehicle.tafweed != null 
-          ? VehicleDocument(
-              expiryDate: _selectedDate!,
-              attachmentUrl: widget.vehicle.tafweed!.attachmentUrl,
-              notificationDays: widget.vehicle.tafweed!.notificationDays,
-            )
-          : VehicleDocument(expiryDate: _selectedDate!);
 
-      final updatedVehicle = widget.vehicle.copyWith(
-        tafweed: updatedTafweed,
-        currentTafweedDriverId: _selectedDriverId,
+      // Enforce Business Rule: One Driver -> One Vehicle
+      // Check if current driver is already assigned to another vehicle
+      final existingVehicles = vehicleProvider.vehicles
+          .where(
+            (v) =>
+                v.id != widget.vehicle.id &&
+                (v.tafweeds?.any((t) => t.driverId == _selectedDriverId) ??
+                    false),
+          )
+          .toList();
+
+      bool confirmSwap = true;
+      if (existingVehicles.isNotEmpty) {
+        confirmSwap =
+            await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Driver Already Authorized'),
+                content: Text(
+                  'This driver is currently authorized for ${existingVehicles.first.make} ${existingVehicles.first.model} (${existingVehicles.first.plateNumber}). Do you want to swap the driver to this vehicle? They will be removed from the other vehicle\'s authorization.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Swap'),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+      }
+
+      if (!confirmSwap) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      // Remove driver from other vehicles if swapping
+      for (final otherVehicle in existingVehicles) {
+        final updatedOtherTafweeds = List<TafweedRecord>.from(
+          otherVehicle.tafweeds ?? [],
+        )..removeWhere((t) => t.driverId == _selectedDriverId);
+        final updatedOtherVehicle = otherVehicle.copyWith(
+          tafweeds: updatedOtherTafweeds,
+        );
+        await vehicleProvider.updateVehicle(updatedOtherVehicle);
+      }
+
+      List<TafweedRecord> currentTafweeds = List.from(
+        widget.vehicle.tafweeds ?? [],
       );
+
+      final index = currentTafweeds.indexWhere(
+        (t) => t.driverId == _selectedDriverId,
+      );
+      final attachmentUrl = index != -1
+          ? currentTafweeds[index].attachmentUrl
+          : null;
+      final notificationDays = index != -1
+          ? currentTafweeds[index].notificationDays
+          : null;
+
+      final updatedRecord = TafweedRecord(
+        driverId: _selectedDriverId!,
+        expiryDate: _selectedDate!,
+        attachmentUrl: attachmentUrl,
+        notificationDays: notificationDays,
+      );
+
+      if (index != -1) {
+        currentTafweeds[index] = updatedRecord;
+      } else {
+        currentTafweeds.add(updatedRecord);
+      }
+
+      final updatedVehicle = widget.vehicle.copyWith(tafweeds: currentTafweeds);
 
       await vehicleProvider.updateVehicle(updatedVehicle);
 
@@ -80,9 +154,9 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update Tafweed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to update Tafweed: $e')));
       }
     } finally {
       if (mounted) {
@@ -126,6 +200,14 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
                   onChanged: (val) {
                     setState(() {
                       _selectedDriverId = val;
+                      if (val != null) {
+                        final existing = widget.vehicle.tafweeds
+                            ?.where((t) => t.driverId == val)
+                            .firstOrNull;
+                        if (existing != null) {
+                          _selectedDate = existing.expiryDate;
+                        }
+                      }
                     });
                   },
                 ),
@@ -137,8 +219,12 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
                     final picked = await showDatePicker(
                       context: context,
                       initialDate: _selectedDate ?? DateTime.now(),
-                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                      firstDate: DateTime.now().subtract(
+                        const Duration(days: 365),
+                      ),
+                      lastDate: DateTime.now().add(
+                        const Duration(days: 365 * 5),
+                      ),
                     );
                     if (picked != null) {
                       setState(() {
@@ -159,8 +245,12 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
         ),
         ElevatedButton(
           onPressed: _isLoading ? null : _saveTafweed,
-          child: _isLoading 
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Text('Save'),
         ),
       ],
