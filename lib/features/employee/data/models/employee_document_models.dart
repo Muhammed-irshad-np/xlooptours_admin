@@ -6,7 +6,6 @@ class IqamaModel extends IqamaDocument {
     required super.expiryDate,
     super.insuranceExpiryDate,
     super.attachmentUrl,
-    super.notificationDays,
   });
 
   factory IqamaModel.fromJson(Map<String, dynamic> json) {
@@ -17,7 +16,6 @@ class IqamaModel extends IqamaDocument {
           ? DateTime.parse(json['insuranceExpiryDate'] as String)
           : null,
       attachmentUrl: json['attachmentUrl'] as String?,
-      notificationDays: json['notificationDays'] as int?,
     );
   }
 
@@ -28,7 +26,6 @@ class IqamaModel extends IqamaDocument {
       if (insuranceExpiryDate != null)
         'insuranceExpiryDate': insuranceExpiryDate!.toIso8601String(),
       if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
-      if (notificationDays != null) 'notificationDays': notificationDays,
     };
   }
 }
@@ -39,7 +36,6 @@ class BahrainResidenceModel extends BahrainResidenceDocument {
     required super.expiryDate,
     super.insuranceExpiryDate,
     super.attachmentUrl,
-    super.notificationDays,
   });
 
   factory BahrainResidenceModel.fromJson(Map<String, dynamic> json) {
@@ -50,7 +46,6 @@ class BahrainResidenceModel extends BahrainResidenceDocument {
           ? DateTime.parse(json['insuranceExpiryDate'] as String)
           : null,
       attachmentUrl: json['attachmentUrl'] as String?,
-      notificationDays: json['notificationDays'] as int?,
     );
   }
 
@@ -61,7 +56,6 @@ class BahrainResidenceModel extends BahrainResidenceDocument {
       if (insuranceExpiryDate != null)
         'insuranceExpiryDate': insuranceExpiryDate!.toIso8601String(),
       if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
-      if (notificationDays != null) 'notificationDays': notificationDays,
     };
   }
 }
@@ -73,7 +67,6 @@ class DrivingLicenseModel extends DrivingLicenseDocument {
     required super.expiryDate,
     required super.type,
     super.attachmentUrl,
-    super.notificationDays,
   });
 
   factory DrivingLicenseModel.fromJson(Map<String, dynamic> json) {
@@ -86,7 +79,6 @@ class DrivingLicenseModel extends DrivingLicenseDocument {
         orElse: () => DrivingLicenseType.private,
       ),
       attachmentUrl: json['attachmentUrl'] as String?,
-      notificationDays: json['notificationDays'] as int?,
     );
   }
 
@@ -97,7 +89,6 @@ class DrivingLicenseModel extends DrivingLicenseDocument {
       'expiryDate': expiryDate.toIso8601String(),
       'type': type.name,
       if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
-      if (notificationDays != null) 'notificationDays': notificationDays,
     };
   }
 }
@@ -108,7 +99,6 @@ class PassportModel extends PassportDocument {
     required super.number,
     required super.expiryDate,
     super.attachmentUrl,
-    super.notificationDays,
   });
 
   factory PassportModel.fromJson(Map<String, dynamic> json) {
@@ -117,7 +107,6 @@ class PassportModel extends PassportDocument {
       number: json['number'] as String? ?? '',
       expiryDate: DateTime.parse(json['expiryDate'] as String),
       attachmentUrl: json['attachmentUrl'] as String?,
-      notificationDays: json['notificationDays'] as int?,
     );
   }
 
@@ -127,7 +116,6 @@ class PassportModel extends PassportDocument {
       'number': number,
       'expiryDate': expiryDate.toIso8601String(),
       if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
-      if (notificationDays != null) 'notificationDays': notificationDays,
     };
   }
 }
@@ -138,7 +126,6 @@ class VisaModel extends VisaDocument {
     required super.expiryDate,
     super.type,
     super.attachmentUrl,
-    super.notificationDays,
   });
 
   factory VisaModel.fromJson(Map<String, dynamic> json) {
@@ -152,7 +139,6 @@ class VisaModel extends VisaDocument {
             )
           : null,
       attachmentUrl: json['attachmentUrl'] as String?,
-      notificationDays: json['notificationDays'] as int?,
     );
   }
 
@@ -162,7 +148,6 @@ class VisaModel extends VisaDocument {
       'expiryDate': expiryDate.toIso8601String(),
       if (type != null) 'type': type!.name,
       if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
-      if (notificationDays != null) 'notificationDays': notificationDays,
     };
   }
 }
@@ -171,14 +156,12 @@ class AuthorizationModel extends AuthorizationDocument {
   const AuthorizationModel({
     required super.expiryDate,
     super.attachmentUrl,
-    super.notificationDays,
   });
 
   factory AuthorizationModel.fromJson(Map<String, dynamic> json) {
     return AuthorizationModel(
       expiryDate: DateTime.parse(json['expiryDate'] as String),
       attachmentUrl: json['attachmentUrl'] as String?,
-      notificationDays: json['notificationDays'] as int?,
     );
   }
 
@@ -186,7 +169,6 @@ class AuthorizationModel extends AuthorizationDocument {
     return {
       'expiryDate': expiryDate.toIso8601String(),
       if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
-      if (notificationDays != null) 'notificationDays': notificationDays,
     };
   }
 }

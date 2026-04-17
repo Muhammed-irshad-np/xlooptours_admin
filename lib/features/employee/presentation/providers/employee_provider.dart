@@ -7,6 +7,9 @@ import '../../domain/usecases/insert_employee_usecase.dart';
 import '../../domain/usecases/update_employee_usecase.dart';
 import '../../domain/usecases/upload_document_attachment_usecase.dart';
 import '../../domain/usecases/upload_employee_image_usecase.dart';
+import '../../domain/usecases/get_employee_settings_usecase.dart';
+import '../../domain/usecases/update_employee_settings_usecase.dart';
+import '../../domain/entities/employee_settings_entity.dart';
 
 class EmployeeProvider with ChangeNotifier {
   final GetAllEmployeesUseCase getAllEmployeesUseCase;
@@ -15,6 +18,8 @@ class EmployeeProvider with ChangeNotifier {
   final DeleteEmployeeUseCase deleteEmployeeUseCase;
   final UploadEmployeeImageUseCase uploadEmployeeImageUseCase;
   final UploadDocumentAttachmentUseCase uploadDocumentAttachmentUseCase;
+  final GetEmployeeSettingsUseCase getEmployeeSettingsUseCase;
+  final UpdateEmployeeSettingsUseCase updateEmployeeSettingsUseCase;
 
   EmployeeProvider({
     required this.getAllEmployeesUseCase,
@@ -23,13 +28,17 @@ class EmployeeProvider with ChangeNotifier {
     required this.deleteEmployeeUseCase,
     required this.uploadEmployeeImageUseCase,
     required this.uploadDocumentAttachmentUseCase,
+    required this.getEmployeeSettingsUseCase,
+    required this.updateEmployeeSettingsUseCase,
   });
 
   List<EmployeeEntity> _employees = [];
+  EmployeeSettingsEntity? _settings;
   bool _isLoading = false;
   String? _error;
 
   List<EmployeeEntity> get employees => _employees;
+  EmployeeSettingsEntity? get settings => _settings;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -129,6 +138,42 @@ class EmployeeProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('Error uploading document attachment in provider: $e');
       rethrow;
+    }
+  }
+
+  // ======================
+  // Settings Methods
+  // ======================
+
+  Future<void> fetchEmployeeSettings() async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      _settings = await getEmployeeSettingsUseCase();
+      _error = null;
+    } catch (e) {
+      _error = 'Failed to fetch settings: $e';
+      debugPrint(_error);
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateEmployeeSettings(EmployeeSettingsEntity settings) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      await updateEmployeeSettingsUseCase(settings);
+      _settings = settings;
+      _error = null;
+    } catch (e) {
+      _error = 'Failed to update settings: $e';
+      debugPrint(_error);
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 }

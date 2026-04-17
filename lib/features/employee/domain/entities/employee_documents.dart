@@ -5,14 +5,12 @@ class IqamaDocument extends Equatable {
   final DateTime expiryDate;
   final DateTime? insuranceExpiryDate;
   final String? attachmentUrl;
-  final int? notificationDays;
 
   const IqamaDocument({
     required this.number,
     required this.expiryDate,
     this.insuranceExpiryDate,
     this.attachmentUrl,
-    this.notificationDays,
   });
 
   @override
@@ -21,7 +19,6 @@ class IqamaDocument extends Equatable {
     expiryDate,
     insuranceExpiryDate,
     attachmentUrl,
-    notificationDays,
   ];
 }
 
@@ -30,14 +27,12 @@ class BahrainResidenceDocument extends Equatable {
   final DateTime expiryDate;
   final DateTime? insuranceExpiryDate;
   final String? attachmentUrl;
-  final int? notificationDays;
 
   const BahrainResidenceDocument({
     required this.number,
     required this.expiryDate,
     this.insuranceExpiryDate,
     this.attachmentUrl,
-    this.notificationDays,
   });
 
   @override
@@ -46,7 +41,6 @@ class BahrainResidenceDocument extends Equatable {
     expiryDate,
     insuranceExpiryDate,
     attachmentUrl,
-    notificationDays,
   ];
 }
 
@@ -58,7 +52,6 @@ class DrivingLicenseDocument extends Equatable {
   final DateTime expiryDate;
   final DrivingLicenseType type;
   final String? attachmentUrl;
-  final int? notificationDays;
 
   const DrivingLicenseDocument({
     required this.countryOfOrigin,
@@ -66,7 +59,6 @@ class DrivingLicenseDocument extends Equatable {
     required this.expiryDate,
     required this.type,
     this.attachmentUrl,
-    this.notificationDays,
   });
 
   @override
@@ -76,7 +68,6 @@ class DrivingLicenseDocument extends Equatable {
     expiryDate,
     type,
     attachmentUrl,
-    notificationDays,
   ];
 }
 
@@ -85,14 +76,12 @@ class PassportDocument extends Equatable {
   final String number;
   final DateTime expiryDate;
   final String? attachmentUrl;
-  final int? notificationDays;
 
   const PassportDocument({
     required this.nameOnPassport,
     required this.number,
     required this.expiryDate,
     this.attachmentUrl,
-    this.notificationDays,
   });
 
   @override
@@ -101,7 +90,6 @@ class PassportDocument extends Equatable {
     number,
     expiryDate,
     attachmentUrl,
-    notificationDays,
   ];
 }
 
@@ -112,14 +100,12 @@ class VisaDocument extends Equatable {
   final DateTime expiryDate;
   final VisaType? type;
   final String? attachmentUrl;
-  final int? notificationDays;
 
   const VisaDocument({
     required this.number,
     required this.expiryDate,
     this.type,
     this.attachmentUrl,
-    this.notificationDays,
   });
 
   @override
@@ -128,21 +114,18 @@ class VisaDocument extends Equatable {
     expiryDate,
     type,
     attachmentUrl,
-    notificationDays,
   ];
 }
 
 class AuthorizationDocument extends Equatable {
   final DateTime expiryDate;
   final String? attachmentUrl;
-  final int? notificationDays;
 
   const AuthorizationDocument({
     required this.expiryDate,
     this.attachmentUrl,
-    this.notificationDays,
   });
 
   @override
-  List<Object?> get props => [expiryDate, attachmentUrl, notificationDays];
+  List<Object?> get props => [expiryDate, attachmentUrl];
 }

@@ -150,8 +150,6 @@ class UpdateDialogHelper {
                                   insuranceExpiryDate:
                                       employee.iqama!.insuranceExpiryDate,
                                   attachmentUrl: employee.iqama!.attachmentUrl,
-                                  notificationDays:
-                                      employee.iqama!.notificationDays,
                                 )
                               : IqamaDocument(
                                   number: "",
@@ -170,8 +168,6 @@ class UpdateDialogHelper {
                                   type: employee.drivingLicense!.type,
                                   attachmentUrl:
                                       employee.drivingLicense!.attachmentUrl,
-                                  notificationDays:
-                                      employee.drivingLicense!.notificationDays,
                                 )
                               : DrivingLicenseDocument(
                                   countryOfOrigin: "",
@@ -191,8 +187,6 @@ class UpdateDialogHelper {
                                   expiryDate: selectedDate!,
                                   attachmentUrl:
                                       employee.passport!.attachmentUrl,
-                                  notificationDays:
-                                      employee.passport!.notificationDays,
                                 )
                               : PassportDocument(
                                   nameOnPassport: "",
@@ -210,8 +204,6 @@ class UpdateDialogHelper {
                                   type: employee.saudiVisa!.type,
                                   attachmentUrl:
                                       employee.saudiVisa!.attachmentUrl,
-                                  notificationDays:
-                                      employee.saudiVisa!.notificationDays,
                                 )
                               : VisaDocument(
                                   number: "",
@@ -228,8 +220,6 @@ class UpdateDialogHelper {
                                   type: employee.bahrainVisa!.type,
                                   attachmentUrl:
                                       employee.bahrainVisa!.attachmentUrl,
-                                  notificationDays:
-                                      employee.bahrainVisa!.notificationDays,
                                 )
                               : VisaDocument(
                                   number: "",
@@ -246,8 +236,6 @@ class UpdateDialogHelper {
                                   type: employee.dubaiVisa!.type,
                                   attachmentUrl:
                                       employee.dubaiVisa!.attachmentUrl,
-                                  notificationDays:
-                                      employee.dubaiVisa!.notificationDays,
                                 )
                               : VisaDocument(
                                   number: "",
@@ -264,8 +252,6 @@ class UpdateDialogHelper {
                                   type: employee.qatarVisa!.type,
                                   attachmentUrl:
                                       employee.qatarVisa!.attachmentUrl,
-                                  notificationDays:
-                                      employee.qatarVisa!.notificationDays,
                                 )
                               : VisaDocument(
                                   number: "",

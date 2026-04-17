@@ -50,12 +50,10 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   // Document Specific Controllers
   late TextEditingController _iqamaNumberController;
-  late TextEditingController _iqamaNotificationDaysController;
   final ValueNotifier<DateTime?> _iqamaExpiryDate = ValueNotifier(null);
   final ValueNotifier<DateTime?> _insuranceExpiryDate = ValueNotifier(null);
 
   late TextEditingController _bahrainResidenceNumberController;
-  late TextEditingController _bahrainResidenceNotificationDaysController;
   final ValueNotifier<DateTime?> _bahrainResidenceExpiryDate = ValueNotifier(
     null,
   );
@@ -65,32 +63,27 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   late TextEditingController _passportNameController;
   late TextEditingController _passportNumberController;
-  late TextEditingController _passportNotificationDaysController;
   final ValueNotifier<DateTime?> _passportExpiryDate = ValueNotifier(null);
 
   late TextEditingController _saudiVisaNumberController;
-  late TextEditingController _saudiVisaNotificationDaysController;
   final ValueNotifier<DateTime?> _saudiVisaExpiryDate = ValueNotifier(null);
   final ValueNotifier<VisaType> _selectedSaudiVisaType = ValueNotifier(
     VisaType.singleEntry,
   );
 
   late TextEditingController _bahrainVisaNumberController;
-  late TextEditingController _bahrainVisaNotificationDaysController;
   final ValueNotifier<DateTime?> _bahrainVisaExpiryDate = ValueNotifier(null);
   final ValueNotifier<VisaType> _selectedBahrainVisaType = ValueNotifier(
     VisaType.singleEntry,
   );
 
   late TextEditingController _dubaiVisaNumberController;
-  late TextEditingController _dubaiVisaNotificationDaysController;
   final ValueNotifier<DateTime?> _dubaiVisaExpiryDate = ValueNotifier(null);
   final ValueNotifier<VisaType> _selectedDubaiVisaType = ValueNotifier(
     VisaType.singleEntry,
   );
 
   late TextEditingController _qatarVisaNumberController;
-  late TextEditingController _qatarVisaNotificationDaysController;
   final ValueNotifier<DateTime?> _qatarVisaExpiryDate = ValueNotifier(null);
   final ValueNotifier<VisaType> _selectedQatarVisaType = ValueNotifier(
     VisaType.singleEntry,
@@ -98,7 +91,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   late TextEditingController _licenseCountryController;
   late TextEditingController _licenseNumberController;
-  late TextEditingController _licenseNotificationDaysController;
   final ValueNotifier<DateTime?> _licenseExpiryDate = ValueNotifier(null);
   final ValueNotifier<DrivingLicenseType> _selectedLicenseType = ValueNotifier(
     DrivingLicenseType.private,
@@ -169,17 +161,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _iqamaNumberController = TextEditingController(
       text: e?.iqama?.number ?? '',
     );
-    _iqamaNotificationDaysController = TextEditingController(
-      text: e?.iqama?.notificationDays?.toString() ?? '',
-    );
     _iqamaExpiryDate.value = e?.iqama?.expiryDate;
     _insuranceExpiryDate.value = e?.iqama?.insuranceExpiryDate;
 
     _bahrainResidenceNumberController = TextEditingController(
       text: e?.bahrainResidence?.number ?? '',
-    );
-    _bahrainResidenceNotificationDaysController = TextEditingController(
-      text: e?.bahrainResidence?.notificationDays?.toString() ?? '',
     );
     _bahrainResidenceExpiryDate.value = e?.bahrainResidence?.expiryDate;
     _bahrainInsuranceExpiryDate.value =
@@ -191,16 +177,10 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _passportNumberController = TextEditingController(
       text: e?.passport?.number ?? '',
     );
-    _passportNotificationDaysController = TextEditingController(
-      text: e?.passport?.notificationDays?.toString() ?? '',
-    );
     _passportExpiryDate.value = e?.passport?.expiryDate;
 
     _saudiVisaNumberController = TextEditingController(
       text: e?.saudiVisa?.number ?? '',
-    );
-    _saudiVisaNotificationDaysController = TextEditingController(
-      text: e?.saudiVisa?.notificationDays?.toString() ?? '',
     );
     _saudiVisaExpiryDate.value = e?.saudiVisa?.expiryDate;
     if (e?.saudiVisa?.type != null) {
@@ -210,9 +190,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _bahrainVisaNumberController = TextEditingController(
       text: e?.bahrainVisa?.number ?? '',
     );
-    _bahrainVisaNotificationDaysController = TextEditingController(
-      text: e?.bahrainVisa?.notificationDays?.toString() ?? '',
-    );
     _bahrainVisaExpiryDate.value = e?.bahrainVisa?.expiryDate;
     if (e?.bahrainVisa?.type != null) {
       _selectedBahrainVisaType.value = e!.bahrainVisa!.type!;
@@ -221,9 +198,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _dubaiVisaNumberController = TextEditingController(
       text: e?.dubaiVisa?.number ?? '',
     );
-    _dubaiVisaNotificationDaysController = TextEditingController(
-      text: e?.dubaiVisa?.notificationDays?.toString() ?? '',
-    );
     _dubaiVisaExpiryDate.value = e?.dubaiVisa?.expiryDate;
     if (e?.dubaiVisa?.type != null) {
       _selectedDubaiVisaType.value = e!.dubaiVisa!.type!;
@@ -231,9 +205,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
     _qatarVisaNumberController = TextEditingController(
       text: e?.qatarVisa?.number ?? '',
-    );
-    _qatarVisaNotificationDaysController = TextEditingController(
-      text: e?.qatarVisa?.notificationDays?.toString() ?? '',
     );
     _qatarVisaExpiryDate.value = e?.qatarVisa?.expiryDate;
     if (e?.qatarVisa?.type != null) {
@@ -245,9 +216,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     );
     _licenseNumberController = TextEditingController(
       text: e?.drivingLicense?.number ?? '',
-    );
-    _licenseNotificationDaysController = TextEditingController(
-      text: e?.drivingLicense?.notificationDays?.toString() ?? '',
     );
     _licenseExpiryDate.value = e?.drivingLicense?.expiryDate;
     if (e?.drivingLicense?.type != null) {
@@ -338,42 +306,37 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _pickedImage.dispose();
 
     _iqamaNumberController.dispose();
-    _iqamaNotificationDaysController.dispose();
     _iqamaExpiryDate.dispose();
     _insuranceExpiryDate.dispose();
     _bahrainResidenceNumberController.dispose();
-    _bahrainResidenceNotificationDaysController.dispose();
     _bahrainResidenceExpiryDate.dispose();
     _bahrainInsuranceExpiryDate.dispose();
     _passportNameController.dispose();
     _passportNumberController.dispose();
-    _passportNotificationDaysController.dispose();
     _passportExpiryDate.dispose();
     _saudiVisaNumberController.dispose();
-    _saudiVisaNotificationDaysController.dispose();
     _saudiVisaExpiryDate.dispose();
     _selectedSaudiVisaType.dispose();
     _bahrainVisaNumberController.dispose();
-    _bahrainVisaNotificationDaysController.dispose();
     _bahrainVisaExpiryDate.dispose();
     _selectedBahrainVisaType.dispose();
     _dubaiVisaNumberController.dispose();
-    _dubaiVisaNotificationDaysController.dispose();
     _dubaiVisaExpiryDate.dispose();
     _selectedDubaiVisaType.dispose();
     _qatarVisaNumberController.dispose();
-    _qatarVisaNotificationDaysController.dispose();
     _qatarVisaExpiryDate.dispose();
     _selectedQatarVisaType.dispose();
     _licenseCountryController.dispose();
     _licenseNumberController.dispose();
-    _licenseNotificationDaysController.dispose();
     _licenseExpiryDate.dispose();
     _selectedLicenseType.dispose();
 
     // Dispose contact entries
     for (final entry in _contactEntries.value) {
-      entry.dispose();
+      entry.phoneController.dispose();
+      entry.labelController.dispose();
+      entry.countryCode.dispose();
+      entry.rechargeExpiry.dispose();
     }
     _contactEntries.dispose();
 
@@ -530,11 +493,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _iqamaNumberController.text.trim(),
                 expiryDate: _iqamaExpiryDate.value!,
                 insuranceExpiryDate: _insuranceExpiryDate.value,
-                notificationDays:
-                    int.tryParse(
-                      _iqamaNotificationDaysController.text.trim(),
-                    ) ??
-                    30,
                 attachmentUrl: iqamaUrl,
               )
             : null,
@@ -545,11 +503,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _bahrainResidenceNumberController.text.trim(),
                 expiryDate: _bahrainResidenceExpiryDate.value!,
                 insuranceExpiryDate: _bahrainInsuranceExpiryDate.value,
-                notificationDays:
-                    int.tryParse(
-                      _bahrainResidenceNotificationDaysController.text.trim(),
-                    ) ??
-                    30,
                 attachmentUrl: bahrainResidenceUrl,
               )
             : null,
@@ -560,11 +513,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 nameOnPassport: _passportNameController.text.trim(),
                 number: _passportNumberController.text.trim(),
                 expiryDate: _passportExpiryDate.value!,
-                notificationDays:
-                    int.tryParse(
-                      _passportNotificationDaysController.text.trim(),
-                    ) ??
-                    30,
                 attachmentUrl: passportUrl,
               )
             : null,
@@ -575,11 +523,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _saudiVisaNumberController.text.trim(),
                 expiryDate: _saudiVisaExpiryDate.value!,
                 type: _selectedSaudiVisaType.value,
-                notificationDays:
-                    int.tryParse(
-                      _saudiVisaNotificationDaysController.text.trim(),
-                    ) ??
-                    30,
                 attachmentUrl: saudiVisaUrl,
               )
             : null,
@@ -590,11 +533,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _bahrainVisaNumberController.text.trim(),
                 expiryDate: _bahrainVisaExpiryDate.value!,
                 type: _selectedBahrainVisaType.value,
-                notificationDays:
-                    int.tryParse(
-                      _bahrainVisaNotificationDaysController.text.trim(),
-                    ) ??
-                    30,
                 attachmentUrl: bahrainVisaUrl,
               )
             : null,
@@ -605,11 +543,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _dubaiVisaNumberController.text.trim(),
                 expiryDate: _dubaiVisaExpiryDate.value!,
                 type: _selectedDubaiVisaType.value,
-                notificationDays:
-                    int.tryParse(
-                      _dubaiVisaNotificationDaysController.text.trim(),
-                    ) ??
-                    30,
                 attachmentUrl: dubaiVisaUrl,
               )
             : null,
@@ -620,11 +553,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _qatarVisaNumberController.text.trim(),
                 expiryDate: _qatarVisaExpiryDate.value!,
                 type: _selectedQatarVisaType.value,
-                notificationDays:
-                    int.tryParse(
-                      _qatarVisaNotificationDaysController.text.trim(),
-                    ) ??
-                    30,
                 attachmentUrl: qatarVisaUrl,
               )
             : null,
@@ -636,11 +564,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 number: _licenseNumberController.text.trim(),
                 expiryDate: _licenseExpiryDate.value!,
                 type: _selectedLicenseType.value,
-                notificationDays:
-                    int.tryParse(
-                      _licenseNotificationDaysController.text.trim(),
-                    ) ??
-                    30,
                 attachmentUrl: licenseUrl,
               )
             : null,
@@ -1167,13 +1090,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           ],
                         ),
                         SizedBox(height: 16.h),
-                        _buildTextField(
-                          controller: _iqamaNotificationDaysController,
-                          label: 'Alert Before (Days)',
-                          icon: Icons.notifications,
-                          keyboardType: TextInputType.number,
-                        ),
-                        SizedBox(height: 16.h),
                         _buildAttachmentPicker(
                           label: 'Iqama Scan / Copy',
                           pickedFileNotifier: _iqamaAttachment,
@@ -1278,14 +1194,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           ],
                         ),
                         SizedBox(height: 16.h),
-                        _buildTextField(
-                          controller:
-                              _bahrainResidenceNotificationDaysController,
-                          label: 'Alert Before (Days)',
-                          icon: Icons.notifications,
-                          keyboardType: TextInputType.number,
-                        ),
-                        SizedBox(height: 16.h),
                         _buildAttachmentPicker(
                           label: 'Residence ID Scan / Copy',
                           pickedFileNotifier: _bahrainResidenceAttachment,
@@ -1361,15 +1269,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                 controller: _passportNameController,
                                 label: 'Name on Passport',
                                 icon: Icons.person,
-                              ),
-                            ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _passportNotificationDaysController,
-                                label: 'Alert Before (Days)',
-                                icon: Icons.notifications,
-                                keyboardType: TextInputType.number,
                               ),
                             ),
                           ],
@@ -1473,16 +1372,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                 },
                               ),
                             ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: _buildTextField(
-                                controller:
-                                    _saudiVisaNotificationDaysController,
-                                label: 'Alert Before (Days)',
-                                icon: Icons.notifications,
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
                           ],
                         ),
                         SizedBox(height: 16.h),
@@ -1582,16 +1471,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     },
                                   );
                                 },
-                              ),
-                            ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: _buildTextField(
-                                controller:
-                                    _bahrainVisaNotificationDaysController,
-                                label: 'Alert Before (Days)',
-                                icon: Icons.notifications,
-                                keyboardType: TextInputType.number,
                               ),
                             ),
                           ],
@@ -1695,16 +1574,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                 },
                               ),
                             ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: _buildTextField(
-                                controller:
-                                    _dubaiVisaNotificationDaysController,
-                                label: 'Alert Before (Days)',
-                                icon: Icons.notifications,
-                                keyboardType: TextInputType.number,
-                              ),
-                            ),
                           ],
                         ),
                         SizedBox(height: 16.h),
@@ -1804,16 +1673,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     },
                                   );
                                 },
-                              ),
-                            ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: _buildTextField(
-                                controller:
-                                    _qatarVisaNotificationDaysController,
-                                label: 'Alert Before (Days)',
-                                icon: Icons.notifications,
-                                keyboardType: TextInputType.number,
                               ),
                             ),
                           ],
@@ -1925,13 +1784,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               ),
                             ),
                           ],
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildTextField(
-                          controller: _licenseNotificationDaysController,
-                          label: 'Alert Before (Days)',
-                          icon: Icons.notifications,
-                          keyboardType: TextInputType.number,
                         ),
                         SizedBox(height: 16.h),
                         _buildAttachmentPicker(
@@ -2305,7 +2157,10 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                   final updated = List<_ContactEntry>.from(
                     _contactEntries.value,
                   )..removeAt(index);
-                  entry.dispose();
+                  entry.phoneController.dispose();
+                  entry.labelController.dispose();
+                  entry.countryCode.dispose();
+                  entry.rechargeExpiry.dispose();
                   _contactEntries.value = updated;
                 },
                 icon: Icon(Icons.delete, color: Colors.red, size: 20.sp),
@@ -2391,15 +2246,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                   },
                 ),
               ),
-              SizedBox(width: 8.w),
-              Expanded(
-                child: _buildTextField(
-                  controller: entry.notificationDaysController,
-                  label: 'Alert Before (Days)',
-                  icon: Icons.notifications,
-                  keyboardType: TextInputType.number,
-                ),
-              ),
             ],
           ),
         ],
@@ -2413,7 +2259,6 @@ class _ContactEntry {
   final String id;
   final TextEditingController phoneController;
   final TextEditingController labelController;
-  final TextEditingController notificationDaysController;
   final ValueNotifier<String> countryCode;
   final ValueNotifier<DateTime?> rechargeExpiry;
   String? currentHolderId;
@@ -2424,7 +2269,6 @@ class _ContactEntry {
     required this.id,
     required this.phoneController,
     required this.labelController,
-    required this.notificationDaysController,
     required this.countryCode,
     required this.rechargeExpiry,
     this.currentHolderId,
@@ -2437,7 +2281,6 @@ class _ContactEntry {
       id: const Uuid().v4(),
       phoneController: TextEditingController(),
       labelController: TextEditingController(),
-      notificationDaysController: TextEditingController(text: '30'),
       countryCode: ValueNotifier('+966'),
       rechargeExpiry: ValueNotifier(null),
     );
@@ -2448,9 +2291,6 @@ class _ContactEntry {
       id: contact.id,
       phoneController: TextEditingController(text: contact.phoneNumber),
       labelController: TextEditingController(text: contact.label),
-      notificationDaysController: TextEditingController(
-        text: (contact.notificationDays ?? 30).toString(),
-      ),
       countryCode: ValueNotifier(contact.countryCode),
       rechargeExpiry: ValueNotifier(contact.rechargeExpiryDate),
       currentHolderId: contact.currentHolderId,
@@ -2467,18 +2307,8 @@ class _ContactEntry {
       label: labelController.text.trim(),
       rechargeExpiryDate: rechargeExpiry.value,
       rechargeCost: rechargeCost,
-      notificationDays:
-          int.tryParse(notificationDaysController.text.trim()) ?? 30,
       currentHolderId: currentHolderId,
       currentHolderName: currentHolderName,
     );
-  }
-
-  void dispose() {
-    phoneController.dispose();
-    labelController.dispose();
-    notificationDaysController.dispose();
-    countryCode.dispose();
-    rechargeExpiry.dispose();
   }
 }

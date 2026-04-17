@@ -1,5 +1,6 @@
 import 'package:image_picker/image_picker.dart';
 import '../entities/employee_entity.dart';
+import '../entities/employee_settings_entity.dart';
 
 abstract class EmployeeRepository {
   Future<List<EmployeeEntity>> getAllEmployees();
@@ -12,4 +13,6 @@ abstract class EmployeeRepository {
     String employeeId,
     String docType,
   );
+  Future<EmployeeSettingsEntity> getEmployeeSettings();
+  Future<void> updateEmployeeSettings(EmployeeSettingsEntity settings);
 }

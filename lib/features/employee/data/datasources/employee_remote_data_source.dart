@@ -4,6 +4,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/employee_model.dart';
+import '../models/employee_settings_model.dart';
 
 abstract class EmployeeRemoteDataSource {
   Future<List<EmployeeModel>> getAllEmployees();
@@ -19,6 +20,8 @@ abstract class EmployeeRemoteDataSource {
     String employeeId,
     String docType,
   );
+  Future<EmployeeSettingsModel> getEmployeeSettings();
+  Future<void> updateEmployeeSettings(EmployeeSettingsModel settings);
 }
 
 class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
@@ -105,5 +108,22 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     }
 
     return await storageRef.getDownloadURL();
+  }
+
+  @override
+  Future<EmployeeSettingsModel> getEmployeeSettings() async {
+    final doc = await firestore.collection('Settings').doc('employee_settings').get();
+    if (doc.exists && doc.data() != null) {
+      return EmployeeSettingsModel.fromJson(doc.data()!);
+    }
+    return const EmployeeSettingsModel();
+  }
+
+  @override
+  Future<void> updateEmployeeSettings(EmployeeSettingsModel settings) async {
+    await firestore
+        .collection('Settings')
+        .doc('employee_settings')
+        .set(settings.toJson(), SetOptions(merge: true));
   }
 }

@@ -382,7 +382,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
                 onPressed: () {
                   showDialog(
                     context: context,
-                    builder: (context) => AuthorizeVehicleDialog(employee: employee),
+                    builder: (context) =>
+                        AuthorizeVehicleDialog(employee: employee),
                   );
                 },
                 icon: const Icon(Icons.add_circle_outline, size: 20),
@@ -396,7 +397,9 @@ class EmployeeDetailsScreen extends StatelessWidget {
           ),
           Card(
             elevation: 2,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.r),
+            ),
             child: Padding(
               padding: EdgeInsets.all(20.w),
               child: Text(
@@ -422,7 +425,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
               onPressed: () {
                 showDialog(
                   context: context,
-                  builder: (context) => AuthorizeVehicleDialog(employee: employee),
+                  builder: (context) =>
+                      AuthorizeVehicleDialog(employee: employee),
                 );
               },
               icon: const Icon(Icons.add_circle_outline, size: 20),
@@ -435,74 +439,90 @@ class EmployeeDetailsScreen extends StatelessWidget {
           ],
         ),
         ...authorizedVehicles.map((vehicle) {
-          final tafweedsForEmployee = vehicle.tafweeds?.where((t) => t.driverId == employee.id).toList();
-          final employeeTafweed = (tafweedsForEmployee != null && tafweedsForEmployee.isNotEmpty) ? tafweedsForEmployee.first : null;
-          
+          final tafweedsForEmployee = vehicle.tafweeds
+              ?.where((t) => t.driverId == employee.id)
+              .toList();
+          final employeeTafweed =
+              (tafweedsForEmployee != null && tafweedsForEmployee.isNotEmpty)
+              ? tafweedsForEmployee.first
+              : null;
+
           return Card(
-              elevation: 2,
-              margin: EdgeInsets.only(bottom: 12.h),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
-              child: Padding(
-                padding: EdgeInsets.all(20.w),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(12.w),
-                      decoration: BoxDecoration(
-                        color: Colors.purple.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.admin_panel_settings,
-                        color: Colors.purple,
-                        size: 30.sp,
-                      ),
+            elevation: 2,
+            margin: EdgeInsets.only(bottom: 12.h),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.r),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(20.w),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
                     ),
-                    SizedBox(width: 16.w),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${vehicle.make} ${vehicle.model}',
-                            style: TextStyle(
-                              fontSize: 18.sp,
-                              fontWeight: FontWeight.bold,
-                            ),
+                    child: Icon(
+                      Icons.admin_panel_settings,
+                      color: Colors.purple,
+                      size: 30.sp,
+                    ),
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${vehicle.make} ${vehicle.model}',
+                          style: TextStyle(
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.bold,
                           ),
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          'Plate: ${vehicle.plateNumber}',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            color: Colors.grey[700],
+                          ),
+                        ),
+                        if (employeeTafweed != null) ...[
                           SizedBox(height: 4.h),
-                          Text(
-                            'Plate: ${vehicle.plateNumber}',
-                            style: TextStyle(fontSize: 14.sp, color: Colors.grey[700]),
+                          Row(
+                            children: [
+                              Text(
+                                'Tafweed Expiry: ',
+                                style: TextStyle(
+                                  fontSize: 14.sp,
+                                  color: Colors.grey[700],
+                                ),
+                              ),
+                              Text(
+                                _formatDate(employeeTafweed.expiryDate),
+                                style: TextStyle(
+                                  fontSize: 14.sp,
+                                  fontWeight: FontWeight.bold,
+                                  color:
+                                      employeeTafweed.expiryDate.isBefore(
+                                        DateTime.now(),
+                                      )
+                                      ? Colors.red
+                                      : Colors.green,
+                                ),
+                              ),
+                            ],
                           ),
-                          if (employeeTafweed != null) ...[
-                            SizedBox(height: 4.h),
-                            Row(
-                              children: [
-                                Text(
-                                  'Tafweed Expiry: ',
-                                  style: TextStyle(fontSize: 14.sp, color: Colors.grey[700]),
-                                ),
-                                Text(
-                                  _formatDate(employeeTafweed.expiryDate),
-                                  style: TextStyle(
-                                    fontSize: 14.sp,
-                                    fontWeight: FontWeight.bold,
-                                    color: employeeTafweed.expiryDate.isBefore(DateTime.now())
-                                        ? Colors.red
-                                        : Colors.green,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ]
                         ],
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            );
+            ),
+          );
         }),
       ],
     );
@@ -620,11 +640,6 @@ class EmployeeDetailsScreen extends StatelessWidget {
                 ),
               ],
             ),
-            _buildDetailRow(
-              'Alert Before',
-              '${contact.notificationDays ?? 30} Days',
-              Icons.notifications,
-            ),
           ],
         ),
       ),
@@ -645,7 +660,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             extraInfo: employee.iqama!.insuranceExpiryDate != null
                 ? 'Insurance Expiry: ${_formatDate(employee.iqama!.insuranceExpiryDate)}'
                 : null,
-            notificationDays: employee.iqama!.notificationDays,
+            notificationDays: null,
           ),
         if (employee.bahrainResidence != null)
           _buildDocumentCard(
@@ -658,7 +673,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             extraInfo: employee.bahrainResidence!.insuranceExpiryDate != null
                 ? 'Insurance Expiry: ${_formatDate(employee.bahrainResidence!.insuranceExpiryDate)}'
                 : null,
-            notificationDays: employee.bahrainResidence!.notificationDays,
+            notificationDays: null,
           ),
         if (employee.passport != null)
           _buildDocumentCard(
@@ -669,7 +684,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             expiryDate: employee.passport!.expiryDate,
             attachmentUrl: employee.passport!.attachmentUrl,
             extraInfo: 'Name: ${employee.passport!.nameOnPassport}',
-            notificationDays: employee.passport!.notificationDays,
+            notificationDays: null,
           ),
         if (employee.drivingLicense != null)
           _buildDocumentCard(
@@ -681,7 +696,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             attachmentUrl: employee.drivingLicense!.attachmentUrl,
             extraInfo:
                 'Type: ${employee.drivingLicense!.type.name.toUpperCase()}\nCountry: ${employee.drivingLicense!.countryOfOrigin}',
-            notificationDays: employee.drivingLicense!.notificationDays,
+            notificationDays: null,
           ),
         if (employee.saudiVisa != null)
           _buildVisaCard(context, 'Saudi Visa', employee.saudiVisa!),
@@ -699,7 +714,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             number: 'N/A',
             expiryDate: employee.authorization!.expiryDate,
             attachmentUrl: employee.authorization!.attachmentUrl,
-            notificationDays: employee.authorization!.notificationDays,
+            notificationDays: null,
           ),
         if (_hasNoDocuments())
           Padding(
@@ -740,7 +755,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
       attachmentUrl: visa.attachmentUrl,
       extraInfo:
           'Type: ${visa.type == VisaType.singleEntry ? "Single Entry" : "Multiple Entry"}',
-      notificationDays: visa.notificationDays,
+      notificationDays: null,
     );
   }
 
@@ -820,14 +835,6 @@ class EmployeeDetailsScreen extends StatelessWidget {
                           ),
                         ),
                       ],
-                      SizedBox(height: 4.h),
-                      Text(
-                        'Alert Before: ${notificationDays ?? 30} Days',
-                        style: TextStyle(
-                          fontSize: 13.sp,
-                          color: Colors.grey[600],
-                        ),
-                      ),
                     ],
                   ),
                 ),

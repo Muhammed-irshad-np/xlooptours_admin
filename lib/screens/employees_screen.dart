@@ -10,6 +10,7 @@ import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../widgets/responsive_layout.dart';
 import 'employee_details_screen.dart';
 import 'employee_form_screen.dart';
+import 'employee_master_screen.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
 
@@ -33,13 +34,16 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   final ValueNotifier<Map<String, VehicleEntity>> _assignedVehicles =
       ValueNotifier<Map<String, VehicleEntity>>({});
 
-  final List<String> _tabs = ['All', 'Management', 'Office', 'Drivers'];
+  final List<String> _tabs = ['All', 'Management', 'Office', 'Drivers', 'Master'];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
-    _tabController.addListener(_filterEmployees);
+    _tabController.addListener(() {
+      _filterEmployees();
+      if (mounted) setState(() {});
+    });
     _loadEmployees();
   }
 
@@ -223,7 +227,9 @@ class _EmployeesScreenState extends State<EmployeesScreen>
           tabs: _tabs.map((t) => Tab(text: t)).toList(),
         ),
       ),
-      body: Column(
+      body: _tabController.index == _tabs.length - 1
+          ? const EmployeeMasterScreen()
+          : Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),

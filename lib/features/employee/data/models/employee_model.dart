@@ -58,7 +58,6 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: iqama!.expiryDate,
               insuranceExpiryDate: iqama!.insuranceExpiryDate,
               attachmentUrl: iqama!.attachmentUrl,
-              notificationDays: iqama!.notificationDays,
             ).toJson()
           : null,
       'bahrainResidence': bahrainResidence != null
@@ -67,7 +66,6 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: bahrainResidence!.expiryDate,
               insuranceExpiryDate: bahrainResidence!.insuranceExpiryDate,
               attachmentUrl: bahrainResidence!.attachmentUrl,
-              notificationDays: bahrainResidence!.notificationDays,
             ).toJson()
           : null,
       'drivingLicense': drivingLicense != null
@@ -77,7 +75,6 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: drivingLicense!.expiryDate,
               type: drivingLicense!.type,
               attachmentUrl: drivingLicense!.attachmentUrl,
-              notificationDays: drivingLicense!.notificationDays,
             ).toJson()
           : null,
       'passport': passport != null
@@ -86,7 +83,6 @@ class EmployeeModel extends EmployeeEntity {
               number: passport!.number,
               expiryDate: passport!.expiryDate,
               attachmentUrl: passport!.attachmentUrl,
-              notificationDays: passport!.notificationDays,
             ).toJson()
           : null,
       'saudiVisa': saudiVisa != null
@@ -95,7 +91,6 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: saudiVisa!.expiryDate,
               type: saudiVisa!.type,
               attachmentUrl: saudiVisa!.attachmentUrl,
-              notificationDays: saudiVisa!.notificationDays,
             ).toJson()
           : null,
       'bahrainVisa': bahrainVisa != null
@@ -104,7 +99,6 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: bahrainVisa!.expiryDate,
               type: bahrainVisa!.type,
               attachmentUrl: bahrainVisa!.attachmentUrl,
-              notificationDays: bahrainVisa!.notificationDays,
             ).toJson()
           : null,
       'dubaiVisa': dubaiVisa != null
@@ -113,7 +107,6 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: dubaiVisa!.expiryDate,
               type: dubaiVisa!.type,
               attachmentUrl: dubaiVisa!.attachmentUrl,
-              notificationDays: dubaiVisa!.notificationDays,
             ).toJson()
           : null,
       'qatarVisa': qatarVisa != null
@@ -122,14 +115,12 @@ class EmployeeModel extends EmployeeEntity {
               expiryDate: qatarVisa!.expiryDate,
               type: qatarVisa!.type,
               attachmentUrl: qatarVisa!.attachmentUrl,
-              notificationDays: qatarVisa!.notificationDays,
             ).toJson()
           : null,
       'authorization': authorization != null
           ? AuthorizationModel(
               expiryDate: authorization!.expiryDate,
               attachmentUrl: authorization!.attachmentUrl,
-              notificationDays: authorization!.notificationDays,
             ).toJson()
           : null,
       'contacts': contacts

@@ -1,8 +1,10 @@
 import 'package:image_picker/image_picker.dart';
 import '../../domain/entities/employee_entity.dart';
+import '../../domain/entities/employee_settings_entity.dart';
 import '../../domain/repositories/employee_repository.dart';
 import '../datasources/employee_remote_data_source.dart';
 import '../models/employee_model.dart';
+import '../models/employee_settings_model.dart';
 
 class EmployeeRepositoryImpl implements EmployeeRepository {
   final EmployeeRemoteDataSource remoteDataSource;
@@ -47,5 +49,16 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
       employeeId,
       docType,
     );
+  }
+
+  @override
+  Future<EmployeeSettingsEntity> getEmployeeSettings() async {
+    return await remoteDataSource.getEmployeeSettings();
+  }
+
+  @override
+  Future<void> updateEmployeeSettings(EmployeeSettingsEntity settings) async {
+    final model = EmployeeSettingsModel.fromEntity(settings);
+    await remoteDataSource.updateEmployeeSettings(model);
   }
 }
