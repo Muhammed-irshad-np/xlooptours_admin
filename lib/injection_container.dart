@@ -90,6 +90,12 @@ import 'features/invoice/presentation/providers/invoice_provider.dart';
 import 'features/analytics/domain/usecases/get_analytics_usecase.dart';
 import 'features/analytics/presentation/providers/analytics_provider.dart';
 
+import 'features/xloop_vault/data/datasources/vault_remote_data_source.dart';
+import 'features/xloop_vault/data/repositories/vault_repository_impl.dart';
+import 'features/xloop_vault/domain/repositories/vault_repository.dart';
+import 'features/xloop_vault/domain/usecases/vault_usecases.dart';
+import 'features/xloop_vault/presentation/providers/vault_provider.dart';
+
 final sl = GetIt.instance; // sl stands for Service Locator
 
 Future<void> init() async {
@@ -343,6 +349,41 @@ Future<void> init() async {
 
   // UseCases
   sl.registerLazySingleton(() => GetAnalyticsUseCase(sl()));
+
+  //! Features - Vault
+  // State Management (Provider)
+  sl.registerFactory(
+    () => VaultProvider(
+      getVaultDataUseCase: sl(),
+      updateVaultDataUseCase: sl(),
+      getVatFilingsUseCase: sl(),
+      addVatFilingUseCase: sl(),
+      updateVatFilingUseCase: sl(),
+      deleteVatFilingUseCase: sl(),
+      uploadVaultDocumentUseCase: sl(),
+      verifyVaultPasswordUseCase: sl(),
+    ),
+  );
+
+  // UseCases
+  sl.registerLazySingleton(() => GetVaultDataUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateVaultDataUseCase(sl()));
+  sl.registerLazySingleton(() => GetVatFilingsUseCase(sl()));
+  sl.registerLazySingleton(() => AddVatFilingUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateVatFilingUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteVatFilingUseCase(sl()));
+  sl.registerLazySingleton(() => UploadVaultDocumentUseCase(sl()));
+  sl.registerLazySingleton(() => VerifyVaultPasswordUseCase(sl()));
+
+  // Repositories
+  sl.registerLazySingleton<VaultRepository>(
+    () => VaultRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data sources
+  sl.registerLazySingleton<VaultRemoteDataSource>(
+    () => VaultRemoteDataSourceImpl(firestore: sl(), storage: sl()),
+  );
 
   //! Core
   // e.g. NetworkInfo

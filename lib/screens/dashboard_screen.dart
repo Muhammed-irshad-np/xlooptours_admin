@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:go_router/go_router.dart';
 
 import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
@@ -135,7 +136,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               ResponsiveLayout(
                 mobile: Column(
                   children: [
-                    _buildExpiriesSection(),
+                    const _ExpiriesSection(),
                     SizedBox(height: 32.h),
                     _buildRecentActivitySection(),
                     SizedBox(height: 32.h),
@@ -149,7 +150,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       flex: 3,
                       child: Column(
                         children: [
-                          _buildExpiriesSection(),
+                          const _ExpiriesSection(),
                           SizedBox(height: 32.h),
                           _buildRecentActivitySection(),
                         ],
@@ -362,59 +363,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
-  // ── Expiries section ─────────────────────────────────────────────────────────
-  Widget _buildExpiriesSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Consumer<NotificationProvider>(
-          builder: (context, provider, _) {
-            final expiries = provider.notifications
-                .where((n) => n.type == NotificationType.expiry)
-                .toList();
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _SectionLabel(
-                  label: 'Action Items / Expiries',
-                  icon: Icons.warning_amber_rounded,
-                  iconColor: _DT.danger,
-                  count: expiries.length,
-                ),
-                SizedBox(height: 16.h),
-                if (expiries.isEmpty)
-                  _DashboardEmptyState(
-                    message: 'All clear — no urgent action items',
-                    icon: Icons.check_circle_outline_rounded,
-                    color: _DT.success,
-                  )
-                else
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: 500.h),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      physics: const ClampingScrollPhysics(),
-                      itemCount: expiries.length,
-                      separatorBuilder: (_, __) => SizedBox(height: 12.h),
-                      itemBuilder: (context, i) => _ExpiryCard(
-                        alert: expiries[i],
-                        onUpdate: () => UpdateDialogHelper.showUpdateDialog(
-                          context,
-                          expiries[i],
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  // ── Recent activity section ──────────────────────────────────────────────────
+  // ── Expiries section (moved to Stateful Widget below) ───────────────────────
   Widget _buildRecentActivitySection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1321,6 +1270,234 @@ class _OdometerDialog extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Expiries Section (Stateful with Tabs & View All)
+// ═══════════════════════════════════════════════════════════════════════════════
+class _ExpiriesSection extends StatefulWidget {
+  const _ExpiriesSection();
+
+  @override
+  State<_ExpiriesSection> createState() => _ExpiriesSectionState();
+}
+
+class _ExpiriesSectionState extends State<_ExpiriesSection> {
+  int _selectedTabIndex = 0;
+  final List<String> _tabs = ['All', 'Vehicles', 'Employees', 'Other'];
+
+  List<NotificationEntity> _getFilteredExpiries(
+      List<NotificationEntity> allExpiries) {
+    if (_selectedTabIndex == 0) return allExpiries;
+    if (_selectedTabIndex == 1) {
+      // Vehicles
+      return allExpiries
+          .where((n) =>
+              n.id.startsWith('maintenance_') || n.id.startsWith('v_expiry_'))
+          .toList();
+    }
+    if (_selectedTabIndex == 2) {
+      // Employees
+      return allExpiries.where((n) => n.id.startsWith('expiry_')).toList();
+    }
+    // Other (including Company Docs / Vault)
+    return allExpiries
+        .where((n) =>
+            !n.id.startsWith('maintenance_') &&
+            !n.id.startsWith('v_expiry_') &&
+            !n.id.startsWith('expiry_'))
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<NotificationProvider>(
+      builder: (context, provider, _) {
+        final expiries = provider.notifications
+            .where((n) => n.type == NotificationType.expiry)
+            .toList();
+
+        final filtered = _getFilteredExpiries(expiries);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _SectionLabel(
+                  label: 'Action Items / Expiries',
+                  icon: Icons.warning_amber_rounded,
+                  iconColor: _DT.danger,
+                  count: expiries.length,
+                ),
+                TextButton(
+                  onPressed: () {
+                    // Navigate to ExpiriesListScreen
+                    context.push('/expiries');
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: _DT.brand,
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'View All',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      SizedBox(width: 4.w),
+                      Icon(Icons.arrow_forward_rounded, size: 16.sp),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 16.h),
+            if (expiries.isNotEmpty) ...[
+              // Custom interactive tabs for better design
+              Semantics(
+                label: 'Action item tabs',
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  child: Row(
+                    children: List.generate(_tabs.length, (index) {
+                      final isSelected = _selectedTabIndex == index;
+                      int tabCount = 0;
+                      if (index == 0) tabCount = expiries.length;
+                      if (index == 1) {
+                        tabCount = expiries
+                            .where((n) =>
+                                n.id.startsWith('maintenance_') ||
+                                n.id.startsWith('v_expiry_'))
+                            .length;
+                      }
+                      if (index == 2) {
+                        tabCount = expiries
+                            .where((n) => n.id.startsWith('expiry_'))
+                            .length;
+                      }
+                      if (index == 3) {
+                        tabCount = expiries
+                            .where((n) =>
+                                !n.id.startsWith('maintenance_') &&
+                                !n.id.startsWith('v_expiry_') &&
+                                !n.id.startsWith('expiry_'))
+                            .length;
+                      }
+
+                      return Padding(
+                        padding: EdgeInsets.only(right: 8.w),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          child: ChoiceChip(
+                            label: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(_tabs[index]),
+                                if (tabCount > 0) ...[
+                                  SizedBox(width: 6.w),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 6.w, vertical: 2.h),
+                                    decoration: BoxDecoration(
+                                      color: isSelected
+                                          ? Colors.white.withOpacity(0.2)
+                                          : _DT.brand.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(20.r),
+                                    ),
+                                    child: Text(
+                                      tabCount.toString(),
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : _DT.brand,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              if (selected) {
+                                setState(() {
+                                  _selectedTabIndex = index;
+                                });
+                              }
+                            },
+                            labelStyle: GoogleFonts.inter(
+                              color: isSelected
+                                  ? Colors.white
+                                  : _DT.textSecondary,
+                              fontWeight: isSelected
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                              fontSize: 13.sp,
+                            ),
+                            backgroundColor: Colors.white,
+                            selectedColor: _DT.brand,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20.r),
+                              side: BorderSide(
+                                color: isSelected
+                                    ? _DT.brand
+                                    : _DT.border.withOpacity(0.8),
+                              ),
+                            ),
+                            elevation: isSelected ? 2 : 0,
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ),
+              SizedBox(height: 16.h),
+            ],
+            if (filtered.isEmpty)
+              _DashboardEmptyState(
+                message: expiries.isEmpty
+                    ? 'All clear — no urgent action items'
+                    : 'No action items in this category',
+                icon: Icons.check_circle_outline_rounded,
+                color: _DT.success,
+              )
+            else
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: 500.h),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const ClampingScrollPhysics(),
+                  itemCount: filtered.length,
+                  separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                  itemBuilder: (context, i) => _ExpiryCard(
+                    alert: filtered[i],
+                    onUpdate: () => UpdateDialogHelper.showUpdateDialog(
+                      context,
+                      filtered[i],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

@@ -9,11 +9,14 @@ import 'trip_creation_screen.dart';
 import 'notifications_screen.dart';
 import 'dashboard_screen.dart';
 
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:provider/provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
-import 'companies_screen.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
-
+import '../features/xloop_vault/presentation/pages/vault_screen.dart';
+import '../features/xloop_vault/presentation/providers/vault_provider.dart';
+import 'companies_screen.dart';
 /// The main admin scaffold with a professional, dark-themed sidebar.
 class AdminLayout extends StatefulWidget {
   const AdminLayout({super.key});
@@ -178,7 +181,7 @@ class _Sidebar extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Logo Header
-          _buildLogoSection(),
+          _buildLogoSection(context),
           // Divider
           Container(
             height: 1,
@@ -250,9 +253,70 @@ class _Sidebar extends StatelessWidget {
     );
   }
 
-  Widget _buildLogoSection() {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 22.h),
+  Future<void> _handleLogoClick(BuildContext context) async {
+    final passwordController = TextEditingController();
+    bool isObscured = true;
+    final success = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('Access Secure Vault', style: TextStyle(fontWeight: FontWeight.bold)),
+            content: TextField(
+              controller: passwordController,
+              obscureText: isObscured,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                suffixIcon: IconButton(
+                  icon: Icon(isObscured ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () => setState(() => isObscured = !isObscured),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final password = passwordController.text;
+                  final bytes = utf8.encode(password);
+                  final digest = sha256.convert(bytes);
+                  final passwordHash = digest.toString();
+                  
+                  final vaultProvider = context.read<VaultProvider>();
+                  final isValid = await vaultProvider.verifyPassword(passwordHash);
+
+                  if (isValid && context.mounted) {
+                    Navigator.pop(context, true);
+                  } else if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Incorrect password')),
+                    );
+                  }
+                },
+                child: const Text('Enter'),
+              ),
+            ],
+          );
+        }
+      ),
+    );
+
+    if (success == true && context.mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const VaultScreen()),
+      );
+    }
+  }
+
+  Widget _buildLogoSection(BuildContext context) {
+    return InkWell(
+      onTap: () => _handleLogoClick(context),
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 22.h),
       child: Row(
         children: [
           // Logo inside a rounded container
@@ -304,6 +368,7 @@ class _Sidebar extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

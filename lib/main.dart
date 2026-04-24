@@ -16,6 +16,7 @@ import 'features/employee/presentation/providers/employee_provider.dart';
 import 'features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'features/invoice/presentation/providers/invoice_provider.dart';
 import 'features/analytics/presentation/providers/analytics_provider.dart';
+import 'features/xloop_vault/presentation/providers/vault_provider.dart';
 
 import 'screens/invoice_form_screen.dart';
 import 'screens/pdf_preview_screen.dart';
@@ -37,6 +38,7 @@ import 'screens/public/under_maintenance_screen.dart';
 // Added
 // import 'screens/vehicles_screen.dart'; // Removed unused import
 import 'screens/vehicle_form_screen.dart'; // Added
+import 'screens/expiries_list_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -238,6 +240,10 @@ class _MyAppState extends State<MyApp> {
             return VehicleFormScreen(vehicle: vehicle);
           },
         ),
+        GoRoute(
+          path: '/expiries',
+          builder: (context, state) => const ExpiriesListScreen(),
+        ),
       ],
     );
   }
@@ -254,6 +260,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => di.sl<VehicleProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<InvoiceProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<AnalyticsProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<VaultProvider>()),
       ],
       child: ScreenUtilInit(
         designSize: const Size(1440, 900),
