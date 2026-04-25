@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xloop_invoice/core/utils/share_helper.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class DocumentViewerScreen extends StatefulWidget {
   final String attachmentUrl;
@@ -47,6 +48,20 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
               );
             },
             tooltip: 'Share',
+          ),
+          IconButton(
+            icon: const Icon(Icons.download),
+            onPressed: () async {
+              final uri = Uri.parse(widget.attachmentUrl);
+              if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Could not download file')),
+                  );
+                }
+              }
+            },
+            tooltip: 'Download',
           ),
           IconButton(
             icon: const Icon(Icons.close),

@@ -34,7 +34,13 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   final ValueNotifier<Map<String, VehicleEntity>> _assignedVehicles =
       ValueNotifier<Map<String, VehicleEntity>>({});
 
-  final List<String> _tabs = ['All', 'Management', 'Office', 'Drivers', 'Master'];
+  final List<String> _tabs = [
+    'All',
+    'Management',
+    'Office',
+    'Drivers',
+    'Master',
+  ];
 
   @override
   void initState() {
@@ -230,97 +236,101 @@ class _EmployeesScreenState extends State<EmployeesScreen>
       body: _tabController.index == _tabs.length - 1
           ? const EmployeeMasterScreen()
           : Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search employees...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search employees...',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                    onChanged: (val) {
+                      _searchQuery = val;
+                      _filterEmployees();
+                    },
+                  ),
                 ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-              ),
-              onChanged: (val) {
-                _searchQuery = val;
-                _filterEmployees();
-              },
-            ),
-          ),
-          Expanded(
-            child: ValueListenableBuilder<bool>(
-              valueListenable: _isLoading,
-              builder: (context, isLoading, _) {
-                if (isLoading) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                return ValueListenableBuilder<List<EmployeeEntity>>(
-                  valueListenable: _filteredEmployees,
-                  builder: (context, filteredEmployees, _) {
-                    if (filteredEmployees.isEmpty) {
-                      return Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.person_off_outlined,
-                              size: 64.sp,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 16.h),
-                            Text(
-                              'No employees found',
-                              style: TextStyle(
-                                fontSize: 18.sp,
-                                color: Colors.grey,
+                Expanded(
+                  child: ValueListenableBuilder<bool>(
+                    valueListenable: _isLoading,
+                    builder: (context, isLoading, _) {
+                      if (isLoading) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      return ValueListenableBuilder<List<EmployeeEntity>>(
+                        valueListenable: _filteredEmployees,
+                        builder: (context, filteredEmployees, _) {
+                          if (filteredEmployees.isEmpty) {
+                            return Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.person_off_outlined,
+                                    size: 64.sp,
+                                    color: Colors.grey,
+                                  ),
+                                  SizedBox(height: 16.h),
+                                  Text(
+                                    'No employees found',
+                                    style: TextStyle(
+                                      fontSize: 18.sp,
+                                      color: Colors.grey,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
+                            );
+                          }
 
-                    return ValueListenableBuilder<Map<String, VehicleEntity>>(
-                      valueListenable: _assignedVehicles,
-                      builder: (context, assignedVehicles, _) {
-                        return ResponsiveLayout(
-                          mobile: ListView.builder(
-                            itemCount: filteredEmployees.length,
-                            padding: const EdgeInsets.all(8),
-                            itemBuilder: (context, index) => _buildEmployeeCard(
-                              filteredEmployees[index],
-                              assignedVehicles,
-                            ),
-                          ),
-                          desktop: GridView.builder(
-                            padding: const EdgeInsets.all(16),
-                            gridDelegate:
-                                SliverGridDelegateWithMaxCrossAxisExtent(
-                                  maxCrossAxisExtent: 430.w,
-                                  childAspectRatio: 1.4,
-                                  crossAxisSpacing: 16,
-                                  mainAxisSpacing: 16,
+                          return ValueListenableBuilder<
+                            Map<String, VehicleEntity>
+                          >(
+                            valueListenable: _assignedVehicles,
+                            builder: (context, assignedVehicles, _) {
+                              return ResponsiveLayout(
+                                mobile: ListView.builder(
+                                  itemCount: filteredEmployees.length,
+                                  padding: const EdgeInsets.all(8),
+                                  itemBuilder: (context, index) =>
+                                      _buildEmployeeCard(
+                                        filteredEmployees[index],
+                                        assignedVehicles,
+                                      ),
                                 ),
-                            itemCount: filteredEmployees.length,
-                            itemBuilder: (context, index) => _buildEmployeeCard(
-                              filteredEmployees[index],
-                              assignedVehicles,
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                );
-              },
+                                desktop: GridView.builder(
+                                  padding: const EdgeInsets.all(16),
+                                  gridDelegate:
+                                      SliverGridDelegateWithMaxCrossAxisExtent(
+                                        maxCrossAxisExtent: 430.w,
+                                        childAspectRatio: 1.4,
+                                        crossAxisSpacing: 16,
+                                        mainAxisSpacing: 16,
+                                      ),
+                                  itemCount: filteredEmployees.length,
+                                  itemBuilder: (context, index) =>
+                                      _buildEmployeeCard(
+                                        filteredEmployees[index],
+                                        assignedVehicles,
+                                      ),
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _navigateToForm(null),
         child: const Icon(Icons.add),

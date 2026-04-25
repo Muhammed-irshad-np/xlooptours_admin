@@ -9,10 +9,11 @@ import '../../../../core/widgets/modern_app_bar.dart';
 import '../../../../core/widgets/modern_tab_bar.dart';
 import 'vat_filing_dialog.dart';
 import '../../domain/entities/vault_data.dart';
-import 'dart:io';
-import 'dart:ui';
+import 'package:cross_file/cross_file.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../screens/document_viewer_screen.dart';
+import '../../../../core/utils/share_helper.dart';
 
 class VaultScreen extends StatefulWidget {
   const VaultScreen({super.key});
@@ -299,6 +300,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
           'Commercial License Document',
           license.documentUrl,
           (url) => _updateLicense(provider, documentUrl: url),
+          () => _updateLicense(provider, documentUrl: ''),
           provider,
           'license',
         ),
@@ -317,19 +319,20 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
           onEdit: () => _pickDate(cert.issueDate, (d) => _updateVatCert(provider, issueDate: d)),
         ),
         _buildInfoRow(
-          'Expiry Date',
-          cert.expiryDate != null ? DateFormat('dd MMM yyyy').format(cert.expiryDate!) : 'Not set',
-          icon: Icons.event_available_outlined,
-          semanticsLabel: 'VAT certificate expiry date',
-          trailing: _buildExpiryBadge(cert.expiryDate, cert.alertDays),
-          onEdit: () => _pickDate(cert.expiryDate, (d) => _updateVatCert(provider, expiryDate: d)),
-        ),
-        _buildInfoRow(
           'VAT Account No.',
           cert.vatAccountNo.isEmpty ? 'Not set' : cert.vatAccountNo,
           icon: Icons.badge_outlined,
           semanticsLabel: 'VAT account number',
           onEdit: () => _editText('VAT Account No.', cert.vatAccountNo, (v) => _updateVatCert(provider, vatAccountNo: v)),
+        ),
+        SizedBox(height: 8.h),
+        _buildDocumentSection(
+          'VAT Certificate Document',
+          cert.documentUrl,
+          (url) => _updateVatCert(provider, documentUrl: url),
+          () => _updateVatCert(provider, documentUrl: ''),
+          provider,
+          'vat_cert',
         ),
       ],
     );
@@ -398,7 +401,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildDocumentSection(String label, String? url, Function(String) onUpload, VaultProvider provider, String folderName) {
+  Widget _buildDocumentSection(String label, String? url, Function(String) onUpload, VoidCallback onDelete, VaultProvider provider, String folderName) {
     final bool hasDoc = url != null && url.isNotEmpty;
     return StateWithHover(
       builder: (context, isHovered) {
@@ -439,16 +442,50 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                     ),
                   ),
                 ),
-                if (hasDoc)
+                if (hasDoc) ...[
                   Semantics(
                     button: true,
                     label: 'View $label',
                     child: IconButton(
                       icon: Icon(Icons.visibility_outlined, size: 20.sp, color: const Color(0xFF2563EB)),
-                      onPressed: () => _viewDocument(url),
+                      onPressed: () => _viewDocument(url, label),
                       tooltip: 'View Document',
                     ),
                   ),
+                  Semantics(
+                    button: true,
+                    label: 'Share $label',
+                    child: IconButton(
+                      icon: Icon(Icons.share_outlined, size: 20.sp, color: const Color(0xFF13b1f2)),
+                      onPressed: () {
+                        ShareHelper.shareDocument(
+                          context,
+                          url: url,
+                          title: label,
+                        );
+                      },
+                      tooltip: 'Share Document',
+                    ),
+                  ),
+                  Semantics(
+                    button: true,
+                    label: 'Download $label',
+                    child: IconButton(
+                      icon: Icon(Icons.download_outlined, size: 20.sp, color: const Color(0xFF10B981)),
+                      onPressed: () => _downloadFile(url),
+                      tooltip: 'Download Document',
+                    ),
+                  ),
+                  Semantics(
+                    button: true,
+                    label: 'Delete $label',
+                    child: IconButton(
+                      icon: Icon(Icons.delete_outline, size: 20.sp, color: const Color(0xFFF43F5E)),
+                      onPressed: onDelete,
+                      tooltip: 'Delete Document',
+                    ),
+                  ),
+                ],
                 Semantics(
                   button: true,
                   label: hasDoc ? 'Replace $label' : 'Upload $label',
@@ -581,7 +618,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                       child: Row(
                         children: [
                           Text(
-                            'SAR ${NumberFormat('#,##0.00').format(filing.amount)}',
+                            '${filing.currency} ${NumberFormat('#,##0.00').format(filing.amount)}',
                             style: GoogleFonts.plusJakartaSans(
                               color: const Color(0xFF2563EB),
                               fontWeight: FontWeight.w700,
@@ -590,6 +627,19 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                           ),
                           SizedBox(width: 8.w),
                           Container(width: 4.w, height: 4.h, decoration: const BoxDecoration(color: Color(0xFF94A3B8), shape: BoxShape.circle)),
+                          if (filing.billNumber.isNotEmpty) ...[
+                            SizedBox(width: 8.w),
+                            Text(
+                              'Bill: ${filing.billNumber}',
+                              style: GoogleFonts.plusJakartaSans(
+                                color: const Color(0xFF64748B),
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            SizedBox(width: 8.w),
+                            Container(width: 4.w, height: 4.h, decoration: const BoxDecoration(color: Color(0xFF94A3B8), shape: BoxShape.circle)),
+                          ],
                           SizedBox(width: 8.w),
                           Text(
                             '${DateFormat('dd/MM/yy').format(filing.fromDate)} - ${DateFormat('dd/MM/yy').format(filing.toDate)}',
@@ -651,11 +701,11 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                               Wrap(
                                 spacing: 8.w,
                                 runSpacing: 8.h,
-                                children: filing.documentUrls.asMap().entries.map((entry) {
-                                  return InkWell(
-                                    onTap: () => _viewDocument(entry.value),
-                                    child: Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                                  children: filing.documentUrls.asMap().entries.map((entry) {
+                                    final docUrl = entry.value;
+                                    final docName = 'VAT Doc ${entry.key + 1}';
+                                    return Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
                                       decoration: BoxDecoration(
                                         color: Colors.white,
                                         borderRadius: BorderRadius.circular(8.r),
@@ -674,11 +724,32 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                                               color: const Color(0xFF1E293B),
                                             ),
                                           ),
+                                          SizedBox(width: 8.w),
+                                          IconButton(
+                                            icon: Icon(Icons.visibility_outlined, size: 16.sp, color: const Color(0xFF64748B)),
+                                            onPressed: () => _viewDocument(docUrl, docName),
+                                            constraints: BoxConstraints(minWidth: 32.w, minHeight: 32.h),
+                                            padding: EdgeInsets.zero,
+                                            tooltip: 'View',
+                                          ),
+                                          IconButton(
+                                            icon: Icon(Icons.share_outlined, size: 16.sp, color: const Color(0xFFF59E0B)),
+                                            onPressed: () => ShareHelper.shareDocument(context, url: docUrl, title: docName),
+                                            constraints: BoxConstraints(minWidth: 32.w, minHeight: 32.h),
+                                            padding: EdgeInsets.zero,
+                                            tooltip: 'Share',
+                                          ),
+                                          IconButton(
+                                            icon: Icon(Icons.download_outlined, size: 16.sp, color: const Color(0xFF10B981)),
+                                            onPressed: () => _downloadFile(docUrl),
+                                            constraints: BoxConstraints(minWidth: 32.w, minHeight: 32.h),
+                                            padding: EdgeInsets.zero,
+                                            tooltip: 'Download',
+                                          ),
                                         ],
                                       ),
-                                    ),
-                                  );
-                                }).toList(),
+                                    );
+                                  }).toList(),
                               )
                           ],
                         ),
@@ -1065,37 +1136,79 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
     if (result != null) onUpdate(result);
   }
 
-  Future<void> _viewDocument(String url) async {
-    if (await canLaunchUrl(Uri.parse(url))) {
-      await launchUrl(Uri.parse(url));
+  void _viewDocument(String url, String title) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DocumentViewerScreen(
+          attachmentUrl: url,
+          title: title,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _downloadFile(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not download file')),
+        );
+      }
     }
   }
 
   Future<void> _uploadDocument(Function(String) onUpload, VaultProvider provider, String folderName) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-    );
-    if (result != null && result.files.single.path != null) {
-      final file = File(result.files.single.path!);
-      final fileSize = await file.length();
-      
-      if (fileSize > 5 * 1024 * 1024) { // 5MB limit
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: false, // avoid loading full bytes into memory before we need
+      );
+      if (result != null && result.files.isNotEmpty && result.files.single.path != null) {
+        final pf = result.files.single;
+        final xFile = XFile(pf.path!);
+
+        // Size check using XFile.length()
+        final fileSize = await xFile.length();
+        if (fileSize > 5 * 1024 * 1024) { // 5MB limit
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('File size must be less than 5MB')),
+            );
+          }
+          return;
+        }
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('File size must be less than 5MB')),
+            const SnackBar(content: Text('Uploading document...')),
           );
         }
-        return;
-      }
 
-      final uploadedUrl = await provider.uploadDocument(file, folderName);
-      if (uploadedUrl != null) {
-        onUpload(uploadedUrl);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Upload failed')));
+        final uploadedUrl = await provider.uploadDocument(xFile, folderName);
+        if (uploadedUrl != null) {
+          onUpload(uploadedUrl);
+          if (mounted) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('✅ Upload successful')),
+            );
+          }
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(provider.errorMessage ?? 'Upload failed')),
+            );
+          }
         }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking file: $e')),
+        );
       }
     }
   }
@@ -1113,12 +1226,12 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
     await provider.updateVaultData(newData);
   }
 
-  Future<void> _updateVatCert(VaultProvider provider, {DateTime? issueDate, DateTime? expiryDate, String? vatAccountNo, int? alertDays}) async {
+  Future<void> _updateVatCert(VaultProvider provider, {DateTime? issueDate, String? vatAccountNo, String? documentUrl, int? alertDays}) async {
     final currentData = provider.vaultData!;
     final newCert = VatCertificate(
       issueDate: issueDate ?? currentData.vatCertificate.issueDate,
-      expiryDate: expiryDate ?? currentData.vatCertificate.expiryDate,
       vatAccountNo: vatAccountNo ?? currentData.vatCertificate.vatAccountNo,
+      documentUrl: documentUrl ?? currentData.vatCertificate.documentUrl,
       alertDays: alertDays ?? currentData.vatCertificate.alertDays,
     );
     final newData = VaultData(license: currentData.license, vatCertificate: newCert);

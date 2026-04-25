@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:cross_file/cross_file.dart';
 import '../../domain/entities/vault_data.dart';
 import '../../domain/repositories/vault_repository.dart';
 import '../datasources/vault_remote_data_source.dart';
@@ -31,8 +31,8 @@ class VaultRepositoryImpl implements VaultRepository {
         ),
         vatCertificate: VatCertificateModel(
           issueDate: data.vatCertificate.issueDate,
-          expiryDate: data.vatCertificate.expiryDate,
           vatAccountNo: data.vatCertificate.vatAccountNo,
+          documentUrl: data.vatCertificate.documentUrl,
         ),
       );
       await remoteDataSource.updateVaultData(model);
@@ -57,6 +57,8 @@ class VaultRepositoryImpl implements VaultRepository {
         id: filing.id,
         date: filing.date,
         amount: filing.amount,
+        currency: filing.currency,
+        billNumber: filing.billNumber,
         fromDate: filing.fromDate,
         toDate: filing.toDate,
         documentUrls: filing.documentUrls,
@@ -74,6 +76,8 @@ class VaultRepositoryImpl implements VaultRepository {
         id: filing.id,
         date: filing.date,
         amount: filing.amount,
+        currency: filing.currency,
+        billNumber: filing.billNumber,
         fromDate: filing.fromDate,
         toDate: filing.toDate,
         documentUrls: filing.documentUrls,
@@ -94,7 +98,7 @@ class VaultRepositoryImpl implements VaultRepository {
   }
 
   @override
-  Future<String> uploadVaultDocument(File file, String path) async {
+  Future<String> uploadVaultDocument(XFile file, String path) async {
     try {
       return await remoteDataSource.uploadVaultDocument(file, path);
     } catch (e) {

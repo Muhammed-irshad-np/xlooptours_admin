@@ -31,25 +31,27 @@ class CommercialLicense extends Equatable {
 
 class VatCertificate extends Equatable {
   final DateTime? issueDate;
-  final DateTime? expiryDate;
   final String vatAccountNo;
+  final String? documentUrl;
   final int alertDays;
 
   const VatCertificate({
     this.issueDate,
-    this.expiryDate,
     this.vatAccountNo = '',
+    this.documentUrl,
     this.alertDays = 30,
   });
 
   @override
-  List<Object?> get props => [issueDate, expiryDate, vatAccountNo, alertDays];
+  List<Object?> get props => [issueDate, vatAccountNo, documentUrl, alertDays];
 }
 
 class VatFiling extends Equatable {
   final String id;
   final DateTime date;
   final double amount;
+  final String currency;
+  final String billNumber;
   final DateTime fromDate;
   final DateTime toDate;
   final List<String> documentUrls;
@@ -58,11 +60,13 @@ class VatFiling extends Equatable {
     required this.id,
     required this.date,
     required this.amount,
+    this.currency = 'SAR',
+    this.billNumber = '',
     required this.fromDate,
     required this.toDate,
     required this.documentUrls,
   });
 
   @override
-  List<Object?> get props => [id, date, amount, fromDate, toDate, documentUrls];
+  List<Object?> get props => [id, date, amount, currency, billNumber, fromDate, toDate, documentUrls];
 }

@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:cross_file/cross_file.dart';
 import '../entities/vault_data.dart';
 import '../repositories/vault_repository.dart';
 
@@ -41,7 +41,7 @@ class DeleteVatFilingUseCase {
 class UploadVaultDocumentUseCase {
   final VaultRepository repository;
   UploadVaultDocumentUseCase(this.repository);
-  Future<String> call(File file, String path) => repository.uploadVaultDocument(file, path);
+  Future<String> call(XFile file, String path) => repository.uploadVaultDocument(file, path);
 }
 
 class VerifyVaultPasswordUseCase {

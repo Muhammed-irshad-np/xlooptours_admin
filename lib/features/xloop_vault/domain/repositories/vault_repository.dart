@@ -1,5 +1,5 @@
 import '../entities/vault_data.dart';
-import 'dart:io';
+import 'package:cross_file/cross_file.dart';
 
 abstract class VaultRepository {
   Future<VaultData> getVaultData();
@@ -8,6 +8,6 @@ abstract class VaultRepository {
   Future<void> addVatFiling(VatFiling filing);
   Future<void> updateVatFiling(VatFiling filing);
   Future<void> deleteVatFiling(String id);
-  Future<String> uploadVaultDocument(File file, String path);
+  Future<String> uploadVaultDocument(XFile file, String path);
   Future<bool> verifyVaultPassword(String password);
 }

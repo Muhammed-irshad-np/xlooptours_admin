@@ -5,8 +5,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/vault_provider.dart';
 import '../../domain/entities/vault_data.dart';
-import 'dart:io';
+import 'package:cross_file/cross_file.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class VatFilingDialog extends StatefulWidget {
   final VatFiling? filing;
@@ -18,10 +19,12 @@ class VatFilingDialog extends StatefulWidget {
 
 class _VatFilingDialogState extends State<VatFilingDialog> {
   final _amountController = TextEditingController();
+  final _billNumberController = TextEditingController();
+  String _currency = 'SAR';
   DateTime? _date;
   DateTime? _fromDate;
   DateTime? _toDate;
-  List<File> _selectedFiles = [];
+  List<XFile> _selectedFiles = [];
   List<String> _existingUrls = [];
   bool _isSaving = false;
 
@@ -33,6 +36,8 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       _fromDate = widget.filing!.fromDate;
       _toDate = widget.filing!.toDate;
       _amountController.text = widget.filing!.amount.toString();
+      _billNumberController.text = widget.filing!.billNumber;
+      _currency = widget.filing!.currency;
       _existingUrls = List.from(widget.filing!.documentUrls);
     }
   }
@@ -40,41 +45,57 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
   @override
   void dispose() {
     _amountController.dispose();
+    _billNumberController.dispose();
     super.dispose();
   }
 
   Future<void> _pickFiles() async {
-    final result = await FilePicker.platform.pickFiles(
-      allowMultiple: true, 
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
-    );
-    if (result != null) {
-      if (result.files.length + _existingUrls.length > 3) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Maximum 3 documents allowed total')));
-        }
-        return;
-      }
-      
-      List<File> validFiles = [];
-      for (var file in result.files) {
-        if (file.path != null) {
-          final f = File(file.path!);
-          final size = await f.length();
-          if (size > 5 * 1024 * 1024) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${file.name} exceeds 5MB limit')));
-            }
-            return;
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.any,
+        withData: false,
+      );
+      if (result != null) {
+        final totalAfterAdd = result.files.length + _selectedFiles.length + _existingUrls.length;
+        if (totalAfterAdd > 3) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Maximum 3 documents allowed total')),
+            );
           }
-          validFiles.add(f);
+          return;
+        }
+
+        final List<XFile> validFiles = [];
+        for (final pf in result.files) {
+          if (pf.path != null) {
+            final xf = XFile(pf.path!);
+            final size = await xf.length();
+            if (size > 5 * 1024 * 1024) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('${pf.name} exceeds 5MB limit')),
+                );
+              }
+              continue; // skip oversized files, allow rest
+            }
+            validFiles.add(xf);
+          }
+        }
+
+        if (validFiles.isNotEmpty) {
+          setState(() {
+            _selectedFiles = [..._selectedFiles, ...validFiles];
+          });
         }
       }
-
-      setState(() {
-        _selectedFiles = validFiles;
-      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking files: $e')),
+        );
+      }
     }
   }
 
@@ -127,6 +148,8 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       id: widget.filing?.id ?? '', 
       date: _date!,
       amount: amountValue,
+      currency: _currency,
+      billNumber: _billNumberController.text.trim(),
       fromDate: _fromDate!,
       toDate: _toDate!,
       documentUrls: [..._existingUrls, ...uploadedUrls],
@@ -178,13 +201,35 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
                       semanticsLabel: 'Date of filing',
                     ),
                     SizedBox(height: 16.h),
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: Semantics(
+                            label: 'VAT amount',
+                            child: _buildTextField(
+                              controller: _amountController,
+                              label: 'Amount',
+                              icon: Icons.payments_outlined,
+                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 12.w),
+                        Expanded(
+                          flex: 1,
+                          child: _buildCurrencyDropdown(),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16.h),
                     Semantics(
-                      label: 'VAT amount in Saudi Riyals',
+                      label: 'Bill Number',
                       child: _buildTextField(
-                        controller: _amountController,
-                        label: 'Amount (SAR)',
-                        icon: Icons.payments_outlined,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        controller: _billNumberController,
+                        label: 'Bill Number',
+                        icon: Icons.receipt_outlined,
+                        hint: 'Enter bill number…',
                       ),
                     ),
                     SizedBox(height: 24.h),
@@ -270,7 +315,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
     );
   }
 
-  Widget _buildTextField({required TextEditingController controller, required String label, required IconData icon, TextInputType? keyboardType}) {
+  Widget _buildTextField({required TextEditingController controller, required String label, required IconData icon, TextInputType? keyboardType, String? hint}) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
@@ -286,7 +331,28 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
         fillColor: const Color(0xFFF1F5F9),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide.none),
         labelStyle: TextStyle(color: const Color(0xFF64748B), fontSize: 13.sp),
-        hintText: '0.00…',
+        hintText: hint ?? '0.00…',
+      ),
+    );
+  }
+
+  Widget _buildCurrencyDropdown() {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(12.r),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButtonFormField<String>(
+          value: _currency,
+          decoration: const InputDecoration(border: InputBorder.none),
+          items: ['SAR', 'BHD'].map((c) => DropdownMenuItem(
+            value: c,
+            child: Text(c, style: GoogleFonts.plusJakartaSans(fontSize: 14.sp, fontWeight: FontWeight.bold)),
+          )).toList(),
+          onChanged: (v) => setState(() => _currency = v ?? 'SAR'),
+        ),
       ),
     );
   }
@@ -354,12 +420,13 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
               children: _existingUrls.asMap().entries.map((entry) {
                 return Semantics(
                   label: 'Uploaded document ${entry.key + 1}',
-                  child: Chip(
+                  child: InputChip(
                     backgroundColor: const Color(0xFFE2E8F0),
+                    avatar: Icon(Icons.visibility_outlined, size: 14.sp, color: const Color(0xFF2563EB)),
                     label: Text('Doc ${entry.key + 1}', style: TextStyle(fontSize: 11.sp)),
+                    onPressed: () => _viewDocument(entry.value),
                     onDeleted: () => setState(() => _existingUrls.removeAt(entry.key)),
                     deleteIconColor: const Color(0xFFF43F5E),
-                    deleteButtonTooltipMessage: 'Remove this document',
                   ),
                 );
               }).toList(),
@@ -373,12 +440,11 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
               children: _selectedFiles.asMap().entries.map((entry) {
                 return Semantics(
                   label: 'New file to upload ${entry.key + 1}',
-                  child: Chip(
+                  child: InputChip(
                     backgroundColor: const Color(0xFF2563EB).withOpacity(0.1),
                     label: Text('New File ${entry.key + 1}', style: TextStyle(fontSize: 11.sp, color: const Color(0xFF2563EB))),
                     onDeleted: () => setState(() => _selectedFiles.removeAt(entry.key)),
                     deleteIconColor: const Color(0xFF2563EB),
-                    deleteButtonTooltipMessage: 'Cancel upload of this file',
                   ),
                 );
               }).toList(),
@@ -445,5 +511,23 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
         ],
       ),
     );
+  }
+  Future<void> _viewDocument(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (!await launchUrl(uri)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open document')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to open document: $e')),
+        );
+      }
+    }
   }
 }

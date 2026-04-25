@@ -55,16 +55,16 @@ class CommercialLicenseModel extends CommercialLicense {
 class VatCertificateModel extends VatCertificate {
   const VatCertificateModel({
     super.issueDate,
-    super.expiryDate,
     super.vatAccountNo,
+    super.documentUrl,
     super.alertDays,
   });
 
   factory VatCertificateModel.fromJson(Map<String, dynamic> json) {
     return VatCertificateModel(
       issueDate: json['issueDate'] != null ? (json['issueDate'] as Timestamp).toDate() : null,
-      expiryDate: json['expiryDate'] != null ? (json['expiryDate'] as Timestamp).toDate() : null,
       vatAccountNo: json['vatAccountNo'] ?? '',
+      documentUrl: json['documentUrl'],
       alertDays: json['alertDays'] ?? 30,
     );
   }
@@ -72,8 +72,8 @@ class VatCertificateModel extends VatCertificate {
   Map<String, dynamic> toJson() {
     return {
       'issueDate': issueDate != null ? Timestamp.fromDate(issueDate!) : null,
-      'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate!) : null,
       'vatAccountNo': vatAccountNo,
+      'documentUrl': documentUrl,
       'alertDays': alertDays,
     };
   }
@@ -84,6 +84,8 @@ class VatFilingModel extends VatFiling {
     required super.id,
     required super.date,
     required super.amount,
+    super.currency,
+    super.billNumber,
     required super.fromDate,
     required super.toDate,
     required super.documentUrls,
@@ -94,6 +96,8 @@ class VatFilingModel extends VatFiling {
       id: id,
       date: (json['date'] as Timestamp).toDate(),
       amount: (json['amount'] ?? 0).toDouble(),
+      currency: json['currency'] ?? 'SAR',
+      billNumber: json['billNumber'] ?? '',
       fromDate: (json['fromDate'] as Timestamp).toDate(),
       toDate: (json['toDate'] as Timestamp).toDate(),
       documentUrls: List<String>.from(json['documentUrls'] ?? []),
@@ -104,6 +108,8 @@ class VatFilingModel extends VatFiling {
     return {
       'date': Timestamp.fromDate(date),
       'amount': amount,
+      'currency': currency,
+      'billNumber': billNumber,
       'fromDate': Timestamp.fromDate(fromDate),
       'toDate': Timestamp.fromDate(toDate),
       'documentUrls': documentUrls,

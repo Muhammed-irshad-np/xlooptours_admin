@@ -1,5 +1,5 @@
-import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cross_file/cross_file.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/vault_data_model.dart';
 import 'package:path/path.dart' as path;
@@ -11,7 +11,7 @@ abstract class VaultRemoteDataSource {
   Future<void> addVatFiling(VatFilingModel filing);
   Future<void> updateVatFiling(VatFilingModel filing);
   Future<void> deleteVatFiling(String id);
-  Future<String> uploadVaultDocument(File file, String folderPath);
+  Future<String> uploadVaultDocument(XFile file, String folderPath);
   Future<bool> verifyVaultPassword(String passwordHash);
 }
 
@@ -76,12 +76,44 @@ class VaultRemoteDataSourceImpl implements VaultRemoteDataSource {
   }
 
   @override
-  Future<String> uploadVaultDocument(File file, String folderPath) async {
-    final extension = path.extension(file.path);
+  Future<String> uploadVaultDocument(XFile file, String folderPath) async {
+    final extension = path.extension(file.name).isNotEmpty
+        ? path.extension(file.name)
+        : '.${file.name.split('.').last}';
     final fileName = '${DateTime.now().millisecondsSinceEpoch}$extension';
     final ref = storage.ref().child('vault/$folderPath/$fileName');
-    final uploadTask = await ref.putFile(file);
+    // Use putData to avoid platform-specific "unsupported file _namespace"
+    // errors that occur on iOS/macOS when using putFile with security-scoped paths.
+    final bytes = await file.readAsBytes();
+    final uploadTask = await ref.putData(
+      bytes,
+      SettableMetadata(
+        contentType: _mimeType(extension),
+        customMetadata: {'originalName': file.name},
+      ),
+    );
     return await uploadTask.ref.getDownloadURL();
+  }
+
+  /// Returns a best-guess MIME type from file extension.
+  String _mimeType(String ext) {
+    switch (ext.toLowerCase().replaceAll('.', '')) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'xlsx':
+      case 'xls':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'doc':
+      case 'docx':
+        return 'application/msword';
+      default:
+        return 'application/octet-stream';
+    }
   }
 
   @override

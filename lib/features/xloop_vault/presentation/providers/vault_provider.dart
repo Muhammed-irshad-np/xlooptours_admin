@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:cross_file/cross_file.dart';
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/vault_data.dart';
 import '../../domain/usecases/vault_usecases.dart';
@@ -118,7 +118,7 @@ class VaultProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> uploadDocument(File file, String folderPath) async {
+  Future<String?> uploadDocument(XFile file, String folderPath) async {
     try {
       return await uploadVaultDocumentUseCase(file, folderPath);
     } catch (e) {
