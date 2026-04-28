@@ -346,7 +346,7 @@ class _Sidebar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'XLoop Tours',
+                  'Xloop Tours',
                   style: GoogleFonts.merriweather(
                     fontSize: 13.sp,
                     fontWeight: FontWeight.bold,

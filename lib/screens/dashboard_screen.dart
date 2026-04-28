@@ -259,7 +259,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 ),
                 SizedBox(height: 6.h),
                 Text(
-                  'XLoop Admin Panel',
+                  'Xloop Admin Panel',
                   style: GoogleFonts.inter(
                     fontSize: 24.sp,
                     fontWeight: FontWeight.w800,

@@ -16,6 +16,7 @@ import '../core/widgets/modern_app_bar.dart';
 import '../widgets/custom_date_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/image_service.dart';
+import 'document_viewer_screen.dart';
 
 class VehicleFormScreen extends StatefulWidget {
   final VehicleEntity? vehicle;
@@ -42,6 +43,8 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   final ValueNotifier<DateTime?> _insuranceExpiryDate = ValueNotifier(null);
   final ValueNotifier<DateTime?> _registrationExpiryDate = ValueNotifier(null);
   final ValueNotifier<DateTime?> _fahasExpiryDate = ValueNotifier(null);
+  final ValueNotifier<DateTime?> _bahrainInsuranceExpiryDate =
+      ValueNotifier(null);
   // Maintenance Intervals (Dynamic) - REMOVED
 
   // Vehicle Master Data
@@ -73,6 +76,17 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   final ValueNotifier<XFile?> _isthimaraAttachment = ValueNotifier(null);
   final ValueNotifier<String?> _isthimaraAttachmentUrl = ValueNotifier(null);
   final ValueNotifier<bool> _isUploadingIsthimara = ValueNotifier(false);
+
+  final ValueNotifier<XFile?> _bahrainInsuranceAttachment = ValueNotifier(null);
+  final ValueNotifier<String?> _bahrainInsuranceAttachmentUrl =
+      ValueNotifier(null);
+  final ValueNotifier<bool> _isUploadingBahrainInsurance = ValueNotifier(false);
+  final ValueNotifier<XFile?> _insuranceAttachment = ValueNotifier(null);
+  final ValueNotifier<String?> _insuranceAttachmentUrl = ValueNotifier(null);
+  final ValueNotifier<bool> _isUploadingInsurance = ValueNotifier(false);
+  final ValueNotifier<XFile?> _fahasAttachment = ValueNotifier(null);
+  final ValueNotifier<String?> _fahasAttachmentUrl = ValueNotifier(null);
+  final ValueNotifier<bool> _isUploadingFahas = ValueNotifier(false);
 
   final ValueNotifier<String?> _assignedEmployeeId = ValueNotifier(null);
   final ValueNotifier<List<EmployeeEntity>> _employees = ValueNotifier([]);
@@ -120,6 +134,16 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _insuranceExpiryDate.dispose();
     _registrationExpiryDate.dispose();
     _fahasExpiryDate.dispose();
+    _bahrainInsuranceExpiryDate.dispose();
+    _bahrainInsuranceAttachment.dispose();
+    _bahrainInsuranceAttachmentUrl.dispose();
+    _insuranceAttachment.dispose();
+    _insuranceAttachmentUrl.dispose();
+    _fahasAttachment.dispose();
+    _fahasAttachmentUrl.dispose();
+    _isUploadingInsurance.dispose();
+    _isUploadingFahas.dispose();
+    _isUploadingBahrainInsurance.dispose();
 
     super.dispose();
   }
@@ -178,8 +202,12 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _insuranceExpiryDate.value = v.insurance?.expiryDate;
     _registrationExpiryDate.value = v.registration?.expiryDate;
     _fahasExpiryDate.value = v.fahas?.expiryDate;
+    _bahrainInsuranceExpiryDate.value = v.bahrainInsurance?.expiryDate;
 
     _isthimaraAttachmentUrl.value = v.registration?.attachmentUrl;
+    _bahrainInsuranceAttachmentUrl.value = v.bahrainInsurance?.attachmentUrl;
+    _insuranceAttachmentUrl.value = v.insurance?.attachmentUrl;
+    _fahasAttachmentUrl.value = v.fahas?.attachmentUrl;
     // Intervals removed from here
 
     _vinNumberController.text = v.vinNumber ?? '';
@@ -269,6 +297,57 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     }
   }
 
+  Future<String?> _uploadBahrainInsurance(XFile file, String vehicleId) async {
+    try {
+      _isUploadingBahrainInsurance.value = true;
+      final url = await context.read<VehicleProvider>().uploadVehicleDocument(
+        file,
+        vehicleId,
+        'bahrain_insurance',
+      );
+      _isUploadingBahrainInsurance.value = false;
+      return url;
+    } catch (e) {
+      debugPrint('Error uploading bahrain insurance: $e');
+      _isUploadingBahrainInsurance.value = false;
+      return null;
+    }
+  }
+
+  Future<String?> _uploadInsurance(XFile file, String vehicleId) async {
+    try {
+      _isUploadingInsurance.value = true;
+      final url = await context.read<VehicleProvider>().uploadVehicleDocument(
+        file,
+        vehicleId,
+        'insurance',
+      );
+      _isUploadingInsurance.value = false;
+      return url;
+    } catch (e) {
+      debugPrint('Error uploading insurance: $e');
+      _isUploadingInsurance.value = false;
+      return null;
+    }
+  }
+
+  Future<String?> _uploadFahas(XFile file, String vehicleId) async {
+    try {
+      _isUploadingFahas.value = true;
+      final url = await context.read<VehicleProvider>().uploadVehicleDocument(
+        file,
+        vehicleId,
+        'fahas',
+      );
+      _isUploadingFahas.value = false;
+      return url;
+    } catch (e) {
+      debugPrint('Error uploading fahas: $e');
+      _isUploadingFahas.value = false;
+      return null;
+    }
+  }
+
   Future<void> _saveVehicle() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -329,6 +408,57 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
         }
       }
 
+      // Upload Bahrain Insurance if picked
+      String? bahrainInsuranceUrl = _bahrainInsuranceAttachmentUrl.value;
+      if (_bahrainInsuranceAttachment.value != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Uploading Bahrain Insurance...')),
+          );
+        }
+        final url = await _uploadBahrainInsurance(
+          _bahrainInsuranceAttachment.value!,
+          vehicleId,
+        );
+        if (url != null) {
+          bahrainInsuranceUrl = url;
+        }
+      }
+
+      // Upload Insurance if picked
+      String? insuranceUrl = _insuranceAttachmentUrl.value;
+      if (_insuranceAttachment.value != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Uploading Insurance...')),
+          );
+        }
+        final url = await _uploadInsurance(
+          _insuranceAttachment.value!,
+          vehicleId,
+        );
+        if (url != null) {
+          insuranceUrl = url;
+        }
+      }
+
+      // Upload Fahas if picked
+      String? fahasUrl = _fahasAttachmentUrl.value;
+      if (_fahasAttachment.value != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Uploading Fahas...')),
+          );
+        }
+        final url = await _uploadFahas(
+          _fahasAttachment.value!,
+          vehicleId,
+        );
+        if (url != null) {
+          fahasUrl = url;
+        }
+      }
+
       final VehicleEntity vehicle;
       if (widget.vehicle != null) {
         // When editing, preserve fields like maintenance and maintenanceHistory
@@ -342,28 +472,34 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           assignedDriverId: _assignedEmployeeId.value,
           imageUrl: imageUrl,
           insurance: _insuranceExpiryDate.value != null
-              ? VehicleDocument(
-                  expiryDate: _insuranceExpiryDate.value!,
-                  attachmentUrl:
-                      registrationUrl == _isthimaraAttachmentUrl.value
-                      ? widget.vehicle?.insurance?.attachmentUrl
-                      : widget
-                            .vehicle
-                            ?.insurance
-                            ?.attachmentUrl, // Insurance didn't change attachment logic here yet
-                )
+              ? (widget.vehicle?.insurance?.copyWith(
+                    expiryDate: _insuranceExpiryDate.value!,
+                    attachmentUrl: insuranceUrl,
+                  ) ??
+                  VehicleDocument(
+                    expiryDate: _insuranceExpiryDate.value!,
+                    attachmentUrl: insuranceUrl,
+                  ))
               : null,
           registration: _registrationExpiryDate.value != null
-              ? VehicleDocument(
-                  expiryDate: _registrationExpiryDate.value!,
-                  attachmentUrl: registrationUrl,
-                )
+              ? (widget.vehicle?.registration?.copyWith(
+                    expiryDate: _registrationExpiryDate.value!,
+                    attachmentUrl: registrationUrl,
+                  ) ??
+                  VehicleDocument(
+                    expiryDate: _registrationExpiryDate.value!,
+                    attachmentUrl: registrationUrl,
+                  ))
               : null,
           fahas: _fahasExpiryDate.value != null
-              ? VehicleDocument(
-                  expiryDate: _fahasExpiryDate.value!,
-                  attachmentUrl: widget.vehicle?.fahas?.attachmentUrl,
-                )
+              ? (widget.vehicle?.fahas?.copyWith(
+                    expiryDate: _fahasExpiryDate.value!,
+                    attachmentUrl: fahasUrl,
+                  ) ??
+                  VehicleDocument(
+                    expiryDate: _fahasExpiryDate.value!,
+                    attachmentUrl: fahasUrl,
+                  ))
               : null,
           vinNumber: _vinNumberController.text.isNotEmpty
               ? _vinNumberController.text
@@ -384,6 +520,16 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
               ? _departmentController.text
               : null,
           status: _status.value,
+          bahrainInsurance: _bahrainInsuranceExpiryDate.value != null
+              ? (widget.vehicle?.bahrainInsurance?.copyWith(
+                    expiryDate: _bahrainInsuranceExpiryDate.value!,
+                    attachmentUrl: bahrainInsuranceUrl,
+                  ) ??
+                  VehicleDocument(
+                    expiryDate: _bahrainInsuranceExpiryDate.value!,
+                    attachmentUrl: bahrainInsuranceUrl,
+                  ))
+              : null,
         );
       } else {
         // When creating new, set maintenance to null and history to empty
@@ -399,7 +545,10 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           imageUrl: imageUrl,
           isActive: true,
           insurance: _insuranceExpiryDate.value != null
-              ? VehicleDocument(expiryDate: _insuranceExpiryDate.value!)
+              ? VehicleDocument(
+                  expiryDate: _insuranceExpiryDate.value!,
+                  attachmentUrl: insuranceUrl,
+                )
               : null,
           registration: _registrationExpiryDate.value != null
               ? VehicleDocument(
@@ -408,7 +557,10 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                 )
               : null,
           fahas: _fahasExpiryDate.value != null
-              ? VehicleDocument(expiryDate: _fahasExpiryDate.value!)
+              ? VehicleDocument(
+                  expiryDate: _fahasExpiryDate.value!,
+                  attachmentUrl: fahasUrl,
+                )
               : null,
           maintenance: null,
           maintenanceHistory: [],
@@ -431,6 +583,12 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
               ? _departmentController.text
               : null,
           status: _status.value,
+          bahrainInsurance: _bahrainInsuranceExpiryDate.value != null
+              ? VehicleDocument(
+                  expiryDate: _bahrainInsuranceExpiryDate.value!,
+                  attachmentUrl: bahrainInsuranceUrl,
+                )
+              : null,
         );
       }
 
@@ -701,6 +859,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                           label: 'Isthimara Scan / Copy',
                           pickedFileNotifier: _isthimaraAttachment,
                           existingUrlNotifier: _isthimaraAttachmentUrl,
+                          expiryDateNotifier: _registrationExpiryDate,
                         ),
                         SizedBox(height: 16.h),
                         ValueListenableBuilder<DateTime?>(
@@ -725,6 +884,13 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                           },
                         ),
                         SizedBox(height: 16.h),
+                        _buildAttachmentPicker(
+                          label: 'Insurance Scan / Copy',
+                          pickedFileNotifier: _insuranceAttachment,
+                          existingUrlNotifier: _insuranceAttachmentUrl,
+                          expiryDateNotifier: _insuranceExpiryDate,
+                        ),
+                        SizedBox(height: 16.h),
                         ValueListenableBuilder<DateTime?>(
                           valueListenable: _fahasExpiryDate,
                           builder: (context, date, _) {
@@ -745,6 +911,43 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                               onClear: () => _fahasExpiryDate.value = null,
                             );
                           },
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildAttachmentPicker(
+                          label: 'Fahas Scan / Copy',
+                          pickedFileNotifier: _fahasAttachment,
+                          existingUrlNotifier: _fahasAttachmentUrl,
+                          expiryDateNotifier: _fahasExpiryDate,
+                        ),
+                        SizedBox(height: 16.h),
+                        ValueListenableBuilder<DateTime?>(
+                          valueListenable: _bahrainInsuranceExpiryDate,
+                          builder: (context, date, _) {
+                            return CustomDatePicker(
+                              label: 'Bahrain Insurance Expiry',
+                              date: date,
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate: date ?? DateTime.now(),
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2050),
+                                );
+                                if (picked != null) {
+                                  _bahrainInsuranceExpiryDate.value = picked;
+                                }
+                              },
+                              onClear: () =>
+                                  _bahrainInsuranceExpiryDate.value = null,
+                            );
+                          },
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildAttachmentPicker(
+                          label: 'Bahrain Insurance Scan / Copy',
+                          pickedFileNotifier: _bahrainInsuranceAttachment,
+                          existingUrlNotifier: _bahrainInsuranceAttachmentUrl,
+                          expiryDateNotifier: _bahrainInsuranceExpiryDate,
                         ),
 
                         SizedBox(height: 32.h),
@@ -790,6 +993,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     required String label,
     required ValueNotifier<XFile?> pickedFileNotifier,
     required ValueNotifier<String?> existingUrlNotifier,
+    ValueNotifier<DateTime?>? expiryDateNotifier,
   }) {
     return ValueListenableBuilder<XFile?>(
       valueListenable: pickedFileNotifier,
@@ -833,6 +1037,9 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                         onPressed: () {
                           pickedFileNotifier.value = null;
                           existingUrlNotifier.value = null;
+                          if (expiryDateNotifier != null) {
+                            expiryDateNotifier.value = null;
+                          }
                         },
                       ),
                   ],
@@ -850,7 +1057,17 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                     text: 'View existing scan',
                     color: Colors.blue.shade700,
                     onTap: () {
-                      // Logic to view existing scan if needed
+                      if (existingUrl.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DocumentViewerScreen(
+                              attachmentUrl: existingUrl,
+                              title: label,
+                            ),
+                          ),
+                        );
+                      }
                     },
                   ),
                 SizedBox(height: 6.h),

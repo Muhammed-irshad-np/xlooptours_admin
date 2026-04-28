@@ -13,6 +13,7 @@ import '../core/widgets/modern_app_bar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../widgets/add_maintenance_record_dialog.dart';
 import '../features/vehicle/presentation/widgets/update_tafweed_dialog.dart';
 
@@ -213,57 +214,114 @@ class VehicleDetailScreen extends StatelessWidget {
             ),
             const Divider(height: 32),
             _buildSectionHeader('Documents'),
-            _buildDetailRow(
+            _buildDocumentCard(
               context,
-              'Insurance Expiry',
-              currentVehicle.insurance?.expiryDate != null
-                  ? DateFormat(
-                      'yyyy-MM-dd',
-                    ).format(currentVehicle.insurance!.expiryDate)
-                  : 'N/A',
-              Icons.security_outlined,
+              title: 'Insurance',
+              icon: Icons.security_outlined,
+              expiryDate: currentVehicle.insurance?.expiryDate,
               attachmentUrl: currentVehicle.insurance?.attachmentUrl,
+              onDelete: () {
+                _confirmDelete(context, 'Insurance', () {
+                  context.read<VehicleProvider>().deleteVehicleDocument(
+                    currentVehicle,
+                    'Insurance',
+                  );
+                });
+              },
             ),
-            _buildDetailRow(
+            _buildDocumentCard(
               context,
-              'Isthimara (Registration) Expiry',
-              currentVehicle.registration?.expiryDate != null
-                  ? DateFormat(
-                      'yyyy-MM-dd',
-                    ).format(currentVehicle.registration!.expiryDate)
-                  : 'N/A',
-              Icons.description_outlined,
+              title: 'Isthimara (Registration)',
+              icon: Icons.description_outlined,
+              expiryDate: currentVehicle.registration?.expiryDate,
               attachmentUrl: currentVehicle.registration?.attachmentUrl,
+              onDelete: () {
+                _confirmDelete(context, 'Isthimara', () {
+                  context.read<VehicleProvider>().deleteVehicleDocument(
+                    currentVehicle,
+                    'Isthimara',
+                  );
+                });
+              },
             ),
-            _buildDetailRow(
+            _buildDocumentCard(
               context,
-              'Fahas Expiry',
-              currentVehicle.fahas?.expiryDate != null
-                  ? DateFormat(
-                      'yyyy-MM-dd',
-                    ).format(currentVehicle.fahas!.expiryDate)
-                  : 'N/A',
-              Icons.fact_check_outlined,
+              title: 'Fahas',
+              icon: Icons.fact_check_outlined,
+              expiryDate: currentVehicle.fahas?.expiryDate,
               attachmentUrl: currentVehicle.fahas?.attachmentUrl,
+              onDelete: () {
+                _confirmDelete(context, 'Fahas', () {
+                  context.read<VehicleProvider>().deleteVehicleDocument(
+                    currentVehicle,
+                    'Fahas',
+                  );
+                });
+              },
             ),
+            _buildDocumentCard(
+              context,
+              title: 'Bahrain Insurance',
+              icon: Icons.security_outlined,
+              expiryDate: currentVehicle.bahrainInsurance?.expiryDate,
+              attachmentUrl: currentVehicle.bahrainInsurance?.attachmentUrl,
+              onDelete: () {
+                _confirmDelete(context, 'Bahrain Insurance', () {
+                  context.read<VehicleProvider>().deleteVehicleDocument(
+                    currentVehicle,
+                    'Bahrain Insurance',
+                  );
+                });
+              },
+            ),
+            const Divider(height: 32),
             _buildSectionHeader('Tafweed Authorizations'),
             Consumer<EmployeeProvider>(
               builder: (context, empProvider, child) {
-                if (currentVehicle.tafweeds == null || currentVehicle.tafweeds!.isEmpty) {
-                  return _buildDetailRow(
-                    context,
-                    'Tafweed',
-                    'No Authorized Drivers',
-                    Icons.admin_panel_settings_outlined,
-                    actionWidget: TextButton.icon(
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('Add'),
-                      onPressed: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => UpdateTafweedDialog(vehicle: currentVehicle),
-                        );
-                      },
+                if (currentVehicle.tafweeds == null ||
+                    currentVehicle.tafweeds!.isEmpty) {
+                  return Card(
+                    elevation: 0,
+                    color: Colors.grey[100],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 16.w,
+                        vertical: 12.h,
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.admin_panel_settings_outlined,
+                            color: Colors.grey[600],
+                            size: 20.sp,
+                          ),
+                          SizedBox(width: 12.w),
+                          Text(
+                            'No Authorized Drivers',
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14.sp,
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton.icon(
+                            icon: const Icon(Icons.add, size: 18),
+                            label: const Text('Add'),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder:
+                                    (context) => UpdateTafweedDialog(
+                                      vehicle: currentVehicle,
+                                    ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 }
@@ -272,16 +330,19 @@ class VehicleDetailScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     ...currentVehicle.tafweeds!.map((tafweed) {
-                      final driver = empProvider.employees.cast<EmployeeEntity?>().firstWhere(
-                        (e) => e?.id == tafweed.driverId,
-                        orElse: () => null,
-                      );
-                      return _buildDetailRow(
+                      final driver = empProvider.employees
+                          .cast<EmployeeEntity?>()
+                          .firstWhere(
+                            (e) => e?.id == tafweed.driverId,
+                            orElse: () => null,
+                          );
+                      return _buildDocumentCard(
                         context,
-                        driver?.fullName ?? 'Unknown Driver',
-                        'Exp: ${DateFormat('yyyy-MM-dd').format(tafweed.expiryDate)}',
-                        Icons.admin_panel_settings_outlined,
+                        title: driver?.fullName ?? 'Unknown Driver',
+                        icon: Icons.admin_panel_settings_outlined,
+                        expiryDate: tafweed.expiryDate,
                         attachmentUrl: tafweed.attachmentUrl,
+                        extraInfo: 'Tafweed Authorization',
                       );
                     }),
                     Align(
@@ -564,7 +625,6 @@ class VehicleDetailScreen extends StatelessWidget {
     String label,
     String value,
     IconData icon, {
-    String? attachmentUrl,
     Widget? actionWidget,
   }) {
     return Padding(
@@ -592,38 +652,221 @@ class VehicleDetailScreen extends StatelessWidget {
             ),
           ),
           if (actionWidget != null) actionWidget,
-          if (attachmentUrl != null && attachmentUrl.isNotEmpty) ...[
-            IconButton(
-              icon: const Icon(Icons.share, color: Color(0xFF13b1f2)),
-              onPressed: () {
-                ShareHelper.shareDocument(
-                  context,
-                  url: attachmentUrl,
-                  title: label,
-                );
-              },
-              tooltip: 'Share Attachment',
+        ],
+      ),
+    );
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'N/A';
+    return DateFormat('dd MMM yyyy').format(date);
+  }
+
+  Future<void> _launchUrl(String? urlString) async {
+    if (urlString == null || urlString.isEmpty) return;
+    final Uri url = Uri.parse(urlString);
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      debugPrint('Could not launch $urlString');
+    }
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    String title,
+    VoidCallback onConfirm,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Delete $title'),
+            content: Text(
+              'Are you sure you want to delete this document and clear its expiry date?',
             ),
-            IconButton(
-              icon: const Icon(
-                Icons.remove_red_eye_outlined,
-                color: Colors.blue,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
               ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DocumentViewerScreen(
-                      attachmentUrl: attachmentUrl,
-                      title: label,
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+    );
+    if (confirmed == true) {
+      onConfirm();
+    }
+  }
+
+  Widget _buildDocumentCard(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    DateTime? expiryDate,
+    String? attachmentUrl,
+    String? extraInfo,
+    VoidCallback? onDelete,
+  }) {
+    final bool isExpired =
+        expiryDate != null && expiryDate.isBefore(DateTime.now());
+    final bool hasAttachment =
+        attachmentUrl != null && attachmentUrl.isNotEmpty;
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.only(bottom: 12.h),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        side: BorderSide(color: Colors.grey[200]!),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16.w),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(10.w),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Icon(icon, color: Colors.blue[700], size: 24.sp),
+                ),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+                      Row(
+                        children: [
+                          Text(
+                            'Expiry: ${_formatDate(expiryDate)}',
+                            style: TextStyle(
+                              fontSize: 13.sp,
+                              color: isExpired ? Colors.red : Colors.grey[700],
+                              fontWeight:
+                                  isExpired
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                            ),
+                          ),
+                          if (isExpired) ...[
+                            SizedBox(width: 8.w),
+                            Icon(Icons.warning, color: Colors.red, size: 14.sp),
+                          ],
+                        ],
+                      ),
+                      if (extraInfo != null) ...[
+                        SizedBox(height: 4.h),
+                        Text(
+                          extraInfo,
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (onDelete != null)
+                  IconButton(
+                    onPressed: onDelete,
+                    icon: Icon(
+                      Icons.delete_outline,
+                      color: Colors.red[400],
+                      size: 20.sp,
+                    ),
+                    tooltip: 'Delete Document',
+                  ),
+              ],
+            ),
+            if (hasAttachment) ...[
+              SizedBox(height: 12.h),
+              const Divider(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:
+                              (context) => DocumentViewerScreen(
+                                attachmentUrl: attachmentUrl,
+                                title: title,
+                              ),
+                        ),
+                      );
+                    },
+                    icon: Icon(Icons.remove_red_eye_outlined, size: 18.sp),
+                    label: const Text('Preview'),
+                    style: TextButton.styleFrom(foregroundColor: Colors.blue),
+                  ),
+                  SizedBox(width: 8.w),
+                  TextButton.icon(
+                    onPressed: () {
+                      ShareHelper.shareDocument(
+                        context,
+                        url: attachmentUrl,
+                        title: title,
+                      );
+                    },
+                    icon: Icon(Icons.share_outlined, size: 18.sp),
+                    label: const Text('Share'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF13b1f2),
                     ),
                   ),
-                );
-              },
-              tooltip: 'View Attachment',
-            ),
+                  SizedBox(width: 8.w),
+                  TextButton.icon(
+                    onPressed: () => _launchUrl(attachmentUrl),
+                    icon: Icon(Icons.download_outlined, size: 18.sp),
+                    label: const Text('Download'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.grey[700],
+                    ),
+                  ),
+                ],
+              ),
+            ] else ...[
+              SizedBox(height: 12.h),
+              const Divider(),
+              Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 14.sp,
+                    color: Colors.grey[500],
+                  ),
+                  SizedBox(width: 6.w),
+                  Text(
+                    'No document attachment found',
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: Colors.grey[500],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

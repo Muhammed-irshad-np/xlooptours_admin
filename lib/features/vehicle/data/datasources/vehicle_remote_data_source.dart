@@ -84,9 +84,9 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
 
     final Map<String, dynamic> vehicleData = vehicle.toJson();
 
-    // CRITICAL: Filter out null values to prevent Firestore from clearing existing fields
-    // that are not provided in this update (partial update pattern).
-    vehicleData.removeWhere((key, value) => value == null);
+    // Note: We no longer remove null values here. This allows explicitly setting fields
+    // to null in Firestore (e.g., when deleting a document attachment or clearing a field).
+    // The VehicleModel.toJson() provides a full representation of the entity.
 
     await firestore.collection('vehicles').doc(vehicle.id).update(vehicleData);
   }

@@ -117,7 +117,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       'ar': 'انضم إلينا للحصول على خدمات أسطول متميزة\nوسائقين محترفين.',
     },
     'powered_by': {
-      'en': 'Powered by XLOOP TOURS W.L.L',
+      'en': 'Powered by Xloop Tours W.L.L',
       'ar': 'مشغل بواسطة اكس لوب ت ورس ذ.ل.ل',
     },
     'call_any_time': {'en': 'CALL ANY TIME', 'ar': 'اتصل في أي وقت'},
@@ -131,12 +131,12 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       'ar': 'عضو في شبكة السفر النخبة',
     },
     'header_company_name': {
-      'en': 'XLOOP TOURS W.L.L',
+      'en': 'Xloop Tours W.L.L',
       'ar': 'اكس لوب ت ورس ذ.ل.ل',
     },
     'success_gratitude': {
       'en':
-          'Thanks for registering with XLoop Tours.\nWe are excited to have you on board.',
+          'Thanks for registering with Xloop Tours.\nWe are excited to have you on board.',
       'ar': 'شكراً لتسجيلك مع إكس لوب تورز.\nنحن متحمسون لانضمامك إلينا.',
     },
     'book_first_ride_btn': {'en': 'BOOK YOUR RIDE', 'ar': 'احجز رحلتك'},
@@ -676,7 +676,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                       color: _brandColor,
                                     ),
                                     Text(
-                                      'XLOOP',
+                                      'Xloop',
                                       style: GoogleFonts.merriweather(
                                         fontWeight: FontWeight.bold,
                                       ),

@@ -157,7 +157,7 @@ class UnderMaintenanceScreen extends StatelessWidget {
           left: 0,
           right: 0,
           child: Text(
-            'XLOOP TOURS W.L.L © ${DateTime.now().year}',
+            'Xloop Tours W.L.L © ${DateTime.now().year}',
             style: GoogleFonts.notoSans(
               fontSize: 12.sp,
               color: Colors.white.withOpacity(0.6),
@@ -305,7 +305,7 @@ class UnderMaintenanceScreen extends StatelessWidget {
           left: 0,
           right: 0,
           child: Text(
-            'XLOOP TOURS W.L.L © ${DateTime.now().year}',
+            'Xloop Tours W.L.L © ${DateTime.now().year}',
             style: GoogleFonts.notoSans(
               fontSize: 24.sp,
               color: Colors.white.withOpacity(0.6),

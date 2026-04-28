@@ -14,6 +14,7 @@ class VehicleModel extends VehicleEntity {
     super.imageUrl,
     super.isActive = true,
     super.insurance,
+    super.bahrainInsurance,
     super.registration,
     super.fahas,
     super.maintenance,
@@ -46,6 +47,7 @@ class VehicleModel extends VehicleEntity {
       'imageUrl': imageUrl,
       'isActive': isActive,
       'insurance': insurance != null ? _documentToJson(insurance!) : null,
+      'bahrainInsurance': bahrainInsurance != null ? _documentToJson(bahrainInsurance!) : null,
       'registration': registration != null
           ? _documentToJson(registration!)
           : null,
@@ -173,6 +175,9 @@ class VehicleModel extends VehicleEntity {
       isActive: json['isActive'] as bool? ?? true,
       insurance: json['insurance'] != null
           ? _documentFromJson(json['insurance'] as Map<String, dynamic>)
+          : null,
+      bahrainInsurance: json['bahrainInsurance'] != null
+          ? _documentFromJson(json['bahrainInsurance'] as Map<String, dynamic>)
           : null,
       registration: json['registration'] != null
           ? _documentFromJson(json['registration'] as Map<String, dynamic>)
@@ -316,6 +321,7 @@ class VehicleModel extends VehicleEntity {
       imageUrl: entity.imageUrl,
       isActive: entity.isActive,
       insurance: entity.insurance,
+      bahrainInsurance: entity.bahrainInsurance,
       registration: entity.registration,
       fahas: entity.fahas,
       maintenance: entity.maintenance,
@@ -349,6 +355,7 @@ class VehicleModel extends VehicleEntity {
     String? imageUrl,
     bool? isActive,
     VehicleDocument? insurance,
+    VehicleDocument? bahrainInsurance,
     VehicleDocument? registration,
     VehicleDocument? fahas,
     VehicleMaintenance? maintenance,
@@ -366,6 +373,10 @@ class VehicleModel extends VehicleEntity {
     String? department,
     String? status,
     List<MaintenanceRecord>? maintenanceHistory,
+    bool clearInsurance = false,
+    bool clearBahrainInsurance = false,
+    bool clearRegistration = false,
+    bool clearFahas = false,
   }) {
     return VehicleModel(
       id: id ?? this.id,
@@ -378,9 +389,14 @@ class VehicleModel extends VehicleEntity {
       assignedDriverId: assignedDriverId ?? this.assignedDriverId,
       imageUrl: imageUrl ?? this.imageUrl,
       isActive: isActive ?? this.isActive,
-      insurance: insurance ?? this.insurance,
-      registration: registration ?? this.registration,
-      fahas: fahas ?? this.fahas,
+      insurance: clearInsurance ? null : (insurance ?? this.insurance),
+      bahrainInsurance: clearBahrainInsurance
+          ? null
+          : (bahrainInsurance ?? this.bahrainInsurance),
+      registration: clearRegistration
+          ? null
+          : (registration ?? this.registration),
+      fahas: clearFahas ? null : (fahas ?? this.fahas),
       maintenance: maintenance ?? this.maintenance,
       tafweeds: tafweeds ?? this.tafweeds,
       vinNumber: vinNumber ?? this.vinNumber,

@@ -13,6 +13,7 @@ class VehicleEntity extends Equatable {
   final String? imageUrl;
   final bool isActive;
   final VehicleDocument? insurance;
+  final VehicleDocument? bahrainInsurance;
   final VehicleDocument? registration;
   final VehicleDocument? fahas;
   final VehicleMaintenance? maintenance;
@@ -43,6 +44,7 @@ class VehicleEntity extends Equatable {
     this.imageUrl,
     this.isActive = true,
     this.insurance,
+    this.bahrainInsurance,
     this.registration,
     this.fahas,
     this.maintenance,
@@ -75,6 +77,7 @@ class VehicleEntity extends Equatable {
     imageUrl,
     isActive,
     insurance,
+    bahrainInsurance,
     registration,
     fahas,
     maintenance,
@@ -106,6 +109,7 @@ class VehicleEntity extends Equatable {
     String? imageUrl,
     bool? isActive,
     VehicleDocument? insurance,
+    VehicleDocument? bahrainInsurance,
     VehicleDocument? registration,
     VehicleDocument? fahas,
     VehicleMaintenance? maintenance,
@@ -123,6 +127,10 @@ class VehicleEntity extends Equatable {
     String? department,
     String? status,
     List<MaintenanceRecord>? maintenanceHistory,
+    bool clearInsurance = false,
+    bool clearBahrainInsurance = false,
+    bool clearRegistration = false,
+    bool clearFahas = false,
   }) {
     return VehicleEntity(
       id: id ?? this.id,
@@ -135,9 +143,14 @@ class VehicleEntity extends Equatable {
       assignedDriverId: assignedDriverId ?? this.assignedDriverId,
       imageUrl: imageUrl ?? this.imageUrl,
       isActive: isActive ?? this.isActive,
-      insurance: insurance ?? this.insurance,
-      registration: registration ?? this.registration,
-      fahas: fahas ?? this.fahas,
+      insurance: clearInsurance ? null : (insurance ?? this.insurance),
+      bahrainInsurance: clearBahrainInsurance
+          ? null
+          : (bahrainInsurance ?? this.bahrainInsurance),
+      registration: clearRegistration
+          ? null
+          : (registration ?? this.registration),
+      fahas: clearFahas ? null : (fahas ?? this.fahas),
       maintenance: maintenance ?? this.maintenance,
       tafweeds: tafweeds ?? this.tafweeds,
       vinNumber: vinNumber ?? this.vinNumber,

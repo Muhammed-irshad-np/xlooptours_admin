@@ -30,7 +30,7 @@ class HomeScreen extends StatelessWidget {
               const Icon(Icons.receipt_long, size: 80, color: Colors.blue),
               const SizedBox(height: 24),
               const Text(
-                'XLoop Tours',
+                'Xloop Tours',
                 style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 2),

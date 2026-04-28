@@ -16,6 +16,7 @@ class _VehicleExpiryAlertSettingsScreenState extends State<VehicleExpiryAlertSet
   late TextEditingController _isthimaraController;
   late TextEditingController _fahasController;
   late TextEditingController _insuranceController;
+  late TextEditingController _bahrainInsuranceController;
   late TextEditingController _tafweedController;
 
   @override
@@ -24,6 +25,7 @@ class _VehicleExpiryAlertSettingsScreenState extends State<VehicleExpiryAlertSet
     _isthimaraController = TextEditingController();
     _fahasController = TextEditingController();
     _insuranceController = TextEditingController();
+    _bahrainInsuranceController = TextEditingController();
     _tafweedController = TextEditingController();
 
     // Fetch settings on init
@@ -35,6 +37,7 @@ class _VehicleExpiryAlertSettingsScreenState extends State<VehicleExpiryAlertSet
             _isthimaraController.text = settings.isthimaraAlertDays.toString();
             _fahasController.text = settings.fahasAlertDays.toString();
             _insuranceController.text = settings.insuranceAlertDays.toString();
+            _bahrainInsuranceController.text = settings.bahrainInsuranceAlertDays.toString();
             _tafweedController.text = settings.tafweedAlertDays.toString();
           }
       });
@@ -46,6 +49,7 @@ class _VehicleExpiryAlertSettingsScreenState extends State<VehicleExpiryAlertSet
     _isthimaraController.dispose();
     _fahasController.dispose();
     _insuranceController.dispose();
+    _bahrainInsuranceController.dispose();
     _tafweedController.dispose();
     super.dispose();
   }
@@ -57,6 +61,7 @@ class _VehicleExpiryAlertSettingsScreenState extends State<VehicleExpiryAlertSet
         isthimaraAlertDays: int.parse(_isthimaraController.text),
         fahasAlertDays: int.parse(_fahasController.text),
         insuranceAlertDays: int.parse(_insuranceController.text),
+        bahrainInsuranceAlertDays: int.parse(_bahrainInsuranceController.text),
         tafweedAlertDays: int.parse(_tafweedController.text),
       );
 
@@ -122,6 +127,13 @@ class _VehicleExpiryAlertSettingsScreenState extends State<VehicleExpiryAlertSet
                     controller: _insuranceController,
                     icon: Icons.verified_user,
                     color: Colors.green,
+                  ),
+                  SizedBox(height: 24.h),
+                  _buildSettingField(
+                    label: 'Bahrain Insurance Alert',
+                    controller: _bahrainInsuranceController,
+                    icon: Icons.security,
+                    color: Colors.teal,
                   ),
                   SizedBox(height: 24.h),
                   _buildSettingField(

@@ -66,6 +66,23 @@ class GetVehicleExpiryAlertsUseCase {
         }
       }
 
+      // Bahrain Insurance
+      if (vehicle.bahrainInsurance != null) {
+        final days = vehicle.bahrainInsurance!.expiryDate.difference(now).inDays;
+        final alertDays = vehicle.bahrainInsurance!.notificationDays ?? settings.bahrainInsuranceAlertDays;
+        if (days <= alertDays) {
+          alerts.add(
+            VehicleExpiryAlert(
+              vehicleId: vehicle.id,
+              plateNumber: vehicle.plateNumber,
+              documentType: 'Bahrain Insurance',
+              expiryDate: vehicle.bahrainInsurance!.expiryDate,
+              daysUntilExpiry: days,
+            ),
+          );
+        }
+      }
+
       // Tafweed
       if (vehicle.tafweeds != null) {
         for (var tafweed in vehicle.tafweeds!) {

@@ -11,6 +11,20 @@ class VehicleDocument extends Equatable {
     this.notificationDays,
   });
 
+  VehicleDocument copyWith({
+    DateTime? expiryDate,
+    String? attachmentUrl,
+    bool clearAttachment = false,
+    int? notificationDays,
+  }) {
+    return VehicleDocument(
+      expiryDate: expiryDate ?? this.expiryDate,
+      attachmentUrl:
+          clearAttachment ? null : (attachmentUrl ?? this.attachmentUrl),
+      notificationDays: notificationDays ?? this.notificationDays,
+    );
+  }
+
   @override
   List<Object?> get props => [expiryDate, attachmentUrl, notificationDays];
 }
@@ -32,12 +46,14 @@ class TafweedRecord extends Equatable {
     String? driverId,
     DateTime? expiryDate,
     String? attachmentUrl,
+    bool clearAttachment = false,
     int? notificationDays,
   }) {
     return TafweedRecord(
       driverId: driverId ?? this.driverId,
       expiryDate: expiryDate ?? this.expiryDate,
-      attachmentUrl: attachmentUrl ?? this.attachmentUrl,
+      attachmentUrl:
+          clearAttachment ? null : (attachmentUrl ?? this.attachmentUrl),
       notificationDays: notificationDays ?? this.notificationDays,
     );
   }

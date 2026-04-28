@@ -17,10 +17,10 @@ class VehicleExpiryAlert extends Equatable {
 
   @override
   List<Object?> get props => [
-        vehicleId,
-        plateNumber,
-        documentType,
-        expiryDate,
-        daysUntilExpiry,
-      ];
+    vehicleId,
+    plateNumber,
+    documentType,
+    expiryDate,
+    daysUntilExpiry,
+  ];
 }

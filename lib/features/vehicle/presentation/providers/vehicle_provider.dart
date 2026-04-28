@@ -181,6 +181,35 @@ class VehicleProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> deleteVehicleDocument(
+    VehicleEntity vehicle,
+    String documentType,
+  ) async {
+    _setLoading(true);
+    try {
+      VehicleEntity updatedVehicle;
+      if (documentType == 'Insurance') {
+        updatedVehicle = vehicle.copyWith(clearInsurance: true);
+      } else if (documentType == 'Isthimara') {
+        updatedVehicle = vehicle.copyWith(clearRegistration: true);
+      } else if (documentType == 'Fahas') {
+        updatedVehicle = vehicle.copyWith(clearFahas: true);
+      } else if (documentType == 'Bahrain Insurance') {
+        updatedVehicle = vehicle.copyWith(clearBahrainInsurance: true);
+      } else {
+        throw Exception('Unknown document type: $documentType');
+      }
+
+      await updateVehicleUseCase(updatedVehicle);
+      await fetchAllVehicles();
+    } catch (e) {
+      _errorMessage = 'Failed to delete document: $e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
+    }
+  }
+
   Future<void> assignDriver(String? vehicleId, String driverId) async {
     _setLoading(true);
     try {

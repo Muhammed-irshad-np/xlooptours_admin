@@ -5,6 +5,7 @@ class VehicleSettingsModel extends VehicleSettingsEntity {
     super.isthimaraAlertDays = 30,
     super.fahasAlertDays = 30,
     super.insuranceAlertDays = 30,
+    super.bahrainInsuranceAlertDays = 30,
     super.tafweedAlertDays = 30,
   });
 
@@ -13,6 +14,7 @@ class VehicleSettingsModel extends VehicleSettingsEntity {
       'isthimaraAlertDays': isthimaraAlertDays,
       'fahasAlertDays': fahasAlertDays,
       'insuranceAlertDays': insuranceAlertDays,
+      'bahrainInsuranceAlertDays': bahrainInsuranceAlertDays,
       'tafweedAlertDays': tafweedAlertDays,
     };
   }
@@ -22,6 +24,7 @@ class VehicleSettingsModel extends VehicleSettingsEntity {
       isthimaraAlertDays: json['isthimaraAlertDays'] as int? ?? 30,
       fahasAlertDays: json['fahasAlertDays'] as int? ?? 30,
       insuranceAlertDays: json['insuranceAlertDays'] as int? ?? 30,
+      bahrainInsuranceAlertDays: json['bahrainInsuranceAlertDays'] as int? ?? 30,
       tafweedAlertDays: json['tafweedAlertDays'] as int? ?? 30,
     );
   }
@@ -31,6 +34,7 @@ class VehicleSettingsModel extends VehicleSettingsEntity {
       isthimaraAlertDays: entity.isthimaraAlertDays,
       fahasAlertDays: entity.fahasAlertDays,
       insuranceAlertDays: entity.insuranceAlertDays,
+      bahrainInsuranceAlertDays: entity.bahrainInsuranceAlertDays,
       tafweedAlertDays: entity.tafweedAlertDays,
     );
   }

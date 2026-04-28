@@ -46,7 +46,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC), // Slate 50
       appBar: ModernAppBar(
-        title: 'XLoop Secure Vault',
+        title: 'Xloop Secure Vault',
         actions: [
           Semantics(
             label: 'Security Status: Your data is protected by bank-grade encryption',

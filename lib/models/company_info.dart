@@ -1,6 +1,6 @@
 class CompanyInfo {
   // Company Name
-  static const String companyNameEn = 'X L O O P';
+  static const String companyNameEn = 'X l o o p';
   static const String companyNameEn2 = 'TOURS W.L.L';
   static const String companyNameAr = 'اكس لوب';
   static const String companyNameAr2 = 'ت ورس ذ.ل.ل';
@@ -34,7 +34,7 @@ class CompanyInfo {
   static const String email = 'enquiries@xlooptours.com';
 
   // Bank Details
-  static const String accountName = 'XLOOP TOURS W.L.L';
+  static const String accountName = 'Xloop Tours W.L.L';
   static const String accountNumber = '0012 328654 001';
   static const String iban = 'BH78AUBB00012328654001';
   static const String bankName = 'AHLI UNITED BANK';
