@@ -4,7 +4,6 @@ class IqamaModel extends IqamaDocument {
   const IqamaModel({
     required super.number,
     required super.expiryDate,
-    super.insuranceExpiryDate,
     super.attachmentUrl,
   });
 
@@ -12,9 +11,6 @@ class IqamaModel extends IqamaDocument {
     return IqamaModel(
       number: json['number'] as String? ?? '',
       expiryDate: DateTime.parse(json['expiryDate'] as String),
-      insuranceExpiryDate: json['insuranceExpiryDate'] != null
-          ? DateTime.parse(json['insuranceExpiryDate'] as String)
-          : null,
       attachmentUrl: json['attachmentUrl'] as String?,
     );
   }
@@ -23,8 +19,6 @@ class IqamaModel extends IqamaDocument {
     return {
       'number': number,
       'expiryDate': expiryDate.toIso8601String(),
-      if (insuranceExpiryDate != null)
-        'insuranceExpiryDate': insuranceExpiryDate!.toIso8601String(),
       if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
     };
   }
@@ -34,7 +28,6 @@ class BahrainResidenceModel extends BahrainResidenceDocument {
   const BahrainResidenceModel({
     required super.number,
     required super.expiryDate,
-    super.insuranceExpiryDate,
     super.attachmentUrl,
   });
 
@@ -42,9 +35,6 @@ class BahrainResidenceModel extends BahrainResidenceDocument {
     return BahrainResidenceModel(
       number: json['number'] as String? ?? '',
       expiryDate: DateTime.parse(json['expiryDate'] as String),
-      insuranceExpiryDate: json['insuranceExpiryDate'] != null
-          ? DateTime.parse(json['insuranceExpiryDate'] as String)
-          : null,
       attachmentUrl: json['attachmentUrl'] as String?,
     );
   }
@@ -53,12 +43,32 @@ class BahrainResidenceModel extends BahrainResidenceDocument {
     return {
       'number': number,
       'expiryDate': expiryDate.toIso8601String(),
-      if (insuranceExpiryDate != null)
-        'insuranceExpiryDate': insuranceExpiryDate!.toIso8601String(),
       if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
     };
   }
 }
+
+class HealthInsuranceModel extends HealthInsuranceDocument {
+  const HealthInsuranceModel({
+    required super.expiryDate,
+    super.attachmentUrl,
+  });
+
+  factory HealthInsuranceModel.fromJson(Map<String, dynamic> json) {
+    return HealthInsuranceModel(
+      expiryDate: DateTime.parse(json['expiryDate'] as String),
+      attachmentUrl: json['attachmentUrl'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'expiryDate': expiryDate.toIso8601String(),
+      if (attachmentUrl != null) 'attachmentUrl': attachmentUrl,
+    };
+  }
+}
+
 
 class DrivingLicenseModel extends DrivingLicenseDocument {
   const DrivingLicenseModel({

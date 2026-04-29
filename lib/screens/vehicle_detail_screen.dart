@@ -15,7 +15,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../widgets/add_maintenance_record_dialog.dart';
-import '../features/vehicle/presentation/widgets/update_tafweed_dialog.dart';
+import 'tafweed_history_view_all_screen.dart';
+
 
 class VehicleDetailScreen extends StatelessWidget {
   final VehicleEntity vehicle;
@@ -306,20 +307,7 @@ class VehicleDetailScreen extends StatelessWidget {
                               fontSize: 14.sp,
                             ),
                           ),
-                          const Spacer(),
-                          TextButton.icon(
-                            icon: const Icon(Icons.add, size: 18),
-                            label: const Text('Add'),
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder:
-                                    (context) => UpdateTafweedDialog(
-                                      vehicle: currentVehicle,
-                                    ),
-                              );
-                            },
-                          ),
+
                         ],
                       ),
                     ),
@@ -345,23 +333,13 @@ class VehicleDetailScreen extends StatelessWidget {
                         extraInfo: 'Tafweed Authorization',
                       );
                     }),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        icon: const Icon(Icons.add, size: 18),
-                        label: const Text('Add / Update Driver'),
-                        onPressed: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => UpdateTafweedDialog(vehicle: currentVehicle),
-                          );
-                        },
-                      ),
-                    ),
+
                   ],
                 );
               },
             ),
+            const Divider(height: 32),
+            _buildTafweedHistorySection(context, currentVehicle),
             const Divider(height: 32),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -527,13 +505,24 @@ class VehicleDetailScreen extends StatelessWidget {
     // Attempt to find a suitable icon based on service type
     IconData icon = Icons.build_circle_outlined;
     final type = record.serviceType?.toLowerCase() ?? '';
-    if (type.contains('oil')) icon = Icons.oil_barrel_outlined;
-    if (type.contains('tyre') || type.contains('tire'))
+    if (type.contains('oil')) {
+      icon = Icons.oil_barrel_outlined;
+    }
+    if (type.contains('tyre') || type.contains('tire')) {
       icon = Icons.tire_repair_outlined;
-    if (type.contains('battery')) icon = Icons.battery_charging_full_outlined;
-    if (type.contains('brake')) icon = Icons.settings_backup_restore_outlined;
-    if (type.contains('filter')) icon = Icons.filter_alt_outlined;
-    if (type.contains('ac')) icon = Icons.ac_unit_outlined;
+    }
+    if (type.contains('battery')) {
+      icon = Icons.battery_charging_full_outlined;
+    }
+    if (type.contains('brake')) {
+      icon = Icons.settings_backup_restore_outlined;
+    }
+    if (type.contains('filter')) {
+      icon = Icons.filter_alt_outlined;
+    }
+    if (type.contains('ac')) {
+      icon = Icons.ac_unit_outlined;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12.0),
@@ -615,6 +604,170 @@ class VehicleDetailScreen extends StatelessWidget {
           fontSize: 18,
           fontWeight: FontWeight.bold,
           color: Colors.blue,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTafweedHistorySection(BuildContext context, VehicleEntity vehicle) {
+    return Consumer<EmployeeProvider>(
+      builder: (context, empProvider, child) {
+        final List<_VehicleTafweedHistoryEntry> entries = [];
+
+        // Active tafweeds
+        if (vehicle.tafweeds != null) {
+          for (final t in vehicle.tafweeds!) {
+            final driver = empProvider.employees.cast<EmployeeEntity?>().firstWhere(
+              (e) => e?.id == t.driverId,
+              orElse: () => null,
+            );
+            entries.add(_VehicleTafweedHistoryEntry(record: t, driverName: driver?.fullName ?? 'Unknown Driver', isActive: true));
+          }
+        }
+
+        // Historical tafweeds
+        if (vehicle.tafweedHistory != null) {
+          for (final t in vehicle.tafweedHistory!) {
+            final driver = empProvider.employees.cast<EmployeeEntity?>().firstWhere(
+              (e) => e?.id == t.driverId,
+              orElse: () => null,
+            );
+            entries.add(_VehicleTafweedHistoryEntry(record: t, driverName: driver?.fullName ?? 'Unknown Driver', isActive: false));
+          }
+        }
+
+        if (entries.isEmpty) return const SizedBox.shrink();
+
+        // Sort newest issuedDate first
+        entries.sort((a, b) => b.record.issuedDate.compareTo(a.record.issuedDate));
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSectionHeader('Tafweed History'),
+            ...entries.take(5).map((entry) => _buildTafweedHistoryItem(context, entry)),
+            if (entries.length > 5)
+              Padding(
+                padding: EdgeInsets.only(top: 8.h),
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TafweedHistoryViewAllScreen(
+                          title: 'History: ${vehicle.plateNumber}',
+                          id: vehicle.id,
+                          type: TafweedHistoryType.vehicle,
+                        ),
+                      ),
+                    );
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.blue[700],
+                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                      side: BorderSide(color: Colors.blue.withValues(alpha: 0.2)),
+                    ),
+                  ),
+                  child: const Center(child: Text('View All History')),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildTafweedHistoryItem(BuildContext context, _VehicleTafweedHistoryEntry entry) {
+    final bool isExpired = entry.record.expiryDate.isBefore(DateTime.now());
+    
+    Color statusColor = Colors.grey;
+    String statusLabel = 'Historical';
+    IconData statusIcon = Icons.archive_outlined;
+
+    if (entry.isActive) {
+      if (isExpired) {
+        statusColor = Colors.red;
+        statusLabel = 'Expired';
+        statusIcon = Icons.warning_amber_outlined;
+      } else {
+        statusColor = Colors.green;
+        statusLabel = 'Active';
+        statusIcon = Icons.check_circle_outline;
+      }
+    }
+
+    return Card(
+      elevation: 0,
+      margin: EdgeInsets.only(bottom: 12.h),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        side: BorderSide(color: statusColor.withValues(alpha: 0.2)),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16.w),
+        child: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(10.w),
+              decoration: BoxDecoration(
+                color: statusColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Icon(statusIcon, color: statusColor, size: 24.sp),
+            ),
+            SizedBox(width: 16.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        entry.driverName,
+                        style: TextStyle(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          statusLabel,
+                          style: TextStyle(
+                            fontSize: 10.sp,
+                            color: statusColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 6.h),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today_outlined, size: 12.sp, color: Colors.grey[600]),
+                      SizedBox(width: 4.w),
+                      Text(
+                        '${_formatDate(entry.record.issuedDate)} - ${_formatDate(entry.record.expiryDate)}',
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: isExpired && entry.isActive ? Colors.red : Colors.grey[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -870,4 +1023,16 @@ class VehicleDetailScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _VehicleTafweedHistoryEntry {
+  final TafweedRecord record;
+  final String driverName;
+  final bool isActive;
+
+  const _VehicleTafweedHistoryEntry({
+    required this.record,
+    required this.driverName,
+    required this.isActive,
+  });
 }

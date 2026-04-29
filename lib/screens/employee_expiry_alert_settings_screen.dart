@@ -21,6 +21,8 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
   late TextEditingController _dubaiVisaController;
   late TextEditingController _qatarVisaController;
   late TextEditingController _phoneRechargeController;
+  late TextEditingController _healthInsuranceController;
+  late TextEditingController _tafweedController;
 
   @override
   void initState() {
@@ -33,6 +35,8 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
     _dubaiVisaController = TextEditingController();
     _qatarVisaController = TextEditingController();
     _phoneRechargeController = TextEditingController();
+    _healthInsuranceController = TextEditingController();
+    _tafweedController = TextEditingController();
 
     // Fetch settings on init
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -48,6 +52,8 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
             _dubaiVisaController.text = settings.dubaiVisaAlertDays.toString();
             _qatarVisaController.text = settings.qatarVisaAlertDays.toString();
             _phoneRechargeController.text = settings.phoneRechargeAlertDays.toString();
+            _healthInsuranceController.text = settings.healthInsuranceAlertDays.toString();
+            _tafweedController.text = settings.tafweedAlertDays.toString();
           }
       });
     });
@@ -63,6 +69,8 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
     _dubaiVisaController.dispose();
     _qatarVisaController.dispose();
     _phoneRechargeController.dispose();
+    _healthInsuranceController.dispose();
+    _tafweedController.dispose();
     super.dispose();
   }
 
@@ -78,6 +86,8 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
         dubaiVisaAlertDays: int.parse(_dubaiVisaController.text),
         qatarVisaAlertDays: int.parse(_qatarVisaController.text),
         phoneRechargeAlertDays: int.parse(_phoneRechargeController.text),
+        healthInsuranceAlertDays: int.parse(_healthInsuranceController.text),
+        tafweedAlertDays: int.parse(_tafweedController.text),
       );
 
       try {
@@ -131,6 +141,20 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
                   ),
                   SizedBox(height: 24.h),
                   _buildSettingField(
+                    label: 'Health Insurance Alert',
+                    controller: _healthInsuranceController,
+                    icon: Icons.health_and_safety,
+                    color: Colors.pink,
+                  ),
+                  SizedBox(height: 24.h),
+                  _buildSettingField(
+                    label: 'Tafweed (Authorization) Alert',
+                    controller: _tafweedController,
+                    icon: Icons.assignment_turned_in,
+                    color: Colors.deepPurple,
+                  ),
+                  SizedBox(height: 24.h),
+                  _buildSettingField(
                     label: 'Driving License Alert',
                     controller: _drivingLicenseController,
                     icon: Icons.drive_eta,
@@ -178,6 +202,7 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
                     icon: Icons.phone_android,
                     color: Colors.redAccent,
                   ),
+
                   SizedBox(height: 48.h),
                   SizedBox(
                     width: double.infinity,

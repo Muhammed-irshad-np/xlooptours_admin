@@ -8,6 +8,16 @@ class VaultData extends Equatable {
 
   @override
   List<Object?> get props => [license, vatCertificate];
+
+  VaultData copyWith({
+    CommercialLicense? license,
+    VatCertificate? vatCertificate,
+  }) {
+    return VaultData(
+      license: license ?? this.license,
+      vatCertificate: vatCertificate ?? this.vatCertificate,
+    );
+  }
 }
 
 class CommercialLicense extends Equatable {
@@ -27,6 +37,22 @@ class CommercialLicense extends Equatable {
 
   @override
   List<Object?> get props => [issueDate, expiryDate, registrationNo, documentUrl, alertDays];
+
+  CommercialLicense copyWith({
+    DateTime? issueDate,
+    DateTime? expiryDate,
+    String? registrationNo,
+    String? documentUrl,
+    int? alertDays,
+  }) {
+    return CommercialLicense(
+      issueDate: issueDate ?? this.issueDate,
+      expiryDate: expiryDate ?? this.expiryDate,
+      registrationNo: registrationNo ?? this.registrationNo,
+      documentUrl: documentUrl ?? this.documentUrl,
+      alertDays: alertDays ?? this.alertDays,
+    );
+  }
 }
 
 class VatCertificate extends Equatable {
@@ -44,6 +70,20 @@ class VatCertificate extends Equatable {
 
   @override
   List<Object?> get props => [issueDate, vatAccountNo, documentUrl, alertDays];
+
+  VatCertificate copyWith({
+    DateTime? issueDate,
+    String? vatAccountNo,
+    String? documentUrl,
+    int? alertDays,
+  }) {
+    return VatCertificate(
+      issueDate: issueDate ?? this.issueDate,
+      vatAccountNo: vatAccountNo ?? this.vatAccountNo,
+      documentUrl: documentUrl ?? this.documentUrl,
+      alertDays: alertDays ?? this.alertDays,
+    );
+  }
 }
 
 class VatFiling extends Equatable {

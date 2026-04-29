@@ -16,6 +16,7 @@ class UpdateTafweedDialog extends StatefulWidget {
 }
 
 class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
+  DateTime? _issuedDate;
   DateTime? _selectedDate;
   String? _selectedDriverId;
   bool _isLoading = false;
@@ -23,6 +24,7 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
   @override
   void initState() {
     super.initState();
+    _issuedDate = DateTime.now();
     _selectedDate = null;
     _selectedDriverId = null;
 
@@ -104,13 +106,25 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
         return;
       }
 
-      // Remove driver from other vehicles if swapping
+      // Archive the old tafweed record instead of discarding it.
       for (final otherVehicle in existingVehicles) {
+        final recordToArchive = otherVehicle.tafweeds
+            ?.where((t) => t.driverId == _selectedDriverId)
+            .firstOrNull;
+
         final updatedOtherTafweeds = List<TafweedRecord>.from(
           otherVehicle.tafweeds ?? [],
         )..removeWhere((t) => t.driverId == _selectedDriverId);
+
+        final updatedHistory =
+            List<TafweedRecord>.from(otherVehicle.tafweedHistory ?? []);
+        if (recordToArchive != null) {
+          updatedHistory.add(recordToArchive);
+        }
+
         final updatedOtherVehicle = otherVehicle.copyWith(
           tafweeds: updatedOtherTafweeds,
+          tafweedHistory: updatedHistory,
         );
         await vehicleProvider.updateVehicle(updatedOtherVehicle);
       }
@@ -131,6 +145,7 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
 
       final updatedRecord = TafweedRecord(
         driverId: _selectedDriverId!,
+        issuedDate: _issuedDate ?? DateTime.now(),
         expiryDate: _selectedDate!,
         attachmentUrl: attachmentUrl,
         notificationDays: notificationDays,
@@ -197,7 +212,7 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
                       child: Text(e.fullName),
                     );
                   }).toList(),
-                  onChanged: (val) {
+                   onChanged: (val) {
                     setState(() {
                       _selectedDriverId = val;
                       if (val != null) {
@@ -205,13 +220,36 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
                             ?.where((t) => t.driverId == val)
                             .firstOrNull;
                         if (existing != null) {
+                          _issuedDate = existing.issuedDate;
                           _selectedDate = existing.expiryDate;
+                        } else {
+                          _issuedDate = DateTime.now();
                         }
                       }
                     });
                   },
                 ),
                 const SizedBox(height: 16),
+                // Issue date picker
+                CustomDatePicker(
+                  label: 'Tafweed Issue Date',
+                  date: _issuedDate,
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _issuedDate ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime.now().add(
+                        const Duration(days: 365 * 5),
+                      ),
+                    );
+                    if (picked != null) {
+                      setState(() => _issuedDate = picked);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                // Expiry date picker
                 CustomDatePicker(
                   label: 'Tafweed Expiry Date',
                   date: _selectedDate,

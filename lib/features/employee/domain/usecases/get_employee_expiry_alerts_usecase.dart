@@ -134,6 +134,40 @@ class GetEmployeeExpiryAlertsUseCase {
         }
       }
 
+      // Health Insurance
+      if (employee.healthInsurance != null) {
+        final days = employee.healthInsurance!.expiryDate.difference(now).inDays;
+        final alertDays = settings.healthInsuranceAlertDays;
+        if (days <= alertDays) {
+          alerts.add(
+            EmployeeExpiryAlert(
+              employeeId: employee.id,
+              employeeName: employee.fullName,
+              documentType: 'Health Insurance',
+              expiryDate: employee.healthInsurance!.expiryDate,
+              daysUntilExpiry: days,
+            ),
+          );
+        }
+      }
+
+      // Tafweed (Authorization)
+      if (employee.authorization != null) {
+        final days = employee.authorization!.expiryDate.difference(now).inDays;
+        final alertDays = settings.tafweedAlertDays;
+        if (days <= alertDays) {
+          alerts.add(
+            EmployeeExpiryAlert(
+              employeeId: employee.id,
+              employeeName: employee.fullName,
+              documentType: 'Tafweed (Authorization)',
+              expiryDate: employee.authorization!.expiryDate,
+              daysUntilExpiry: days,
+            ),
+          );
+        }
+      }
+
       // Phone Recharge – per contact
       for (final contact in employee.contacts) {
         if (contact.rechargeExpiryDate != null) {

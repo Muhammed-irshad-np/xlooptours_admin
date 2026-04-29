@@ -10,6 +10,7 @@ import '../../../vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.
 import '../../../vehicle/domain/usecases/get_vehicle_expiry_alerts_usecase.dart';
 import '../../../vehicle/domain/entities/vehicle_entity.dart';
 import '../../../vehicle/domain/entities/maintenance_type_entity.dart';
+import '../../../xloop_vault/domain/usecases/get_vault_expiry_alerts_usecase.dart';
 
 class NotificationProvider extends ChangeNotifier {
   final GetNotifications _getNotifications;
@@ -19,6 +20,7 @@ class NotificationProvider extends ChangeNotifier {
   final GetEmployeeExpiryAlertsUseCase _getEmployeeExpiryAlerts;
   final GetVehicleMaintenanceAlertsUseCase _getVehicleMaintenanceAlerts;
   final GetVehicleExpiryAlertsUseCase _getVehicleExpiryAlerts;
+  final GetVaultExpiryAlertsUseCase _getVaultExpiryAlerts;
   final SharedPreferences _prefs;
 
   static const String _readVirtualIdsKey = 'read_virtual_notification_ids';
@@ -39,6 +41,7 @@ class NotificationProvider extends ChangeNotifier {
     required GetEmployeeExpiryAlertsUseCase getEmployeeExpiryAlerts,
     required GetVehicleMaintenanceAlertsUseCase getVehicleMaintenanceAlerts,
     required GetVehicleExpiryAlertsUseCase getVehicleExpiryAlerts,
+    required GetVaultExpiryAlertsUseCase getVaultExpiryAlerts,
     required SharedPreferences sharedPreferences,
   }) : _getNotifications = getNotifications,
        _insertNotification = insertNotification,
@@ -47,6 +50,7 @@ class NotificationProvider extends ChangeNotifier {
        _getEmployeeExpiryAlerts = getEmployeeExpiryAlerts,
        _getVehicleMaintenanceAlerts = getVehicleMaintenanceAlerts,
        _getVehicleExpiryAlerts = getVehicleExpiryAlerts,
+       _getVaultExpiryAlerts = getVaultExpiryAlerts,
        _prefs = sharedPreferences {
     _init();
   }
@@ -171,6 +175,26 @@ class NotificationProvider extends ChangeNotifier {
       }).toList();
 
       _computedNotifications.addAll(vehicleExpiryNotifications);
+
+      // ── Vault expiry alerts ────────────────────────────────────────────────
+      final vaultAlerts = await _getVaultExpiryAlerts();
+      final vaultNotifications = vaultAlerts.map((alert) {
+        final id = 'vault_${alert.documentType.replaceAll(' ', '_')}';
+        return NotificationEntity(
+          id: id,
+          title: 'Company ${alert.documentType} Alert',
+          message:
+              'Company ${alert.documentType} is expiring on '
+              '${alert.expiryDate.toLocal().toString().split(' ')[0]} '
+              '(${alert.daysUntilExpiry} days left).',
+          timestamp: DateTime.now(),
+          isRead: _readVirtualIds.contains(id),
+          type: NotificationType.expiry,
+          relatedId: 'vault', // Generic ID for company vault
+        );
+      }).toList();
+
+      _computedNotifications.addAll(vaultNotifications);
     } catch (e) {
       debugPrint('Failed to compute alerts: $e');
     }
@@ -194,7 +218,8 @@ class NotificationProvider extends ChangeNotifier {
   bool _isVirtualId(String id) {
     return id.startsWith('expiry_') ||
            id.startsWith('maintenance_') ||
-           id.startsWith('v_expiry_');
+           id.startsWith('v_expiry_') ||
+           id.startsWith('vault_');
   }
 
   Future<bool> markAsRead(String id) async {

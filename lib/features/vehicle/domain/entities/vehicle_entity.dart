@@ -18,6 +18,9 @@ class VehicleEntity extends Equatable {
   final VehicleDocument? fahas;
   final VehicleMaintenance? maintenance;
   final List<TafweedRecord>? tafweeds;
+  /// Archived tafweed records — moved here when a driver is swapped off
+  /// a vehicle, preserving the full assignment history for auditing.
+  final List<TafweedRecord>? tafweedHistory;
   final String? vinNumber;
   final String? engineNumber;
   final String? fuelType;
@@ -49,6 +52,7 @@ class VehicleEntity extends Equatable {
     this.fahas,
     this.maintenance,
     this.tafweeds,
+    this.tafweedHistory,
     this.vinNumber,
     this.engineNumber,
     this.fuelType,
@@ -82,6 +86,7 @@ class VehicleEntity extends Equatable {
     fahas,
     maintenance,
     tafweeds,
+    tafweedHistory,
     vinNumber,
     engineNumber,
     fuelType,
@@ -114,6 +119,7 @@ class VehicleEntity extends Equatable {
     VehicleDocument? fahas,
     VehicleMaintenance? maintenance,
     List<TafweedRecord>? tafweeds,
+    List<TafweedRecord>? tafweedHistory,
     String? vinNumber,
     String? engineNumber,
     String? fuelType,
@@ -153,6 +159,7 @@ class VehicleEntity extends Equatable {
       fahas: clearFahas ? null : (fahas ?? this.fahas),
       maintenance: maintenance ?? this.maintenance,
       tafweeds: tafweeds ?? this.tafweeds,
+      tafweedHistory: tafweedHistory ?? this.tafweedHistory,
       vinNumber: vinNumber ?? this.vinNumber,
       engineNumber: engineNumber ?? this.engineNumber,
       fuelType: fuelType ?? this.fuelType,

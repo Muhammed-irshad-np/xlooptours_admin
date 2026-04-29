@@ -21,6 +21,7 @@ class EmployeeEntity extends Equatable {
   final String? assignedVehicleId;
   final IqamaDocument? iqama;
   final BahrainResidenceDocument? bahrainResidence;
+  final HealthInsuranceDocument? healthInsurance;
   final DrivingLicenseDocument? drivingLicense;
   final PassportDocument? passport;
   final VisaDocument? saudiVisa;
@@ -49,6 +50,7 @@ class EmployeeEntity extends Equatable {
     this.assignedVehicleId,
     this.iqama,
     this.bahrainResidence,
+    this.healthInsurance,
     this.drivingLicense,
     this.passport,
     this.saudiVisa,
@@ -58,6 +60,20 @@ class EmployeeEntity extends Equatable {
     this.authorization,
     this.contacts = const [],
   });
+
+  factory EmployeeEntity.empty() {
+    return const EmployeeEntity(
+      id: '',
+      fullName: '',
+      position: '',
+      email: '',
+      phoneNumber: '',
+      nationality: '',
+      idType: '',
+      idNumber: '',
+      gender: '',
+    );
+  }
 
   EmployeeEntity copyWith({
     String? id,
@@ -78,6 +94,7 @@ class EmployeeEntity extends Equatable {
     String? assignedVehicleId,
     IqamaDocument? iqama,
     BahrainResidenceDocument? bahrainResidence,
+    HealthInsuranceDocument? healthInsurance,
     DrivingLicenseDocument? drivingLicense,
     PassportDocument? passport,
     VisaDocument? saudiVisa,
@@ -106,6 +123,7 @@ class EmployeeEntity extends Equatable {
       assignedVehicleId: assignedVehicleId ?? this.assignedVehicleId,
       iqama: iqama ?? this.iqama,
       bahrainResidence: bahrainResidence ?? this.bahrainResidence,
+      healthInsurance: healthInsurance ?? this.healthInsurance,
       drivingLicense: drivingLicense ?? this.drivingLicense,
       passport: passport ?? this.passport,
       saudiVisa: saudiVisa ?? this.saudiVisa,
@@ -137,6 +155,7 @@ class EmployeeEntity extends Equatable {
     assignedVehicleId,
     iqama,
     bahrainResidence,
+    healthInsurance,
     drivingLicense,
     passport,
     saudiVisa,

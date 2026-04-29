@@ -51,15 +51,16 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   // Document Specific Controllers
   late TextEditingController _iqamaNumberController;
   final ValueNotifier<DateTime?> _iqamaExpiryDate = ValueNotifier(null);
-  final ValueNotifier<DateTime?> _insuranceExpiryDate = ValueNotifier(null);
 
   late TextEditingController _bahrainResidenceNumberController;
   final ValueNotifier<DateTime?> _bahrainResidenceExpiryDate = ValueNotifier(
     null,
   );
-  final ValueNotifier<DateTime?> _bahrainInsuranceExpiryDate = ValueNotifier(
-    null,
-  );
+
+  // Health Insurance
+  final ValueNotifier<DateTime?> _healthInsuranceExpiryDate = ValueNotifier(null);
+  final ValueNotifier<XFile?> _healthInsuranceAttachment = ValueNotifier(null);
+  final ValueNotifier<String?> _healthInsuranceAttachmentUrl = ValueNotifier(null);
 
   late TextEditingController _passportNameController;
   late TextEditingController _passportNumberController;
@@ -162,14 +163,14 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       text: e?.iqama?.number ?? '',
     );
     _iqamaExpiryDate.value = e?.iqama?.expiryDate;
-    _insuranceExpiryDate.value = e?.iqama?.insuranceExpiryDate;
 
     _bahrainResidenceNumberController = TextEditingController(
       text: e?.bahrainResidence?.number ?? '',
     );
     _bahrainResidenceExpiryDate.value = e?.bahrainResidence?.expiryDate;
-    _bahrainInsuranceExpiryDate.value =
-        e?.bahrainResidence?.insuranceExpiryDate;
+
+    _healthInsuranceExpiryDate.value = e?.healthInsurance?.expiryDate;
+    _healthInsuranceAttachmentUrl.value = e?.healthInsurance?.attachmentUrl;
 
     _passportNameController = TextEditingController(
       text: e?.passport?.nameOnPassport ?? '',
@@ -307,10 +308,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
     _iqamaNumberController.dispose();
     _iqamaExpiryDate.dispose();
-    _insuranceExpiryDate.dispose();
     _bahrainResidenceNumberController.dispose();
     _bahrainResidenceExpiryDate.dispose();
-    _bahrainInsuranceExpiryDate.dispose();
+    _healthInsuranceExpiryDate.dispose();
+    _healthInsuranceAttachment.dispose();
+    _healthInsuranceAttachmentUrl.dispose();
     _passportNameController.dispose();
     _passportNumberController.dispose();
     _passportExpiryDate.dispose();
@@ -468,6 +470,15 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         );
       }
 
+      String? healthInsuranceUrl = _healthInsuranceAttachmentUrl.value;
+      if (_healthInsuranceAttachment.value != null && mounted) {
+        healthInsuranceUrl = await provider.uploadDocumentAttachment(
+          _healthInsuranceAttachment.value!,
+          id,
+          'health_insurance',
+        );
+      }
+
       final newEmployee = EmployeeEntity(
         id: id,
         fullName: _nameController.text.trim(),
@@ -492,7 +503,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
             ? IqamaDocument(
                 number: _iqamaNumberController.text.trim(),
                 expiryDate: _iqamaExpiryDate.value!,
-                insuranceExpiryDate: _insuranceExpiryDate.value,
                 attachmentUrl: iqamaUrl,
               )
             : null,
@@ -502,8 +512,13 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
             ? BahrainResidenceDocument(
                 number: _bahrainResidenceNumberController.text.trim(),
                 expiryDate: _bahrainResidenceExpiryDate.value!,
-                insuranceExpiryDate: _bahrainInsuranceExpiryDate.value,
                 attachmentUrl: bahrainResidenceUrl,
+              )
+            : null,
+        healthInsurance: _healthInsuranceExpiryDate.value != null
+            ? HealthInsuranceDocument(
+                expiryDate: _healthInsuranceExpiryDate.value!,
+                attachmentUrl: healthInsuranceUrl,
               )
             : null,
         passport:
@@ -1054,39 +1069,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                 },
                               ),
                             ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: ValueListenableBuilder<DateTime?>(
-                                valueListenable: _insuranceExpiryDate,
-                                builder: (context, date, _) {
-                                  return CustomDatePicker(
-                                    label: 'Health Ins. Expiry',
-                                    date: date,
-                                    onTap: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate:
-                                            date ??
-                                            DateTime.now().add(
-                                              const Duration(days: 365),
-                                            ),
-                                        firstDate: DateTime.now().subtract(
-                                          const Duration(days: 365 * 5),
-                                        ),
-                                        lastDate: DateTime.now().add(
-                                          const Duration(days: 365 * 10),
-                                        ),
-                                      );
-                                      if (picked != null) {
-                                        _insuranceExpiryDate.value = picked;
-                                      }
-                                    },
-                                    onClear: () =>
-                                        _insuranceExpiryDate.value = null,
-                                  );
-                                },
-                              ),
-                            ),
                           ],
                         ),
                         SizedBox(height: 16.h),
@@ -1156,13 +1138,43 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                 },
                               ),
                             ),
-                            SizedBox(width: 16.w),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                        _buildAttachmentPicker(
+                          label: 'Residence ID Scan / Copy',
+                          pickedFileNotifier: _bahrainResidenceAttachment,
+                          existingUrlNotifier: _bahrainResidenceAttachmentUrl,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Health Insurance Card
+                  Card(
+                    elevation: 1,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ExpansionTile(
+                      title: const Text(
+                        'Health Insurance Details',
+                        style: TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                      leading: const Icon(
+                        Icons.health_and_safety,
+                        color: Colors.red,
+                      ),
+                      childrenPadding: const EdgeInsets.all(16),
+                      children: [
+                        Row(
+                          children: [
                             Expanded(
                               child: ValueListenableBuilder<DateTime?>(
-                                valueListenable: _bahrainInsuranceExpiryDate,
+                                valueListenable: _healthInsuranceExpiryDate,
                                 builder: (context, date, _) {
                                   return CustomDatePicker(
-                                    label: 'Health Ins. Expiry',
+                                    label: 'Health Insurance Expiry',
                                     date: date,
                                     onTap: () async {
                                       final picked = await showDatePicker(
@@ -1180,13 +1192,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                         ),
                                       );
                                       if (picked != null) {
-                                        _bahrainInsuranceExpiryDate.value =
+                                        _healthInsuranceExpiryDate.value =
                                             picked;
                                       }
                                     },
                                     onClear: () =>
-                                        _bahrainInsuranceExpiryDate.value =
-                                            null,
+                                        _healthInsuranceExpiryDate.value = null,
                                   );
                                 },
                               ),
@@ -1195,9 +1206,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                         ),
                         SizedBox(height: 16.h),
                         _buildAttachmentPicker(
-                          label: 'Residence ID Scan / Copy',
-                          pickedFileNotifier: _bahrainResidenceAttachment,
-                          existingUrlNotifier: _bahrainResidenceAttachmentUrl,
+                          label: 'Health Insurance Card Scan / Copy',
+                          pickedFileNotifier: _healthInsuranceAttachment,
+                          existingUrlNotifier: _healthInsuranceAttachmentUrl,
                         ),
                       ],
                     ),

@@ -9,6 +9,8 @@ class EmployeeSettingsEntity extends Equatable {
   final int dubaiVisaAlertDays;
   final int qatarVisaAlertDays;
   final int phoneRechargeAlertDays;
+  final int healthInsuranceAlertDays;
+  final int tafweedAlertDays;
 
   const EmployeeSettingsEntity({
     this.iqamaAlertDays = 30,
@@ -19,6 +21,8 @@ class EmployeeSettingsEntity extends Equatable {
     this.dubaiVisaAlertDays = 30,
     this.qatarVisaAlertDays = 30,
     this.phoneRechargeAlertDays = 30,
+    this.healthInsuranceAlertDays = 30,
+    this.tafweedAlertDays = 30,
   });
 
   @override
@@ -31,6 +35,8 @@ class EmployeeSettingsEntity extends Equatable {
         dubaiVisaAlertDays,
         qatarVisaAlertDays,
         phoneRechargeAlertDays,
+        healthInsuranceAlertDays,
+        tafweedAlertDays,
       ];
 
   EmployeeSettingsEntity copyWith({
@@ -42,6 +48,8 @@ class EmployeeSettingsEntity extends Equatable {
     int? dubaiVisaAlertDays,
     int? qatarVisaAlertDays,
     int? phoneRechargeAlertDays,
+    int? healthInsuranceAlertDays,
+    int? tafweedAlertDays,
   }) {
     return EmployeeSettingsEntity(
       iqamaAlertDays: iqamaAlertDays ?? this.iqamaAlertDays,
@@ -52,6 +60,9 @@ class EmployeeSettingsEntity extends Equatable {
       dubaiVisaAlertDays: dubaiVisaAlertDays ?? this.dubaiVisaAlertDays,
       qatarVisaAlertDays: qatarVisaAlertDays ?? this.qatarVisaAlertDays,
       phoneRechargeAlertDays: phoneRechargeAlertDays ?? this.phoneRechargeAlertDays,
+      healthInsuranceAlertDays: healthInsuranceAlertDays ?? this.healthInsuranceAlertDays,
+      tafweedAlertDays: tafweedAlertDays ?? this.tafweedAlertDays,
     );
   }
+
 }

@@ -1286,28 +1286,33 @@ class _ExpiriesSection extends StatefulWidget {
 
 class _ExpiriesSectionState extends State<_ExpiriesSection> {
   int _selectedTabIndex = 0;
-  final List<String> _tabs = ['All', 'Vehicles', 'Employees', 'Other'];
+  final List<String> _tabs = ['All', 'Company', 'Vehicles', 'Employees', 'Other'];
 
   List<NotificationEntity> _getFilteredExpiries(
       List<NotificationEntity> allExpiries) {
     if (_selectedTabIndex == 0) return allExpiries;
     if (_selectedTabIndex == 1) {
+      // Company (Vault)
+      return allExpiries.where((n) => n.id.startsWith('vault_')).toList();
+    }
+    if (_selectedTabIndex == 2) {
       // Vehicles
       return allExpiries
           .where((n) =>
               n.id.startsWith('maintenance_') || n.id.startsWith('v_expiry_'))
           .toList();
     }
-    if (_selectedTabIndex == 2) {
+    if (_selectedTabIndex == 3) {
       // Employees
       return allExpiries.where((n) => n.id.startsWith('expiry_')).toList();
     }
-    // Other (including Company Docs / Vault)
+    // Other
     return allExpiries
         .where((n) =>
             !n.id.startsWith('maintenance_') &&
             !n.id.startsWith('v_expiry_') &&
-            !n.id.startsWith('expiry_'))
+            !n.id.startsWith('expiry_') &&
+            !n.id.startsWith('vault_'))
         .toList();
   }
 
@@ -1377,23 +1382,28 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
                       int tabCount = 0;
                       if (index == 0) tabCount = expiries.length;
                       if (index == 1) {
+                        tabCount =
+                            expiries.where((n) => n.id.startsWith('vault_')).length;
+                      }
+                      if (index == 2) {
                         tabCount = expiries
                             .where((n) =>
                                 n.id.startsWith('maintenance_') ||
                                 n.id.startsWith('v_expiry_'))
                             .length;
                       }
-                      if (index == 2) {
+                      if (index == 3) {
                         tabCount = expiries
                             .where((n) => n.id.startsWith('expiry_'))
                             .length;
                       }
-                      if (index == 3) {
+                      if (index == 4) {
                         tabCount = expiries
                             .where((n) =>
                                 !n.id.startsWith('maintenance_') &&
                                 !n.id.startsWith('v_expiry_') &&
-                                !n.id.startsWith('expiry_'))
+                                !n.id.startsWith('expiry_') &&
+                                !n.id.startsWith('vault_'))
                             .length;
                       }
 

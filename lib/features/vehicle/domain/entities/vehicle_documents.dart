@@ -31,12 +31,18 @@ class VehicleDocument extends Equatable {
 
 class TafweedRecord extends Equatable {
   final String driverId;
+
+  /// The date the tafweed was issued / assignment started.
+  /// Used together with [expiryDate] to form a date range for
+  /// fine-responsibility cross-referencing.
+  final DateTime issuedDate;
   final DateTime expiryDate;
   final String? attachmentUrl;
   final int? notificationDays;
 
   const TafweedRecord({
     required this.driverId,
+    required this.issuedDate,
     required this.expiryDate,
     this.attachmentUrl,
     this.notificationDays,
@@ -44,6 +50,7 @@ class TafweedRecord extends Equatable {
 
   TafweedRecord copyWith({
     String? driverId,
+    DateTime? issuedDate,
     DateTime? expiryDate,
     String? attachmentUrl,
     bool clearAttachment = false,
@@ -51,6 +58,7 @@ class TafweedRecord extends Equatable {
   }) {
     return TafweedRecord(
       driverId: driverId ?? this.driverId,
+      issuedDate: issuedDate ?? this.issuedDate,
       expiryDate: expiryDate ?? this.expiryDate,
       attachmentUrl:
           clearAttachment ? null : (attachmentUrl ?? this.attachmentUrl),
@@ -59,7 +67,7 @@ class TafweedRecord extends Equatable {
   }
 
   @override
-  List<Object?> get props => [driverId, expiryDate, attachmentUrl, notificationDays];
+  List<Object?> get props => [driverId, issuedDate, expiryDate, attachmentUrl, notificationDays];
 }
 
 class MaintenanceRecord extends Equatable {

@@ -15,17 +15,17 @@ class AuthorizeVehicleDialog extends StatefulWidget {
 }
 
 class _AuthorizeVehicleDialogState extends State<AuthorizeVehicleDialog> {
-  DateTime? _selectedDate;
+  DateTime? _issuedDate;
+  DateTime? _expiryDate;
   String? _selectedVehicleId;
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _selectedDate = null;
-    _selectedVehicleId = null;
-    
-    // Fetch vehicles if not already loaded
+    _issuedDate = DateTime.now();
+
+    // Fetch vehicles if not already loaded.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final vehicleProvider = context.read<VehicleProvider>();
       if (vehicleProvider.vehicles.isEmpty) {
@@ -35,9 +35,11 @@ class _AuthorizeVehicleDialogState extends State<AuthorizeVehicleDialog> {
   }
 
   Future<void> _saveTafweed() async {
-    if (_selectedDate == null) {
+    if (_expiryDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an expiry date for Tafweed')),
+        const SnackBar(
+          content: Text('Please select an expiry date for Tafweed'),
+        ),
       );
       return;
     }
@@ -49,18 +51,17 @@ class _AuthorizeVehicleDialogState extends State<AuthorizeVehicleDialog> {
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       final vehicleProvider = context.read<VehicleProvider>();
-      
-      // Enforce Business Rule: One Driver -> One Vehicle
-      // Check if current driver is already assigned to another vehicle
-      final existingVehicles = vehicleProvider.vehicles.where((v) => 
-        v.id != _selectedVehicleId && 
-        (v.tafweeds?.any((t) => t.driverId == widget.employee.id) ?? false)
+      final issuedDate = _issuedDate ?? DateTime.now();
+
+      // Enforce Business Rule: One Driver → One Vehicle
+      // Check if the current driver is already authorised on another vehicle.
+      final existingVehicles = vehicleProvider.vehicles.where((v) =>
+        v.id != _selectedVehicleId &&
+        (v.tafweeds?.any((t) => t.driverId == widget.employee.id) ?? false),
       ).toList();
 
       bool confirmSwap = true;
@@ -69,7 +70,14 @@ class _AuthorizeVehicleDialogState extends State<AuthorizeVehicleDialog> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Driver Already Authorized'),
-            content: Text('This driver is currently authorized for ${existingVehicles.first.make} ${existingVehicles.first.model} (${existingVehicles.first.plateNumber}). Do you want to swap the driver to the new vehicle? They will be removed from the other vehicle\'s authorization.'),
+            content: Text(
+              'This driver is currently authorized for '
+              '${existingVehicles.first.make} ${existingVehicles.first.model} '
+              '(${existingVehicles.first.plateNumber}). '
+              'Do you want to swap the driver to the new vehicle? '
+              'They will be removed from the other vehicle\'s authorization '
+              'and that record will be saved to history.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
@@ -85,40 +93,61 @@ class _AuthorizeVehicleDialogState extends State<AuthorizeVehicleDialog> {
       }
 
       if (!confirmSwap) {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
+        if (mounted) setState(() => _isLoading = false);
         return;
       }
 
-      // Remove driver from other vehicles if swapping
+      // Archive the old tafweed record (move to history instead of deleting).
       for (final otherVehicle in existingVehicles) {
-        final updatedOtherTafweeds = List<TafweedRecord>.from(otherVehicle.tafweeds ?? [])..removeWhere((t) => t.driverId == widget.employee.id);
-        final updatedOtherVehicle = otherVehicle.copyWith(tafweeds: updatedOtherTafweeds);
+        final recordToArchive = otherVehicle.tafweeds
+            ?.where((t) => t.driverId == widget.employee.id)
+            .firstOrNull;
+
+        final updatedActiveTafweeds =
+            List<TafweedRecord>.from(otherVehicle.tafweeds ?? [])
+              ..removeWhere((t) => t.driverId == widget.employee.id);
+
+        // Append the archived record to tafweedHistory.
+        final updatedHistory =
+            List<TafweedRecord>.from(otherVehicle.tafweedHistory ?? []);
+        if (recordToArchive != null) {
+          updatedHistory.add(recordToArchive);
+        }
+
+        final updatedOtherVehicle = otherVehicle.copyWith(
+          tafweeds: updatedActiveTafweeds,
+          tafweedHistory: updatedHistory,
+        );
         await vehicleProvider.updateVehicle(updatedOtherVehicle);
       }
 
-      // Add driver to new vehicle
-      final selectedVehicle = vehicleProvider.vehicles.firstWhere((v) => v.id == _selectedVehicleId);
-      List<TafweedRecord> currentTafweeds = List.from(selectedVehicle.tafweeds ?? []);
-      
-      final index = currentTafweeds.indexWhere((t) => t.driverId == widget.employee.id);
-      final attachmentUrl = index != -1 ? currentTafweeds[index].attachmentUrl : null;
-      final notificationDays = index != -1 ? currentTafweeds[index].notificationDays : null;
+      // Add / update the driver on the selected vehicle.
+      final selectedVehicle = vehicleProvider.vehicles.firstWhere(
+        (v) => v.id == _selectedVehicleId,
+      );
+      List<TafweedRecord> currentTafweeds =
+          List.from(selectedVehicle.tafweeds ?? []);
 
-      final updatedRecord = TafweedRecord(
+      final index = currentTafweeds.indexWhere(
+        (t) => t.driverId == widget.employee.id,
+      );
+      final existingAttachmentUrl =
+          index != -1 ? currentTafweeds[index].attachmentUrl : null;
+      final existingNotificationDays =
+          index != -1 ? currentTafweeds[index].notificationDays : null;
+
+      final newRecord = TafweedRecord(
         driverId: widget.employee.id,
-        expiryDate: _selectedDate!,
-        attachmentUrl: attachmentUrl,
-        notificationDays: notificationDays,
+        issuedDate: issuedDate,
+        expiryDate: _expiryDate!,
+        attachmentUrl: existingAttachmentUrl,
+        notificationDays: existingNotificationDays,
       );
 
       if (index != -1) {
-        currentTafweeds[index] = updatedRecord;
+        currentTafweeds[index] = newRecord;
       } else {
-        currentTafweeds.add(updatedRecord);
+        currentTafweeds.add(newRecord);
       }
 
       final updatedVehicle = selectedVehicle.copyWith(
@@ -140,11 +169,7 @@ class _AuthorizeVehicleDialogState extends State<AuthorizeVehicleDialog> {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -166,12 +191,13 @@ class _AuthorizeVehicleDialogState extends State<AuthorizeVehicleDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Vehicle selector
                 DropdownButtonFormField<String>(
                   decoration: const InputDecoration(
                     labelText: 'Select Vehicle',
                     border: OutlineInputBorder(),
                   ),
-                  value: _selectedVehicleId,
+                  initialValue: _selectedVehicleId,
                   items: vehicleProvider.vehicles.map((v) {
                     return DropdownMenuItem(
                       value: v.id,
@@ -182,32 +208,57 @@ class _AuthorizeVehicleDialogState extends State<AuthorizeVehicleDialog> {
                     setState(() {
                       _selectedVehicleId = val;
                       if (val != null) {
-                        final v = vehicleProvider.vehicles.firstWhere((v) => v.id == val);
-                        final existing = v.tafweeds?.where((t) => t.driverId == widget.employee.id).firstOrNull;
+                        final v = vehicleProvider.vehicles.firstWhere(
+                          (v) => v.id == val,
+                        );
+                        final existing = v.tafweeds
+                            ?.where((t) => t.driverId == widget.employee.id)
+                            .firstOrNull;
                         if (existing != null) {
-                          _selectedDate = existing.expiryDate;
-                        } else {
-                          // Try to get setting default if possible or keep null
+                          _issuedDate = existing.issuedDate;
+                          _expiryDate = existing.expiryDate;
                         }
                       }
                     });
                   },
                 ),
                 const SizedBox(height: 16),
+                // Issued date picker
                 CustomDatePicker(
-                  label: 'Tafweed Expiry Date',
-                  date: _selectedDate,
+                  label: 'Tafweed Issue Date',
+                  date: _issuedDate,
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
-                      initialDate: _selectedDate ?? DateTime.now(),
-                      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-                      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+                      initialDate: _issuedDate ?? DateTime.now(),
+                      firstDate: DateTime(2000),
+                      lastDate: DateTime.now().add(
+                        const Duration(days: 365 * 5),
+                      ),
                     );
                     if (picked != null) {
-                      setState(() {
-                        _selectedDate = picked;
-                      });
+                      setState(() => _issuedDate = picked);
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+                // Expiry date picker
+                CustomDatePicker(
+                  label: 'Tafweed Expiry Date',
+                  date: _expiryDate,
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: _expiryDate ?? DateTime.now(),
+                      firstDate: DateTime.now().subtract(
+                        const Duration(days: 365),
+                      ),
+                      lastDate: DateTime.now().add(
+                        const Duration(days: 365 * 5),
+                      ),
+                    );
+                    if (picked != null) {
+                      setState(() => _expiryDate = picked);
                     }
                   },
                 ),
@@ -223,8 +274,12 @@ class _AuthorizeVehicleDialogState extends State<AuthorizeVehicleDialog> {
         ),
         ElevatedButton(
           onPressed: _isLoading ? null : _saveTafweed,
-          child: _isLoading 
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Text('Authorize'),
         ),
       ],

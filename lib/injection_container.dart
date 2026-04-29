@@ -94,6 +94,7 @@ import 'features/xloop_vault/data/datasources/vault_remote_data_source.dart';
 import 'features/xloop_vault/data/repositories/vault_repository_impl.dart';
 import 'features/xloop_vault/domain/repositories/vault_repository.dart';
 import 'features/xloop_vault/domain/usecases/vault_usecases.dart';
+import 'features/xloop_vault/domain/usecases/get_vault_expiry_alerts_usecase.dart';
 import 'features/xloop_vault/presentation/providers/vault_provider.dart';
 
 final sl = GetIt.instance; // sl stands for Service Locator
@@ -143,6 +144,7 @@ Future<void> init() async {
       getEmployeeExpiryAlerts: sl(),
       getVehicleMaintenanceAlerts: sl(),
       getVehicleExpiryAlerts: sl(),
+      getVaultExpiryAlerts: sl(),
       sharedPreferences: sl(),
     ),
   );
@@ -374,6 +376,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => DeleteVatFilingUseCase(sl()));
   sl.registerLazySingleton(() => UploadVaultDocumentUseCase(sl()));
   sl.registerLazySingleton(() => VerifyVaultPasswordUseCase(sl()));
+  sl.registerLazySingleton(() => GetVaultExpiryAlertsUseCase(sl()));
 
   // Repositories
   sl.registerLazySingleton<VaultRepository>(

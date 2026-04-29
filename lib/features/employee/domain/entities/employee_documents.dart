@@ -3,13 +3,11 @@ import 'package:equatable/equatable.dart';
 class IqamaDocument extends Equatable {
   final String number;
   final DateTime expiryDate;
-  final DateTime? insuranceExpiryDate;
   final String? attachmentUrl;
 
   const IqamaDocument({
     required this.number,
     required this.expiryDate,
-    this.insuranceExpiryDate,
     this.attachmentUrl,
   });
 
@@ -17,7 +15,6 @@ class IqamaDocument extends Equatable {
   List<Object?> get props => [
     number,
     expiryDate,
-    insuranceExpiryDate,
     attachmentUrl,
   ];
 }
@@ -25,13 +22,11 @@ class IqamaDocument extends Equatable {
 class BahrainResidenceDocument extends Equatable {
   final String number;
   final DateTime expiryDate;
-  final DateTime? insuranceExpiryDate;
   final String? attachmentUrl;
 
   const BahrainResidenceDocument({
     required this.number,
     required this.expiryDate,
-    this.insuranceExpiryDate,
     this.attachmentUrl,
   });
 
@@ -39,10 +34,23 @@ class BahrainResidenceDocument extends Equatable {
   List<Object?> get props => [
     number,
     expiryDate,
-    insuranceExpiryDate,
     attachmentUrl,
   ];
 }
+
+class HealthInsuranceDocument extends Equatable {
+  final DateTime expiryDate;
+  final String? attachmentUrl;
+
+  const HealthInsuranceDocument({
+    required this.expiryDate,
+    this.attachmentUrl,
+  });
+
+  @override
+  List<Object?> get props => [expiryDate, attachmentUrl];
+}
+
 
 enum DrivingLicenseType { private, heavy }
 

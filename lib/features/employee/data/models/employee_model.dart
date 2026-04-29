@@ -24,6 +24,7 @@ class EmployeeModel extends EmployeeEntity {
     super.assignedVehicleId,
     super.iqama,
     super.bahrainResidence,
+    super.healthInsurance,
     super.drivingLicense,
     super.passport,
     super.saudiVisa,
@@ -56,7 +57,6 @@ class EmployeeModel extends EmployeeEntity {
           ? IqamaModel(
               number: iqama!.number,
               expiryDate: iqama!.expiryDate,
-              insuranceExpiryDate: iqama!.insuranceExpiryDate,
               attachmentUrl: iqama!.attachmentUrl,
             ).toJson()
           : null,
@@ -64,8 +64,13 @@ class EmployeeModel extends EmployeeEntity {
           ? BahrainResidenceModel(
               number: bahrainResidence!.number,
               expiryDate: bahrainResidence!.expiryDate,
-              insuranceExpiryDate: bahrainResidence!.insuranceExpiryDate,
               attachmentUrl: bahrainResidence!.attachmentUrl,
+            ).toJson()
+          : null,
+      'healthInsurance': healthInsurance != null
+          ? HealthInsuranceModel(
+              expiryDate: healthInsurance!.expiryDate,
+              attachmentUrl: healthInsurance!.attachmentUrl,
             ).toJson()
           : null,
       'drivingLicense': drivingLicense != null
@@ -159,6 +164,23 @@ class EmployeeModel extends EmployeeEntity {
               json['bahrainResidence'] as Map<String, dynamic>,
             )
           : null,
+      healthInsurance: json['healthInsurance'] != null
+          ? HealthInsuranceModel.fromJson(
+              json['healthInsurance'] as Map<String, dynamic>,
+            )
+          : (json['iqama'] != null &&
+                  json['iqama']['insuranceExpiryDate'] != null)
+              ? HealthInsuranceModel(
+                  expiryDate: DateTime.parse(
+                      json['iqama']['insuranceExpiryDate'] as String),
+                )
+              : (json['bahrainResidence'] != null &&
+                      json['bahrainResidence']['insuranceExpiryDate'] != null)
+                  ? HealthInsuranceModel(
+                      expiryDate: DateTime.parse(json['bahrainResidence']
+                          ['insuranceExpiryDate'] as String),
+                    )
+                  : null,
       drivingLicense: json['drivingLicense'] != null
           ? DrivingLicenseModel.fromJson(
               json['drivingLicense'] as Map<String, dynamic>,
@@ -236,6 +258,7 @@ class EmployeeModel extends EmployeeEntity {
       assignedVehicleId: entity.assignedVehicleId,
       iqama: entity.iqama,
       bahrainResidence: entity.bahrainResidence,
+      healthInsurance: entity.healthInsurance,
       drivingLicense: entity.drivingLicense,
       passport: entity.passport,
       saudiVisa: entity.saudiVisa,
@@ -267,6 +290,7 @@ class EmployeeModel extends EmployeeEntity {
     String? assignedVehicleId,
     IqamaDocument? iqama,
     BahrainResidenceDocument? bahrainResidence,
+    HealthInsuranceDocument? healthInsurance,
     DrivingLicenseDocument? drivingLicense,
     PassportDocument? passport,
     VisaDocument? saudiVisa,
@@ -293,18 +317,18 @@ class EmployeeModel extends EmployeeEntity {
       isActive: isActive ?? this.isActive,
       imageUrl: imageUrl ?? this.imageUrl,
       assignedVehicleId: assignedVehicleId ?? this.assignedVehicleId,
-      iqama: iqama ?? this.iqama as IqamaModel?,
-      bahrainResidence:
-          bahrainResidence ?? this.bahrainResidence as BahrainResidenceModel?,
-      drivingLicense:
-          drivingLicense ?? this.drivingLicense as DrivingLicenseModel?,
-      passport: passport ?? this.passport as PassportModel?,
-      saudiVisa: saudiVisa ?? this.saudiVisa as VisaModel?,
-      bahrainVisa: bahrainVisa ?? this.bahrainVisa as VisaModel?,
-      dubaiVisa: dubaiVisa ?? this.dubaiVisa as VisaModel?,
-      qatarVisa: qatarVisa ?? this.qatarVisa as VisaModel?,
-      authorization: authorization ?? this.authorization as AuthorizationModel?,
+      iqama: iqama ?? this.iqama,
+      bahrainResidence: bahrainResidence ?? this.bahrainResidence,
+      healthInsurance: healthInsurance ?? this.healthInsurance,
+      drivingLicense: drivingLicense ?? this.drivingLicense,
+      passport: passport ?? this.passport,
+      saudiVisa: saudiVisa ?? this.saudiVisa,
+      bahrainVisa: bahrainVisa ?? this.bahrainVisa,
+      dubaiVisa: dubaiVisa ?? this.dubaiVisa,
+      qatarVisa: qatarVisa ?? this.qatarVisa,
+      authorization: authorization ?? this.authorization,
       contacts: contacts ?? this.contacts,
     );
   }
+
 }

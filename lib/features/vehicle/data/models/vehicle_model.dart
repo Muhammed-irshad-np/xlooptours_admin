@@ -19,6 +19,7 @@ class VehicleModel extends VehicleEntity {
     super.fahas,
     super.maintenance,
     super.tafweeds,
+    super.tafweedHistory,
     super.vinNumber,
     super.engineNumber,
     super.fuelType,
@@ -56,6 +57,7 @@ class VehicleModel extends VehicleEntity {
           ? _maintenanceToJson(maintenance!)
           : null,
       'tafweeds': tafweeds?.map((e) => _tafweedRecordToJson(e)).toList(),
+      'tafweedHistory': tafweedHistory?.map((e) => _tafweedRecordToJson(e)).toList(),
       'vinNumber': vinNumber,
       'engineNumber': engineNumber,
       'fuelType': fuelType,
@@ -85,6 +87,7 @@ class VehicleModel extends VehicleEntity {
   static Map<String, dynamic> _tafweedRecordToJson(TafweedRecord record) {
     return {
       'driverId': record.driverId,
+      'issuedDate': record.issuedDate.toIso8601String(),
       'expiryDate': record.expiryDate.toIso8601String(),
       'attachmentUrl': record.attachmentUrl,
       'notificationDays': record.notificationDays,
@@ -193,6 +196,11 @@ class VehicleModel extends VehicleEntity {
                 .map((e) => _tafweedRecordFromJson(e as Map<String, dynamic>))
                 .toList()
           : null,
+      tafweedHistory: json['tafweedHistory'] != null
+          ? (json['tafweedHistory'] as List)
+                .map((e) => _tafweedRecordFromJson(e as Map<String, dynamic>))
+                .toList()
+          : null,
       vinNumber: json['vinNumber'] as String?,
       engineNumber: json['engineNumber'] as String?,
       fuelType: json['fuelType'] as String?,
@@ -226,9 +234,14 @@ class VehicleModel extends VehicleEntity {
   }
 
   static TafweedRecord _tafweedRecordFromJson(Map<String, dynamic> json) {
+    // `issuedDate` may be absent on legacy records — fall back to expiryDate.
+    final expiryDate = DateTime.parse(json['expiryDate'] as String);
     return TafweedRecord(
       driverId: json['driverId'] as String,
-      expiryDate: DateTime.parse(json['expiryDate'] as String),
+      issuedDate: json['issuedDate'] != null
+          ? DateTime.parse(json['issuedDate'] as String)
+          : expiryDate,
+      expiryDate: expiryDate,
       attachmentUrl: json['attachmentUrl'] as String?,
       notificationDays: json['notificationDays'] as int?,
     );
@@ -326,6 +339,7 @@ class VehicleModel extends VehicleEntity {
       fahas: entity.fahas,
       maintenance: entity.maintenance,
       tafweeds: entity.tafweeds,
+      tafweedHistory: entity.tafweedHistory,
       vinNumber: entity.vinNumber,
       engineNumber: entity.engineNumber,
       fuelType: entity.fuelType,
@@ -360,6 +374,7 @@ class VehicleModel extends VehicleEntity {
     VehicleDocument? fahas,
     VehicleMaintenance? maintenance,
     List<TafweedRecord>? tafweeds,
+    List<TafweedRecord>? tafweedHistory,
     String? vinNumber,
     String? engineNumber,
     String? fuelType,
@@ -399,6 +414,7 @@ class VehicleModel extends VehicleEntity {
       fahas: clearFahas ? null : (fahas ?? this.fahas),
       maintenance: maintenance ?? this.maintenance,
       tafweeds: tafweeds ?? this.tafweeds,
+      tafweedHistory: tafweedHistory ?? this.tafweedHistory,
       vinNumber: vinNumber ?? this.vinNumber,
       engineNumber: engineNumber ?? this.engineNumber,
       fuelType: fuelType ?? this.fuelType,

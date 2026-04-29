@@ -10,12 +10,14 @@ import 'package:xloop_invoice/core/utils/share_helper.dart';
 import '../features/employee/domain/entities/employee_contact.dart';
 import '../features/employee/domain/entities/employee_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
+import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import 'package:xloop_invoice/features/employee/presentation/widgets/authorize_vehicle_dialog.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'package:provider/provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
+import 'tafweed_history_view_all_screen.dart';
 
 class EmployeeDetailsScreen extends StatelessWidget {
   final EmployeeEntity employee;
@@ -76,6 +78,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
                         _buildVehicleCard(),
                       ],
                       _buildAuthorizedVehiclesCard(context),
+                      _buildTafweedHistorySection(context),
                     ],
                   ),
                 ),
@@ -657,9 +660,6 @@ class EmployeeDetailsScreen extends StatelessWidget {
             number: employee.iqama!.number,
             expiryDate: employee.iqama!.expiryDate,
             attachmentUrl: employee.iqama!.attachmentUrl,
-            extraInfo: employee.iqama!.insuranceExpiryDate != null
-                ? 'Insurance Expiry: ${_formatDate(employee.iqama!.insuranceExpiryDate)}'
-                : null,
             notificationDays: null,
           ),
         if (employee.bahrainResidence != null)
@@ -670,9 +670,6 @@ class EmployeeDetailsScreen extends StatelessWidget {
             number: employee.bahrainResidence!.number,
             expiryDate: employee.bahrainResidence!.expiryDate,
             attachmentUrl: employee.bahrainResidence!.attachmentUrl,
-            extraInfo: employee.bahrainResidence!.insuranceExpiryDate != null
-                ? 'Insurance Expiry: ${_formatDate(employee.bahrainResidence!.insuranceExpiryDate)}'
-                : null,
             notificationDays: null,
           ),
         if (employee.passport != null)
@@ -706,6 +703,16 @@ class EmployeeDetailsScreen extends StatelessWidget {
           _buildVisaCard(context, 'Dubai Visa', employee.dubaiVisa!),
         if (employee.qatarVisa != null)
           _buildVisaCard(context, 'Qatar Visa', employee.qatarVisa!),
+        if (employee.healthInsurance != null)
+          _buildDocumentCard(
+            context,
+            title: 'Health Insurance',
+            icon: Icons.health_and_safety,
+            number: 'N/A',
+            expiryDate: employee.healthInsurance!.expiryDate,
+            attachmentUrl: employee.healthInsurance!.attachmentUrl,
+            notificationDays: null,
+          ),
         if (employee.authorization != null)
           _buildDocumentCard(
             context,
@@ -738,6 +745,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
         employee.bahrainResidence == null &&
         employee.passport == null &&
         employee.drivingLicense == null &&
+        employee.healthInsurance == null &&
         employee.saudiVisa == null &&
         employee.bahrainVisa == null &&
         employee.dubaiVisa == null &&
@@ -942,4 +950,253 @@ class EmployeeDetailsScreen extends StatelessWidget {
       ),
     );
   }
+
+  /// Builds the Tafweed History timeline — all past and active authorizations
+  /// for this driver across every vehicle, sorted newest issued-date first.
+  Widget _buildTafweedHistorySection(BuildContext context) {
+    final vehicles = context.watch<VehicleProvider>().vehicles;
+
+    // Collect entries: { record, vehicle, isActive }
+    final List<_TafweedHistoryEntry> entries = [];
+
+    for (final vehicle in vehicles) {
+      // Active records for this driver.
+      final active = vehicle.tafweeds
+              ?.where((t) => t.driverId == employee.id) ??
+          [];
+      for (final t in active) {
+        entries.add(_TafweedHistoryEntry(record: t, vehicle: vehicle, isActive: true));
+      }
+
+      // Historical (archived) records for this driver.
+      final history = vehicle.tafweedHistory
+              ?.where((t) => t.driverId == employee.id) ??
+          [];
+      for (final t in history) {
+        entries.add(_TafweedHistoryEntry(record: t, vehicle: vehicle, isActive: false));
+      }
+    }
+
+    if (entries.isEmpty) return const SizedBox.shrink();
+
+    // Sort newest issuedDate first.
+    entries.sort((a, b) => b.record.issuedDate.compareTo(a.record.issuedDate));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(height: 24.h),
+        Padding(
+          padding: EdgeInsets.only(bottom: 12.h, left: 4.w),
+          child: Row(
+            children: [
+              Icon(Icons.history, color: Colors.indigo[700], size: 20.sp),
+              SizedBox(width: 8.w),
+              Text(
+                'Tafweed History',
+                style: TextStyle(
+                  fontSize: 18.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.indigo[900],
+                ),
+              ),
+            ],
+          ),
+        ),
+        ...entries.take(5).map((entry) => _buildHistoryEntry(entry)),
+        if (entries.length > 5)
+          Padding(
+            padding: EdgeInsets.only(top: 8.h),
+            child: TextButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TafweedHistoryViewAllScreen(
+                      title: 'History: ${employee.fullName}',
+                      id: employee.id,
+                      type: TafweedHistoryType.employee,
+                    ),
+                  ),
+                );
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.indigo[700],
+                padding: EdgeInsets.symmetric(vertical: 12.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                  side: BorderSide(color: Colors.indigo.withValues(alpha: 0.2)),
+                ),
+              ),
+              child: const Text('View All History'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildHistoryEntry(_TafweedHistoryEntry entry) {
+    final now = DateTime.now();
+    final isExpired = entry.record.expiryDate.isBefore(now);
+
+    final Color statusColor;
+    final String statusLabel;
+    final IconData statusIcon;
+
+    if (entry.isActive && !isExpired) {
+      statusColor = Colors.green;
+      statusLabel = 'Active';
+      statusIcon = Icons.check_circle_outline;
+    } else if (entry.isActive && isExpired) {
+      statusColor = Colors.red;
+      statusLabel = 'Expired';
+      statusIcon = Icons.warning_amber_outlined;
+    } else {
+      statusColor = Colors.grey;
+      statusLabel = 'Historical';
+      statusIcon = Icons.archive_outlined;
+    }
+
+    return Card(
+      elevation: 1,
+      margin: EdgeInsets.only(bottom: 10.h),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12.r),
+        side: BorderSide(
+          color: statusColor.withValues(alpha: 0.35),
+          width: 1,
+        ),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(16.w),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Left accent bar
+            Container(
+              width: 4.w,
+              height: 64.h,
+              decoration: BoxDecoration(
+                color: statusColor,
+                borderRadius: BorderRadius.circular(4.r),
+              ),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${entry.vehicle.make} ${entry.vehicle.model}',
+                              style: TextStyle(
+                                fontSize: 15.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 2.h),
+                            Text(
+                              'Plate: ${entry.vehicle.plateNumber}',
+                              style: TextStyle(
+                                fontSize: 13.sp,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Status badge
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8.w,
+                          vertical: 4.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: statusColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8.r),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(statusIcon, size: 13.sp, color: statusColor),
+                            SizedBox(width: 4.w),
+                            Text(
+                              statusLabel,
+                              style: TextStyle(
+                                fontSize: 11.sp,
+                                color: statusColor,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 10.h),
+                  // Date range row
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today_outlined,
+                        size: 13.sp,
+                        color: Colors.grey[500],
+                      ),
+                      SizedBox(width: 6.w),
+                      Text(
+                        'Issued: ${_formatDate(entry.record.issuedDate)}',
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                      SizedBox(width: 16.w),
+                      Icon(
+                        Icons.event_outlined,
+                        size: 13.sp,
+                        color: isExpired ? Colors.red[400] : Colors.grey[500],
+                      ),
+                      SizedBox(width: 6.w),
+                      Text(
+                        'Expiry: ${_formatDate(entry.record.expiryDate)}',
+                        style: TextStyle(
+                          fontSize: 13.sp,
+                          fontWeight: isExpired
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                          color: isExpired ? Colors.red : Colors.grey[700],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Simple data class for bundling a tafweed record with its vehicle context.
+class _TafweedHistoryEntry {
+  final TafweedRecord record;
+  final VehicleEntity vehicle;
+  final bool isActive;
+
+  const _TafweedHistoryEntry({
+    required this.record,
+    required this.vehicle,
+    required this.isActive,
+  });
 }

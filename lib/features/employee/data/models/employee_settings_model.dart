@@ -10,6 +10,8 @@ class EmployeeSettingsModel extends EmployeeSettingsEntity {
     super.dubaiVisaAlertDays = 30,
     super.qatarVisaAlertDays = 30,
     super.phoneRechargeAlertDays = 30,
+    super.healthInsuranceAlertDays = 30,
+    super.tafweedAlertDays = 30,
   });
 
   Map<String, dynamic> toJson() {
@@ -22,6 +24,8 @@ class EmployeeSettingsModel extends EmployeeSettingsEntity {
       'dubaiVisaAlertDays': dubaiVisaAlertDays,
       'qatarVisaAlertDays': qatarVisaAlertDays,
       'phoneRechargeAlertDays': phoneRechargeAlertDays,
+      'healthInsuranceAlertDays': healthInsuranceAlertDays,
+      'tafweedAlertDays': tafweedAlertDays,
     };
   }
 
@@ -35,6 +39,8 @@ class EmployeeSettingsModel extends EmployeeSettingsEntity {
       dubaiVisaAlertDays: json['dubaiVisaAlertDays'] as int? ?? 30,
       qatarVisaAlertDays: json['qatarVisaAlertDays'] as int? ?? 30,
       phoneRechargeAlertDays: json['phoneRechargeAlertDays'] as int? ?? 30,
+      healthInsuranceAlertDays: json['healthInsuranceAlertDays'] as int? ?? 30,
+      tafweedAlertDays: json['tafweedAlertDays'] as int? ?? 30,
     );
   }
 
@@ -48,6 +54,9 @@ class EmployeeSettingsModel extends EmployeeSettingsEntity {
       dubaiVisaAlertDays: entity.dubaiVisaAlertDays,
       qatarVisaAlertDays: entity.qatarVisaAlertDays,
       phoneRechargeAlertDays: entity.phoneRechargeAlertDays,
+      healthInsuranceAlertDays: entity.healthInsuranceAlertDays,
+      tafweedAlertDays: entity.tafweedAlertDays,
     );
   }
+
 }

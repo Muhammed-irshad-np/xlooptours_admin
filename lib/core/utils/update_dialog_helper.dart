@@ -1,9 +1,9 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:provider/provider.dart';
-// import 'package:intl/intl.dart';
 import '../../features/notifications/domain/entities/notification_entity.dart';
 import '../../features/employee/presentation/providers/employee_provider.dart';
 import '../../features/vehicle/presentation/providers/vehicle_provider.dart';
@@ -14,6 +14,8 @@ import '../../features/employee/domain/entities/employee_contact.dart';
 import '../../features/employee/domain/entities/employee_documents.dart';
 import '../../features/employee/domain/entities/employee_entity.dart';
 import '../../features/vehicle/domain/entities/vehicle_entity.dart';
+import '../../features/xloop_vault/presentation/providers/vault_provider.dart';
+import '../../features/xloop_vault/domain/entities/vault_data.dart';
 
 class UpdateDialogHelper {
   static void showUpdateDialog(
@@ -24,6 +26,10 @@ class UpdateDialogHelper {
       _showEmployeeExpiryUpdateDialog(context, notification);
     } else if (notification.id.startsWith('maintenance_')) {
       _showVehicleMaintenanceUpdateDialog(context, notification);
+    } else if (notification.id.startsWith('vault_')) {
+      _showVaultExpiryUpdateDialog(context, notification);
+    } else if (notification.id.startsWith('v_expiry_')) {
+      _showVehicleExpiryUpdateDialog(context, notification);
     }
   }
 
@@ -58,6 +64,7 @@ class UpdateDialogHelper {
       'Dubai Visa': 'dubai_visa',
       'Qatar Visa': 'qatar_visa',
       'Authorization': 'authorization',
+      'Health Insurance': 'health_insurance',
     };
 
     DateTime? selectedDate;
@@ -290,8 +297,6 @@ class UpdateDialogHelper {
                                       ? IqamaDocument(
                                           number: employee.iqama!.number,
                                           expiryDate: selectedDate!,
-                                          insuranceExpiryDate: employee
-                                              .iqama!.insuranceExpiryDate,
                                           attachmentUrl: _url(
                                             employee.iqama!.attachmentUrl,
                                           ),
@@ -311,9 +316,6 @@ class UpdateDialogHelper {
                                               number: employee
                                                   .bahrainResidence!.number,
                                               expiryDate: selectedDate!,
-                                              insuranceExpiryDate: employee
-                                                  .bahrainResidence!
-                                                  .insuranceExpiryDate,
                                               attachmentUrl: _url(
                                                 employee.bahrainResidence!
                                                     .attachmentUrl,
@@ -324,6 +326,23 @@ class UpdateDialogHelper {
                                               expiryDate: selectedDate!,
                                               attachmentUrl: newAttachmentUrl,
                                             ),
+                                );
+                                break;
+                              case 'Health Insurance':
+                                updatedEmployee = employee.copyWith(
+                                  healthInsurance: employee.healthInsurance !=
+                                          null
+                                      ? HealthInsuranceDocument(
+                                          expiryDate: selectedDate!,
+                                          attachmentUrl: _url(
+                                            employee.healthInsurance!
+                                                .attachmentUrl,
+                                          ),
+                                        )
+                                      : HealthInsuranceDocument(
+                                          expiryDate: selectedDate!,
+                                          attachmentUrl: newAttachmentUrl,
+                                        ),
                                 );
                                 break;
                               case 'Driving License':
@@ -783,6 +802,277 @@ class UpdateDialogHelper {
                     }
                   },
                   child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  static void _showVaultExpiryUpdateDialog(
+    BuildContext context,
+    NotificationEntity notification,
+  ) async {
+    final vaultProvider = context.read<VaultProvider>();
+    final vaultData = vaultProvider.vaultData;
+    if (vaultData == null) return;
+
+    final documentType = notification.id.substring('vault_'.length).replaceAll('_', ' ');
+
+    DateTime? selectedDate;
+    XFile? pickedFile;
+    bool isSaving = false;
+
+    // Pre-fill existing date
+    if (documentType == 'Commercial License') {
+      selectedDate = vaultData.license.expiryDate;
+    }
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+              title: Text('Update $documentType', style: const TextStyle(fontWeight: FontWeight.bold)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CustomDatePicker(
+                    label: 'New Expiry Date',
+                    date: selectedDate,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: selectedDate ?? DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) setState(() => selectedDate = picked);
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    icon: Icon(pickedFile != null ? Icons.check_circle : Icons.attach_file),
+                    label: Text(pickedFile != null ? p.basename(pickedFile!.path) : 'Choose File'),
+                    onPressed: isSaving ? null : () async {
+                      final result = await FilePicker.platform.pickFiles(type: FileType.any);
+                      if (result != null && result.files.isNotEmpty) {
+                        setState(() => pickedFile = XFile(result.files.first.path!));
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: isSaving ? null : () => Navigator.pop(ctx), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: isSaving ? null : () async {
+                    if (selectedDate == null) return;
+                    setState(() => isSaving = true);
+                    try {
+                      String? newUrl;
+                      if (pickedFile != null) {
+                        newUrl = await vaultProvider.uploadDocument(
+                          pickedFile!,
+                          'vault/company_documents',
+                        );
+                      }
+
+                      VaultData updatedData = vaultData;
+                      if (documentType == 'Commercial License') {
+                        updatedData = vaultData.copyWith(
+                          license: vaultData.license.copyWith(
+                            expiryDate: selectedDate,
+                            documentUrl: newUrl ?? vaultData.license.documentUrl,
+                          ),
+                        );
+                      }
+
+                      await vaultProvider.updateVaultData(updatedData);
+
+                      if (ctx.mounted) {
+                        final notifProvider = ctx.read<NotificationProvider>();
+                        final vehicleProvider = ctx.read<VehicleProvider>();
+                        await notifProvider.markAsRead(notification.id);
+                        await notifProvider.refreshAlerts(
+                          vehicles: vehicleProvider.vehicles,
+                          maintenanceTypes: vehicleProvider.maintenanceTypes,
+                        );
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Updated successfully')));
+                      }
+                    } catch (e) {
+                      setState(() => isSaving = false);
+                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                    }
+                  },
+                  child: isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  static void _showVehicleExpiryUpdateDialog(
+    BuildContext context,
+    NotificationEntity notification,
+  ) async {
+    final relatedId = notification.relatedId;
+    if (relatedId == null) return;
+
+    final vehicleProvider = context.read<VehicleProvider>();
+    final vehicle = vehicleProvider.vehicles.cast<VehicleEntity?>().firstWhere(
+      (v) => v?.id == relatedId,
+      orElse: () => null,
+    );
+    if (vehicle == null) return;
+
+    final prefix = 'v_expiry_${relatedId}_';
+    final documentType = notification.id.substring(prefix.length).replaceAll('_', ' ');
+
+    DateTime? selectedDate;
+    XFile? pickedFile;
+    bool isSaving = false;
+
+    // Map doc type to internal field
+    final Map<String, String> docKeys = {
+      'Istimara': 'istimara',
+      'Insurance': 'insurance',
+      'Fahas': 'fahas',
+      'Bahrain Insurance': 'bahrain_insurance',
+    };
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+              title: Text('Update $documentType', style: const TextStyle(fontWeight: FontWeight.bold)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  CustomDatePicker(
+                    label: 'New Expiry Date',
+                    date: selectedDate,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: ctx,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) setState(() => selectedDate = picked);
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    icon: Icon(pickedFile != null ? Icons.check_circle : Icons.attach_file),
+                    label: Text(pickedFile != null ? p.basename(pickedFile!.path) : 'Choose File'),
+                    onPressed: isSaving ? null : () async {
+                      final result = await FilePicker.platform.pickFiles(type: FileType.any);
+                      if (result != null && result.files.isNotEmpty) {
+                        setState(() => pickedFile = XFile(result.files.first.path!));
+                      }
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: isSaving ? null : () => Navigator.pop(ctx), child: const Text('Cancel')),
+                ElevatedButton(
+                  onPressed: isSaving ? null : () async {
+                    if (selectedDate == null) return;
+                    setState(() => isSaving = true);
+                    try {
+                      String? newUrl;
+                      if (pickedFile != null && docKeys.containsKey(documentType)) {
+                        newUrl = await vehicleProvider.uploadVehicleDocument(
+                          pickedFile!,
+                          vehicle.id,
+                          docKeys[documentType]!,
+                        );
+                      }
+
+                      VehicleEntity updatedVehicle = vehicle;
+                      String? url(String? existing) => newUrl ?? existing;
+
+                      switch (documentType) {
+                        case 'Istimara':
+                          updatedVehicle = vehicle.copyWith(
+                            registration: (vehicle.registration ??
+                                    VehicleDocument(expiryDate: selectedDate!))
+                                .copyWith(
+                              expiryDate: selectedDate,
+                              attachmentUrl: url(vehicle.registration?.attachmentUrl),
+                            ),
+                          );
+                          break;
+                        case 'Insurance':
+                          updatedVehicle = vehicle.copyWith(
+                            insurance: (vehicle.insurance ??
+                                    VehicleDocument(expiryDate: selectedDate!))
+                                .copyWith(
+                              expiryDate: selectedDate,
+                              attachmentUrl: url(vehicle.insurance?.attachmentUrl),
+                            ),
+                          );
+                          break;
+                        case 'Fahas':
+                          updatedVehicle = vehicle.copyWith(
+                            fahas: (vehicle.fahas ??
+                                    VehicleDocument(expiryDate: selectedDate!))
+                                .copyWith(
+                              expiryDate: selectedDate,
+                              attachmentUrl: url(vehicle.fahas?.attachmentUrl),
+                            ),
+                          );
+                          break;
+                        case 'Bahrain Insurance':
+                          updatedVehicle = vehicle.copyWith(
+                            bahrainInsurance: (vehicle.bahrainInsurance ??
+                                    VehicleDocument(expiryDate: selectedDate!))
+                                .copyWith(
+                              expiryDate: selectedDate,
+                              attachmentUrl:
+                                  url(vehicle.bahrainInsurance?.attachmentUrl),
+                            ),
+                          );
+                          break;
+                      }
+
+                      await vehicleProvider.updateVehicle(updatedVehicle);
+
+                      if (ctx.mounted) {
+                        final notifProvider = ctx.read<NotificationProvider>();
+                        await notifProvider.markAsRead(notification.id);
+                        await notifProvider.refreshAlerts(
+                          vehicles: vehicleProvider.vehicles,
+                          maintenanceTypes: vehicleProvider.maintenanceTypes,
+                        );
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Updated successfully')));
+                      }
+                    } catch (e) {
+                      setState(() => isSaving = false);
+                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+                    }
+                  },
+                  child: isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Save'),
                 ),
               ],
             );
