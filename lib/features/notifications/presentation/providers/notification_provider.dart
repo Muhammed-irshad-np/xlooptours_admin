@@ -283,6 +283,10 @@ class NotificationProvider extends ChangeNotifier {
     );
   }
 
+  List<NotificationEntity> getNotificationsByRelatedId(String relatedId) {
+    return _notifications.where((n) => n.relatedId == relatedId).toList();
+  }
+
   void clearError() {
     _errorMessage = null;
     notifyListeners();

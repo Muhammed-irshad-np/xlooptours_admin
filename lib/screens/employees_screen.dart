@@ -13,6 +13,8 @@ import 'employee_form_screen.dart';
 import 'employee_master_screen.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
+import '../features/notifications/presentation/providers/notification_provider.dart';
+import '../core/widgets/action_items_dialog.dart';
 
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({super.key});
@@ -472,6 +474,39 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                       ),
                       tooltip: 'View Details',
                       onPressed: () => _showDetails(employee),
+                    ),
+                    Consumer<NotificationProvider>(
+                      builder: (context, provider, _) {
+                        final alerts = provider.getNotificationsByRelatedId(
+                          employee.id,
+                        );
+                        if (alerts.isEmpty) return const SizedBox.shrink();
+
+                        return IconButton(
+                          onPressed:
+                              () => ActionItemsDialog.show(
+                                context,
+                                employee.fullName,
+                                employee.id,
+                              ),
+                          icon: Badge(
+                            label: Text(
+                              alerts.length.toString(),
+                              style: TextStyle(
+                                fontSize: 10.sp,
+                                color: Colors.white,
+                              ),
+                            ),
+                            backgroundColor: Colors.red,
+                            child: Icon(
+                              Icons.warning_amber_rounded,
+                              color: Colors.red,
+                              size: 24.sp,
+                            ),
+                          ),
+                          tooltip: 'Action Items',
+                        );
+                      },
                     ),
                     PopupMenuButton<String>(
                       onSelected: (value) {
