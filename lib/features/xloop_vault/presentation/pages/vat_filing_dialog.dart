@@ -25,7 +25,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
   DateTime? _fromDate;
   DateTime? _toDate;
   List<XFile> _selectedFiles = [];
-  List<String> _existingUrls = [];
+  List<VaultDocument> _existingDocuments = [];
   bool _isSaving = false;
 
   @override
@@ -38,7 +38,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       _amountController.text = widget.filing!.amount.toString();
       _billNumberController.text = widget.filing!.billNumber;
       _currency = widget.filing!.currency;
-      _existingUrls = List.from(widget.filing!.documentUrls);
+      _existingDocuments = List.from(widget.filing!.documents);
     }
   }
 
@@ -57,7 +57,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
         withData: false,
       );
       if (result != null) {
-        final totalAfterAdd = result.files.length + _selectedFiles.length + _existingUrls.length;
+        final totalAfterAdd = result.files.length + _selectedFiles.length + _existingDocuments.length;
         if (totalAfterAdd > 3) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -136,11 +136,11 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
     setState(() => _isSaving = true);
     final provider = context.read<VaultProvider>();
 
-    List<String> uploadedUrls = [];
+    List<VaultDocument> uploadedDocuments = [];
     for (var file in _selectedFiles) {
-      final url = await provider.uploadDocument(file, 'vat_filings');
-      if (url != null) {
-        uploadedUrls.add(url);
+      final doc = await provider.uploadDocument(file, 'vat_filings');
+      if (doc != null) {
+        uploadedDocuments.add(doc);
       }
     }
 
@@ -152,7 +152,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       billNumber: _billNumberController.text.trim(),
       fromDate: _fromDate!,
       toDate: _toDate!,
-      documentUrls: [..._existingUrls, ...uploadedUrls],
+      documents: [..._existingDocuments, ...uploadedDocuments],
     );
 
     final success = widget.filing == null 
@@ -403,7 +403,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
   }
 
   Widget _buildDocumentManager() {
-    final int totalDocs = _selectedFiles.length + _existingUrls.length;
+    final int totalDocs = _selectedFiles.length + _existingDocuments.length;
     return Container(
       padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
@@ -413,19 +413,28 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       ),
       child: Column(
         children: [
-          if (_existingUrls.isNotEmpty) ...[
+          if (_existingDocuments.isNotEmpty) ...[
             Wrap(
               spacing: 8.w,
               runSpacing: 8.h,
-              children: _existingUrls.asMap().entries.map((entry) {
+              children: _existingDocuments.asMap().entries.map((entry) {
+                final doc = entry.value;
                 return Semantics(
-                  label: 'Uploaded document ${entry.key + 1}',
+                  label: 'Uploaded document ${entry.key + 1}: ${doc.name}',
                   child: InputChip(
                     backgroundColor: const Color(0xFFE2E8F0),
                     avatar: Icon(Icons.visibility_outlined, size: 14.sp, color: const Color(0xFF2563EB)),
-                    label: Text('Doc ${entry.key + 1}', style: TextStyle(fontSize: 11.sp)),
-                    onPressed: () => _viewDocument(entry.value),
-                    onDeleted: () => setState(() => _existingUrls.removeAt(entry.key)),
+                    label: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: 100.w),
+                      child: Text(
+                        doc.name, 
+                        style: TextStyle(fontSize: 11.sp),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    onPressed: () => _viewDocument(doc.url),
+                    onDeleted: () => setState(() => _existingDocuments.removeAt(entry.key)),
                     deleteIconColor: const Color(0xFFF43F5E),
                   ),
                 );
@@ -438,11 +447,20 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
               spacing: 8.w,
               runSpacing: 8.h,
               children: _selectedFiles.asMap().entries.map((entry) {
+                final file = entry.value;
                 return Semantics(
-                  label: 'New file to upload ${entry.key + 1}',
+                  label: 'New file to upload: ${file.name}',
                   child: InputChip(
                     backgroundColor: const Color(0xFF2563EB).withOpacity(0.1),
-                    label: Text('New File ${entry.key + 1}', style: TextStyle(fontSize: 11.sp, color: const Color(0xFF2563EB))),
+                    label: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: 100.w),
+                      child: Text(
+                        file.name, 
+                        style: TextStyle(fontSize: 11.sp, color: const Color(0xFF2563EB)),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                     onDeleted: () => setState(() => _selectedFiles.removeAt(entry.key)),
                     deleteIconColor: const Color(0xFF2563EB),
                   ),

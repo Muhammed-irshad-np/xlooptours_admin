@@ -877,9 +877,9 @@ class UpdateDialogHelper {
                     if (selectedDate == null) return;
                     setState(() => isSaving = true);
                     try {
-                      String? newUrl;
+                      VaultDocument? newDoc;
                       if (pickedFile != null) {
-                        newUrl = await vaultProvider.uploadDocument(
+                        newDoc = await vaultProvider.uploadDocument(
                           pickedFile!,
                           'vault/company_documents',
                         );
@@ -890,7 +890,13 @@ class UpdateDialogHelper {
                         updatedData = vaultData.copyWith(
                           license: vaultData.license.copyWith(
                             expiryDate: selectedDate,
-                            documentUrl: newUrl ?? vaultData.license.documentUrl,
+                            document: newDoc ?? vaultData.license.document,
+                          ),
+                        );
+                      } else if (documentType == 'VAT Certificate') {
+                        updatedData = vaultData.copyWith(
+                          vatCertificate: vaultData.vatCertificate.copyWith(
+                            document: newDoc ?? vaultData.vatCertificate.document,
                           ),
                         );
                       }

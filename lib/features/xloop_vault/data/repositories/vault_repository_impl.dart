@@ -27,12 +27,22 @@ class VaultRepositoryImpl implements VaultRepository {
           issueDate: data.license.issueDate,
           expiryDate: data.license.expiryDate,
           registrationNo: data.license.registrationNo,
-          documentUrl: data.license.documentUrl,
+          document: data.license.document != null
+              ? VaultDocumentModel(
+                  url: data.license.document!.url,
+                  name: data.license.document!.name,
+                )
+              : null,
         ),
         vatCertificate: VatCertificateModel(
           issueDate: data.vatCertificate.issueDate,
           vatAccountNo: data.vatCertificate.vatAccountNo,
-          documentUrl: data.vatCertificate.documentUrl,
+          document: data.vatCertificate.document != null
+              ? VaultDocumentModel(
+                  url: data.vatCertificate.document!.url,
+                  name: data.vatCertificate.document!.name,
+                )
+              : null,
         ),
       );
       await remoteDataSource.updateVaultData(model);
@@ -61,7 +71,9 @@ class VaultRepositoryImpl implements VaultRepository {
         billNumber: filing.billNumber,
         fromDate: filing.fromDate,
         toDate: filing.toDate,
-        documentUrls: filing.documentUrls,
+        documents: filing.documents
+            .map((d) => VaultDocumentModel(url: d.url, name: d.name))
+            .toList(),
       );
       await remoteDataSource.addVatFiling(model);
     } catch (e) {
@@ -80,7 +92,9 @@ class VaultRepositoryImpl implements VaultRepository {
         billNumber: filing.billNumber,
         fromDate: filing.fromDate,
         toDate: filing.toDate,
-        documentUrls: filing.documentUrls,
+        documents: filing.documents
+            .map((d) => VaultDocumentModel(url: d.url, name: d.name))
+            .toList(),
       );
       await remoteDataSource.updateVatFiling(model);
     } catch (e) {
@@ -98,13 +112,14 @@ class VaultRepositoryImpl implements VaultRepository {
   }
 
   @override
-  Future<String> uploadVaultDocument(XFile file, String path) async {
+  Future<VaultDocument> uploadVaultDocument(XFile file, String path) async {
     try {
       return await remoteDataSource.uploadVaultDocument(file, path);
     } catch (e) {
       throw ServerFailure(e.toString());
     }
   }
+
 
   @override
   Future<bool> verifyVaultPassword(String password) async {

@@ -1,6 +1,30 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../domain/entities/vault_data.dart';
 
+class VaultDocumentModel extends VaultDocument {
+  const VaultDocumentModel({
+    required super.url,
+    required super.name,
+  });
+
+  factory VaultDocumentModel.fromJson(dynamic json) {
+    if (json is String) {
+      return VaultDocumentModel(url: json, name: 'Document');
+    }
+    return VaultDocumentModel(
+      url: json['url'] ?? '',
+      name: json['name'] ?? 'Document',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'url': url,
+      'name': name,
+    };
+  }
+}
+
 class VaultDataModel extends VaultData {
   const VaultDataModel({
     required CommercialLicenseModel license,
@@ -10,7 +34,8 @@ class VaultDataModel extends VaultData {
   factory VaultDataModel.fromJson(Map<String, dynamic> json) {
     return VaultDataModel(
       license: CommercialLicenseModel.fromJson(json['license'] ?? {}),
-      vatCertificate: VatCertificateModel.fromJson(json['vatCertificate'] ?? {}),
+      vatCertificate:
+          VatCertificateModel.fromJson(json['vatCertificate'] ?? {}),
     );
   }
 
@@ -27,16 +52,24 @@ class CommercialLicenseModel extends CommercialLicense {
     super.issueDate,
     super.expiryDate,
     super.registrationNo,
-    super.documentUrl,
+    VaultDocumentModel? super.document,
     super.alertDays,
   });
 
   factory CommercialLicenseModel.fromJson(Map<String, dynamic> json) {
     return CommercialLicenseModel(
-      issueDate: json['issueDate'] != null ? (json['issueDate'] as Timestamp).toDate() : null,
-      expiryDate: json['expiryDate'] != null ? (json['expiryDate'] as Timestamp).toDate() : null,
+      issueDate: json['issueDate'] != null
+          ? (json['issueDate'] as Timestamp).toDate()
+          : null,
+      expiryDate: json['expiryDate'] != null
+          ? (json['expiryDate'] as Timestamp).toDate()
+          : null,
       registrationNo: json['registrationNo'] ?? '',
-      documentUrl: json['documentUrl'],
+      document: json['document'] != null
+          ? VaultDocumentModel.fromJson(json['document'])
+          : (json['documentUrl'] != null
+              ? VaultDocumentModel.fromJson(json['documentUrl'])
+              : null),
       alertDays: json['alertDays'] ?? 30,
     );
   }
@@ -46,7 +79,7 @@ class CommercialLicenseModel extends CommercialLicense {
       'issueDate': issueDate != null ? Timestamp.fromDate(issueDate!) : null,
       'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate!) : null,
       'registrationNo': registrationNo,
-      'documentUrl': documentUrl,
+      'document': (document as VaultDocumentModel?)?.toJson(),
       'alertDays': alertDays,
     };
   }
@@ -56,15 +89,21 @@ class VatCertificateModel extends VatCertificate {
   const VatCertificateModel({
     super.issueDate,
     super.vatAccountNo,
-    super.documentUrl,
+    VaultDocumentModel? super.document,
     super.alertDays,
   });
 
   factory VatCertificateModel.fromJson(Map<String, dynamic> json) {
     return VatCertificateModel(
-      issueDate: json['issueDate'] != null ? (json['issueDate'] as Timestamp).toDate() : null,
+      issueDate: json['issueDate'] != null
+          ? (json['issueDate'] as Timestamp).toDate()
+          : null,
       vatAccountNo: json['vatAccountNo'] ?? '',
-      documentUrl: json['documentUrl'],
+      document: json['document'] != null
+          ? VaultDocumentModel.fromJson(json['document'])
+          : (json['documentUrl'] != null
+              ? VaultDocumentModel.fromJson(json['documentUrl'])
+              : null),
       alertDays: json['alertDays'] ?? 30,
     );
   }
@@ -73,7 +112,7 @@ class VatCertificateModel extends VatCertificate {
     return {
       'issueDate': issueDate != null ? Timestamp.fromDate(issueDate!) : null,
       'vatAccountNo': vatAccountNo,
-      'documentUrl': documentUrl,
+      'document': (document as VaultDocumentModel?)?.toJson(),
       'alertDays': alertDays,
     };
   }
@@ -88,7 +127,7 @@ class VatFilingModel extends VatFiling {
     super.billNumber,
     required super.fromDate,
     required super.toDate,
-    required super.documentUrls,
+    required List<VaultDocumentModel> super.documents,
   });
 
   factory VatFilingModel.fromJson(Map<String, dynamic> json, String id) {
@@ -100,7 +139,11 @@ class VatFilingModel extends VatFiling {
       billNumber: json['billNumber'] ?? '',
       fromDate: (json['fromDate'] as Timestamp).toDate(),
       toDate: (json['toDate'] as Timestamp).toDate(),
-      documentUrls: List<String>.from(json['documentUrls'] ?? []),
+      documents: (json['documents'] as List? ??
+              json['documentUrls'] as List? ??
+              [])
+          .map((d) => VaultDocumentModel.fromJson(d))
+          .toList(),
     );
   }
 
@@ -112,7 +155,8 @@ class VatFilingModel extends VatFiling {
       'billNumber': billNumber,
       'fromDate': Timestamp.fromDate(fromDate),
       'toDate': Timestamp.fromDate(toDate),
-      'documentUrls': documentUrls,
+      'documents': documents.map((d) => (d as VaultDocumentModel).toJson()).toList(),
     };
   }
 }
+

@@ -11,7 +11,7 @@ abstract class VaultRemoteDataSource {
   Future<void> addVatFiling(VatFilingModel filing);
   Future<void> updateVatFiling(VatFilingModel filing);
   Future<void> deleteVatFiling(String id);
-  Future<String> uploadVaultDocument(XFile file, String folderPath);
+  Future<VaultDocumentModel> uploadVaultDocument(XFile file, String folderPath);
   Future<bool> verifyVaultPassword(String passwordHash);
 }
 
@@ -76,7 +76,7 @@ class VaultRemoteDataSourceImpl implements VaultRemoteDataSource {
   }
 
   @override
-  Future<String> uploadVaultDocument(XFile file, String folderPath) async {
+  Future<VaultDocumentModel> uploadVaultDocument(XFile file, String folderPath) async {
     final extension = path.extension(file.name).isNotEmpty
         ? path.extension(file.name)
         : '.${file.name.split('.').last}';
@@ -92,7 +92,8 @@ class VaultRemoteDataSourceImpl implements VaultRemoteDataSource {
         customMetadata: {'originalName': file.name},
       ),
     );
-    return await uploadTask.ref.getDownloadURL();
+    final url = await uploadTask.ref.getDownloadURL();
+    return VaultDocumentModel(url: url, name: file.name);
   }
 
   /// Returns a best-guess MIME type from file extension.

@@ -8,6 +8,6 @@ abstract class VaultRepository {
   Future<void> addVatFiling(VatFiling filing);
   Future<void> updateVatFiling(VatFiling filing);
   Future<void> deleteVatFiling(String id);
-  Future<String> uploadVaultDocument(XFile file, String path);
+  Future<VaultDocument> uploadVaultDocument(XFile file, String path);
   Future<bool> verifyVaultPassword(String password);
 }

@@ -42,26 +42,22 @@ class ShareHelper {
 
       final mimeType = _getMimeType(filename);
 
+      XFile xFile;
+
       if (kIsWeb) {
-        // On Web, file sharing support is limited and often triggers a download.
-        // To allow sharing to WhatsApp/others, we share the link as text.
-        await Share.share(
-          '$title\n$url',
-          subject: title,
+        xFile = XFile.fromData(
+          response.bodyBytes,
+          name: filename,
+          mimeType: mimeType,
         );
-        return;
+      } else {
+        // For Native platforms, save to temporary file first for better share sheet support
+        final tempDir = await getTemporaryDirectory();
+        final tempFile = File('${tempDir.path}/$filename');
+        await tempFile.writeAsBytes(response.bodyBytes);
+
+        xFile = XFile(tempFile.path, name: filename, mimeType: mimeType);
       }
-
-      // For Native platforms, save to temporary file first for better share sheet support
-      final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/$filename');
-      await tempFile.writeAsBytes(response.bodyBytes);
-
-      final xFile = XFile(
-        tempFile.path,
-        name: filename,
-        mimeType: mimeType,
-      );
 
       // We pass the Subject and Text to pre-fill the share action (like Email subject)
       await Share.shareXFiles(

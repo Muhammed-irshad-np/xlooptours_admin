@@ -118,7 +118,7 @@ class VaultProvider extends ChangeNotifier {
     }
   }
 
-  Future<String?> uploadDocument(XFile file, String folderPath) async {
+  Future<VaultDocument?> uploadDocument(XFile file, String folderPath) async {
     try {
       return await uploadVaultDocumentUseCase(file, folderPath);
     } catch (e) {
@@ -127,6 +127,7 @@ class VaultProvider extends ChangeNotifier {
       return null;
     }
   }
+
 
   Future<bool> verifyPassword(String passwordHash) async {
     _setLoading(true);

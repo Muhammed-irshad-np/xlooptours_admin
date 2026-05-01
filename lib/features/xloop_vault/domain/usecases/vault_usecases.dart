@@ -41,7 +41,7 @@ class DeleteVatFilingUseCase {
 class UploadVaultDocumentUseCase {
   final VaultRepository repository;
   UploadVaultDocumentUseCase(this.repository);
-  Future<String> call(XFile file, String path) => repository.uploadVaultDocument(file, path);
+  Future<VaultDocument> call(XFile file, String path) => repository.uploadVaultDocument(file, path);
 }
 
 class VerifyVaultPasswordUseCase {
