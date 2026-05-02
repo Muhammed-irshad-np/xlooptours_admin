@@ -523,6 +523,9 @@ class VehicleDetailScreen extends StatelessWidget {
     if (type.contains('ac')) {
       icon = Icons.ac_unit_outlined;
     }
+    if (type.contains('wash')) {
+      icon = Icons.local_car_wash_outlined;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12.0),

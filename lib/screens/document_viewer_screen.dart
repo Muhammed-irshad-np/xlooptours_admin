@@ -1,8 +1,14 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xloop_invoice/core/utils/share_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+// Conditional imports for web platform view
+import 'document_viewer_stub.dart'
+    if (dart.library.html) 'document_viewer_web.dart'
+    as platform_viewer;
 
 class DocumentViewerScreen extends StatefulWidget {
   final String attachmentUrl;
@@ -20,13 +26,10 @@ class DocumentViewerScreen extends StatefulWidget {
 
 class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   bool _isPdfUrl(String url) {
-    // Attempt basic parsing
     final cleanUrl = url.split('?').first.toLowerCase();
     if (cleanUrl.endsWith('.pdf')) {
       return true;
     }
-    // If it's a firebase url and doesn't clearly end with jpg/png/jpeg, we can attempt PDF rendering or pass it to CachedNetworkImage which will fail if it's a PDF.
-    // For simplicity, we check for .pdf.
     return cleanUrl.endsWith('.pdf') || url.toLowerCase().contains('.pdf?');
   }
 
@@ -72,27 +75,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       body: SafeArea(
         child: Center(
           child: isPdf
-              ? SfPdfViewer.network(
-                  widget.attachmentUrl,
-                  canShowScrollHead: false,
-                  canShowScrollStatus: false,
-                  onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
-                    debugPrint(
-                      'PDF Load Failed: ${details.error} - ${details.description}',
-                    );
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            'Failed to load PDF: ${details.error}\nThis might be a CORS issue on Web.',
-                          ),
-                          backgroundColor: Colors.red,
-                          duration: const Duration(seconds: 5),
-                        ),
-                      );
-                    }
-                  },
-                )
+              ? _buildPdfViewer()
               : InteractiveViewer(
                   panEnabled: true,
                   boundaryMargin: const EdgeInsets.all(20),
@@ -116,6 +99,35 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                 ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPdfViewer() {
+    if (kIsWeb) {
+      // On web, use an iframe to leverage the browser's built-in PDF viewer.
+      // This avoids CORS and binary data corruption issues entirely.
+      return platform_viewer.buildPdfWebView(widget.attachmentUrl);
+    }
+
+    // On native platforms, use SfPdfViewer.network directly (no CORS issues).
+    return SfPdfViewer.network(
+      widget.attachmentUrl,
+      canShowScrollHead: false,
+      canShowScrollStatus: false,
+      onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
+        debugPrint(
+          'PDF Load Failed: ${details.error} - ${details.description}',
+        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to load PDF: ${details.error}'),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+        }
+      },
     );
   }
 }

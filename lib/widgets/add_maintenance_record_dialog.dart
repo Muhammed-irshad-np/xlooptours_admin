@@ -6,8 +6,18 @@ import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 
+/// Special sentinel IDs for built-in extras that are not part of the
+/// Firestore-managed maintenance-type master list.
+const String _kCarWashId = '__car_wash__';
+const String _kOtherId = '__other__';
+
 class _MaintenanceEntry {
   String? maintenanceTypeId;
+
+  /// When [maintenanceTypeId] == [_kOtherId], the user must fill in a custom
+  /// name via this controller.
+  final TextEditingController customTypeController = TextEditingController();
+
   DateTime date = DateTime.now();
   final TextEditingController dateController = TextEditingController(
     text: DateFormat('MMM dd, yyyy').format(DateTime.now()),
@@ -17,6 +27,7 @@ class _MaintenanceEntry {
   final TextEditingController notesController = TextEditingController();
 
   void dispose() {
+    customTypeController.dispose();
     dateController.dispose();
     serviceKmController.dispose();
     costController.dispose();
@@ -92,17 +103,42 @@ class _AddMaintenanceRecordDialogState
     }
   }
 
+  /// Resolves the human-readable service-type name for a given entry.
+  String _resolveTypeName(_MaintenanceEntry entry, VehicleProvider provider) {
+    if (entry.maintenanceTypeId == _kCarWashId) return 'Car Wash';
+    if (entry.maintenanceTypeId == _kOtherId) {
+      return entry.customTypeController.text.trim();
+    }
+    // Lookup from master list
+    final type = provider.maintenanceTypes.firstWhere(
+      (t) => t.id == entry.maintenanceTypeId,
+      orElse: () => throw StateError('Type not found'),
+    );
+    return type.name;
+  }
+
   Future<void> _saveRecords() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Check if any types are null
-    if (_entries.any((entry) => entry.maintenanceTypeId == null)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a maintenance type for all entries.'),
-        ),
-      );
-      return;
+    // Validate type selection
+    for (final entry in _entries) {
+      if (entry.maintenanceTypeId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select a maintenance type for all entries.'),
+          ),
+        );
+        return;
+      }
+      if (entry.maintenanceTypeId == _kOtherId &&
+          entry.customTypeController.text.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please enter a name for the custom maintenance type.'),
+          ),
+        );
+        return;
+      }
     }
 
     setState(() {
@@ -113,10 +149,7 @@ class _AddMaintenanceRecordDialogState
       final provider = context.read<VehicleProvider>();
 
       final recordsToAdd = _entries.map((entry) {
-        // Find the maintenance type name based on ID
-        final type = provider.maintenanceTypes.firstWhere(
-          (t) => t.id == entry.maintenanceTypeId,
-        );
+        final typeName = _resolveTypeName(entry, provider);
 
         return (
           typeId: entry.maintenanceTypeId!,
@@ -126,7 +159,7 @@ class _AddMaintenanceRecordDialogState
             cost: double.tryParse(entry.costController.text),
             serviceProvider: '',
             notes: entry.notesController.text,
-            serviceType: type.name,
+            serviceType: typeName,
           ),
         );
       }).toList();
@@ -189,311 +222,41 @@ class _AddMaintenanceRecordDialogState
   ) {
     switch (typeId) {
       case 'engine_oil':
-        return VehicleMaintenance(
-          engineOil: record,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(engineOil: record);
       case 'gear_oil':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: record,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(gearOil: record);
       case 'housing_oil':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: record,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(housingOil: record);
       case 'tyre_change':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: record,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(tyreChange: record);
       case 'battery_change':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: record,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(batteryChange: record);
       case 'brake_pads':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: record,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(brakePads: record);
       case 'air_filter':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: record,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(airFilter: record);
       case 'ac_service':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: record,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(acService: record);
       case 'wheel_alignment':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: record,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(wheelAlignment: record);
       case 'spark_plugs':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: record,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(sparkPlugs: record);
       case 'coolant_flush':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: record,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(coolantFlush: record);
       case 'wiper_blades':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: record,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(wiperBlades: record);
       case 'timing_belt':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: record,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(timingBelt: record);
       case 'transmission_fluid':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: record,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(transmissionFluid: record);
       case 'brake_fluid':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: record,
-          fuelFilter: m.fuelFilter,
-        );
+        return m.copyWith(brakeFluid: record);
       case 'fuel_filter':
-        return VehicleMaintenance(
-          engineOil: m.engineOil,
-          gearOil: m.gearOil,
-          housingOil: m.housingOil,
-          tyreChange: m.tyreChange,
-          batteryChange: m.batteryChange,
-          brakePads: m.brakePads,
-          airFilter: m.airFilter,
-          acService: m.acService,
-          wheelAlignment: m.wheelAlignment,
-          sparkPlugs: m.sparkPlugs,
-          coolantFlush: m.coolantFlush,
-          wiperBlades: m.wiperBlades,
-          timingBelt: m.timingBelt,
-          transmissionFluid: m.transmissionFluid,
-          brakeFluid: m.brakeFluid,
-          fuelFilter: record,
-        );
+        return m.copyWith(fuelFilter: record);
       default:
-        return m; // Unknown type — leave unchanged
+        // Car Wash, Other, or any future ad-hoc types — only stored in flat
+        // history, no typed field to update.
+        return m;
     }
   }
 
@@ -530,107 +293,208 @@ class _AddMaintenanceRecordDialogState
                   separatorBuilder: (context, index) => Divider(height: 32.h),
                   itemBuilder: (context, index) {
                     final entry = _entries[index];
-                    return Row(
+                    final isOther = entry.maintenanceTypeId == _kOtherId;
+
+                    return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          flex: 2,
-                          child: DropdownButtonFormField<String>(
-                            // ignore: deprecated_member_use
-                            value: entry.maintenanceTypeId,
-                            decoration: InputDecoration(
-                              labelText: 'Maintenance Type',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8.r),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // ---------- Maintenance Type dropdown ----------
+                            Expanded(
+                              flex: 2,
+                              child: DropdownButtonFormField<String>(
+                              initialValue: entry.maintenanceTypeId,
+                                decoration: InputDecoration(
+                                  labelText: 'Maintenance Type',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8.r),
+                                  ),
+                                ),
+                                isExpanded: true,
+                                items: [
+                                  // ── Master types from Firestore ──
+                                  ...types.map((t) {
+                                    return DropdownMenuItem(
+                                      value: t.id,
+                                      child: Text(t.name),
+                                    );
+                                  }),
+                                  // ── Visual separator ──
+                                  if (types.isNotEmpty)
+                                    DropdownMenuItem<String>(
+                                      enabled: false,
+                                      value: null,
+                                      child: Divider(
+                                        height: 1,
+                                        color: Colors.grey[300],
+                                      ),
+                                    ),
+                                  // ── Car Wash (built-in) ──
+                                  DropdownMenuItem(
+                                    value: _kCarWashId,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.local_car_wash_outlined,
+                                          size: 18.sp,
+                                          color: Colors.blue,
+                                        ),
+                                        SizedBox(width: 8.w),
+                                        const Text('Car Wash'),
+                                      ],
+                                    ),
+                                  ),
+                                  // ── Other (custom) ──
+                                  DropdownMenuItem(
+                                    value: _kOtherId,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.edit_note_outlined,
+                                          size: 18.sp,
+                                          color: Colors.deepPurple,
+                                        ),
+                                        SizedBox(width: 8.w),
+                                        const Text('Other (Custom)'),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                onChanged: (value) {
+                                  setState(() {
+                                    entry.maintenanceTypeId = value;
+                                    // Clear custom text when switching away
+                                    if (value != _kOtherId) {
+                                      entry.customTypeController.clear();
+                                    }
+                                  });
+                                },
+                                validator: (v) => v == null ? 'Required' : null,
                               ),
                             ),
-                            items: types.map((t) {
-                              return DropdownMenuItem(
-                                value: t.id,
-                                child: Text(t.name),
-                              );
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                entry.maintenanceTypeId = value;
-                              });
-                            },
-                            validator: (v) => v == null ? 'Required' : null,
-                          ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: TextFormField(
+                                controller: entry.dateController,
+                                readOnly: true,
+                                onTap: () => _selectDate(context, entry),
+                                decoration: InputDecoration(
+                                  labelText: 'Date',
+                                  suffixIcon: const Icon(Icons.calendar_today),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8.r),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: TextFormField(
+                                controller: entry.serviceKmController,
+                                decoration: InputDecoration(
+                                  labelText: 'Current Odometer',
+                                  suffixText: 'km',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8.r),
+                                  ),
+                                ),
+                                keyboardType: TextInputType.number,
+                                validator: (v) {
+                                  if (v == null || v.isEmpty) return 'Required';
+                                  if (int.tryParse(v) == null) return 'Invalid';
+                                  return null;
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: TextFormField(
+                                controller: entry.costController,
+                                decoration: InputDecoration(
+                                  labelText: 'Cost (Optional)',
+                                  prefixText: '\$ ',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8.r),
+                                  ),
+                                ),
+                                keyboardType: const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: TextFormField(
+                                controller: entry.notesController,
+                                decoration: InputDecoration(
+                                  labelText: 'Notes',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(8.r),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            if (_entries.length > 1)
+                              Padding(
+                                padding: EdgeInsets.only(left: 8.w, top: 4.h),
+                                child: IconButton(
+                                  icon: const Icon(
+                                    Icons.delete_outline,
+                                    color: Colors.red,
+                                  ),
+                                  onPressed: () => _removeEntry(index),
+                                ),
+                              ),
+                          ],
                         ),
-                        SizedBox(width: 16.w),
-                        Expanded(
-                          child: TextFormField(
-                            controller: entry.dateController,
-                            readOnly: true,
-                            onTap: () => _selectDate(context, entry),
-                            decoration: InputDecoration(
-                              labelText: 'Date',
-                              suffixIcon: const Icon(Icons.calendar_today),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8.r),
+
+                        // ── "Other" custom type text field ──
+                        if (isOther) ...[
+                          SizedBox(height: 12.h),
+                          Row(
+                            children: [
+                              SizedBox(width: 8.w),
+                              Icon(
+                                Icons.subdirectory_arrow_right_rounded,
+                                size: 20.sp,
+                                color: Colors.deepPurple[300],
                               ),
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 16.w),
-                        Expanded(
-                          child: TextFormField(
-                            controller: entry.serviceKmController,
-                            decoration: InputDecoration(
-                              labelText: 'Current Odometer',
-                              suffixText: 'km',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8.r),
+                              SizedBox(width: 8.w),
+                              SizedBox(
+                                width: 320.w,
+                                child: TextFormField(
+                                  controller: entry.customTypeController,
+                                  autofocus: true,
+                                  decoration: InputDecoration(
+                                    labelText: 'Enter maintenance type name',
+                                    hintText: 'e.g. Windshield Replacement',
+                                    prefixIcon: Icon(
+                                      Icons.label_outline,
+                                      size: 18.sp,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                    filled: true,
+                                    fillColor:
+                                        Colors.deepPurple.withValues(alpha: 0.03),
+                                  ),
+                                  textCapitalization:
+                                      TextCapitalization.words,
+                                  validator: (v) {
+                                    if (entry.maintenanceTypeId == _kOtherId &&
+                                        (v == null || v.trim().isEmpty)) {
+                                      return 'Please enter a type name';
+                                    }
+                                    return null;
+                                  },
+                                ),
                               ),
-                            ),
-                            keyboardType: TextInputType.number,
-                            validator: (v) {
-                              if (v == null || v.isEmpty) return 'Required';
-                              if (int.tryParse(v) == null) return 'Invalid';
-                              return null;
-                            },
+                            ],
                           ),
-                        ),
-                        SizedBox(width: 16.w),
-                        Expanded(
-                          child: TextFormField(
-                            controller: entry.costController,
-                            decoration: InputDecoration(
-                              labelText: 'Cost (Optional)',
-                              prefixText: '\$ ',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8.r),
-                              ),
-                            ),
-                            keyboardType: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 16.w),
-                        Expanded(
-                          child: TextFormField(
-                            controller: entry.notesController,
-                            decoration: InputDecoration(
-                              labelText: 'Notes',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8.r),
-                              ),
-                            ),
-                          ),
-                        ),
-                        if (_entries.length > 1)
-                          Padding(
-                            padding: EdgeInsets.only(left: 8.w, top: 4.h),
-                            child: IconButton(
-                              icon: const Icon(
-                                Icons.delete_outline,
-                                color: Colors.red,
-                              ),
-                              onPressed: () => _removeEntry(index),
-                            ),
-                          ),
+                        ],
                       ],
                     );
                   },
