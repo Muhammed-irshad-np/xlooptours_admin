@@ -126,7 +126,7 @@ class _MaintenanceTypeMasterScreenState
                     ),
                   ),
                   subtitle: Text(
-                    'Interval: ${type.defaultIntervalKm} KM',
+                    'SUV: ${type.suvIntervalKm} KM  |  Sedan: ${type.sedanIntervalKm} KM',
                     style: TextStyle(color: Colors.grey[600], fontSize: 14.sp),
                   ),
                   trailing: Row(
@@ -199,21 +199,26 @@ class _AddEditMaintenanceTypeDialogState
     extends State<_AddEditMaintenanceTypeDialog> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
-  late TextEditingController _intervalController;
+  late TextEditingController _suvIntervalController;
+  late TextEditingController _sedanIntervalController;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.type?.name ?? '');
-    _intervalController = TextEditingController(
-      text: widget.type?.defaultIntervalKm.toString() ?? '',
+    _suvIntervalController = TextEditingController(
+      text: widget.type?.suvIntervalKm.toString() ?? '',
+    );
+    _sedanIntervalController = TextEditingController(
+      text: widget.type?.sedanIntervalKm.toString() ?? '',
     );
   }
 
   @override
   void dispose() {
     _nameController.dispose();
-    _intervalController.dispose();
+    _suvIntervalController.dispose();
+    _sedanIntervalController.dispose();
     super.dispose();
   }
 
@@ -223,7 +228,8 @@ class _AddEditMaintenanceTypeDialogState
     final newType = MaintenanceTypeEntity(
       id: widget.type?.id ?? const Uuid().v4(),
       name: _nameController.text.trim(),
-      defaultIntervalKm: int.tryParse(_intervalController.text.trim()) ?? 0,
+      suvIntervalKm: int.tryParse(_suvIntervalController.text.trim()) ?? 0,
+      sedanIntervalKm: int.tryParse(_sedanIntervalController.text.trim()) ?? 0,
     );
 
     widget.onSave(newType);
@@ -262,18 +268,40 @@ class _AddEditMaintenanceTypeDialogState
                 validator: (v) => v!.isEmpty ? 'Required' : null,
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _intervalController,
-                decoration: const InputDecoration(
-                  labelText: 'Default Interval (KM) (e.g. 5000)',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Required';
-                  if (int.tryParse(v) == null) return 'Must be a valid number';
-                  return null;
-                },
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _suvIntervalController,
+                      decoration: const InputDecoration(
+                        labelText: 'SUV Interval (KM)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Required';
+                        if (int.tryParse(v) == null) return 'Invalid number';
+                        return null;
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _sedanIntervalController,
+                      decoration: const InputDecoration(
+                        labelText: 'Sedan Interval (KM)',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                      validator: (v) {
+                        if (v == null || v.isEmpty) return 'Required';
+                        if (int.tryParse(v) == null) return 'Invalid number';
+                        return null;
+                      },
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 24),
               Row(

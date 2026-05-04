@@ -4,16 +4,17 @@ class MaintenanceTypeModel extends MaintenanceTypeEntity {
   const MaintenanceTypeModel({
     required super.id,
     required super.name,
-    required super.defaultIntervalKm,
+    required super.suvIntervalKm,
+    required super.sedanIntervalKm,
   });
 
   factory MaintenanceTypeModel.fromJson(Map<String, dynamic> json) {
+    final defaultInterval = json['defaultIntervalKm'] as int? ?? 5000;
     return MaintenanceTypeModel(
       id: json['id'] as String? ?? json['documentId'] as String? ?? '',
       name: json['name'] as String? ?? '',
-      defaultIntervalKm:
-          json['defaultIntervalKm'] as int? ??
-          5000, // provide a fallback interval
+      suvIntervalKm: json['suvIntervalKm'] as int? ?? defaultInterval,
+      sedanIntervalKm: json['sedanIntervalKm'] as int? ?? defaultInterval,
     );
   }
 
@@ -21,23 +22,32 @@ class MaintenanceTypeModel extends MaintenanceTypeEntity {
     return MaintenanceTypeModel(
       id: entity.id,
       name: entity.name,
-      defaultIntervalKm: entity.defaultIntervalKm,
+      suvIntervalKm: entity.suvIntervalKm,
+      sedanIntervalKm: entity.sedanIntervalKm,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'id': id, 'name': name, 'defaultIntervalKm': defaultIntervalKm};
+    return {
+      'id': id,
+      'name': name,
+      'suvIntervalKm': suvIntervalKm,
+      'sedanIntervalKm': sedanIntervalKm,
+      'defaultIntervalKm': defaultIntervalKm, // keep writing for legacy clients if any
+    };
   }
 
   MaintenanceTypeModel copyWith({
     String? id,
     String? name,
-    int? defaultIntervalKm,
+    int? suvIntervalKm,
+    int? sedanIntervalKm,
   }) {
     return MaintenanceTypeModel(
       id: id ?? this.id,
       name: name ?? this.name,
-      defaultIntervalKm: defaultIntervalKm ?? this.defaultIntervalKm,
+      suvIntervalKm: suvIntervalKm ?? this.suvIntervalKm,
+      sedanIntervalKm: sedanIntervalKm ?? this.sedanIntervalKm,
     );
   }
 }

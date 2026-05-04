@@ -52,7 +52,13 @@ class GetVehicleMaintenanceAlertsUseCase {
 
       // For each maintenance type configured, check if service is overdue.
       for (final type in maintenanceTypes) {
-        if (type.defaultIntervalKm <= 0) continue;
+        // Determine the applicable interval for this vehicle type
+        final String vType = vehicle.type.toLowerCase();
+        final int intervalKm = vType.contains('sedan') 
+            ? type.sedanIntervalKm 
+            : type.suvIntervalKm;
+
+        if (intervalKm <= 0) continue;
 
         final key = type.name.toLowerCase().trim();
         final entries = byType[key];
@@ -62,7 +68,7 @@ class GetVehicleMaintenanceAlertsUseCase {
         entries.sort((a, b) => b.mileage.compareTo(a.mileage));
         final lastService = entries.first;
 
-        final nextDue = lastService.mileage + type.defaultIntervalKm;
+        final nextDue = lastService.mileage + intervalKm;
 
         if (currentMileage >= nextDue) {
           alerts.add(
