@@ -96,6 +96,7 @@ class GetVehicleExpiryAlertsUseCase {
                 documentType: 'Tafweed',
                 expiryDate: tafweed.expiryDate,
                 daysUntilExpiry: days,
+                documentId: tafweed.driverId,
               ),
             );
           }

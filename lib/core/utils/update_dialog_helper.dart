@@ -944,7 +944,15 @@ class UpdateDialogHelper {
     if (vehicle == null) return;
 
     final prefix = 'v_expiry_${relatedId}_';
-    final documentType = notification.id.substring(prefix.length).replaceAll('_', ' ');
+    final suffix = notification.id.substring(prefix.length);
+    String documentType = suffix;
+    String? driverId;
+    if (suffix.startsWith('Tafweed_')) {
+      documentType = 'Tafweed';
+      driverId = suffix.substring('Tafweed_'.length);
+    } else {
+      documentType = documentType.replaceAll('_', ' ');
+    }
 
     DateTime? selectedDate;
     XFile? pickedFile;
@@ -956,6 +964,7 @@ class UpdateDialogHelper {
       'Insurance': 'insurance',
       'Fahas': 'fahas',
       'Bahrain Insurance': 'bahrain_insurance',
+      'Tafweed': 'tafweed',
     };
 
     await showDialog(
@@ -963,6 +972,10 @@ class UpdateDialogHelper {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setState) {
+            // For Tafweed, the user has requested it to be strictly read-only in the vehicle details, 
+            // but updatable from Action Items.
+            final supportsUpload = docKeys.containsKey(documentType);
+
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
               title: Text('Update $documentType', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -983,19 +996,21 @@ class UpdateDialogHelper {
                       if (picked != null) setState(() => selectedDate = picked);
                     },
                   ),
-                  const SizedBox(height: 20),
-                  const Divider(),
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                    icon: Icon(pickedFile != null ? Icons.check_circle : Icons.attach_file),
-                    label: Text(pickedFile != null ? p.basename(pickedFile!.path) : 'Choose File'),
-                    onPressed: isSaving ? null : () async {
-                      final result = await FilePicker.platform.pickFiles(type: FileType.any);
-                      if (result != null && result.files.isNotEmpty) {
-                        setState(() => pickedFile = XFile(result.files.first.path!));
-                      }
-                    },
-                  ),
+                  if (supportsUpload) ...[
+                    const SizedBox(height: 20),
+                    const Divider(),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      icon: Icon(pickedFile != null ? Icons.check_circle : Icons.attach_file),
+                      label: Text(pickedFile != null ? p.basename(pickedFile!.path) : 'Choose File'),
+                      onPressed: isSaving ? null : () async {
+                        final result = await FilePicker.platform.pickFiles(type: FileType.any);
+                        if (result != null && result.files.isNotEmpty) {
+                          setState(() => pickedFile = XFile(result.files.first.path!));
+                        }
+                      },
+                    ),
+                  ],
                 ],
               ),
               actions: [
@@ -1058,6 +1073,23 @@ class UpdateDialogHelper {
                                   url(vehicle.bahrainInsurance?.attachmentUrl),
                             ),
                           );
+                          break;
+                        case 'Tafweed':
+                          if (driverId != null) {
+                            final List<TafweedRecord> currentTafweeds = List.from(vehicle.tafweeds ?? []);
+                            final targetIndex = currentTafweeds.indexWhere((t) => t.driverId == driverId);
+                            
+                            if (targetIndex != -1) {
+                              final current = currentTafweeds[targetIndex];
+                              currentTafweeds[targetIndex] = current.copyWith(
+                                expiryDate: selectedDate,
+                                attachmentUrl: url(current.attachmentUrl),
+                              );
+                              updatedVehicle = vehicle.copyWith(
+                                tafweeds: currentTafweeds,
+                              );
+                            }
+                          }
                           break;
                       }
 

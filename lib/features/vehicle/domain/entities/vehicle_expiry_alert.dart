@@ -3,9 +3,10 @@ import 'package:equatable/equatable.dart';
 class VehicleExpiryAlert extends Equatable {
   final String vehicleId;
   final String plateNumber;
-  final String documentType; // 'Isthimara', 'Fahas', 'Insurance'
+  final String documentType; // 'Isthimara', 'Fahas', 'Insurance', 'Tafweed'
   final DateTime expiryDate;
   final int daysUntilExpiry;
+  final String? documentId;
 
   const VehicleExpiryAlert({
     required this.vehicleId,
@@ -13,6 +14,7 @@ class VehicleExpiryAlert extends Equatable {
     required this.documentType,
     required this.expiryDate,
     required this.daysUntilExpiry,
+    this.documentId,
   });
 
   @override
@@ -22,5 +24,6 @@ class VehicleExpiryAlert extends Equatable {
     documentType,
     expiryDate,
     daysUntilExpiry,
+    documentId,
   ];
 }

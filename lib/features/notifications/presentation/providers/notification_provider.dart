@@ -158,8 +158,10 @@ class NotificationProvider extends ChangeNotifier {
       // ── Vehicle expiry alerts ──────────────────────────────────────────────
       final vehicleExpiryAlerts = await _getVehicleExpiryAlerts();
       final vehicleExpiryNotifications = vehicleExpiryAlerts.map((alert) {
-        final id =
-            'v_expiry_${alert.vehicleId}_${alert.documentType.replaceAll(' ', '_')}';
+        final docTypeFormatted = alert.documentType.replaceAll(' ', '_');
+        final id = alert.documentId != null 
+            ? 'v_expiry_${alert.vehicleId}_${docTypeFormatted}_${alert.documentId}'
+            : 'v_expiry_${alert.vehicleId}_$docTypeFormatted';
         return NotificationEntity(
           id: id,
           title: 'Vehicle ${alert.documentType} Expiring',
