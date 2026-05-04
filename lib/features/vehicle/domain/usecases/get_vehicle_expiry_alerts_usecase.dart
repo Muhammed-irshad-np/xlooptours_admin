@@ -13,7 +13,7 @@ class GetVehicleExpiryAlertsUseCase {
     final now = DateTime.now();
 
     for (var vehicle in vehicles) {
-      if (vehicle.status != 'ACTIVE') continue;
+      if (vehicle.status?.toLowerCase() != 'active') continue;
 
       // Isthimara (Registration)
       if (vehicle.registration != null) {

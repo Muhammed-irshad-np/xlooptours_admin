@@ -114,13 +114,20 @@ class NotificationProvider extends ChangeNotifier {
       final expiryNotifications = expiryAlerts.map((alert) {
         final id =
             'expiry_${alert.employeeId}_${alert.documentType.replaceAll(' ', '_')}';
+        final isExpired = alert.daysUntilExpiry < 0;
+        final absDays = alert.daysUntilExpiry.abs();
+        final expiryDateStr =
+            alert.expiryDate.toLocal().toString().split(' ')[0];
         return NotificationEntity(
           id: id,
-          title: '${alert.documentType} Expiring Soon',
-          message:
-              '${alert.employeeName}\'s ${alert.documentType} is expiring on '
-              '${alert.expiryDate.toLocal().toString().split(' ')[0]} '
-              '(${alert.daysUntilExpiry} days left).',
+          title: isExpired
+              ? '${alert.documentType} Expired'
+              : '${alert.documentType} Expiring Soon',
+          message: isExpired
+              ? '${alert.employeeName}\'s ${alert.documentType} expired on '
+                  '$expiryDateStr ($absDays days ago).'
+              : '${alert.employeeName}\'s ${alert.documentType} is expiring on '
+                  '$expiryDateStr (${alert.daysUntilExpiry} days left).',
           timestamp: DateTime.now(),
           isRead: _readVirtualIds.contains(id),
           type: NotificationType.expiry,
@@ -162,13 +169,20 @@ class NotificationProvider extends ChangeNotifier {
         final id = alert.documentId != null 
             ? 'v_expiry_${alert.vehicleId}_${docTypeFormatted}_${alert.documentId}'
             : 'v_expiry_${alert.vehicleId}_$docTypeFormatted';
+        final isExpired = alert.daysUntilExpiry < 0;
+        final absDays = alert.daysUntilExpiry.abs();
+        final expiryDateStr =
+            alert.expiryDate.toLocal().toString().split(' ')[0];
         return NotificationEntity(
           id: id,
-          title: 'Vehicle ${alert.documentType} Expiring',
-          message:
-              'Vehicle ${alert.plateNumber}\'s ${alert.documentType} is expiring on '
-              '${alert.expiryDate.toLocal().toString().split(' ')[0]} '
-              '(${alert.daysUntilExpiry} days left).',
+          title: isExpired
+              ? 'Vehicle ${alert.documentType} Expired'
+              : 'Vehicle ${alert.documentType} Expiring',
+          message: isExpired
+              ? 'Vehicle ${alert.plateNumber}\'s ${alert.documentType} expired on '
+                  '$expiryDateStr ($absDays days ago).'
+              : 'Vehicle ${alert.plateNumber}\'s ${alert.documentType} is expiring on '
+                  '$expiryDateStr (${alert.daysUntilExpiry} days left).',
           timestamp: DateTime.now(),
           isRead: _readVirtualIds.contains(id),
           type: NotificationType.expiry,
@@ -182,13 +196,20 @@ class NotificationProvider extends ChangeNotifier {
       final vaultAlerts = await _getVaultExpiryAlerts();
       final vaultNotifications = vaultAlerts.map((alert) {
         final id = 'vault_${alert.documentType.replaceAll(' ', '_')}';
+        final isExpired = alert.daysUntilExpiry < 0;
+        final absDays = alert.daysUntilExpiry.abs();
+        final expiryDateStr =
+            alert.expiryDate.toLocal().toString().split(' ')[0];
         return NotificationEntity(
           id: id,
-          title: 'Company ${alert.documentType} Alert',
-          message:
-              'Company ${alert.documentType} is expiring on '
-              '${alert.expiryDate.toLocal().toString().split(' ')[0]} '
-              '(${alert.daysUntilExpiry} days left).',
+          title: isExpired
+              ? 'Company ${alert.documentType} Expired'
+              : 'Company ${alert.documentType} Alert',
+          message: isExpired
+              ? 'Company ${alert.documentType} expired on '
+                  '$expiryDateStr ($absDays days ago).'
+              : 'Company ${alert.documentType} is expiring on '
+                  '$expiryDateStr (${alert.daysUntilExpiry} days left).',
           timestamp: DateTime.now(),
           isRead: _readVirtualIds.contains(id),
           type: NotificationType.expiry,
