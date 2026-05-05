@@ -26,7 +26,7 @@ class AdminLayout extends StatefulWidget {
 }
 
 class _AdminLayoutState extends State<AdminLayout> {
-  final ValueNotifier<int> _selectedIndex = ValueNotifier<int>(3);
+  final ValueNotifier<int> _selectedIndex = ValueNotifier<int>(0);
   bool _isMenuUnlocked = false;
 
   final List<Widget> _screens = [
@@ -167,7 +167,7 @@ class _AdminLayoutState extends State<AdminLayout> {
                 inactiveText: _inactiveText,
                 dividerColor: _dividerColor,
                 onItemSelected: (index) async {
-                  final protectedIndices = [0, 1, 2, 5, 6, 7];
+                  final protectedIndices = [1, 2, 5, 6, 7];
                   if (protectedIndices.contains(index)) {
                     if (!_isMenuUnlocked) {
                       final success = await _showPasswordDialog();
