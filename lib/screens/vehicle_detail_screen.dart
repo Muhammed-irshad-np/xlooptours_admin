@@ -13,10 +13,10 @@ import '../core/widgets/modern_app_bar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
+
 import '../widgets/add_maintenance_record_dialog.dart';
 import 'tafweed_history_view_all_screen.dart';
-
+import '../features/vehicle/presentation/widgets/authorize_driver_to_vehicle_dialog.dart';
 
 class VehicleDetailScreen extends StatelessWidget {
   final VehicleEntity vehicle;
@@ -276,7 +276,26 @@ class VehicleDetailScreen extends StatelessWidget {
               },
             ),
             const Divider(height: 32),
-            _buildSectionHeader('Tafweed Authorizations'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildSectionHeader('Tafweed Authorizations'),
+                if (currentVehicle.tafweeds == null ||
+                    currentVehicle.tafweeds!.isEmpty)
+                  TextButton.icon(
+                    onPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AuthorizeDriverToVehicleDialog(
+                          vehicle: currentVehicle,
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.person_add_alt_1, size: 20),
+                    label: const Text('Authorize Driver'),
+                  ),
+              ],
+            ),
             Consumer<EmployeeProvider>(
               builder: (context, empProvider, child) {
                 if (currentVehicle.tafweeds == null ||
@@ -307,7 +326,6 @@ class VehicleDetailScreen extends StatelessWidget {
                               fontSize: 14.sp,
                             ),
                           ),
-
                         ],
                       ),
                     ),
@@ -331,9 +349,13 @@ class VehicleDetailScreen extends StatelessWidget {
                         expiryDate: tafweed.expiryDate,
                         attachmentUrl: tafweed.attachmentUrl,
                         extraInfo: 'Tafweed Authorization',
+                        onCancel: () => _confirmCancelTafweed(
+                          context,
+                          currentVehicle,
+                          tafweed,
+                        ),
                       );
                     }),
-
                   ],
                 );
               },
@@ -612,7 +634,10 @@ class VehicleDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTafweedHistorySection(BuildContext context, VehicleEntity vehicle) {
+  Widget _buildTafweedHistorySection(
+    BuildContext context,
+    VehicleEntity vehicle,
+  ) {
     return Consumer<EmployeeProvider>(
       builder: (context, empProvider, child) {
         final List<_VehicleTafweedHistoryEntry> entries = [];
@@ -620,35 +645,49 @@ class VehicleDetailScreen extends StatelessWidget {
         // Active tafweeds
         if (vehicle.tafweeds != null) {
           for (final t in vehicle.tafweeds!) {
-            final driver = empProvider.employees.cast<EmployeeEntity?>().firstWhere(
-              (e) => e?.id == t.driverId,
-              orElse: () => null,
+            final driver = empProvider.employees
+                .cast<EmployeeEntity?>()
+                .firstWhere((e) => e?.id == t.driverId, orElse: () => null);
+            entries.add(
+              _VehicleTafweedHistoryEntry(
+                record: t,
+                driverName: driver?.fullName ?? 'Unknown Driver',
+                isActive: true,
+              ),
             );
-            entries.add(_VehicleTafweedHistoryEntry(record: t, driverName: driver?.fullName ?? 'Unknown Driver', isActive: true));
           }
         }
 
         // Historical tafweeds
         if (vehicle.tafweedHistory != null) {
           for (final t in vehicle.tafweedHistory!) {
-            final driver = empProvider.employees.cast<EmployeeEntity?>().firstWhere(
-              (e) => e?.id == t.driverId,
-              orElse: () => null,
+            final driver = empProvider.employees
+                .cast<EmployeeEntity?>()
+                .firstWhere((e) => e?.id == t.driverId, orElse: () => null);
+            entries.add(
+              _VehicleTafweedHistoryEntry(
+                record: t,
+                driverName: driver?.fullName ?? 'Unknown Driver',
+                isActive: false,
+              ),
             );
-            entries.add(_VehicleTafweedHistoryEntry(record: t, driverName: driver?.fullName ?? 'Unknown Driver', isActive: false));
           }
         }
 
         if (entries.isEmpty) return const SizedBox.shrink();
 
         // Sort newest issuedDate first
-        entries.sort((a, b) => b.record.issuedDate.compareTo(a.record.issuedDate));
+        entries.sort(
+          (a, b) => b.record.issuedDate.compareTo(a.record.issuedDate),
+        );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildSectionHeader('Tafweed History'),
-            ...entries.take(5).map((entry) => _buildTafweedHistoryItem(context, entry)),
+            ...entries
+                .take(5)
+                .map((entry) => _buildTafweedHistoryItem(context, entry)),
             if (entries.length > 5)
               Padding(
                 padding: EdgeInsets.only(top: 8.h),
@@ -670,7 +709,9 @@ class VehicleDetailScreen extends StatelessWidget {
                     padding: EdgeInsets.symmetric(vertical: 12.h),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8.r),
-                      side: BorderSide(color: Colors.blue.withValues(alpha: 0.2)),
+                      side: BorderSide(
+                        color: Colors.blue.withValues(alpha: 0.2),
+                      ),
                     ),
                   ),
                   child: const Center(child: Text('View All History')),
@@ -682,9 +723,12 @@ class VehicleDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTafweedHistoryItem(BuildContext context, _VehicleTafweedHistoryEntry entry) {
+  Widget _buildTafweedHistoryItem(
+    BuildContext context,
+    _VehicleTafweedHistoryEntry entry,
+  ) {
     final bool isExpired = entry.record.expiryDate.isBefore(DateTime.now());
-    
+
     Color statusColor = Colors.grey;
     String statusLabel = 'Historical';
     IconData statusIcon = Icons.archive_outlined;
@@ -736,11 +780,16 @@ class VehicleDetailScreen extends StatelessWidget {
                         ),
                       ),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8.w,
+                          vertical: 2.h,
+                        ),
                         decoration: BoxDecoration(
                           color: statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12.r),
-                          border: Border.all(color: statusColor.withValues(alpha: 0.3)),
+                          border: Border.all(
+                            color: statusColor.withValues(alpha: 0.3),
+                          ),
                         ),
                         child: Text(
                           statusLabel,
@@ -756,13 +805,19 @@ class VehicleDetailScreen extends StatelessWidget {
                   SizedBox(height: 6.h),
                   Row(
                     children: [
-                      Icon(Icons.calendar_today_outlined, size: 12.sp, color: Colors.grey[600]),
+                      Icon(
+                        Icons.calendar_today_outlined,
+                        size: 12.sp,
+                        color: Colors.grey[600],
+                      ),
                       SizedBox(width: 4.w),
                       Text(
                         '${_formatDate(entry.record.issuedDate)} - ${_formatDate(entry.record.expiryDate)}',
                         style: TextStyle(
                           fontSize: 13.sp,
-                          color: isExpired && entry.isActive ? Colors.red : Colors.grey[700],
+                          color: isExpired && entry.isActive
+                              ? Colors.red
+                              : Colors.grey[700],
                         ),
                       ),
                     ],
@@ -818,11 +873,46 @@ class VehicleDetailScreen extends StatelessWidget {
     return DateFormat('dd MMM yyyy').format(date);
   }
 
-  Future<void> _launchUrl(String? urlString) async {
-    if (urlString == null || urlString.isEmpty) return;
-    final Uri url = Uri.parse(urlString);
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      debugPrint('Could not launch $urlString');
+  Future<void> _confirmCancelTafweed(
+    BuildContext context,
+    VehicleEntity currentVehicle,
+    TafweedRecord record,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Authorization'),
+        content: const Text(
+          'Are you sure you want to cancel the current authorization? This will record the end date as today and move it to history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Confirm Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      final updatedActiveTafweeds = List<TafweedRecord>.from(
+        currentVehicle.tafweeds ?? [],
+      )..remove(record);
+
+      final updatedHistory = List<TafweedRecord>.from(
+        currentVehicle.tafweedHistory ?? [],
+      );
+      updatedHistory.add(record.copyWith(expiryDate: DateTime.now()));
+
+      final updatedVehicle = currentVehicle.copyWith(
+        tafweeds: updatedActiveTafweeds,
+        tafweedHistory: updatedHistory,
+      );
+      await context.read<VehicleProvider>().updateVehicle(updatedVehicle);
     }
   }
 
@@ -833,24 +923,23 @@ class VehicleDetailScreen extends StatelessWidget {
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: Text('Delete $title'),
-            content: Text(
-              'Are you sure you want to delete this document and clear its expiry date?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: TextButton.styleFrom(foregroundColor: Colors.red),
-                child: const Text('Delete'),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: Text('Delete $title'),
+        content: Text(
+          'Are you sure you want to delete this document and clear its expiry date?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
           ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
     if (confirmed == true) {
       onConfirm();
@@ -865,6 +954,7 @@ class VehicleDetailScreen extends StatelessWidget {
     String? attachmentUrl,
     String? extraInfo,
     VoidCallback? onDelete,
+    VoidCallback? onCancel,
   }) {
     final bool isExpired =
         expiryDate != null && expiryDate.isBefore(DateTime.now());
@@ -913,10 +1003,9 @@ class VehicleDetailScreen extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 13.sp,
                               color: isExpired ? Colors.red : Colors.grey[700],
-                              fontWeight:
-                                  isExpired
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
+                              fontWeight: isExpired
+                                  ? FontWeight.bold
+                                  : FontWeight.normal,
                             ),
                           ),
                           if (isExpired) ...[
@@ -950,53 +1039,67 @@ class VehicleDetailScreen extends StatelessWidget {
                   ),
               ],
             ),
-            if (hasAttachment) ...[
+            if (hasAttachment || onCancel != null) ...[
               SizedBox(height: 12.h),
               const Divider(),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (context) => DocumentViewerScreen(
-                                attachmentUrl: attachmentUrl,
-                                title: title,
-                              ),
+                  if (onCancel != null)
+                    Padding(
+                      padding: EdgeInsets.only(right: 8.w),
+                      child: TextButton.icon(
+                        onPressed: onCancel,
+                        icon: Icon(Icons.cancel_outlined,
+                            color: Colors.orange[700], size: 18.sp),
+                        label: Text(
+                          'Cancel Authorization',
+                          style: TextStyle(
+                            color: Colors.orange[700],
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      );
-                    },
-                    icon: Icon(Icons.remove_red_eye_outlined, size: 18.sp),
-                    label: const Text('Preview'),
-                    style: TextButton.styleFrom(foregroundColor: Colors.blue),
-                  ),
-                  SizedBox(width: 8.w),
-                  TextButton.icon(
-                    onPressed: () {
-                      ShareHelper.shareDocument(
-                        context,
-                        url: attachmentUrl,
-                        title: title,
-                      );
-                    },
-                    icon: Icon(Icons.share_outlined, size: 18.sp),
-                    label: const Text('Share'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF13b1f2),
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.orange[50],
+                          padding: EdgeInsets.symmetric(horizontal: 12.w),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 8.w),
-                  TextButton.icon(
-                    onPressed: () => _launchUrl(attachmentUrl),
-                    icon: Icon(Icons.download_outlined, size: 18.sp),
-                    label: const Text('Download'),
-                    style: TextButton.styleFrom(
-                      foregroundColor: Colors.grey[700],
+                  if (hasAttachment) ...[
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DocumentViewerScreen(
+                              attachmentUrl: attachmentUrl,
+                              title: title,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: Icon(Icons.remove_red_eye_outlined, size: 18.sp),
+                      label: const Text('Preview'),
+                      style: TextButton.styleFrom(foregroundColor: Colors.blue),
                     ),
-                  ),
+                    SizedBox(width: 8.w),
+                    TextButton.icon(
+                      onPressed: () {
+                        ShareHelper.shareDocument(
+                          context,
+                          url: attachmentUrl,
+                          title: title,
+                        );
+                      },
+                      icon: Icon(Icons.share_outlined, size: 18.sp),
+                      label: const Text('Share'),
+                      style: TextButton.styleFrom(foregroundColor: Colors.blue),
+                    ),
+                  ],
                 ],
               ),
             ] else ...[

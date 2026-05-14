@@ -42,6 +42,49 @@ class EmployeeDetailsScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _confirmCancelTafweed(
+    BuildContext context,
+    VehicleEntity currentVehicle,
+    TafweedRecord record,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Authorization'),
+        content: const Text(
+          'Are you sure you want to cancel the current authorization? This will record the end date as today and move it to history.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Confirm Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      final updatedActiveTafweeds = List<TafweedRecord>.from(
+        currentVehicle.tafweeds ?? [],
+      )..remove(record);
+
+      final updatedHistory = List<TafweedRecord>.from(
+        currentVehicle.tafweedHistory ?? [],
+      );
+      updatedHistory.add(record.copyWith(expiryDate: DateTime.now()));
+
+      final updatedVehicle = currentVehicle.copyWith(
+        tafweeds: updatedActiveTafweeds,
+        tafweedHistory: updatedHistory,
+      );
+      await context.read<VehicleProvider>().updateVehicle(updatedVehicle);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -458,70 +501,109 @@ class EmployeeDetailsScreen extends StatelessWidget {
             ),
             child: Padding(
               padding: EdgeInsets.all(20.w),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    padding: EdgeInsets.all(12.w),
-                    decoration: BoxDecoration(
-                      color: Colors.purple.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.admin_panel_settings,
-                      color: Colors.purple,
-                      size: 30.sp,
-                    ),
-                  ),
-                  SizedBox(width: 16.w),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${vehicle.make} ${vehicle.model}',
-                          style: TextStyle(
-                            fontSize: 18.sp,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
                         ),
-                        SizedBox(height: 4.h),
-                        Text(
-                          'Plate: ${vehicle.plateNumber}',
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            color: Colors.grey[700],
-                          ),
+                        child: Icon(
+                          Icons.admin_panel_settings,
+                          color: Colors.purple,
+                          size: 30.sp,
                         ),
-                        if (employeeTafweed != null) ...[
-                          SizedBox(height: 4.h),
-                          Row(
-                            children: [
-                              Text(
-                                'Tafweed Expiry: ',
-                                style: TextStyle(
-                                  fontSize: 14.sp,
-                                  color: Colors.grey[700],
-                                ),
+                      ),
+                      SizedBox(width: 16.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${vehicle.make} ${vehicle.model}',
+                              style: TextStyle(
+                                fontSize: 18.sp,
+                                fontWeight: FontWeight.bold,
                               ),
-                              Text(
-                                _formatDate(employeeTafweed.expiryDate),
-                                style: TextStyle(
-                                  fontSize: 14.sp,
-                                  fontWeight: FontWeight.bold,
-                                  color:
-                                      employeeTafweed.expiryDate.isBefore(
-                                        DateTime.now(),
-                                      )
-                                      ? Colors.red
-                                      : Colors.green,
-                                ),
+                            ),
+                            SizedBox(height: 4.h),
+                            Text(
+                              'Plate: ${vehicle.plateNumber}',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                            if (employeeTafweed != null) ...[
+                              SizedBox(height: 4.h),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Tafweed Expiry: ',
+                                    style: TextStyle(
+                                      fontSize: 14.sp,
+                                      color: Colors.grey[700],
+                                    ),
+                                  ),
+                                  Text(
+                                    _formatDate(employeeTafweed.expiryDate),
+                                    style: TextStyle(
+                                      fontSize: 14.sp,
+                                      fontWeight: FontWeight.bold,
+                                      color: employeeTafweed.expiryDate
+                                              .isBefore(DateTime.now())
+                                          ? Colors.red
+                                          : Colors.green,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (employeeTafweed != null) ...[
+                    SizedBox(height: 12.h),
+                    const Divider(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Padding(
+                          padding: EdgeInsets.only(right: 8.w),
+                          child: TextButton.icon(
+                            onPressed: () => _confirmCancelTafweed(
+                              context,
+                              vehicle,
+                              employeeTafweed,
+                            ),
+                            icon: Icon(Icons.cancel_outlined,
+                                color: Colors.orange[700], size: 18.sp),
+                            label: Text(
+                              'Cancel Authorization',
+                              style: TextStyle(
+                                color: Colors.orange[700],
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              backgroundColor: Colors.orange[50],
+                              padding: EdgeInsets.symmetric(horizontal: 12.w),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                            ),
                           ),
-                        ],
+                        ),
                       ],
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
