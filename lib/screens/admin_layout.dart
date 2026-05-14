@@ -27,7 +27,6 @@ class AdminLayout extends StatefulWidget {
 
 class _AdminLayoutState extends State<AdminLayout> {
   final ValueNotifier<int> _selectedIndex = ValueNotifier<int>(0);
-  bool _isMenuUnlocked = false;
 
   final List<Widget> _screens = [
     const DashboardScreen(),
@@ -90,56 +89,9 @@ class _AdminLayoutState extends State<AdminLayout> {
     ),
   ];
 
-  Future<bool?> _showPasswordDialog() async {
-    final passwordController = TextEditingController();
-    bool isObscured = true;
-    return showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('Unlock Menu', style: TextStyle(fontWeight: FontWeight.bold)),
-            content: TextField(
-              controller: passwordController,
-              obscureText: isObscured,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                suffixIcon: IconButton(
-                  icon: Icon(isObscured ? Icons.visibility : Icons.visibility_off),
-                  onPressed: () => setState(() => isObscured = !isObscured),
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final password = passwordController.text;
-                  final bytes = utf8.encode(password);
-                  final digest = sha256.convert(bytes);
-                  final passwordHash = digest.toString();
-                  
-                  final vaultProvider = context.read<VaultProvider>();
-                  final isValid = await vaultProvider.verifyPassword(passwordHash);
-
-                  if (isValid && context.mounted) {
-                    Navigator.pop(context, true);
-                  } else if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Incorrect password')),
-                    );
-                  }
-                },
-                child: const Text('Unlock'),
-              ),
-            ],
-          );
-        }
-      ),
-    );
+  bool _isAdmin(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
+    return user?.isAdmin ?? false;
   }
 
   @override
@@ -150,6 +102,19 @@ class _AdminLayoutState extends State<AdminLayout> {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = _isAdmin(context);
+
+    final List<Widget> allowedScreens = [];
+    final List<_NavItem> allowedNavItems = [];
+
+    for (int i = 0; i < _navItems.length; i++) {
+      // 0: Dashboard, 3: Employees, 4: Vehicles
+      if (isAdmin || [0, 3, 4].contains(i)) {
+        allowedScreens.add(_screens[i]);
+        allowedNavItems.add(_navItems[i]);
+      }
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Row(
@@ -160,29 +125,15 @@ class _AdminLayoutState extends State<AdminLayout> {
             builder: (context, selectedIndex, _) {
               return _Sidebar(
                 selectedIndex: selectedIndex,
-                items: _navItems,
+                items: allowedNavItems,
                 sidebarBg: _sidebarBg,
                 brandBlue: _brandBlue,
                 activeBg: _activeBg,
                 inactiveText: _inactiveText,
                 dividerColor: _dividerColor,
-                onItemSelected: (index) async {
-                  final protectedIndices = [1, 2, 5, 6, 7];
-                  if (protectedIndices.contains(index)) {
-                    if (!_isMenuUnlocked) {
-                      final success = await _showPasswordDialog();
-                      if (success == true) {
-                        setState(() {
-                          _isMenuUnlocked = true;
-                        });
-                        _selectedIndex.value = index;
-                      }
-                    } else {
-                      _selectedIndex.value = index;
-                    }
-                  } else {
-                    _selectedIndex.value = index;
-                  }
+                isAdmin: isAdmin,
+                onItemSelected: (index) {
+                  _selectedIndex.value = index;
                 },
                 onLogout: () async {
                   await context.read<AuthProvider>().logout();
@@ -195,7 +146,9 @@ class _AdminLayoutState extends State<AdminLayout> {
             child: ValueListenableBuilder<int>(
               valueListenable: _selectedIndex,
               builder: (context, selectedIndex, _) {
-                return _screens[selectedIndex];
+                // Failsafe in case index is out of bounds due to role changes
+                final index = selectedIndex < allowedScreens.length ? selectedIndex : 0;
+                return allowedScreens[index];
               },
             ),
           ),
@@ -227,6 +180,7 @@ class _Sidebar extends StatelessWidget {
   final Color activeBg;
   final Color inactiveText;
   final Color dividerColor;
+  final bool isAdmin;
   final ValueChanged<int> onItemSelected;
   final VoidCallback onLogout;
 
@@ -238,6 +192,7 @@ class _Sidebar extends StatelessWidget {
     required this.activeBg,
     required this.inactiveText,
     required this.dividerColor,
+    required this.isAdmin,
     required this.onItemSelected,
     required this.onLogout,
   });
@@ -323,58 +278,8 @@ class _Sidebar extends StatelessWidget {
     );
   }
 
-  Future<void> _handleLogoClick(BuildContext context) async {
-    final passwordController = TextEditingController();
-    bool isObscured = true;
-    final success = await showDialog<bool>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: const Text('Access Secure Vault', style: TextStyle(fontWeight: FontWeight.bold)),
-            content: TextField(
-              controller: passwordController,
-              obscureText: isObscured,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                suffixIcon: IconButton(
-                  icon: Icon(isObscured ? Icons.visibility : Icons.visibility_off),
-                  onPressed: () => setState(() => isObscured = !isObscured),
-                ),
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final password = passwordController.text;
-                  final bytes = utf8.encode(password);
-                  final digest = sha256.convert(bytes);
-                  final passwordHash = digest.toString();
-                  
-                  final vaultProvider = context.read<VaultProvider>();
-                  final isValid = await vaultProvider.verifyPassword(passwordHash);
-
-                  if (isValid && context.mounted) {
-                    Navigator.pop(context, true);
-                  } else if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Incorrect password')),
-                    );
-                  }
-                },
-                child: const Text('Enter'),
-              ),
-            ],
-          );
-        }
-      ),
-    );
-
-    if (success == true && context.mounted) {
+  void _handleLogoClick(BuildContext context) {
+    if (isAdmin && context.mounted) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const VaultScreen()),

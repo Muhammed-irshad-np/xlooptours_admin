@@ -68,10 +68,11 @@ class CommercialLicense extends Equatable {
     String? registrationNo,
     VaultDocument? document,
     int? alertDays,
+    bool clearExpiryDate = false,
   }) {
     return CommercialLicense(
       issueDate: issueDate ?? this.issueDate,
-      expiryDate: expiryDate ?? this.expiryDate,
+      expiryDate: clearExpiryDate ? null : (expiryDate ?? this.expiryDate),
       registrationNo: registrationNo ?? this.registrationNo,
       document: document ?? this.document,
       alertDays: alertDays ?? this.alertDays,

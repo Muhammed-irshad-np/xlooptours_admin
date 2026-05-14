@@ -259,15 +259,6 @@ class UpdateDialogHelper {
                   onPressed: isSaving
                       ? null
                       : () async {
-                          if (selectedDate == null) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(
-                                content: Text('Please select a date'),
-                              ),
-                            );
-                            return;
-                          }
-
                           setState(() => isSaving = true);
 
                           try {
@@ -292,177 +283,213 @@ class UpdateDialogHelper {
 
                             switch (documentType) {
                               case 'Iqama':
-                                updatedEmployee = employee.copyWith(
-                                  iqama: employee.iqama != null
-                                      ? IqamaDocument(
-                                          number: employee.iqama!.number,
-                                          expiryDate: selectedDate!,
-                                          attachmentUrl: _url(
-                                            employee.iqama!.attachmentUrl,
+                                if (selectedDate == null) {
+                                  updatedEmployee = employee.copyWith(clearIqama: true);
+                                } else {
+                                  updatedEmployee = employee.copyWith(
+                                    iqama: employee.iqama != null
+                                        ? IqamaDocument(
+                                            number: employee.iqama!.number,
+                                            expiryDate: selectedDate!,
+                                            attachmentUrl: _url(
+                                              employee.iqama!.attachmentUrl,
+                                            ),
+                                          )
+                                        : IqamaDocument(
+                                            number: '',
+                                            expiryDate: selectedDate!,
+                                            attachmentUrl: newAttachmentUrl,
                                           ),
-                                        )
-                                      : IqamaDocument(
-                                          number: '',
-                                          expiryDate: selectedDate!,
-                                          attachmentUrl: newAttachmentUrl,
-                                        ),
-                                );
+                                  );
+                                }
                                 break;
                               case 'Bahrain Residence ID':
-                                updatedEmployee = employee.copyWith(
-                                  bahrainResidence:
-                                      employee.bahrainResidence != null
-                                          ? BahrainResidenceDocument(
-                                              number: employee
-                                                  .bahrainResidence!.number,
-                                              expiryDate: selectedDate!,
-                                              attachmentUrl: _url(
-                                                employee.bahrainResidence!
-                                                    .attachmentUrl,
+                                if (selectedDate == null) {
+                                  updatedEmployee = employee.copyWith(clearBahrainResidence: true);
+                                } else {
+                                  updatedEmployee = employee.copyWith(
+                                    bahrainResidence:
+                                        employee.bahrainResidence != null
+                                            ? BahrainResidenceDocument(
+                                                number: employee
+                                                    .bahrainResidence!.number,
+                                                expiryDate: selectedDate!,
+                                                attachmentUrl: _url(
+                                                  employee.bahrainResidence!
+                                                      .attachmentUrl,
+                                                ),
+                                              )
+                                            : BahrainResidenceDocument(
+                                                number: '',
+                                                expiryDate: selectedDate!,
+                                                attachmentUrl: newAttachmentUrl,
                                               ),
-                                            )
-                                          : BahrainResidenceDocument(
-                                              number: '',
-                                              expiryDate: selectedDate!,
-                                              attachmentUrl: newAttachmentUrl,
-                                            ),
-                                );
+                                  );
+                                }
                                 break;
                               case 'Health Insurance':
-                                updatedEmployee = employee.copyWith(
-                                  healthInsurance: employee.healthInsurance !=
-                                          null
-                                      ? HealthInsuranceDocument(
-                                          expiryDate: selectedDate!,
-                                          attachmentUrl: _url(
-                                            employee.healthInsurance!
-                                                .attachmentUrl,
+                                if (selectedDate == null) {
+                                  updatedEmployee = employee.copyWith(clearHealthInsurance: true);
+                                } else {
+                                  updatedEmployee = employee.copyWith(
+                                    healthInsurance: employee.healthInsurance !=
+                                            null
+                                        ? HealthInsuranceDocument(
+                                            expiryDate: selectedDate!,
+                                            attachmentUrl: _url(
+                                              employee.healthInsurance!
+                                                  .attachmentUrl,
+                                            ),
+                                          )
+                                        : HealthInsuranceDocument(
+                                            expiryDate: selectedDate!,
+                                            attachmentUrl: newAttachmentUrl,
                                           ),
-                                        )
-                                      : HealthInsuranceDocument(
-                                          expiryDate: selectedDate!,
-                                          attachmentUrl: newAttachmentUrl,
-                                        ),
-                                );
+                                  );
+                                }
                                 break;
                               case 'Driving License':
-                                updatedEmployee = employee.copyWith(
-                                  drivingLicense:
-                                      employee.drivingLicense != null
-                                          ? DrivingLicenseDocument(
-                                              countryOfOrigin: employee
-                                                  .drivingLicense!
-                                                  .countryOfOrigin,
-                                              number: employee
-                                                  .drivingLicense!.number,
-                                              expiryDate: selectedDate!,
-                                              type: employee
-                                                  .drivingLicense!.type,
-                                              attachmentUrl: _url(
-                                                employee.drivingLicense!
-                                                    .attachmentUrl,
+                                if (selectedDate == null) {
+                                  updatedEmployee = employee.copyWith(clearDrivingLicense: true);
+                                } else {
+                                  updatedEmployee = employee.copyWith(
+                                    drivingLicense:
+                                        employee.drivingLicense != null
+                                            ? DrivingLicenseDocument(
+                                                countryOfOrigin: employee
+                                                    .drivingLicense!
+                                                    .countryOfOrigin,
+                                                number: employee
+                                                    .drivingLicense!.number,
+                                                expiryDate: selectedDate!,
+                                                type: employee
+                                                    .drivingLicense!.type,
+                                                attachmentUrl: _url(
+                                                  employee.drivingLicense!
+                                                      .attachmentUrl,
+                                                ),
+                                              )
+                                            : DrivingLicenseDocument(
+                                                countryOfOrigin: '',
+                                                number: '',
+                                                expiryDate: selectedDate!,
+                                                type: DrivingLicenseType.private,
+                                                attachmentUrl: newAttachmentUrl,
                                               ),
-                                            )
-                                          : DrivingLicenseDocument(
-                                              countryOfOrigin: '',
-                                              number: '',
-                                              expiryDate: selectedDate!,
-                                              type: DrivingLicenseType.private,
-                                              attachmentUrl: newAttachmentUrl,
-                                            ),
-                                );
+                                  );
+                                }
                                 break;
                               case 'Passport':
-                                updatedEmployee = employee.copyWith(
-                                  passport: employee.passport != null
-                                      ? PassportDocument(
-                                          nameOnPassport: employee
-                                              .passport!.nameOnPassport,
-                                          number: employee.passport!.number,
-                                          expiryDate: selectedDate!,
-                                          attachmentUrl: _url(
-                                            employee.passport!.attachmentUrl,
+                                if (selectedDate == null) {
+                                  updatedEmployee = employee.copyWith(clearPassport: true);
+                                } else {
+                                  updatedEmployee = employee.copyWith(
+                                    passport: employee.passport != null
+                                        ? PassportDocument(
+                                            nameOnPassport: employee
+                                                .passport!.nameOnPassport,
+                                            number: employee.passport!.number,
+                                            expiryDate: selectedDate!,
+                                            attachmentUrl: _url(
+                                              employee.passport!.attachmentUrl,
+                                            ),
+                                          )
+                                        : PassportDocument(
+                                            nameOnPassport: '',
+                                            number: '',
+                                            expiryDate: selectedDate!,
+                                            attachmentUrl: newAttachmentUrl,
                                           ),
-                                        )
-                                      : PassportDocument(
-                                          nameOnPassport: '',
-                                          number: '',
-                                          expiryDate: selectedDate!,
-                                          attachmentUrl: newAttachmentUrl,
-                                        ),
-                                );
+                                  );
+                                }
                                 break;
                               case 'Saudi Visa':
-                                updatedEmployee = employee.copyWith(
-                                  saudiVisa: employee.saudiVisa != null
-                                      ? VisaDocument(
-                                          number: employee.saudiVisa!.number,
-                                          expiryDate: selectedDate!,
-                                          type: employee.saudiVisa!.type,
-                                          attachmentUrl: _url(
-                                            employee.saudiVisa!.attachmentUrl,
+                                if (selectedDate == null) {
+                                  updatedEmployee = employee.copyWith(clearSaudiVisa: true);
+                                } else {
+                                  updatedEmployee = employee.copyWith(
+                                    saudiVisa: employee.saudiVisa != null
+                                        ? VisaDocument(
+                                            number: employee.saudiVisa!.number,
+                                            expiryDate: selectedDate!,
+                                            type: employee.saudiVisa!.type,
+                                            attachmentUrl: _url(
+                                              employee.saudiVisa!.attachmentUrl,
+                                            ),
+                                          )
+                                        : VisaDocument(
+                                            number: '',
+                                            expiryDate: selectedDate!,
+                                            attachmentUrl: newAttachmentUrl,
                                           ),
-                                        )
-                                      : VisaDocument(
-                                          number: '',
-                                          expiryDate: selectedDate!,
-                                          attachmentUrl: newAttachmentUrl,
-                                        ),
-                                );
+                                  );
+                                }
                                 break;
                               case 'Bahrain Visa':
-                                updatedEmployee = employee.copyWith(
-                                  bahrainVisa: employee.bahrainVisa != null
-                                      ? VisaDocument(
-                                          number: employee.bahrainVisa!.number,
-                                          expiryDate: selectedDate!,
-                                          type: employee.bahrainVisa!.type,
-                                          attachmentUrl: _url(
-                                            employee.bahrainVisa!.attachmentUrl,
+                                if (selectedDate == null) {
+                                  updatedEmployee = employee.copyWith(clearBahrainVisa: true);
+                                } else {
+                                  updatedEmployee = employee.copyWith(
+                                    bahrainVisa: employee.bahrainVisa != null
+                                        ? VisaDocument(
+                                            number: employee.bahrainVisa!.number,
+                                            expiryDate: selectedDate!,
+                                            type: employee.bahrainVisa!.type,
+                                            attachmentUrl: _url(
+                                              employee.bahrainVisa!.attachmentUrl,
+                                            ),
+                                          )
+                                        : VisaDocument(
+                                            number: '',
+                                            expiryDate: selectedDate!,
+                                            attachmentUrl: newAttachmentUrl,
                                           ),
-                                        )
-                                      : VisaDocument(
-                                          number: '',
-                                          expiryDate: selectedDate!,
-                                          attachmentUrl: newAttachmentUrl,
-                                        ),
-                                );
+                                  );
+                                }
                                 break;
                               case 'Dubai Visa':
-                                updatedEmployee = employee.copyWith(
-                                  dubaiVisa: employee.dubaiVisa != null
-                                      ? VisaDocument(
-                                          number: employee.dubaiVisa!.number,
-                                          expiryDate: selectedDate!,
-                                          type: employee.dubaiVisa!.type,
-                                          attachmentUrl: _url(
-                                            employee.dubaiVisa!.attachmentUrl,
+                                if (selectedDate == null) {
+                                  updatedEmployee = employee.copyWith(clearDubaiVisa: true);
+                                } else {
+                                  updatedEmployee = employee.copyWith(
+                                    dubaiVisa: employee.dubaiVisa != null
+                                        ? VisaDocument(
+                                            number: employee.dubaiVisa!.number,
+                                            expiryDate: selectedDate!,
+                                            type: employee.dubaiVisa!.type,
+                                            attachmentUrl: _url(
+                                              employee.dubaiVisa!.attachmentUrl,
+                                            ),
+                                          )
+                                        : VisaDocument(
+                                            number: '',
+                                            expiryDate: selectedDate!,
+                                            attachmentUrl: newAttachmentUrl,
                                           ),
-                                        )
-                                      : VisaDocument(
-                                          number: '',
-                                          expiryDate: selectedDate!,
-                                          attachmentUrl: newAttachmentUrl,
-                                        ),
-                                );
+                                  );
+                                }
                                 break;
                               case 'Qatar Visa':
-                                updatedEmployee = employee.copyWith(
-                                  qatarVisa: employee.qatarVisa != null
-                                      ? VisaDocument(
-                                          number: employee.qatarVisa!.number,
-                                          expiryDate: selectedDate!,
-                                          type: employee.qatarVisa!.type,
-                                          attachmentUrl: _url(
-                                            employee.qatarVisa!.attachmentUrl,
+                                if (selectedDate == null) {
+                                  updatedEmployee = employee.copyWith(clearQatarVisa: true);
+                                } else {
+                                  updatedEmployee = employee.copyWith(
+                                    qatarVisa: employee.qatarVisa != null
+                                        ? VisaDocument(
+                                            number: employee.qatarVisa!.number,
+                                            expiryDate: selectedDate!,
+                                            type: employee.qatarVisa!.type,
+                                            attachmentUrl: _url(
+                                              employee.qatarVisa!.attachmentUrl,
+                                            ),
+                                          )
+                                        : VisaDocument(
+                                            number: '',
+                                            expiryDate: selectedDate!,
+                                            attachmentUrl: newAttachmentUrl,
                                           ),
-                                        )
-                                      : VisaDocument(
-                                          number: '',
-                                          expiryDate: selectedDate!,
-                                          attachmentUrl: newAttachmentUrl,
-                                        ),
-                                );
+                                  );
+                                }
                                 break;
                               default:
                                 // Phone Recharge contacts
@@ -889,7 +916,7 @@ class UpdateDialogHelper {
                       if (documentType == 'Commercial License') {
                         updatedData = vaultData.copyWith(
                           license: vaultData.license.copyWith(
-                            expiryDate: selectedDate,
+                            expiryDate: selectedDate!,
                             document: newDoc ?? vaultData.license.document,
                           ),
                         );
@@ -1017,7 +1044,6 @@ class UpdateDialogHelper {
                 TextButton(onPressed: isSaving ? null : () => Navigator.pop(ctx), child: const Text('Cancel')),
                 ElevatedButton(
                   onPressed: isSaving ? null : () async {
-                    if (selectedDate == null) return;
                     setState(() => isSaving = true);
                     try {
                       String? newUrl;
@@ -1034,45 +1060,61 @@ class UpdateDialogHelper {
 
                       switch (documentType) {
                         case 'Istimara':
-                          updatedVehicle = vehicle.copyWith(
-                            registration: (vehicle.registration ??
-                                    VehicleDocument(expiryDate: selectedDate!))
-                                .copyWith(
-                              expiryDate: selectedDate,
-                              attachmentUrl: url(vehicle.registration?.attachmentUrl),
-                            ),
-                          );
+                          if (selectedDate == null) {
+                            updatedVehicle = vehicle.copyWith(clearRegistration: true);
+                          } else {
+                            updatedVehicle = vehicle.copyWith(
+                              registration: (vehicle.registration ??
+                                      VehicleDocument(expiryDate: selectedDate!))
+                                  .copyWith(
+                                expiryDate: selectedDate!,
+                                attachmentUrl: url(vehicle.registration?.attachmentUrl),
+                              ),
+                            );
+                          }
                           break;
                         case 'Insurance':
-                          updatedVehicle = vehicle.copyWith(
-                            insurance: (vehicle.insurance ??
-                                    VehicleDocument(expiryDate: selectedDate!))
-                                .copyWith(
-                              expiryDate: selectedDate,
-                              attachmentUrl: url(vehicle.insurance?.attachmentUrl),
-                            ),
-                          );
+                          if (selectedDate == null) {
+                            updatedVehicle = vehicle.copyWith(clearInsurance: true);
+                          } else {
+                            updatedVehicle = vehicle.copyWith(
+                              insurance: (vehicle.insurance ??
+                                      VehicleDocument(expiryDate: selectedDate!))
+                                  .copyWith(
+                                expiryDate: selectedDate!,
+                                attachmentUrl: url(vehicle.insurance?.attachmentUrl),
+                              ),
+                            );
+                          }
                           break;
                         case 'Fahas':
-                          updatedVehicle = vehicle.copyWith(
-                            fahas: (vehicle.fahas ??
-                                    VehicleDocument(expiryDate: selectedDate!))
-                                .copyWith(
-                              expiryDate: selectedDate,
-                              attachmentUrl: url(vehicle.fahas?.attachmentUrl),
-                            ),
-                          );
+                          if (selectedDate == null) {
+                            updatedVehicle = vehicle.copyWith(clearFahas: true);
+                          } else {
+                            updatedVehicle = vehicle.copyWith(
+                              fahas: (vehicle.fahas ??
+                                      VehicleDocument(expiryDate: selectedDate!))
+                                  .copyWith(
+                                expiryDate: selectedDate!,
+                                attachmentUrl: url(vehicle.fahas?.attachmentUrl),
+                              ),
+                            );
+                          }
                           break;
                         case 'Bahrain Insurance':
-                          updatedVehicle = vehicle.copyWith(
-                            bahrainInsurance: (vehicle.bahrainInsurance ??
-                                    VehicleDocument(expiryDate: selectedDate!))
-                                .copyWith(
-                              expiryDate: selectedDate,
-                              attachmentUrl:
-                                  url(vehicle.bahrainInsurance?.attachmentUrl),
-                            ),
-                          );
+                          if (selectedDate == null) {
+                            updatedVehicle = vehicle.copyWith(clearBahrainInsurance: true);
+                          } else {
+                            updatedVehicle = vehicle.copyWith(
+                              bahrainInsurance: (vehicle.bahrainInsurance ??
+                                      VehicleDocument(expiryDate: selectedDate!))
+                                  .copyWith(
+                                expiryDate: selectedDate!,
+                                attachmentUrl:
+                                    url(vehicle.bahrainInsurance?.attachmentUrl),
+                              ),
+                            );
+                          }
                           break;
                         case 'Tafweed':
                           if (driverId != null) {
@@ -1080,11 +1122,15 @@ class UpdateDialogHelper {
                             final targetIndex = currentTafweeds.indexWhere((t) => t.driverId == driverId);
                             
                             if (targetIndex != -1) {
-                              final current = currentTafweeds[targetIndex];
-                              currentTafweeds[targetIndex] = current.copyWith(
-                                expiryDate: selectedDate,
-                                attachmentUrl: url(current.attachmentUrl),
-                              );
+                              if (selectedDate == null) {
+                                currentTafweeds.removeAt(targetIndex);
+                              } else {
+                                final current = currentTafweeds[targetIndex];
+                                currentTafweeds[targetIndex] = current.copyWith(
+                                  expiryDate: selectedDate!,
+                                  attachmentUrl: url(current.attachmentUrl),
+                                );
+                              }
                               updatedVehicle = vehicle.copyWith(
                                 tafweeds: currentTafweeds,
                               );

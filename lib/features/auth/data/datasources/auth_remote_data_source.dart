@@ -25,9 +25,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Stream<UserModel?> get authStateChanges {
-    return auth.authStateChanges().map((user) {
+    return auth.authStateChanges().asyncMap((user) async {
       if (user != null) {
-        return UserModel.fromFirebaseUser(user);
+        bool isAdmin = false;
+        if (user.email != null) {
+          try {
+            final userDoc = await firestore
+                .collection('allowed_users')
+                .doc(user.email!.toLowerCase())
+                .get();
+            if (userDoc.exists) {
+              isAdmin = userDoc.data()?['isAdmin'] ?? false;
+            }
+          } catch (_) {}
+        }
+        return UserModel.fromFirebaseUser(user, isAdmin: isAdmin);
       }
       return null;
     });
@@ -37,6 +49,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   UserModel? get currentUser {
     final user = auth.currentUser;
     if (user != null) {
+      // Synchronous getter won't have the real isAdmin value, 
+      // but authStateChanges will update it shortly.
       return UserModel.fromFirebaseUser(user);
     }
     return null;
@@ -53,7 +67,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         password: password,
       );
       if (credential.user != null) {
-        return UserModel.fromFirebaseUser(credential.user!);
+        bool isAdmin = false;
+        try {
+          final userDoc = await firestore
+              .collection('allowed_users')
+              .doc(credential.user!.email!.toLowerCase())
+              .get();
+          if (userDoc.exists) {
+            isAdmin = userDoc.data()?['isAdmin'] ?? false;
+          }
+        } catch (_) {}
+        return UserModel.fromFirebaseUser(credential.user!, isAdmin: isAdmin);
       }
       throw AuthenticationException('Login failed');
     } on FirebaseAuthException catch (e) {
@@ -80,6 +104,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final userCredential = await auth.signInWithCredential(credential);
       final user = userCredential.user;
 
+      bool isAdmin = false;
+
       if (user != null && user.email != null) {
         try {
           final userDoc = await firestore
@@ -93,6 +119,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               'This email is not authorized to access the application.',
             );
           }
+          
+          isAdmin = userDoc.data()?['isAdmin'] ?? false;
         } catch (e) {
           if (e is AuthenticationException) rethrow;
           await signOut();
@@ -103,7 +131,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
 
       if (user != null) {
-        return UserModel.fromFirebaseUser(user);
+        return UserModel.fromFirebaseUser(user, isAdmin: isAdmin);
       }
       throw AuthenticationException('Login failed');
     } on FirebaseAuthException catch (e) {
