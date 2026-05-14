@@ -6,6 +6,7 @@ class EmployeeSettingsEntity extends Equatable {
   final int passportAlertDays;
   final int saudiVisaAlertDays;
   final int bahrainVisaAlertDays;
+  final int bahrainResidenceAlertDays;
   final int dubaiVisaAlertDays;
   final int qatarVisaAlertDays;
   final int phoneRechargeAlertDays;
@@ -18,6 +19,7 @@ class EmployeeSettingsEntity extends Equatable {
     this.passportAlertDays = 30,
     this.saudiVisaAlertDays = 30,
     this.bahrainVisaAlertDays = 30,
+    this.bahrainResidenceAlertDays = 30,
     this.dubaiVisaAlertDays = 30,
     this.qatarVisaAlertDays = 30,
     this.phoneRechargeAlertDays = 30,
@@ -32,6 +34,7 @@ class EmployeeSettingsEntity extends Equatable {
         passportAlertDays,
         saudiVisaAlertDays,
         bahrainVisaAlertDays,
+        bahrainResidenceAlertDays,
         dubaiVisaAlertDays,
         qatarVisaAlertDays,
         phoneRechargeAlertDays,
@@ -45,6 +48,7 @@ class EmployeeSettingsEntity extends Equatable {
     int? passportAlertDays,
     int? saudiVisaAlertDays,
     int? bahrainVisaAlertDays,
+    int? bahrainResidenceAlertDays,
     int? dubaiVisaAlertDays,
     int? qatarVisaAlertDays,
     int? phoneRechargeAlertDays,
@@ -57,6 +61,7 @@ class EmployeeSettingsEntity extends Equatable {
       passportAlertDays: passportAlertDays ?? this.passportAlertDays,
       saudiVisaAlertDays: saudiVisaAlertDays ?? this.saudiVisaAlertDays,
       bahrainVisaAlertDays: bahrainVisaAlertDays ?? this.bahrainVisaAlertDays,
+      bahrainResidenceAlertDays: bahrainResidenceAlertDays ?? this.bahrainResidenceAlertDays,
       dubaiVisaAlertDays: dubaiVisaAlertDays ?? this.dubaiVisaAlertDays,
       qatarVisaAlertDays: qatarVisaAlertDays ?? this.qatarVisaAlertDays,
       phoneRechargeAlertDays: phoneRechargeAlertDays ?? this.phoneRechargeAlertDays,

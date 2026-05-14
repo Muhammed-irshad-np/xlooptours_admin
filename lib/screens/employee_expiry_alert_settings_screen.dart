@@ -18,6 +18,7 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
   late TextEditingController _passportController;
   late TextEditingController _saudiVisaController;
   late TextEditingController _bahrainVisaController;
+  late TextEditingController _bahrainResidenceController;
   late TextEditingController _dubaiVisaController;
   late TextEditingController _qatarVisaController;
   late TextEditingController _phoneRechargeController;
@@ -32,6 +33,7 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
     _passportController = TextEditingController();
     _saudiVisaController = TextEditingController();
     _bahrainVisaController = TextEditingController();
+    _bahrainResidenceController = TextEditingController();
     _dubaiVisaController = TextEditingController();
     _qatarVisaController = TextEditingController();
     _phoneRechargeController = TextEditingController();
@@ -49,6 +51,7 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
             _passportController.text = settings.passportAlertDays.toString();
             _saudiVisaController.text = settings.saudiVisaAlertDays.toString();
             _bahrainVisaController.text = settings.bahrainVisaAlertDays.toString();
+            _bahrainResidenceController.text = settings.bahrainResidenceAlertDays.toString();
             _dubaiVisaController.text = settings.dubaiVisaAlertDays.toString();
             _qatarVisaController.text = settings.qatarVisaAlertDays.toString();
             _phoneRechargeController.text = settings.phoneRechargeAlertDays.toString();
@@ -66,6 +69,7 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
     _passportController.dispose();
     _saudiVisaController.dispose();
     _bahrainVisaController.dispose();
+    _bahrainResidenceController.dispose();
     _dubaiVisaController.dispose();
     _qatarVisaController.dispose();
     _phoneRechargeController.dispose();
@@ -83,6 +87,7 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
         passportAlertDays: int.parse(_passportController.text),
         saudiVisaAlertDays: int.parse(_saudiVisaController.text),
         bahrainVisaAlertDays: int.parse(_bahrainVisaController.text),
+        bahrainResidenceAlertDays: int.parse(_bahrainResidenceController.text),
         dubaiVisaAlertDays: int.parse(_dubaiVisaController.text),
         qatarVisaAlertDays: int.parse(_qatarVisaController.text),
         phoneRechargeAlertDays: int.parse(_phoneRechargeController.text),
@@ -180,6 +185,13 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
                     controller: _bahrainVisaController,
                     icon: Icons.airplane_ticket_outlined,
                     color: Colors.teal,
+                  ),
+                  SizedBox(height: 24.h),
+                  _buildSettingField(
+                    label: 'Bahrain Residence Alert',
+                    controller: _bahrainResidenceController,
+                    icon: Icons.contact_mail,
+                    color: Colors.indigoAccent,
                   ),
                   SizedBox(height: 24.h),
                   _buildSettingField(

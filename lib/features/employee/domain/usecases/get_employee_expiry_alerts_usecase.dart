@@ -83,6 +83,23 @@ class GetEmployeeExpiryAlertsUseCase {
         }
       }
 
+      // Bahrain Residence
+      if (employee.bahrainResidence != null) {
+        final days = employee.bahrainResidence!.expiryDate.difference(now).inDays;
+        final alertDays = settings.bahrainResidenceAlertDays;
+        if (days <= alertDays) {
+          alerts.add(
+            EmployeeExpiryAlert(
+              employeeId: employee.id,
+              employeeName: employee.fullName,
+              documentType: 'Bahrain Residence',
+              expiryDate: employee.bahrainResidence!.expiryDate,
+              daysUntilExpiry: days,
+            ),
+          );
+        }
+      }
+
       // Bahrain Visa
       if (employee.bahrainVisa != null) {
         final days = employee.bahrainVisa!.expiryDate.difference(now).inDays;
