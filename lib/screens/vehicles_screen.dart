@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:xloop_invoice/screens/vehicle_master_screen.dart'; // Added
 import 'package:xloop_invoice/screens/vehicle_detail_screen.dart';
 import 'package:provider/provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import '../widgets/add_maintenance_record_dialog.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
@@ -112,10 +113,11 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   Widget build(BuildContext context) {
     final vehicleProvider = context.watch<VehicleProvider>();
     final isLoading = vehicleProvider.isLoading;
+    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
     final vehicles = vehicleProvider.vehicles;
 
     return DefaultTabController(
-      length: 2,
+      length: isAdmin ? 2 : 1,
       child: Scaffold(
         appBar: ModernAppBar(
           title: 'Fleet Management',
@@ -126,10 +128,10 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
               tooltip: 'Add Vehicle',
             ),
           ],
-          bottom: const ModernTabBar(
+          bottom: ModernTabBar(
             tabs: [
-              Tab(text: 'Fleet List'),
-              Tab(text: 'Vehicle Master'),
+              const Tab(text: 'Fleet List'),
+              if (isAdmin) const Tab(text: 'Vehicle Master'),
             ],
           ),
         ),
@@ -182,8 +184,8 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                     },
                   ),
 
-            // Tab 2: Vehicle Master
-            const VehicleMasterScreen(),
+            // Tab 2: Vehicle Master (Admin Only)
+            if (isAdmin) const VehicleMasterScreen(),
           ],
         ),
       ),

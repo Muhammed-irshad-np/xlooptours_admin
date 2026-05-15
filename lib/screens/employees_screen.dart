@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
@@ -28,6 +29,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   List<EmployeeEntity> _allEmployees = [];
   String _searchQuery = '';
   late TabController _tabController;
+  bool _isAdmin = false;
 
   final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(true);
   final ValueNotifier<bool> _showInactive = ValueNotifier<bool>(false);
@@ -36,17 +38,21 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   final ValueNotifier<Map<String, VehicleEntity>> _assignedVehicles =
       ValueNotifier<Map<String, VehicleEntity>>({});
 
-  final List<String> _tabs = [
-    'All',
-    'Management',
-    'Office',
-    'Drivers',
-    'Master',
-  ];
+  final List<String> _tabs = [];
 
   @override
   void initState() {
     super.initState();
+    _isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    _tabs.addAll([
+      'All',
+      'Management',
+      'Office',
+      'Drivers',
+    ]);
+    if (_isAdmin) {
+      _tabs.add('Master');
+    }
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(() {
       _filterEmployees();
@@ -235,7 +241,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
           tabs: _tabs.map((t) => Tab(text: t)).toList(),
         ),
       ),
-      body: _tabController.index == _tabs.length - 1
+      body: (_isAdmin && _tabs[_tabController.index] == 'Master')
           ? const EmployeeMasterScreen()
           : Column(
               children: [
@@ -349,7 +355,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
       color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.withOpacity(0.2)),
+        side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -363,7 +369,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                   width: 56, // Increased from 40
                   height: 56, // Increased from 40
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: Colors.blue.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
                   child: ClipOval(
@@ -438,8 +444,8 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                               ),
                               decoration: BoxDecoration(
                                 color: employee.driverType == 'Internal'
-                                    ? Colors.green.withOpacity(0.1)
-                                    : Colors.orange.withOpacity(0.1),
+                                    ? Colors.green.withValues(alpha: 0.1)
+                                    : Colors.orange.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4.r),
                                 border: Border.all(
                                   color: employee.driverType == 'Internal'
@@ -584,9 +590,9 @@ class _EmployeesScreenState extends State<EmployeesScreen>
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.05),
+                  color: Colors.blue.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(8.r),
-                  border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
                 ),
                 child: Row(
                   children: [
