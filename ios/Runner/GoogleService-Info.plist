@@ -2,18 +2,22 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>1014331668523-51e9riafn4samfp8c213gf27ueinndi8.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.1014331668523-51e9riafn4samfp8c213gf27ueinndi8</string>
 	<key>API_KEY</key>
-	<string>AIzaSyDsqA51b6Wb5sjyT5I89xIwwRLqZW2DhOs</string>
+	<string>AIzaSyAwS2Q7gQRMZ0PAfztwcXfy7WqfzdRDA_U</string>
 	<key>GCM_SENDER_ID</key>
-	<string>1098817651136</string>
+	<string>1014331668523</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
 	<string>com.example.xloopInvoice</string>
 	<key>PROJECT_ID</key>
-	<string>xloop-tours-invoice</string>
+	<string>xloop-tours-dev</string>
 	<key>STORAGE_BUCKET</key>
-	<string>xloop-tours-invoice.firebasestorage.app</string>
+	<string>xloop-tours-dev.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -25,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1098817651136:ios:b0e146d25891cc5bb20825</string>
+	<string>1:1014331668523:ios:9bb325c6662728a335926e</string>
 </dict>
 </plist>

@@ -1,26 +1,36 @@
 {
   "project_info": {
-    "project_number": "1098817651136",
-    "project_id": "xloop-tours-invoice",
-    "storage_bucket": "xloop-tours-invoice.firebasestorage.app"
+    "project_number": "1014331668523",
+    "project_id": "xloop-tours-dev",
+    "storage_bucket": "xloop-tours-dev.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1098817651136:android:073e31ea1caacb84b20825",
+        "mobilesdk_app_id": "1:1014331668523:android:bafbe442b4304f0935926e",
         "android_client_info": {
           "package_name": "com.example.xloop_invoice"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "1014331668523-sso54ruvdpk1qt3htlab9fo08rl2b73u.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyD_htXQmKwKkO4-3SVFEqiOFKQeEvWNAHQ"
+          "current_key": "AIzaSyBKPulq8eAFFg7DbsiWA4nyqeTnJy_dKDw"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1014331668523-sso54ruvdpk1qt3htlab9fo08rl2b73u.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
