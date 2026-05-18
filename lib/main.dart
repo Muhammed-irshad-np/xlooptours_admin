@@ -6,7 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:url_strategy/url_strategy.dart'; // Import url_strategy
 import 'package:provider/provider.dart';
 import 'screens/login_screen.dart';
-import 'firebase_options.dart';
+import 'firebase_options.dart' as prod_options;
+import 'firebase_options_dev.dart' as dev_options;
 import 'injection_container.dart' as di;
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/notifications/presentation/providers/notification_provider.dart';
@@ -87,11 +88,15 @@ void main() async {
     );
   };
 
+  const environment = String.fromEnvironment('ENV', defaultValue: 'prod');
+
   try {
     await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
+      options: environment == 'dev'
+          ? dev_options.DefaultFirebaseOptions.currentPlatform
+          : prod_options.DefaultFirebaseOptions.currentPlatform,
     );
-    debugPrint('Firebase initialized successfully');
+    debugPrint('Firebase initialized successfully for $environment environment');
   } catch (e, stackTrace) {
     final errorMessage = e.toString().toLowerCase();
     if (errorMessage.contains('already initialized') ||
