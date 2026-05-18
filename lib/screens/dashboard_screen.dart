@@ -208,6 +208,37 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
       actions: [
+        if (const String.fromEnvironment('ENV', defaultValue: 'prod') == 'dev')
+          Padding(
+            padding: EdgeInsets.only(right: 8.w),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: _DT.warningBg,
+                borderRadius: BorderRadius.circular(20.r),
+                border: Border.all(color: _DT.warningBorder),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.terminal_rounded,
+                    size: 14.sp,
+                    color: _DT.warning,
+                  ),
+                  SizedBox(width: 6.w),
+                  Text(
+                    'Development',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.sp,
+                      color: _DT.warning,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         Padding(
           padding: EdgeInsets.only(right: 16.w),
           child: _AppBarChip(
