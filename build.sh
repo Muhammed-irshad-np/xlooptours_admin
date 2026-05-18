@@ -7,8 +7,8 @@ echo "Vercel Environment: $VERCEL_ENV"
 
 if [ "$VERCEL_ENV" == "production" ]; then
   echo "Building for Production Database..."
-  flutter build web
+  ./flutter/bin/flutter build web --release
 else
   echo "Building for Development Database..."
-  flutter build web --dart-define=ENV=dev
+  ./flutter/bin/flutter build web --release --dart-define=ENV=dev
 fi
