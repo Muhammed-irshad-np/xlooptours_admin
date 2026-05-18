@@ -5,7 +5,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "xloop_invoice",
+            "name": "xloop_invoice (Staging / Dev)",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--web-port",
+                "5005",
+                "--dart-define=ENV=dev"
+            ]
+        },
+        {
+            "name": "xloop_invoice (Production)",
             "request": "launch",
             "type": "dart",
             "args": [
