@@ -394,7 +394,12 @@ Future<void> init() async {
   //! External
   final auth = FirebaseAuth.instance;
   final firestore = FirebaseFirestore.instance;
-  final googleSignIn = GoogleSignIn();
+  final isDev = const String.fromEnvironment('ENV', defaultValue: 'prod') == 'dev';
+  final googleSignIn = GoogleSignIn(
+    clientId: isDev
+        ? '1014331668523-sso54ruvdpk1qt3htlab9fo08rl2b73u.apps.googleusercontent.com'
+        : '1098817651136-nv3hg1dtaio5tvfk7flbn3b4f6k5fgqt.apps.googleusercontent.com',
+  );
   final storage = FirebaseStorage.instance;
   final sharedPreferences = await SharedPreferences.getInstance();
 
