@@ -14,6 +14,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
+import '../features/auth/presentation/providers/auth_provider.dart';
+
 import '../widgets/add_maintenance_record_dialog.dart';
 import 'tafweed_history_view_all_screen.dart';
 import '../features/vehicle/presentation/widgets/authorize_driver_to_vehicle_dialog.dart';
@@ -27,6 +29,7 @@ class VehicleDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<VehicleProvider>(context);
+    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
 
     // Find the latest version of this vehicle in the provider's list
     // to ensure the UI refreshes when maintenance records are added.
@@ -177,42 +180,44 @@ class VehicleDetailScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const Divider(height: 32),
-            _buildSectionHeader('Purchase Information'),
-            _buildDetailRow(
-              context,
-              'Purchase Date',
-              currentVehicle.purchaseDate != null
-                  ? DateFormat(
-                      'yyyy-MM-dd',
-                    ).format(currentVehicle.purchaseDate!)
-                  : 'N/A',
-              Icons.shopping_bag_outlined,
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildDetailRow(
-                    context,
-                    'Purchase Price',
-                    currentVehicle.purchasePrice != null
-                        ? currentVehicle.purchasePrice!.toStringAsFixed(2)
-                        : 'N/A',
-                    Icons.money,
+            if (isAdmin) ...[
+              const Divider(height: 32),
+              _buildSectionHeader('Purchase Information'),
+              _buildDetailRow(
+                context,
+                'Purchase Date',
+                currentVehicle.purchaseDate != null
+                    ? DateFormat(
+                        'yyyy-MM-dd',
+                      ).format(currentVehicle.purchaseDate!)
+                    : 'N/A',
+                Icons.shopping_bag_outlined,
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildDetailRow(
+                      context,
+                      'Purchase Price',
+                      currentVehicle.purchasePrice != null
+                          ? currentVehicle.purchasePrice!.toStringAsFixed(2)
+                          : 'N/A',
+                      Icons.money,
+                    ),
                   ),
-                ),
-                Expanded(
-                  child: _buildDetailRow(
-                    context,
-                    'Current Odometer',
-                    currentVehicle.currentOdometer != null
-                        ? '${currentVehicle.currentOdometer} KM'
-                        : 'N/A',
-                    Icons.speed,
+                  Expanded(
+                    child: _buildDetailRow(
+                      context,
+                      'Current Odometer',
+                      currentVehicle.currentOdometer != null
+                          ? '${currentVehicle.currentOdometer} KM'
+                          : 'N/A',
+                      Icons.speed,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
             const Divider(height: 32),
             _buildSectionHeader('Documents'),
             _buildDocumentCard(

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/vehicle/domain/entities/vehicle_make_entity.dart';
@@ -627,6 +628,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
     return Scaffold(
       appBar: ModernAppBar(
         title: widget.vehicle != null ? 'Edit Vehicle' : 'Add New Vehicle',
@@ -782,52 +784,54 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                           ],
                         ),
 
-                        SizedBox(height: 32.h),
-                        _buildSectionHeader('Purchase Information'),
-                        SizedBox(height: 16.h),
-                        ValueListenableBuilder<DateTime?>(
-                          valueListenable: _purchaseDate,
-                          builder: (context, date, _) {
-                            return CustomDatePicker(
-                              label: 'Purchase Date',
-                              date: date,
-                              onTap: () async {
-                                final picked = await showDatePicker(
-                                  context: context,
-                                  initialDate: date ?? DateTime.now(),
-                                  firstDate: DateTime(2000),
-                                  lastDate: DateTime.now(),
-                                );
-                                if (picked != null) {
-                                  _purchaseDate.value = picked;
-                                }
-                              },
-                              onClear: () => _purchaseDate.value = null,
-                            );
-                          },
-                        ),
-                        SizedBox(height: 16.h),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                'Purchase Price',
-                                _purchasePriceController,
-                                isNumber: true,
-                                required: false,
+                        if (isAdmin) ...[
+                          SizedBox(height: 32.h),
+                          _buildSectionHeader('Purchase Information'),
+                          SizedBox(height: 16.h),
+                          ValueListenableBuilder<DateTime?>(
+                            valueListenable: _purchaseDate,
+                            builder: (context, date, _) {
+                              return CustomDatePicker(
+                                label: 'Purchase Date',
+                                date: date,
+                                onTap: () async {
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: date ?? DateTime.now(),
+                                    firstDate: DateTime(2000),
+                                    lastDate: DateTime.now(),
+                                  );
+                                  if (picked != null) {
+                                    _purchaseDate.value = picked;
+                                  }
+                                },
+                                onClear: () => _purchaseDate.value = null,
+                              );
+                            },
+                          ),
+                          SizedBox(height: 16.h),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildTextField(
+                                  'Purchase Price',
+                                  _purchasePriceController,
+                                  isNumber: true,
+                                  required: false,
+                                ),
                               ),
-                            ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: _buildTextField(
-                                'Current Odometer',
-                                _currentOdometerController,
-                                isNumber: true,
-                                required: false,
+                              SizedBox(width: 16.w),
+                              Expanded(
+                                child: _buildTextField(
+                                  'Current Odometer',
+                                  _currentOdometerController,
+                                  isNumber: true,
+                                  required: false,
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                        ],
 
                         SizedBox(height: 32.h),
                         _buildSectionHeader('Documents (Expiry Dates)'),
