@@ -60,7 +60,7 @@ dependencies:
   firebase_auth: ^5.7.0
   google_sign_in: ^6.2.1
   shared_preferences: ^2.5.3
-  font_awesome_flutter: ^10.12.0
+  font_awesome_flutter: ^11.0.0
   country_picker: ^2.0.27
   url_launcher: ^6.3.2
   timeago: ^3.7.1

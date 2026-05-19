@@ -785,7 +785,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                             _buildDesktopInput(
                               controller: _phoneController,
                               label: _tr('whatsapp_number'),
-                              icon: FontAwesomeIcons.whatsapp,
+                              icon: FontAwesomeIcons.whatsapp.data,
                               keyboardType: TextInputType.phone,
                               inputFormatters: [
                                 FilteringTextInputFormatter.digitsOnly,
@@ -1331,7 +1331,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
                                   _buildFooterInfoItem(
-                                    icon: FontAwesomeIcons.whatsapp,
+                                    icon: FontAwesomeIcons.whatsapp.data,
                                     label: _tr('book_ride'),
                                     value: '+966 50 483 6105',
                                     onTap: _launchWhatsApp,
@@ -1577,7 +1577,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                     _buildMobileInput(
                       controller: _phoneController,
                       label: _tr('whatsapp_number'),
-                      icon: FontAwesomeIcons.whatsapp,
+                      icon: FontAwesomeIcons.whatsapp.data,
                       isRequired: true,
                       keyboardType: TextInputType.phone,
                       inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -2044,7 +2044,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             _buildFooterInfoItem(
-              icon: FontAwesomeIcons.whatsapp,
+              icon: FontAwesomeIcons.whatsapp.data,
               label: _tr('book_ride'),
               value: '+966 50 483 6105',
               onTap: _launchWhatsApp,
