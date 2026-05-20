@@ -7,6 +7,7 @@ class VehicleExpiryAlert extends Equatable {
   final DateTime expiryDate;
   final int daysUntilExpiry;
   final String? documentId;
+  final String? driverName;
 
   const VehicleExpiryAlert({
     required this.vehicleId,
@@ -15,6 +16,7 @@ class VehicleExpiryAlert extends Equatable {
     required this.expiryDate,
     required this.daysUntilExpiry,
     this.documentId,
+    this.driverName,
   });
 
   @override
@@ -25,5 +27,6 @@ class VehicleExpiryAlert extends Equatable {
     expiryDate,
     daysUntilExpiry,
     documentId,
+    driverName,
   ];
 }

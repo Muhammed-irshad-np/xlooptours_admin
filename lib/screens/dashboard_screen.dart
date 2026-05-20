@@ -6,7 +6,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
+import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.dart';
 import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'package:xloop_invoice/features/customer/presentation/providers/customer_provider.dart';
@@ -133,6 +136,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               SizedBox(height: 28.h),
               _buildStatsRow(),
               SizedBox(height: 36.h),
+              const _CelebrationsSection(),
               ResponsiveLayout(
                 mobile: Column(
                   children: [
@@ -1539,6 +1543,627 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
           ],
         );
       },
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Celebrations Section (Birthdays today and upcoming)
+// ═══════════════════════════════════════════════════════════════════════════════
+class _CelebrationsSection extends StatelessWidget {
+  const _CelebrationsSection();
+
+  int _daysUntilBirthday(DateTime birthDate) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    var nextBirthday = DateTime(now.year, birthDate.month, birthDate.day);
+    if (nextBirthday.isBefore(today)) {
+      nextBirthday = DateTime(now.year + 1, birthDate.month, birthDate.day);
+    }
+    return nextBirthday.difference(today).inDays;
+  }
+
+  Future<void> _launchWhatsApp(EmployeeEntity emp, BuildContext context) async {
+    final greeting = "Hi ${emp.fullName}, wishing you a very Happy Birthday from all of us at Xloop! Have a fantastic day ahead! 🎂🎉";
+    String phone = emp.phoneNumber.replaceAll(RegExp(r'\D'), '');
+    if (phone.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid phone number for WhatsApp')),
+      );
+      return;
+    }
+    if (emp.countryCode != null && emp.countryCode!.isNotEmpty) {
+      final cleanCc = emp.countryCode!.replaceAll(RegExp(r'\D'), '');
+      if (!phone.startsWith(cleanCc)) {
+        phone = '$cleanCc$phone';
+      }
+    }
+    final whatsappUrl = 'https://wa.me/$phone?text=${Uri.encodeComponent(greeting)}';
+    final uri = Uri.parse(whatsappUrl);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not launch WhatsApp')),
+      );
+    }
+  }
+
+  Future<void> _launchCall(EmployeeEntity emp, BuildContext context) async {
+    String phone = emp.phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+    if (emp.countryCode != null && emp.countryCode!.isNotEmpty && !phone.startsWith('+')) {
+      final cleanCc = emp.countryCode!.replaceAll(RegExp(r'[^\d+]'), '');
+      if (!phone.startsWith(cleanCc)) {
+        phone = '+$cleanCc$phone';
+      }
+    }
+    final uri = Uri(scheme: 'tel', path: phone);
+    if (!await launchUrl(uri)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not initiate call')),
+      );
+    }
+  }
+
+  Future<void> _launchEmail(EmployeeEntity emp, BuildContext context) async {
+    if (emp.email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No email address provided for this employee')),
+      );
+      return;
+    }
+    final subject = Uri.encodeComponent("Happy Birthday, ${emp.fullName}! 🎂🎉");
+    final body = Uri.encodeComponent(
+      "Hi ${emp.fullName},\n\nWishing you a very Happy Birthday from everyone at Xloop! May this year bring you joy, good health, and success in everything you do!\n\nBest regards,\nThe Xloop Team"
+    );
+    final emailUrl = 'mailto:${emp.email}?subject=$subject&body=$body';
+    final uri = Uri.parse(emailUrl);
+    if (!await launchUrl(uri)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not launch email client')),
+      );
+    }
+  }
+
+  Widget _buildWishActionCircle({
+    required IconData icon,
+    required Color iconColor,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.white,
+        shape: const CircleBorder(),
+        elevation: 2,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: 40.w,
+            height: 40.w,
+            alignment: Alignment.center,
+            child: Icon(
+              icon,
+              size: 18.sp,
+              color: iconColor,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTodayBirthdayCard(EmployeeEntity emp, BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobileCard = width < 680;
+
+    final avatarWidget = Container(
+      width: isMobileCard ? 56.w : 64.w,
+      height: isMobileCard ? 56.w : 64.w,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white, width: 2.w),
+      ),
+      child: ClipOval(
+        child: (emp.imageUrl != null && emp.imageUrl!.isNotEmpty)
+            ? CachedNetworkImage(
+                imageUrl: emp.imageUrl!,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => const Center(
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+                errorWidget: (context, url, error) => const Icon(
+                  Icons.person_rounded,
+                  color: Colors.white,
+                ),
+              )
+            : Center(
+                child: Text(
+                  emp.fullName.isNotEmpty ? emp.fullName[0].toUpperCase() : '?',
+                  style: GoogleFonts.inter(
+                    fontSize: isMobileCard ? 20.sp : 24.sp,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+      ),
+    );
+
+    final detailsWidget = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(12.r),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.auto_awesome,
+                size: 10.sp,
+                color: Colors.white,
+              ),
+              SizedBox(width: 4.w),
+              Text(
+                "TODAY'S BIRTHDAY",
+                style: GoogleFonts.inter(
+                  fontSize: 9.sp,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 6.h),
+        Text(
+          emp.fullName,
+          style: GoogleFonts.inter(
+            fontSize: isMobileCard ? 16.sp : 18.sp,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+            letterSpacing: -0.2,
+          ),
+        ),
+        Text(
+          emp.position,
+          style: GoogleFonts.inter(
+            fontSize: isMobileCard ? 12.sp : 13.sp,
+            fontWeight: FontWeight.w500,
+            color: Colors.white.withOpacity(0.85),
+          ),
+        ),
+      ],
+    );
+
+    final actionsWidget = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildWishActionCircle(
+          icon: Icons.phone_rounded,
+          iconColor: const Color(0xFF4F46E5),
+          tooltip: 'Call ${emp.fullName}',
+          onTap: () => _launchCall(emp, context),
+        ),
+        SizedBox(width: 10.w),
+        _buildWishActionCircle(
+          icon: Icons.chat_bubble_rounded,
+          iconColor: const Color(0xFF16A34A),
+          tooltip: 'Send WhatsApp Wish',
+          onTap: () => _launchWhatsApp(emp, context),
+        ),
+        SizedBox(width: 10.w),
+        _buildWishActionCircle(
+          icon: Icons.email_rounded,
+          iconColor: const Color(0xFFDC2626),
+          tooltip: 'Send Email Wish',
+          onTap: () => _launchEmail(emp, context),
+        ),
+      ],
+    );
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFEC4899), Color(0xFF8B5CF6)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16.r),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8B5CF6).withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -20,
+            top: -20,
+            child: Icon(
+              Icons.cake_rounded,
+              size: 120.sp,
+              color: Colors.white.withOpacity(0.08),
+            ),
+          ),
+          Positioned(
+            left: 10,
+            bottom: -10,
+            child: Icon(
+              Icons.auto_awesome,
+              size: 40.sp,
+              color: Colors.white.withOpacity(0.1),
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+            child: isMobileCard
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          avatarWidget,
+                          SizedBox(width: 14.w),
+                          Expanded(child: detailsWidget),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(
+                            "Send wishes: ",
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withOpacity(0.9),
+                            ),
+                          ),
+                          const Spacer(),
+                          actionsWidget,
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      avatarWidget,
+                      SizedBox(width: 16.w),
+                      Expanded(child: detailsWidget),
+                      SizedBox(width: 16.w),
+                      actionsWidget,
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUpcomingBirthdaysList(List<EmployeeEntity> list, BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(
+              Icons.upcoming_rounded,
+              size: 18.sp,
+              color: _DT.warning,
+            ),
+            SizedBox(width: 6.w),
+            Text(
+              'Upcoming Celebrations',
+              style: GoogleFonts.inter(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.w700,
+                color: _DT.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 12.h),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: list.length,
+          separatorBuilder: (_, __) => SizedBox(height: 10.h),
+          itemBuilder: (context, i) {
+            final emp = list[i];
+            final days = _daysUntilBirthday(emp.birthDate!);
+            return _UpcomingBirthdayCard(
+              employee: emp,
+              daysRemaining: days,
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<EmployeeProvider>(
+      builder: (context, employeeProvider, _) {
+        final employees = employeeProvider.employees;
+
+        final todayBirthdays = employees.where((emp) {
+          if (!emp.isActive || emp.birthDate == null) return false;
+          return _daysUntilBirthday(emp.birthDate!) == 0;
+        }).toList();
+
+        final upcomingBirthdays = employees.where((emp) {
+          if (!emp.isActive || emp.birthDate == null) return false;
+          final days = _daysUntilBirthday(emp.birthDate!);
+          return days > 0 && days <= 10;
+        }).toList();
+
+        if (todayBirthdays.isEmpty && upcomingBirthdays.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        upcomingBirthdays.sort((a, b) =>
+            _daysUntilBirthday(a.birthDate!).compareTo(_daysUntilBirthday(b.birthDate!)));
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _SectionLabel(
+              label: 'Celebrations',
+              icon: Icons.cake_rounded,
+              iconColor: const Color(0xFFD946EF),
+            ),
+            SizedBox(height: 16.h),
+            if (todayBirthdays.isNotEmpty && upcomingBirthdays.isNotEmpty) ...[
+              ResponsiveLayout(
+                mobile: Column(
+                  children: [
+                    ...todayBirthdays.map((emp) => Padding(
+                          padding: EdgeInsets.only(bottom: 16.h),
+                          child: _buildTodayBirthdayCard(emp, context),
+                        )),
+                    _buildUpcomingBirthdaysList(upcomingBirthdays, context),
+                  ],
+                ),
+                desktop: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Column(
+                        children: todayBirthdays
+                            .map((emp) => Padding(
+                                  padding: EdgeInsets.only(bottom: 16.h),
+                                  child: _buildTodayBirthdayCard(emp, context),
+                                ))
+                            .toList(),
+                      ),
+                    ),
+                    SizedBox(width: 28.w),
+                    Expanded(
+                      flex: 2,
+                      child: _buildUpcomingBirthdaysList(upcomingBirthdays, context),
+                    ),
+                  ],
+                ),
+              ),
+            ] else if (todayBirthdays.isNotEmpty) ...[
+              ResponsiveLayout(
+                mobile: Column(
+                  children: todayBirthdays
+                      .map((emp) => Padding(
+                            padding: EdgeInsets.only(bottom: 16.h),
+                            child: _buildTodayBirthdayCard(emp, context),
+                          ))
+                      .toList(),
+                ),
+                desktop: Row(
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: Column(
+                        children: todayBirthdays
+                            .map((emp) => Padding(
+                                  padding: EdgeInsets.only(bottom: 16.h),
+                                  child: _buildTodayBirthdayCard(emp, context),
+                                ))
+                            .toList(),
+                      ),
+                    ),
+                    SizedBox(width: 28.w),
+                    const Spacer(flex: 2),
+                  ],
+                ),
+              ),
+            ] else ...[
+              ResponsiveLayout(
+                mobile: _buildUpcomingBirthdaysList(upcomingBirthdays, context),
+                desktop: Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: _buildUpcomingBirthdaysList(upcomingBirthdays, context),
+                    ),
+                    SizedBox(width: 28.w),
+                    const Spacer(flex: 3),
+                  ],
+                ),
+              ),
+            ],
+            SizedBox(height: 36.h),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  Upcoming Birthday Card
+// ═══════════════════════════════════════════════════════════════════════════════
+class _UpcomingBirthdayCard extends StatefulWidget {
+  final EmployeeEntity employee;
+  final int daysRemaining;
+  const _UpcomingBirthdayCard({
+    required this.employee,
+    required this.daysRemaining,
+  });
+
+  @override
+  State<_UpcomingBirthdayCard> createState() => _UpcomingBirthdayCardState();
+}
+
+class _UpcomingBirthdayCardState extends State<_UpcomingBirthdayCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final emp = widget.employee;
+    final days = widget.daysRemaining;
+
+    String dateStr = '';
+    if (emp.birthDate != null) {
+      final months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      dateStr = '${emp.birthDate!.day} ${months[emp.birthDate!.month - 1]}';
+    }
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        decoration: BoxDecoration(
+          color: _hovered ? _DT.warningBg : Colors.white,
+          borderRadius: BorderRadius.circular(14.r),
+          border: Border.all(
+            color: _hovered ? _DT.warning.withOpacity(0.4) : _DT.warningBorder,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: _DT.warning.withOpacity(_hovered ? 0.1 : 0.04),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+          child: Row(
+            children: [
+              Container(
+                width: 44.w,
+                height: 44.w,
+                decoration: BoxDecoration(
+                  color: _DT.warning.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: ClipOval(
+                  child: (emp.imageUrl != null && emp.imageUrl!.isNotEmpty)
+                      ? CachedNetworkImage(
+                          imageUrl: emp.imageUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(_DT.warning),
+                            ),
+                          ),
+                          errorWidget: (context, url, error) => const Icon(
+                            Icons.person_rounded,
+                            color: _DT.warning,
+                          ),
+                        )
+                      : Center(
+                          child: Text(
+                            emp.fullName.isNotEmpty ? emp.fullName[0].toUpperCase() : '?',
+                            style: GoogleFonts.inter(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w700,
+                              color: _DT.warning,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      emp.fullName,
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14.sp,
+                        color: _DT.textPrimary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      emp.position,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        color: _DT.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    dateStr,
+                    style: GoogleFonts.inter(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                      color: _DT.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                    decoration: BoxDecoration(
+                      color: _DT.warning.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    child: Text(
+                      days == 1 ? 'Tomorrow' : 'In $days days',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w700,
+                        color: _DT.warning,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

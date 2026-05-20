@@ -173,15 +173,20 @@ class NotificationProvider extends ChangeNotifier {
         final absDays = alert.daysUntilExpiry.abs();
         final expiryDateStr =
             alert.expiryDate.toLocal().toString().split(' ')[0];
+        
+        final holderSuffix = (alert.documentType == 'Tafweed' && alert.driverName != null)
+            ? ' (held by ${alert.driverName})'
+            : '';
+
         return NotificationEntity(
           id: id,
           title: isExpired
               ? 'Vehicle ${alert.documentType} Expired'
               : 'Vehicle ${alert.documentType} Expiring',
           message: isExpired
-              ? 'Vehicle ${alert.plateNumber}\'s ${alert.documentType} expired on '
+              ? 'Vehicle ${alert.plateNumber}\'s ${alert.documentType}$holderSuffix expired on '
                   '$expiryDateStr ($absDays days ago).'
-              : 'Vehicle ${alert.plateNumber}\'s ${alert.documentType} is expiring on '
+              : 'Vehicle ${alert.plateNumber}\'s ${alert.documentType}$holderSuffix is expiring on '
                   '$expiryDateStr (${alert.daysUntilExpiry} days left).',
           timestamp: DateTime.now(),
           isRead: _readVirtualIds.contains(id),

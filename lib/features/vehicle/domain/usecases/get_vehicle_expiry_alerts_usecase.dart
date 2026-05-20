@@ -1,14 +1,23 @@
+import 'package:xloop_invoice/features/employee/domain/repositories/employee_repository.dart';
 import '../entities/vehicle_expiry_alert.dart';
 import '../repositories/vehicle_repository.dart';
 
 class GetVehicleExpiryAlertsUseCase {
   final VehicleRepository repository;
+  final EmployeeRepository employeeRepository;
 
-  GetVehicleExpiryAlertsUseCase(this.repository);
+  GetVehicleExpiryAlertsUseCase(this.repository, this.employeeRepository);
 
   Future<List<VehicleExpiryAlert>> call() async {
     final vehicles = await repository.getAllVehicles();
     final settings = await repository.getVehicleSettings();
+    final employees = await employeeRepository.getAllEmployees();
+
+    // Create a map of employee ID to employee full name for O(1) lookups
+    final Map<String, String> employeeNameMap = {
+      for (var emp in employees) emp.id: emp.fullName
+    };
+
     final List<VehicleExpiryAlert> alerts = [];
     final now = DateTime.now();
 
@@ -89,6 +98,7 @@ class GetVehicleExpiryAlertsUseCase {
           final days = tafweed.expiryDate.difference(now).inDays;
           final alertDays = tafweed.notificationDays ?? settings.tafweedAlertDays;
           if (days <= alertDays) {
+            final driverName = employeeNameMap[tafweed.driverId];
             alerts.add(
               VehicleExpiryAlert(
                 vehicleId: vehicle.id,
@@ -97,6 +107,7 @@ class GetVehicleExpiryAlertsUseCase {
                 expiryDate: tafweed.expiryDate,
                 daysUntilExpiry: days,
                 documentId: tafweed.driverId,
+                driverName: driverName,
               ),
             );
           }

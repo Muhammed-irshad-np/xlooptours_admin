@@ -12,7 +12,6 @@ import '../features/employee/domain/entities/employee_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
-import 'package:xloop_invoice/features/employee/presentation/widgets/authorize_vehicle_dialog.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'package:provider/provider.dart';
 import '../core/widgets/modern_app_bar.dart';
@@ -39,49 +38,6 @@ class EmployeeDetailsScreen extends StatelessWidget {
     final Uri url = Uri.parse(urlString);
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       debugPrint('Could not launch $urlString');
-    }
-  }
-
-  Future<void> _confirmCancelTafweed(
-    BuildContext context,
-    VehicleEntity currentVehicle,
-    TafweedRecord record,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel Authorization'),
-        content: const Text(
-          'Are you sure you want to cancel the current authorization? This will record the end date as today and move it to history.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Confirm Cancel'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && context.mounted) {
-      final updatedActiveTafweeds = List<TafweedRecord>.from(
-        currentVehicle.tafweeds ?? [],
-      )..remove(record);
-
-      final updatedHistory = List<TafweedRecord>.from(
-        currentVehicle.tafweedHistory ?? [],
-      );
-      updatedHistory.add(record.copyWith(expiryDate: DateTime.now()));
-
-      final updatedVehicle = currentVehicle.copyWith(
-        tafweeds: updatedActiveTafweeds,
-        tafweedHistory: updatedHistory,
-      );
-      await context.read<VehicleProvider>().updateVehicle(updatedVehicle);
     }
   }
 
@@ -420,27 +376,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(height: 24.h),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildSectionHeader('Tafweed (Authorized Vehicles)'),
-              TextButton.icon(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) =>
-                        AuthorizeVehicleDialog(employee: employee),
-                  );
-                },
-                icon: const Icon(Icons.add_circle_outline, size: 20),
-                label: const Text('Authorize'),
-                style: TextButton.styleFrom(
-                  foregroundColor: Colors.blue[900],
-                  padding: EdgeInsets.symmetric(horizontal: 12.w),
-                ),
-              ),
-            ],
-          ),
+          _buildSectionHeader('Tafweed (Authorized Vehicles)'),
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(
@@ -463,27 +399,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SizedBox(height: 24.h),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            _buildSectionHeader('Tafweed (Authorized Vehicles)'),
-            TextButton.icon(
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (context) =>
-                      AuthorizeVehicleDialog(employee: employee),
-                );
-              },
-              icon: const Icon(Icons.add_circle_outline, size: 20),
-              label: const Text('Authorize'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.blue[900],
-                padding: EdgeInsets.symmetric(horizontal: 12.w),
-              ),
-            ),
-          ],
-        ),
+        _buildSectionHeader('Tafweed (Authorized Vehicles)'),
         ...authorizedVehicles.map((vehicle) {
           final tafweedsForEmployee = vehicle.tafweeds
               ?.where((t) => t.driverId == employee.id)
@@ -568,42 +484,6 @@ class EmployeeDetailsScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (employeeTafweed != null) ...[
-                    SizedBox(height: 12.h),
-                    const Divider(),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        Padding(
-                          padding: EdgeInsets.only(right: 8.w),
-                          child: TextButton.icon(
-                            onPressed: () => _confirmCancelTafweed(
-                              context,
-                              vehicle,
-                              employeeTafweed,
-                            ),
-                            icon: Icon(Icons.cancel_outlined,
-                                color: Colors.orange[700], size: 18.sp),
-                            label: Text(
-                              'Cancel Authorization',
-                              style: TextStyle(
-                                color: Colors.orange[700],
-                                fontSize: 12.sp,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            style: TextButton.styleFrom(
-                              backgroundColor: Colors.orange[50],
-                              padding: EdgeInsets.symmetric(horizontal: 12.w),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8.r),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
                 ],
               ),
             ),

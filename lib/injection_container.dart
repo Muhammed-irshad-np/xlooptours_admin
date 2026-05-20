@@ -293,7 +293,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => UploadVehicleDocumentUseCase(sl()));
   sl.registerLazySingleton(() => GetVehiclesNeedingOdometerUpdateUseCase());
   sl.registerLazySingleton(() => GetVehicleMaintenanceAlertsUseCase());
-  sl.registerLazySingleton(() => GetVehicleExpiryAlertsUseCase(sl()));
+  sl.registerLazySingleton(() => GetVehicleExpiryAlertsUseCase(sl(), sl()));
   sl.registerLazySingleton(() => GetVehicleSettingsUseCase(sl()));
   sl.registerLazySingleton(() => UpdateVehicleSettingsUseCase(sl()));
   sl.registerLazySingleton(() => GetAllVehicleMakesUseCase(sl()));
