@@ -74,6 +74,7 @@ class MaintenanceRecord extends Equatable {
   final DateTime date;
   final int mileage; // in KM
   final String? attachmentUrl;
+  final List<String>? attachmentUrls;
   final int? notificationDays;
   final double? cost;
   final double? partsCost;
@@ -90,6 +91,7 @@ class MaintenanceRecord extends Equatable {
     required this.date,
     required this.mileage,
     this.attachmentUrl,
+    this.attachmentUrls,
     this.notificationDays,
     this.cost,
     this.partsCost,
@@ -107,6 +109,7 @@ class MaintenanceRecord extends Equatable {
     DateTime? date,
     int? mileage,
     String? attachmentUrl,
+    List<String>? attachmentUrls,
     int? notificationDays,
     double? cost,
     double? partsCost,
@@ -123,6 +126,7 @@ class MaintenanceRecord extends Equatable {
       date: date ?? this.date,
       mileage: mileage ?? this.mileage,
       attachmentUrl: attachmentUrl ?? this.attachmentUrl,
+      attachmentUrls: attachmentUrls ?? this.attachmentUrls,
       notificationDays: notificationDays ?? this.notificationDays,
       cost: cost ?? this.cost,
       partsCost: partsCost ?? this.partsCost,
@@ -142,6 +146,7 @@ class MaintenanceRecord extends Equatable {
     date,
     mileage,
     attachmentUrl,
+    attachmentUrls,
     notificationDays,
     cost,
     partsCost,

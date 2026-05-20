@@ -66,6 +66,24 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     await firestore.collection('employees').doc(id).delete();
   }
 
+  String _getMimeType(String ext) {
+    switch (ext.toLowerCase().replaceAll('.', '')) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
   @override
   Future<String> uploadEmployeeImage(XFile image, String employeeId) async {
     final storageRef = storage
@@ -73,13 +91,15 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
         .child('employee_images')
         .child('$employeeId.jpg');
 
+    final metadata = SettableMetadata(contentType: 'image/jpeg');
+
     if (kIsWeb) {
       await storageRef.putData(
         await image.readAsBytes(),
-        SettableMetadata(contentType: 'image/jpeg'),
+        metadata,
       );
     } else {
-      await storageRef.putFile(File(image.path));
+      await storageRef.putFile(File(image.path), metadata);
     }
 
     return await storageRef.getDownloadURL();
@@ -98,13 +118,15 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
         .child(employeeId)
         .child('$docType.$ext');
 
+    final metadata = SettableMetadata(contentType: _getMimeType(ext));
+
     if (kIsWeb) {
       await storageRef.putData(
         await file.readAsBytes(),
-        SettableMetadata(contentType: 'application/octet-stream'),
+        metadata,
       );
     } else {
-      await storageRef.putFile(File(file.path));
+      await storageRef.putFile(File(file.path), metadata);
     }
 
     return await storageRef.getDownloadURL();

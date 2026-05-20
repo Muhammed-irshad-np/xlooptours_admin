@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
@@ -25,6 +28,7 @@ class _MaintenanceEntry {
   final TextEditingController serviceKmController = TextEditingController();
   final TextEditingController costController = TextEditingController();
   final TextEditingController notesController = TextEditingController();
+  List<XFile> pickedFiles = [];
 
   void dispose() {
     customTypeController.dispose();
@@ -103,6 +107,37 @@ class _AddMaintenanceRecordDialogState
     }
   }
 
+  Future<void> _pickFiles(_MaintenanceEntry entry) async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'png', 'jpeg', 'pdf'],
+        withData: kIsWeb,
+      );
+      if (result != null) {
+        for (final platformFile in result.files) {
+          XFile xFile;
+          if (kIsWeb && platformFile.bytes != null) {
+            xFile = XFile.fromData(
+              platformFile.bytes!,
+              name: platformFile.name,
+            );
+          } else if (platformFile.path != null) {
+            xFile = XFile(platformFile.path!);
+          } else {
+            continue;
+          }
+          setState(() {
+            entry.pickedFiles.add(xFile);
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking files: $e');
+    }
+  }
+
   /// Resolves the human-readable service-type name for a given entry.
   String _resolveTypeName(_MaintenanceEntry entry, VehicleProvider provider) {
     if (entry.maintenanceTypeId == _kCarWashId) return 'Car Wash';
@@ -148,10 +183,25 @@ class _AddMaintenanceRecordDialogState
     try {
       final provider = context.read<VehicleProvider>();
 
-      final recordsToAdd = _entries.map((entry) {
+      final List<({String typeId, MaintenanceRecord record})> recordsToAdd = [];
+
+      for (int entryIndex = 0; entryIndex < _entries.length; entryIndex++) {
+        final entry = _entries[entryIndex];
         final typeName = _resolveTypeName(entry, provider);
 
-        return (
+        // Upload picked files sequentially
+        final List<String> uploadedUrls = [];
+        for (int fileIndex = 0; fileIndex < entry.pickedFiles.length; fileIndex++) {
+          final file = entry.pickedFiles[fileIndex];
+          // Construct unique docType to prevent collision/overwrite in Firebase Storage
+          final docType = 'maintenance_${DateTime.now().millisecondsSinceEpoch}_${entryIndex}_$fileIndex';
+          final url = await provider.uploadVehicleDocument(file, widget.vehicle.id, docType);
+          uploadedUrls.add(url);
+        }
+
+        final primaryUrl = uploadedUrls.isNotEmpty ? uploadedUrls.first : null;
+
+        recordsToAdd.add((
           typeId: entry.maintenanceTypeId!,
           record: MaintenanceRecord(
             date: entry.date,
@@ -160,9 +210,11 @@ class _AddMaintenanceRecordDialogState
             serviceProvider: '',
             notes: entry.notesController.text,
             serviceType: typeName,
+            attachmentUrl: primaryUrl,
+            attachmentUrls: uploadedUrls.isNotEmpty ? uploadedUrls : null,
           ),
-        );
-      }).toList();
+        ));
+      }
 
       // Append to flat history list
       final List<MaintenanceRecord> updatedHistory = List.from(
@@ -495,6 +547,76 @@ class _AddMaintenanceRecordDialogState
                             ],
                           ),
                         ],
+
+                        // ── File attachments ──
+                        SizedBox(height: 12.h),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(width: 8.w),
+                            OutlinedButton.icon(
+                              onPressed: () => _pickFiles(entry),
+                              icon: Icon(Icons.attach_file, size: 18.sp),
+                              label: Text(
+                                'Attach Receipt/Document',
+                                style: TextStyle(fontSize: 13.sp),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: Colors.blue.shade300),
+                                foregroundColor: Colors.blue.shade700,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 12.w,
+                                  vertical: 10.h,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              child: entry.pickedFiles.isEmpty
+                                  ? Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 8.h),
+                                      child: Text(
+                                        'No documents attached',
+                                        style: TextStyle(
+                                          fontSize: 13.sp,
+                                          color: Colors.grey[500],
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                    )
+                                  : Wrap(
+                                      spacing: 8.w,
+                                      runSpacing: 8.h,
+                                      children: entry.pickedFiles.asMap().entries.map((fileEntry) {
+                                        final fileIdx = fileEntry.key;
+                                        final file = fileEntry.value;
+                                        return InputChip(
+                                          label: Text(
+                                            file.name,
+                                            style: TextStyle(fontSize: 12.sp),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                          onDeleted: () {
+                                            setState(() {
+                                              entry.pickedFiles.removeAt(fileIdx);
+                                            });
+                                          },
+                                          deleteIconColor: Colors.red[700],
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(20.r),
+                                            side: BorderSide(color: Colors.grey.shade300),
+                                          ),
+                                          backgroundColor: Colors.blue.withValues(alpha: 0.05),
+                                        );
+                                      }).toList(),
+                                    ),
+                            ),
+                          ],
+                        ),
                       ],
                     );
                   },

@@ -149,7 +149,8 @@ class VehicleModel extends VehicleEntity {
     return {
       'date': record.date.toIso8601String(),
       'mileage': record.mileage,
-      'attachmentUrl': record.attachmentUrl,
+      'attachmentUrl': record.attachmentUrl ?? (record.attachmentUrls != null && record.attachmentUrls!.isNotEmpty ? record.attachmentUrls!.first : null),
+      'attachmentUrls': record.attachmentUrls,
       'notificationDays': record.notificationDays,
       'cost': record.cost,
       'partsCost': record.partsCost,
@@ -301,10 +302,15 @@ class VehicleModel extends VehicleEntity {
   }
 
   static MaintenanceRecord _recordFromJson(Map<String, dynamic> json) {
+    final List<dynamic>? urlsJson = json['attachmentUrls'] as List<dynamic>?;
+    final List<String>? attachmentUrls = urlsJson?.map((e) => e as String).toList() ??
+        (json['attachmentUrl'] != null ? [json['attachmentUrl'] as String] : null);
+
     return MaintenanceRecord(
       date: DateTime.parse(json['date'] as String),
       mileage: json['mileage'] as int,
       attachmentUrl: json['attachmentUrl'] as String?,
+      attachmentUrls: attachmentUrls,
       notificationDays: json['notificationDays'] as int?,
       cost: (json['cost'] as num?)?.toDouble(),
       partsCost: (json['partsCost'] as num?)?.toDouble(),

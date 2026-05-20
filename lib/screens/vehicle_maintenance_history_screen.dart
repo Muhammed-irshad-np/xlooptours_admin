@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.dart';
@@ -192,34 +193,75 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
               ),
             if (record.notes != null && record.notes!.isNotEmpty)
               _buildInfoRow(Icons.notes, 'Notes', record.notes!),
-            if (record.attachmentUrl != null &&
-                record.attachmentUrl!.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.remove_red_eye, size: 18),
-                  label: const Text('View Document'),
-                  style: OutlinedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+            (() {
+              final List<String> urls = [];
+              if (record.attachmentUrls != null && record.attachmentUrls!.isNotEmpty) {
+                urls.addAll(record.attachmentUrls!);
+              } else if (record.attachmentUrl != null && record.attachmentUrl!.isNotEmpty) {
+                urls.add(record.attachmentUrl!);
+              }
+
+              if (urls.isEmpty) return const SizedBox.shrink();
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Documents:',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.grey[600],
+                      ),
                     ),
                   ),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DocumentViewerScreen(
-                          attachmentUrl: record.attachmentUrl!,
-                          title:
-                              '${record.serviceType ?? 'Maintenance'} Document',
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8.w,
+                    runSpacing: 8.h,
+                    children: urls.asMap().entries.map((entry) {
+                      final idx = entry.key;
+                      final url = entry.value;
+                      final displayName = urls.length == 1 ? 'Receipt' : 'Receipt #${idx + 1}';
+
+                      return ActionChip(
+                        avatar: Icon(
+                          Icons.file_present_rounded,
+                          size: 16.sp,
+                          color: Colors.blue.shade700,
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+                        label: Text(
+                          displayName,
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        backgroundColor: Colors.blue.shade50.withValues(alpha: 0.5),
+                        side: BorderSide(color: Colors.blue.shade100),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => DocumentViewerScreen(
+                                attachmentUrl: url,
+                                title: '${record.serviceType ?? 'Maintenance'} - $displayName',
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              );
+            })(),
           ],
         ),
       ),
