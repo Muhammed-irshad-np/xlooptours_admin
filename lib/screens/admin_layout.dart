@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:xloop_invoice/features/xloop_vault/presentation/pages/vault_screen.dart';
 import 'home_screen.dart';
 import 'employees_screen.dart';
 import 'vehicles_screen.dart';
@@ -14,9 +15,11 @@ import 'package:crypto/crypto.dart';
 import 'package:provider/provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
-import '../features/xloop_vault/presentation/pages/vault_screen.dart';
 import '../features/xloop_vault/presentation/providers/vault_provider.dart';
 import 'companies_screen.dart';
+import 'package:flutter/services.dart';
+import '../core/widgets/global_search/global_search_palette.dart';
+
 /// The main admin scaffold with a professional, dark-themed sidebar.
 class AdminLayout extends StatefulWidget {
   const AdminLayout({super.key});
@@ -115,47 +118,80 @@ class _AdminLayoutState extends State<AdminLayout> {
       }
     }
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Row(
-        children: [
-          // Sidebar
-          ValueListenableBuilder<int>(
-            valueListenable: _selectedIndex,
-            builder: (context, selectedIndex, _) {
-              return _Sidebar(
-                selectedIndex: selectedIndex,
-                items: allowedNavItems,
-                sidebarBg: _sidebarBg,
-                brandBlue: _brandBlue,
-                activeBg: _activeBg,
-                inactiveText: _inactiveText,
-                dividerColor: _dividerColor,
-                isAdmin: isAdmin,
-                onItemSelected: (index) {
-                  _selectedIndex.value = index;
-                },
-                onLogout: () async {
-                  await context.read<AuthProvider>().logout();
-                },
+    return Shortcuts(
+      shortcuts: <LogicalKeySet, Intent>{
+        LogicalKeySet(LogicalKeyboardKey.meta, LogicalKeyboardKey.keyK):
+            const SearchIntent(),
+        LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyK):
+            const SearchIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          SearchIntent: CallbackAction<SearchIntent>(
+            onInvoke: (SearchIntent intent) {
+              showDialog(
+                context: context,
+                builder: (context) => const GlobalSearchPalette(),
               );
+              return null;
             },
           ),
-          // Main content
-          Expanded(
-            child: ValueListenableBuilder<int>(
-              valueListenable: _selectedIndex,
-              builder: (context, selectedIndex, _) {
-                // Failsafe in case index is out of bounds due to role changes
-                final index = selectedIndex < allowedScreens.length ? selectedIndex : 0;
-                return allowedScreens[index];
-              },
-            ),
+        },
+        child: Scaffold(
+          backgroundColor: Colors.white,
+          body: Row(
+            children: [
+              // Sidebar
+              ValueListenableBuilder<int>(
+                valueListenable: _selectedIndex,
+                builder: (context, selectedIndex, _) {
+                  return _Sidebar(
+                    selectedIndex: selectedIndex,
+                    items: allowedNavItems,
+                    sidebarBg: _sidebarBg,
+                    brandBlue: _brandBlue,
+                    activeBg: _activeBg,
+                    inactiveText: _inactiveText,
+                    dividerColor: _dividerColor,
+                    isAdmin: isAdmin,
+                    onItemSelected: (index) {
+                      _selectedIndex.value = index;
+                    },
+                    onLogout: () async {
+                      await context.read<AuthProvider>().logout();
+                    },
+                    onSearchPressed: () {
+                      showDialog(
+                        context: context,
+                        builder: (context) => const GlobalSearchPalette(),
+                      );
+                    },
+                  );
+                },
+              ),
+              // Main content
+              Expanded(
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _selectedIndex,
+                  builder: (context, selectedIndex, _) {
+                    // Failsafe in case index is out of bounds due to role changes
+                    final index = selectedIndex < allowedScreens.length
+                        ? selectedIndex
+                        : 0;
+                    return allowedScreens[index];
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+}
+
+class SearchIntent extends Intent {
+  const SearchIntent();
 }
 
 class _NavItem {
@@ -183,6 +219,7 @@ class _Sidebar extends StatelessWidget {
   final bool isAdmin;
   final ValueChanged<int> onItemSelected;
   final VoidCallback onLogout;
+  final VoidCallback onSearchPressed;
 
   const _Sidebar({
     required this.selectedIndex,
@@ -195,6 +232,7 @@ class _Sidebar extends StatelessWidget {
     required this.isAdmin,
     required this.onItemSelected,
     required this.onLogout,
+    required this.onSearchPressed,
   });
 
   @override
@@ -212,6 +250,12 @@ class _Sidebar extends StatelessWidget {
             height: 1,
             color: dividerColor,
             margin: EdgeInsets.symmetric(horizontal: 16.w),
+          ),
+          SizedBox(height: 16.h),
+          // Search Button
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12.w),
+            child: _buildSearchButton(),
           ),
           SizedBox(height: 12.h),
           // Nav label
@@ -292,58 +336,103 @@ class _Sidebar extends StatelessWidget {
       onTap: () => _handleLogoClick(context),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 22.h),
-      child: Row(
-        children: [
-          // Logo inside a rounded container
-          Container(
-            width: 36.w,
-            height: 36.h,
-            decoration: BoxDecoration(
-              color: brandBlue.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10.r),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10.r),
-              child: Image.asset(
-                'assets/logo/logo.png',
-                fit: BoxFit.contain,
-                errorBuilder: (c, o, s) => Icon(
-                  Icons.directions_car_rounded,
-                  color: brandBlue,
-                  size: 20.sp,
+        child: Row(
+          children: [
+            // Logo inside a rounded container
+            Container(
+              width: 36.w,
+              height: 36.h,
+              decoration: BoxDecoration(
+                color: brandBlue.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10.r),
+                child: Image.asset(
+                  'assets/logo/logo.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (c, o, s) => Icon(
+                    Icons.directions_car_rounded,
+                    color: brandBlue,
+                    size: 20.sp,
+                  ),
                 ),
               ),
             ),
-          ),
-          SizedBox(width: 12.w),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Xloop Tours',
-                  style: GoogleFonts.merriweather(
-                    fontSize: 13.sp,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+            SizedBox(width: 12.w),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Xloop Tours',
+                    style: GoogleFonts.merriweather(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  'Admin Panel',
-                  style: GoogleFonts.notoSans(
-                    fontSize: 9.sp,
-                    color: brandBlue,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.8,
+                  Text(
+                    'Admin Panel',
+                    style: GoogleFonts.notoSans(
+                      fontSize: 9.sp,
+                      color: brandBlue,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.8,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildSearchButton() {
+    return InkWell(
+      onTap: onSearchPressed,
+      borderRadius: BorderRadius.circular(10.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+        decoration: BoxDecoration(
+          color: activeBg.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(10.r),
+          border: Border.all(color: dividerColor.withOpacity(0.5)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.search_rounded, color: inactiveText, size: 18.sp),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: Text(
+                'Search',
+                style: GoogleFonts.notoSans(
+                  fontSize: 12.sp,
+                  color: inactiveText,
+                ),
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(4.r),
+              ),
+              child: Text(
+                '⌘K',
+                style: GoogleFonts.notoSans(
+                  fontSize: 10.sp,
+                  color: inactiveText,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
