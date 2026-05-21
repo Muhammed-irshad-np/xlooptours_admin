@@ -35,8 +35,6 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   final ValueNotifier<bool> _showInactive = ValueNotifier<bool>(false);
   final ValueNotifier<List<EmployeeEntity>> _filteredEmployees =
       ValueNotifier<List<EmployeeEntity>>([]);
-  final ValueNotifier<Map<String, VehicleEntity>> _assignedVehicles =
-      ValueNotifier<Map<String, VehicleEntity>>({});
 
   final List<String> _tabs = [];
 
@@ -67,7 +65,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     _isLoading.dispose();
     _showInactive.dispose();
     _filteredEmployees.dispose();
-    _assignedVehicles.dispose();
+
     super.dispose();
   }
 
@@ -76,22 +74,8 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     try {
       if (mounted) {
         await context.read<EmployeeProvider>().fetchAllEmployees();
-        if (!mounted) return;
-        await context.read<VehicleProvider>().fetchAllVehicles();
       }
-      if (!mounted) return;
-      final vehicles = context.read<VehicleProvider>().vehicles;
-
-      // Map vehicles by driver ID for quick lookup
-      final vehicleMap = <String, VehicleEntity>{};
-      for (var v in vehicles) {
-        if (v.assignedDriverId != null) {
-          vehicleMap[v.assignedDriverId!] = v;
-        }
-      }
-
       _allEmployees = context.read<EmployeeProvider>().employees;
-      _assignedVehicles.value = vehicleMap;
       _isLoading.value = false;
 
       _filterEmployees();
@@ -298,39 +282,30 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                             );
                           }
 
-                          return ValueListenableBuilder<
-                            Map<String, VehicleEntity>
-                          >(
-                            valueListenable: _assignedVehicles,
-                            builder: (context, assignedVehicles, _) {
-                              return ResponsiveLayout(
-                                mobile: ListView.builder(
-                                  itemCount: filteredEmployees.length,
-                                  padding: const EdgeInsets.all(8),
-                                  itemBuilder: (context, index) =>
-                                      _buildEmployeeCard(
-                                        filteredEmployees[index],
-                                        assignedVehicles,
-                                      ),
-                                ),
-                                desktop: GridView.builder(
-                                  padding: const EdgeInsets.all(16),
-                                  gridDelegate:
-                                      SliverGridDelegateWithMaxCrossAxisExtent(
-                                        maxCrossAxisExtent: 430.w,
-                                        childAspectRatio: 1.4,
-                                        crossAxisSpacing: 16,
-                                        mainAxisSpacing: 16,
-                                      ),
-                                  itemCount: filteredEmployees.length,
-                                  itemBuilder: (context, index) =>
-                                      _buildEmployeeCard(
-                                        filteredEmployees[index],
-                                        assignedVehicles,
-                                      ),
-                                ),
-                              );
-                            },
+                          return ResponsiveLayout(
+                            mobile: ListView.builder(
+                              itemCount: filteredEmployees.length,
+                              padding: const EdgeInsets.all(8),
+                              itemBuilder: (context, index) =>
+                                  _buildEmployeeCard(
+                                    filteredEmployees[index],
+                                  ),
+                            ),
+                            desktop: GridView.builder(
+                              padding: const EdgeInsets.all(16),
+                              gridDelegate:
+                                  SliverGridDelegateWithMaxCrossAxisExtent(
+                                    maxCrossAxisExtent: 430.w,
+                                    childAspectRatio: 1.4,
+                                    crossAxisSpacing: 16,
+                                    mainAxisSpacing: 16,
+                                  ),
+                              itemCount: filteredEmployees.length,
+                              itemBuilder: (context, index) =>
+                                  _buildEmployeeCard(
+                                    filteredEmployees[index],
+                                  ),
+                            ),
                           );
                         },
                       );
@@ -346,10 +321,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     );
   }
 
-  Widget _buildEmployeeCard(
-    EmployeeEntity employee,
-    Map<String, VehicleEntity> assignedVehicles,
-  ) {
+  Widget _buildEmployeeCard(EmployeeEntity employee) {
     return Card(
       elevation: 0,
       color: Colors.white,
@@ -583,41 +555,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                 ],
               ),
             ],
-            // Show Assigned Vehicle for Drivers
-            if (assignedVehicles.isNotEmpty &&
-                assignedVehicles[employee.id] != null) ...[
-              SizedBox(height: 12.h),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.05),
-                  borderRadius: BorderRadius.circular(8.r),
-                  border: Border.all(color: Colors.blue.withValues(alpha: 0.2)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.directions_car,
-                      size: 16.sp,
-                      color: Colors.blue[700],
-                    ),
-                    SizedBox(width: 8.w),
-                    Expanded(
-                      child: Text(
-                        '${assignedVehicles[employee.id]?.make ?? ''} ${assignedVehicles[employee.id]?.model ?? ''} (${assignedVehicles[employee.id]?.plateNumber ?? ''})',
-                        style: TextStyle(
-                          fontSize: 13.sp,
-                          color: Colors.blue[900],
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+
             SizedBox(height: 16.h),
             Divider(),
             Row(
@@ -651,7 +589,6 @@ class _EmployeesScreenState extends State<EmployeesScreen>
       MaterialPageRoute(
         builder: (context) => EmployeeDetailsScreen(
           employee: employee,
-          assignedVehicle: _assignedVehicles.value[employee.id],
         ),
       ),
     );

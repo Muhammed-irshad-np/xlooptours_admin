@@ -10,7 +10,6 @@ abstract class VehicleRepository {
   Future<void> insertVehicle(VehicleEntity vehicle);
   Future<void> updateVehicle(VehicleEntity vehicle);
   Future<void> deleteVehicle(String id);
-  Future<void> assignDriverToVehicle(String? vehicleId, String driverId);
   Future<String> uploadVehicleImage(XFile image, String vehicleId);
   Future<String> uploadDocumentAttachment(
     XFile file,

@@ -8,6 +8,7 @@ import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../core/widgets/action_items_dialog.dart';
+import 'vehicle_detail_screen.dart';
 
 class VehiclesScreen extends StatefulWidget {
   const VehiclesScreen({super.key});
@@ -143,8 +144,8 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                   separatorBuilder: (context, index) => SizedBox(height: 16.h),
                   itemBuilder: (context, index) {
                     final vehicle = vehicles[index];
-                    final driver = vehicle.assignedDriverId != null
-                        ? driversMap[vehicle.assignedDriverId]
+                    final driver = vehicle.currentDriverId != null
+                        ? driversMap[vehicle.currentDriverId]
                         : null;
 
                     return Card(
@@ -195,7 +196,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                                 Text(
                                   driver != null
                                       ? driver.fullName
-                                      : 'No Employee Assigned',
+                                      : 'No Tafweed Issued',
                                   style: TextStyle(
                                     color: driver != null
                                         ? Colors.black87
@@ -233,7 +234,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                                 Icons.remove_red_eye_outlined,
                                 color: Colors.blue,
                               ),
-                              onPressed: () => _showDetails(vehicle, driver),
+                              onPressed: () => _showDetails(vehicle),
                               tooltip: 'View Details',
                             ),
                             Consumer<NotificationProvider>(
@@ -312,7 +313,6 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                         ),
                         onTap: () => _showDetails(
                           vehicle,
-                          driver,
                         ), // Tap opens details now instead of edit
                       ),
                     );
@@ -323,109 +323,14 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     );
   }
 
-  void _showDetails(VehicleEntity vehicle, EmployeeEntity? driver) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        child: Container(
-          width: 500,
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Vehicle Details',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              const Divider(height: 32),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (vehicle.imageUrl != null)
-                        Container(
-                          height: 200,
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            image: DecorationImage(
-                              image: NetworkImage(vehicle.imageUrl!),
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        ),
-
-                      _buildDetailRow(
-                        'Make & Model',
-                        '${vehicle.make} ${vehicle.model}',
-                        Icons.directions_car,
-                      ),
-                      _buildDetailRow(
-                        'Year',
-                        vehicle.year.toString(),
-                        Icons.calendar_today,
-                      ),
-                      _buildDetailRow('Color', vehicle.color, Icons.color_lens),
-                      _buildDetailRow(
-                        'Plate Number',
-                        vehicle.plateNumber,
-                        Icons.confirmation_number,
-                      ),
-                      _buildDetailRow('Type', vehicle.type, Icons.category),
-                      _buildDetailRow(
-                        'Assigned Employee',
-                        driver != null ? driver.fullName : 'Not Assigned',
-                        Icons.person,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+  void _showDetails(VehicleEntity vehicle) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            VehicleDetailScreen(vehicle: vehicle),
       ),
     );
   }
 
-  Widget _buildDetailRow(String label, String value, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Row(
-        children: [
-          Icon(icon, size: 20, color: Colors.grey),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-              ),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
 }

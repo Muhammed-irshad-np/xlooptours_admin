@@ -96,7 +96,9 @@ void main() async {
           ? dev_options.DefaultFirebaseOptions.currentPlatform
           : prod_options.DefaultFirebaseOptions.currentPlatform,
     );
-    debugPrint('Firebase initialized successfully for $environment environment');
+    debugPrint(
+      'Firebase initialized successfully for $environment environment',
+    );
   } catch (e, stackTrace) {
     final errorMessage = e.toString().toLowerCase();
     if (errorMessage.contains('already initialized') ||

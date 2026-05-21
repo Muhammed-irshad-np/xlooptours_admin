@@ -49,7 +49,6 @@ void main() {
       'color': 'Silver',
       'plateNumber': 'ABC-123',
       'type': 'Sedan',
-      'assignedDriverId': null,
       'imageUrl': null,
       'isActive': true,
       'insurance': {
@@ -126,6 +125,7 @@ void main() {
       'transmission': null,
       'purchaseDate': null,
       'purchasePrice': null,
+      'purchaseOdometer': null,
       'currentOdometer': null,
       'lastOdometerUpdateDate': null,
       'gvwr': null,

@@ -174,8 +174,8 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                             SizedBox(height: 16.h),
                         itemBuilder: (context, index) {
                           final vehicle = vehicles[index];
-                          final driver = vehicle.assignedDriverId != null
-                              ? driversMap[vehicle.assignedDriverId]
+                          final driver = vehicle.currentDriverId != null
+                              ? driversMap[vehicle.currentDriverId]
                               : null;
 
                           return _buildVehicleCard(vehicle, driver);
@@ -235,7 +235,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                 Icon(Icons.person, size: 14.sp, color: Colors.blueGrey),
                 SizedBox(width: 4.w),
                 Text(
-                  driver != null ? driver.fullName : 'No Employee Assigned',
+                  driver != null ? driver.fullName : 'No Tafweed Issued',
                   style: TextStyle(
                     color: driver != null ? Colors.black87 : Colors.orange,
                     fontWeight: FontWeight.w500,
@@ -267,7 +267,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                 Icons.remove_red_eye_outlined,
                 color: Colors.blue,
               ),
-              onPressed: () => _showDetails(vehicle, driver),
+              onPressed: () => _showDetails(vehicle),
               tooltip: 'View Details',
             ),
             Consumer<NotificationProvider>(
@@ -351,17 +351,17 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
             ),
           ],
         ),
-        onTap: () => _showDetails(vehicle, driver),
+        onTap: () => _showDetails(vehicle),
       ),
     );
   }
 
-  void _showDetails(VehicleEntity vehicle, EmployeeEntity? driver) {
+  void _showDetails(VehicleEntity vehicle) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) =>
-            VehicleDetailScreen(vehicle: vehicle, driver: driver),
+            VehicleDetailScreen(vehicle: vehicle),
       ),
     );
   }

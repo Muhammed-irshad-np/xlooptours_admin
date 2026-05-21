@@ -15,7 +15,6 @@ abstract class VehicleRemoteDataSource {
   Future<void> insertVehicle(VehicleModel vehicle);
   Future<void> updateVehicle(VehicleModel vehicle);
   Future<void> deleteVehicle(String id);
-  Future<void> assignDriverToVehicle(String? vehicleId, String driverId);
   Future<String> uploadVehicleImage(XFile image, String vehicleId);
 
   // Vehicle Make
@@ -66,22 +65,6 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
 
   @override
   Future<void> updateVehicle(VehicleModel vehicle) async {
-    // Enforce 1:1 Driver Assignment
-    if (vehicle.assignedDriverId != null) {
-      final batch = firestore.batch();
-      final currentAssignments = await firestore
-          .collection('vehicles')
-          .where('assignedDriverId', isEqualTo: vehicle.assignedDriverId)
-          .get();
-
-      for (var doc in currentAssignments.docs) {
-        if (doc.id != vehicle.id) {
-          batch.update(doc.reference, {'assignedDriverId': null});
-        }
-      }
-      await batch.commit();
-    }
-
     final Map<String, dynamic> vehicleData = vehicle.toJson();
 
     // Note: We no longer remove null values here. This allows explicitly setting fields
@@ -94,32 +77,6 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
   @override
   Future<void> deleteVehicle(String id) async {
     await firestore.collection('vehicles').doc(id).delete();
-  }
-
-  @override
-  Future<void> assignDriverToVehicle(String? vehicleId, String driverId) async {
-    final batch = firestore.batch();
-
-    // 1. Find any OTHER vehicle currently assigned to this driver
-    final currentAssignments = await firestore
-        .collection('vehicles')
-        .where('assignedDriverId', isEqualTo: driverId)
-        .get();
-
-    for (var doc in currentAssignments.docs) {
-      if (doc.id != vehicleId) {
-        // Unassign from old vehicle
-        batch.update(doc.reference, {'assignedDriverId': null});
-      }
-    }
-
-    // 2. Assign to new vehicle (if provided)
-    if (vehicleId != null) {
-      final vehicleRef = firestore.collection('vehicles').doc(vehicleId);
-      batch.update(vehicleRef, {'assignedDriverId': driverId});
-    }
-
-    await batch.commit();
   }
 
   String _getMimeType(String ext) {

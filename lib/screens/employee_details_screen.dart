@@ -20,12 +20,9 @@ import 'tafweed_history_view_all_screen.dart';
 
 class EmployeeDetailsScreen extends StatelessWidget {
   final EmployeeEntity employee;
-  final VehicleEntity? assignedVehicle;
-
   const EmployeeDetailsScreen({
     super.key,
     required this.employee,
-    this.assignedVehicle,
   });
 
   String _formatDate(DateTime? date) {
@@ -71,11 +68,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
                       SizedBox(height: 24.h),
                       _buildSectionHeader('Personal Information'),
                       _buildPersonalInfoCard(),
-                      if (assignedVehicle != null) ...[
-                        SizedBox(height: 24.h),
-                        _buildSectionHeader('Assigned Vehicle'),
-                        _buildVehicleCard(),
-                      ],
+
                       _buildAuthorizedVehiclesCard(context),
                       _buildTafweedHistorySection(context),
                     ],
@@ -308,56 +301,6 @@ class EmployeeDetailsScreen extends StatelessWidget {
                 Icons.cake,
               ),
             ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVehicleCard() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
-      child: Padding(
-        padding: EdgeInsets.all(20.w),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(12.w),
-              decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.directions_car,
-                color: Colors.blue,
-                size: 30.sp,
-              ),
-            ),
-            SizedBox(width: 16.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${assignedVehicle!.make} ${assignedVehicle!.model}',
-                    style: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    'Plate: ${assignedVehicle!.plateNumber}',
-                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[700]),
-                  ),
-                  Text(
-                    'Year: ${assignedVehicle!.year}',
-                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[700]),
-                  ),
-                ],
-              ),
-            ),
           ],
         ),
       ),

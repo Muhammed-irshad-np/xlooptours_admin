@@ -128,10 +128,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   final ValueNotifier<String?> _licenseAttachmentUrl = ValueNotifier(null);
 
   final ValueNotifier<bool> _isSaving = ValueNotifier(false);
-  final ValueNotifier<List<VehicleEntity>> _availableVehicles = ValueNotifier(
-    [],
-  );
-  final ValueNotifier<String?> _selectedVehicleId = ValueNotifier(null);
   late final ValueNotifier<String> _primaryCountryCode;
 
   final List<String> _positions = [
@@ -264,29 +260,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       _isActive.value = e.isActive;
       _currentImageUrl.value = e.imageUrl;
     }
-    _loadVehicles(); // Load vehicles
   }
 
-  // Added method to load vehicles
-  Future<void> _loadVehicles() async {
-    try {
-      if (mounted) {
-        await context.read<VehicleProvider>().fetchAllVehicles();
-        if (!mounted) return;
-        final vehicles = context.read<VehicleProvider>().vehicles;
-        _availableVehicles.value = vehicles;
-        // If editing, find the vehicle assigned to this driver
-        if (widget.employee != null) {
-          final assignedVehicle = vehicles
-              .where((v) => v.assignedDriverId == widget.employee!.id)
-              .firstOrNull;
-          _selectedVehicleId.value = assignedVehicle?.id;
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading vehicles: $e');
-    }
-  }
+
 
   @override
   void dispose() {
@@ -343,8 +319,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _contactEntries.dispose();
 
     _isSaving.dispose();
-    _availableVehicles.dispose();
-    _selectedVehicleId.dispose();
     super.dispose();
   }
 
@@ -595,13 +569,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         }
       }
 
-      // Handle Vehicle Assignment
-      if (mounted) {
-        await context.read<VehicleProvider>().assignDriver(
-          _selectedVehicleId.value,
-          id,
-        );
-      }
+
 
       if (mounted) {
         Navigator.pop(context, true);
@@ -754,53 +722,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                       return const SizedBox.shrink();
                     },
                   ),
-                  SizedBox(height: 16.h),
-                  ValueListenableBuilder<List<VehicleEntity>>(
-                    valueListenable: _availableVehicles,
-                    builder: (context, availableVehicles, _) {
-                      return ValueListenableBuilder<String?>(
-                        valueListenable: _selectedVehicleId,
-                        builder: (context, selectedVehicleId, _) {
-                          return DropdownButtonFormField<String>(
-                            initialValue: selectedVehicleId,
-                            decoration: InputDecoration(
-                              labelText: 'Assign Vehicle',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                            ),
-                            items: [
-                              const DropdownMenuItem<String>(
-                                value: null,
-                                child: Text('No Vehicle Assigned'),
-                              ),
-                              ...availableVehicles.map((v) {
-                                final isAssigned =
-                                    v.assignedDriverId != null &&
-                                    v.assignedDriverId != widget.employee?.id;
-                                return DropdownMenuItem(
-                                  value: v.id,
-                                  child: Text(
-                                    '${v.make} ${v.model} (${v.plateNumber})${isAssigned ? " [Assigned]" : ""}',
-                                    style: TextStyle(
-                                      color: isAssigned ? Colors.orange : null,
-                                    ),
-                                  ),
-                                );
-                              }),
-                            ],
-                            onChanged: (val) {
-                              _selectedVehicleId.value = val;
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
+
                   SizedBox(height: 16.h),
 
                   // Contact Info

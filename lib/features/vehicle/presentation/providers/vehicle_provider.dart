@@ -5,7 +5,6 @@ import '../../domain/entities/vehicle_entity.dart';
 import '../../domain/entities/vehicle_make_entity.dart';
 import '../../domain/entities/maintenance_type_entity.dart';
 import '../../domain/entities/vehicle_documents.dart';
-import '../../domain/usecases/assign_driver_to_vehicle_usecase.dart';
 import '../../domain/usecases/delete_vehicle_make_usecase.dart';
 import '../../domain/usecases/delete_vehicle_usecase.dart';
 import '../../domain/usecases/get_all_vehicle_makes_usecase.dart';
@@ -29,7 +28,6 @@ class VehicleProvider extends ChangeNotifier {
   final InsertVehicleUseCase insertVehicleUseCase;
   final UpdateVehicleUseCase updateVehicleUseCase;
   final DeleteVehicleUseCase deleteVehicleUseCase;
-  final AssignDriverToVehicleUseCase assignDriverToVehicleUseCase;
   final UploadVehicleImageUseCase uploadVehicleImageUseCase;
   final UploadVehicleDocumentUseCase uploadVehicleDocumentUseCase;
 
@@ -58,7 +56,6 @@ class VehicleProvider extends ChangeNotifier {
     required this.insertVehicleUseCase,
     required this.updateVehicleUseCase,
     required this.deleteVehicleUseCase,
-    required this.assignDriverToVehicleUseCase,
     required this.uploadVehicleImageUseCase,
     required this.uploadVehicleDocumentUseCase,
     required this.getAllVehicleMakesUseCase,
@@ -204,19 +201,6 @@ class VehicleProvider extends ChangeNotifier {
       await fetchAllVehicles();
     } catch (e) {
       _errorMessage = 'Failed to delete document: $e';
-      debugPrint(_errorMessage);
-      _setLoading(false);
-      rethrow;
-    }
-  }
-
-  Future<void> assignDriver(String? vehicleId, String driverId) async {
-    _setLoading(true);
-    try {
-      await assignDriverToVehicleUseCase(vehicleId, driverId);
-      await fetchAllVehicles();
-    } catch (e) {
-      _errorMessage = 'Failed to assign driver: \$e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;

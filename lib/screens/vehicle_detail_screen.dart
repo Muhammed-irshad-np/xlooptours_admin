@@ -22,9 +22,8 @@ import '../features/vehicle/presentation/widgets/authorize_driver_to_vehicle_dia
 
 class VehicleDetailScreen extends StatelessWidget {
   final VehicleEntity vehicle;
-  final EmployeeEntity? driver;
 
-  const VehicleDetailScreen({super.key, required this.vehicle, this.driver});
+  const VehicleDetailScreen({super.key, required this.vehicle});
 
   @override
   Widget build(BuildContext context) {
@@ -108,12 +107,7 @@ class VehicleDetailScreen extends StatelessWidget {
               currentVehicle.plateNumber,
               Icons.confirmation_number,
             ),
-            _buildDetailRow(
-              context,
-              'Assigned Employee',
-              driver != null ? driver!.fullName : 'Not Assigned',
-              Icons.person,
-            ),
+
             _buildDetailRow(
               context,
               'Status',
@@ -200,7 +194,7 @@ class VehicleDetailScreen extends StatelessWidget {
                       context,
                       'Purchase Price',
                       currentVehicle.purchasePrice != null
-                          ? currentVehicle.purchasePrice!.toStringAsFixed(2)
+                          ? '${currentVehicle.purchasePrice!.toStringAsFixed(2)} SAR'
                           : 'N/A',
                       Icons.money,
                     ),
@@ -208,14 +202,22 @@ class VehicleDetailScreen extends StatelessWidget {
                   Expanded(
                     child: _buildDetailRow(
                       context,
-                      'Current Odometer',
-                      currentVehicle.currentOdometer != null
-                          ? '${currentVehicle.currentOdometer} KM'
+                      'Purchase Odometer',
+                      currentVehicle.purchaseOdometer != null
+                          ? '${currentVehicle.purchaseOdometer} KM'
                           : 'N/A',
-                      Icons.speed,
+                      Icons.speed_outlined,
                     ),
                   ),
                 ],
+              ),
+              _buildDetailRow(
+                context,
+                'Current Odometer',
+                currentVehicle.currentOdometer != null
+                    ? '${currentVehicle.currentOdometer} KM'
+                    : 'N/A',
+                Icons.speed,
               ),
             ],
             const Divider(height: 32),

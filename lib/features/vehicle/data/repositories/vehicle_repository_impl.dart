@@ -39,11 +39,6 @@ class VehicleRepositoryImpl implements VehicleRepository {
   }
 
   @override
-  Future<void> assignDriverToVehicle(String? vehicleId, String driverId) async {
-    return await remoteDataSource.assignDriverToVehicle(vehicleId, driverId);
-  }
-
-  @override
   Future<String> uploadVehicleImage(XFile image, String vehicleId) async {
     return await remoteDataSource.uploadVehicleImage(image, vehicleId);
   }

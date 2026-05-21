@@ -69,6 +69,8 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   final TextEditingController _tireSizeController = TextEditingController();
   final TextEditingController _purchasePriceController =
       TextEditingController();
+  final TextEditingController _purchaseOdometerController =
+      TextEditingController();
   final TextEditingController _currentOdometerController =
       TextEditingController();
 
@@ -89,7 +91,6 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   final ValueNotifier<String?> _fahasAttachmentUrl = ValueNotifier(null);
   final ValueNotifier<bool> _isUploadingFahas = ValueNotifier(false);
 
-  final ValueNotifier<String?> _assignedEmployeeId = ValueNotifier(null);
   final ValueNotifier<List<EmployeeEntity>> _employees = ValueNotifier([]);
 
   final ValueNotifier<String?> _fuelType = ValueNotifier(null);
@@ -102,7 +103,6 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _selectedModel.dispose();
     _selectedYear.dispose();
     _selectedColor.dispose();
-    _assignedEmployeeId.dispose();
     _selectedImage.dispose();
     _currentImageUrl.dispose();
     _isLoading.dispose();
@@ -122,6 +122,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _gvwrController.dispose();
     _tireSizeController.dispose();
     _purchasePriceController.dispose();
+    _purchaseOdometerController.dispose();
     _currentOdometerController.dispose();
 
     _purchaseDate.dispose();
@@ -197,7 +198,6 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
 
     _plateNumberController.text = v.plateNumber;
     _typeController.text = v.type;
-    _assignedEmployeeId.value = v.assignedDriverId;
     _currentImageUrl.value = v.imageUrl;
 
     _insuranceExpiryDate.value = v.insurance?.expiryDate;
@@ -217,6 +217,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _transmission.value = v.transmission;
     _purchaseDate.value = v.purchaseDate;
     _purchasePriceController.text = v.purchasePrice?.toString() ?? '';
+    _purchaseOdometerController.text = v.purchaseOdometer?.toString() ?? '';
     _currentOdometerController.text = v.currentOdometer?.toString() ?? '';
     _gvwrController.text = v.gvwr?.toString() ?? '';
     _tireSizeController.text = v.tireSize ?? '';
@@ -470,7 +471,6 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           color: _selectedColor.value!,
           plateNumber: _plateNumberController.text,
           type: _typeController.text,
-          assignedDriverId: _assignedEmployeeId.value,
           imageUrl: imageUrl,
           insurance: _insuranceExpiryDate.value != null
               ? (widget.vehicle?.insurance?.copyWith(
@@ -512,6 +512,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           transmission: _transmission.value,
           purchaseDate: _purchaseDate.value,
           purchasePrice: double.tryParse(_purchasePriceController.text),
+          purchaseOdometer: int.tryParse(_purchaseOdometerController.text),
           currentOdometer: int.tryParse(_currentOdometerController.text),
           gvwr: _gvwrController.text.isNotEmpty ? _gvwrController.text : null,
           tireSize: _tireSizeController.text.isNotEmpty
@@ -542,7 +543,6 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           color: _selectedColor.value!,
           plateNumber: _plateNumberController.text,
           type: _typeController.text,
-          assignedDriverId: _assignedEmployeeId.value,
           imageUrl: imageUrl,
           isActive: true,
           insurance: _insuranceExpiryDate.value != null
@@ -575,6 +575,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           transmission: _transmission.value,
           purchaseDate: _purchaseDate.value,
           purchasePrice: double.tryParse(_purchasePriceController.text),
+          purchaseOdometer: int.tryParse(_purchaseOdometerController.text),
           currentOdometer: int.tryParse(_currentOdometerController.text),
           gvwr: _gvwrController.text.isNotEmpty ? _gvwrController.text : null,
           tireSize: _tireSizeController.text.isNotEmpty
@@ -721,8 +722,6 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                         SizedBox(height: 16.h),
                         Row(
                           children: [
-                            Expanded(child: _buildDriverDropdown()),
-                            SizedBox(width: 16.w),
                             Expanded(child: _buildStatusDropdown()),
                           ],
                         ),
@@ -823,13 +822,20 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                               SizedBox(width: 16.w),
                               Expanded(
                                 child: _buildTextField(
-                                  'Current Odometer',
-                                  _currentOdometerController,
+                                  'Purchase Odometer',
+                                  _purchaseOdometerController,
                                   isNumber: true,
                                   required: false,
                                 ),
                               ),
                             ],
+                          ),
+                          SizedBox(height: 16.h),
+                          _buildTextField(
+                            'Current Odometer',
+                            _currentOdometerController,
+                            isNumber: true,
+                            required: false,
                           ),
                         ],
 
@@ -1387,59 +1393,6 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     );
   }
 
-  Widget _buildDriverDropdown() {
-    return AnimatedBuilder(
-      animation: Listenable.merge([_assignedEmployeeId, _employees]),
-      builder: (context, _) {
-        return DropdownButtonFormField<String>(
-          // ignore: deprecated_member_use
-          value: _assignedEmployeeId.value,
-          decoration: InputDecoration(
-            labelText: 'Assigned Employee',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8.r),
-            ),
-          ),
-          items: [
-            const DropdownMenuItem<String>(value: null, child: Text('None')),
-            ..._employees.value.map((employee) {
-              return DropdownMenuItem<String>(
-                value: employee.id,
-                child: Row(
-                  children: [
-                    Text(employee.fullName),
-                    SizedBox(width: 8.w),
-                    Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 8.w,
-                        vertical: 2.h,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4.r),
-                        border: Border.all(color: Colors.blue),
-                      ),
-                      child: Text(
-                        employee.position,
-                        style: TextStyle(
-                          fontSize: 10.sp,
-                          color: Colors.blue,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ],
-          onChanged: (value) {
-            _assignedEmployeeId.value = value;
-          },
-        );
-      },
-    );
-  }
 
   Widget _buildFuelTypeDropdown() {
     return ValueListenableBuilder<String?>(

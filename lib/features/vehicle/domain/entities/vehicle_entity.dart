@@ -9,7 +9,13 @@ class VehicleEntity extends Equatable {
   final String color;
   final String plateNumber;
   final String type; // e.g., SUV, Sedan
-  final String? assignedDriverId; // Reference to Employee ID
+  String? get currentDriverId {
+    if (tafweeds != null && tafweeds!.isNotEmpty) {
+      return tafweeds!.last.driverId;
+    }
+    return null;
+  }
+  
   final String? imageUrl;
   final bool isActive;
   final VehicleDocument? insurance;
@@ -27,6 +33,7 @@ class VehicleEntity extends Equatable {
   final String? transmission;
   final DateTime? purchaseDate;
   final double? purchasePrice;
+  final int? purchaseOdometer;
   final int? currentOdometer;
   final DateTime? lastOdometerUpdateDate;
   final String? gvwr;
@@ -43,7 +50,6 @@ class VehicleEntity extends Equatable {
     required this.color,
     required this.plateNumber,
     required this.type,
-    this.assignedDriverId,
     this.imageUrl,
     this.isActive = true,
     this.insurance,
@@ -59,6 +65,7 @@ class VehicleEntity extends Equatable {
     this.transmission,
     this.purchaseDate,
     this.purchasePrice,
+    this.purchaseOdometer,
     this.currentOdometer,
     this.lastOdometerUpdateDate,
     this.gvwr,
@@ -77,7 +84,6 @@ class VehicleEntity extends Equatable {
     color,
     plateNumber,
     type,
-    assignedDriverId,
     imageUrl,
     isActive,
     insurance,
@@ -93,6 +99,7 @@ class VehicleEntity extends Equatable {
     transmission,
     purchaseDate,
     purchasePrice,
+    purchaseOdometer,
     currentOdometer,
     lastOdometerUpdateDate,
     gvwr,
@@ -110,7 +117,6 @@ class VehicleEntity extends Equatable {
     String? color,
     String? plateNumber,
     String? type,
-    String? assignedDriverId,
     String? imageUrl,
     bool? isActive,
     VehicleDocument? insurance,
@@ -126,6 +132,7 @@ class VehicleEntity extends Equatable {
     String? transmission,
     DateTime? purchaseDate,
     double? purchasePrice,
+    int? purchaseOdometer,
     int? currentOdometer,
     DateTime? lastOdometerUpdateDate,
     String? gvwr,
@@ -146,7 +153,6 @@ class VehicleEntity extends Equatable {
       color: color ?? this.color,
       plateNumber: plateNumber ?? this.plateNumber,
       type: type ?? this.type,
-      assignedDriverId: assignedDriverId ?? this.assignedDriverId,
       imageUrl: imageUrl ?? this.imageUrl,
       isActive: isActive ?? this.isActive,
       insurance: clearInsurance ? null : (insurance ?? this.insurance),
@@ -166,6 +172,7 @@ class VehicleEntity extends Equatable {
       transmission: transmission ?? this.transmission,
       purchaseDate: purchaseDate ?? this.purchaseDate,
       purchasePrice: purchasePrice ?? this.purchasePrice,
+      purchaseOdometer: purchaseOdometer ?? this.purchaseOdometer,
       currentOdometer: currentOdometer ?? this.currentOdometer,
       lastOdometerUpdateDate:
           lastOdometerUpdateDate ?? this.lastOdometerUpdateDate,
