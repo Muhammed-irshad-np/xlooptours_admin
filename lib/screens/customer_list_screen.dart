@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../features/notifications/domain/entities/notification_entity.dart';
@@ -88,6 +89,31 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     if (result != null && context.mounted) {
       context.read<CustomerProvider>().fetchAllCustomers();
     }
+  }
+
+  Future<void> _copyFeedbackLink(CustomerEntity customer) async {
+    final currentUrl = Uri.base.toString();
+    final baseUrl = currentUrl.contains('#')
+        ? currentUrl.substring(0, currentUrl.indexOf('#'))
+        : currentUrl;
+    final finalBaseUrl = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+
+    final uri = Uri.parse(finalBaseUrl);
+    final hostUrl = '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
+    final clientNameEncoded = Uri.encodeComponent(customer.name);
+    final companyNameEncoded = customer.companyName != null ? Uri.encodeComponent(customer.companyName!) : '';
+    final feedbackUrl = '$hostUrl/feedback?clientName=$clientNameEncoded&companyName=$companyNameEncoded';
+
+    await Clipboard.setData(ClipboardData(text: feedbackUrl));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Feedback link for ${customer.name} copied!'),
+        backgroundColor: Colors.green,
+      ),
+    );
   }
 
   Future<void> _toggleCustomerStatus(
@@ -261,9 +287,21 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                                       _navigateToForm(customer);
                                     } else if (value == 'delete') {
                                       _deleteCustomer(customer);
+                                    } else if (value == 'copy_link') {
+                                      _copyFeedbackLink(customer);
                                     }
                                   },
                                   itemBuilder: (context) => [
+                                    const PopupMenuItem(
+                                      value: 'copy_link',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.copy_rounded, size: 20),
+                                          SizedBox(width: 8),
+                                          Text('Copy Feedback Link'),
+                                        ],
+                                      ),
+                                    ),
                                     const PopupMenuItem(
                                       value: 'edit',
                                       child: Row(

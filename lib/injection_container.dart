@@ -96,6 +96,13 @@ import 'features/xloop_vault/domain/usecases/vault_usecases.dart';
 import 'features/xloop_vault/domain/usecases/get_vault_expiry_alerts_usecase.dart';
 import 'features/xloop_vault/presentation/providers/vault_provider.dart';
 
+import 'features/feedback/data/datasources/feedback_remote_data_source.dart';
+import 'features/feedback/data/repositories/feedback_repository_impl.dart';
+import 'features/feedback/domain/repositories/feedback_repository.dart';
+import 'features/feedback/domain/usecases/submit_feedback_usecase.dart';
+import 'features/feedback/domain/usecases/get_latest_feedbacks_usecase.dart';
+import 'features/feedback/presentation/providers/feedback_provider.dart';
+
 final sl = GetIt.instance; // sl stands for Service Locator
 
 Future<void> init() async {
@@ -383,6 +390,29 @@ Future<void> init() async {
   // Data sources
   sl.registerLazySingleton<VaultRemoteDataSource>(
     () => VaultRemoteDataSourceImpl(firestore: sl(), storage: sl()),
+  );
+
+  //! Features - Feedback
+  // State Management (Provider)
+  sl.registerFactory(
+    () => FeedbackProvider(
+      submitFeedbackUseCase: sl(),
+      getLatestFeedbacksUseCase: sl(),
+    ),
+  );
+
+  // UseCases
+  sl.registerLazySingleton(() => SubmitFeedbackUseCase(sl()));
+  sl.registerLazySingleton(() => GetLatestFeedbacksUseCase(sl()));
+
+  // Repositories
+  sl.registerLazySingleton<FeedbackRepository>(
+    () => FeedbackRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data sources
+  sl.registerLazySingleton<FeedbackRemoteDataSource>(
+    () => FeedbackRemoteDataSourceImpl(firestore: sl()),
   );
 
   //! Core

@@ -18,6 +18,7 @@ import 'features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'features/invoice/presentation/providers/invoice_provider.dart';
 import 'features/analytics/presentation/providers/analytics_provider.dart';
 import 'features/xloop_vault/presentation/providers/vault_provider.dart';
+import 'features/feedback/presentation/providers/feedback_provider.dart';
 
 import 'screens/invoice_form_screen.dart';
 import 'screens/pdf_preview_screen.dart';
@@ -40,6 +41,7 @@ import 'screens/public/under_maintenance_screen.dart';
 // import 'screens/vehicles_screen.dart'; // Removed unused import
 import 'screens/vehicle_form_screen.dart'; // Added
 import 'screens/expiries_list_screen.dart';
+import 'features/feedback/presentation/pages/feedback_form_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -136,14 +138,15 @@ class _MyAppState extends State<MyApp> {
         final isLoggedIn = authProvider.user != null;
         final isLoggingIn = state.uri.path == '/login';
         final isRegistering = state.uri.path == '/register';
+        final isFeedback = state.uri.path == '/feedback';
         final isRoot = state.uri.path == '/';
 
-        // Allow public access to registration
+        // Allow public access to registration and feedback
         // Maintenance Screen logic:
         // - In Release Mode: Always show maintenance screen at root '/'
         // - In Debug/Profile Mode: Bypass maintenance, treat '/' as normal app root (login or home)
 
-        if (isRegistering) {
+        if (isRegistering || isFeedback) {
           return null;
         }
 
@@ -204,6 +207,19 @@ class _MyAppState extends State<MyApp> {
           builder: (context, state) {
             final companyId = state.uri.queryParameters['companyId'];
             return RegistrationScreen(companyId: companyId);
+          },
+        ),
+        GoRoute(
+          path: '/feedback',
+          builder: (context, state) {
+            final clientName = state.uri.queryParameters['clientName'];
+            final companyName = state.uri.queryParameters['companyName'];
+            final driverName = state.uri.queryParameters['driverName'];
+            return FeedbackFormScreen(
+              prefilledClientName: clientName,
+              prefilledCompanyName: companyName,
+              prefilledDriverName: driverName,
+            );
           },
         ),
         GoRoute(
@@ -268,6 +284,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => di.sl<InvoiceProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<AnalyticsProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<VaultProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<FeedbackProvider>()),
       ],
       child: ScreenUtilInit(
         designSize: const Size(1440, 900),

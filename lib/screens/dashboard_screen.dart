@@ -9,10 +9,12 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import 'package:flutter/services.dart';
 import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.dart';
 import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'package:xloop_invoice/features/customer/presentation/providers/customer_provider.dart';
+import 'package:xloop_invoice/features/feedback/presentation/providers/feedback_provider.dart';
 import 'package:xloop_invoice/features/notifications/presentation/providers/notification_provider.dart';
 import 'package:xloop_invoice/features/notifications/domain/entities/notification_entity.dart';
 import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicles_needing_odo_update_usecase.dart';
@@ -102,6 +104,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       // then refresh alerts so NotificationProvider has all data it needs.
       context.read<EmployeeProvider>().fetchAllEmployees();
       context.read<CustomerProvider>().fetchAllCustomers();
+      context.read<FeedbackProvider>().fetchLatestFeedbacks();
       await Future.wait([
         vehicleProvider.fetchAllVehicles(),
         vehicleProvider.fetchAllMaintenanceTypes(),
@@ -144,6 +147,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                     SizedBox(height: 32.h),
                     _buildRecentActivitySection(),
                     SizedBox(height: 32.h),
+                    _buildFeedbacksSection(),
+                    SizedBox(height: 32.h),
                     _buildOdometerSection(),
                   ],
                 ),
@@ -157,6 +162,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                           const _ExpiriesSection(),
                           SizedBox(height: 32.h),
                           _buildRecentActivitySection(),
+                          SizedBox(height: 32.h),
+                          _buildFeedbacksSection(),
                         ],
                       ),
                     ),
@@ -225,11 +232,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    Icons.terminal_rounded,
-                    size: 14.sp,
-                    color: _DT.warning,
-                  ),
+                  Icon(Icons.terminal_rounded, size: 14.sp, color: _DT.warning),
                   SizedBox(width: 6.w),
                   Text(
                     'Development',
@@ -444,6 +447,156 @@ class _DashboardScreenState extends State<DashboardScreen>
                     ),
                   ),
               ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  // ── Feedbacks section ───────────────────────────────────────────────────────
+  Widget _buildFeedbacksSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _SectionLabel(
+              label: 'Recent Feedback',
+              icon: Icons.feedback_outlined,
+              iconColor: _DT.success,
+            ),
+            IconButton(
+              icon: Icon(Icons.copy, color: _DT.brand, size: 18.sp),
+              tooltip: 'Copy Feedback Link',
+              onPressed: () async {
+                final currentUrl = Uri.base.toString();
+                final baseUrl = currentUrl.contains('#')
+                    ? currentUrl.substring(0, currentUrl.indexOf('#'))
+                    : currentUrl;
+                final finalBaseUrl = baseUrl.endsWith('/')
+                    ? baseUrl.substring(0, baseUrl.length - 1)
+                    : baseUrl;
+                final feedbackUrl = '$finalBaseUrl/feedback';
+
+                await Clipboard.setData(ClipboardData(text: feedbackUrl));
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Feedback link copied to clipboard!'),
+                    backgroundColor: _DT.success,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        SizedBox(height: 16.h),
+        Consumer<FeedbackProvider>(
+          builder: (context, provider, _) {
+            if (provider.isLoadingFeedbacks) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final feedbacks = provider.latestFeedbacks;
+
+            if (feedbacks.isEmpty) {
+              return const _DashboardEmptyState(
+                message: 'No feedback received yet',
+                icon: Icons.chat_bubble_outline,
+                color: _DT.textMuted,
+              );
+            }
+
+            return ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: 500.h),
+              child: _DashboardCard(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  physics: const ClampingScrollPhysics(),
+                  itemCount: feedbacks.length,
+                  separatorBuilder: (_, __) => Container(
+                    height: 1.h,
+                    margin: EdgeInsets.symmetric(horizontal: 20.w),
+                    color: _DT.borderLight,
+                  ),
+                  itemBuilder: (context, i) {
+                    final f = feedbacks[i];
+                    return ListTile(
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 20.w,
+                        vertical: 8.h,
+                      ),
+                      leading: CircleAvatar(
+                        backgroundColor: _DT.success.withOpacity(0.1),
+                        child: Text(
+                          f.clientName.isNotEmpty
+                              ? f.clientName[0].toUpperCase()
+                              : '?',
+                          style: const TextStyle(
+                            color: _DT.success,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      title: Text(
+                        f.clientName,
+                        style: GoogleFonts.inter(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: _DT.textPrimary,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(height: 4.h),
+                          Text(
+                            'Driver: ${f.driverName}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              color: _DT.textSecondary,
+                            ),
+                          ),
+                          SizedBox(height: 4.h),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.star,
+                                size: 14.sp,
+                                color: Colors.amber,
+                              ),
+                              SizedBox(width: 4.w),
+                              Text(
+                                '${f.safetyRating} / 5',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.sp,
+                                  color: _DT.textMuted,
+                                ),
+                              ),
+                              SizedBox(width: 12.w),
+                              Icon(
+                                Icons.access_time,
+                                size: 14.sp,
+                                color: _DT.textMuted,
+                              ),
+                              SizedBox(width: 4.w),
+                              Text(
+                                timeago.format(f.createdAt),
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.sp,
+                                  color: _DT.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
             );
           },
         ),
@@ -1321,10 +1474,17 @@ class _ExpiriesSection extends StatefulWidget {
 
 class _ExpiriesSectionState extends State<_ExpiriesSection> {
   int _selectedTabIndex = 0;
-  final List<String> _tabs = ['All', 'Company', 'Vehicles', 'Employees', 'Other'];
+  final List<String> _tabs = [
+    'All',
+    'Company',
+    'Vehicles',
+    'Employees',
+    'Other',
+  ];
 
   List<NotificationEntity> _getFilteredExpiries(
-      List<NotificationEntity> allExpiries) {
+    List<NotificationEntity> allExpiries,
+  ) {
     if (_selectedTabIndex == 0) return allExpiries;
     if (_selectedTabIndex == 1) {
       // Company (Vault)
@@ -1333,8 +1493,10 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
     if (_selectedTabIndex == 2) {
       // Vehicles
       return allExpiries
-          .where((n) =>
-              n.id.startsWith('maintenance_') || n.id.startsWith('v_expiry_'))
+          .where(
+            (n) =>
+                n.id.startsWith('maintenance_') || n.id.startsWith('v_expiry_'),
+          )
           .toList();
     }
     if (_selectedTabIndex == 3) {
@@ -1343,11 +1505,13 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
     }
     // Other
     return allExpiries
-        .where((n) =>
-            !n.id.startsWith('maintenance_') &&
-            !n.id.startsWith('v_expiry_') &&
-            !n.id.startsWith('expiry_') &&
-            !n.id.startsWith('vault_'))
+        .where(
+          (n) =>
+              !n.id.startsWith('maintenance_') &&
+              !n.id.startsWith('v_expiry_') &&
+              !n.id.startsWith('expiry_') &&
+              !n.id.startsWith('vault_'),
+        )
         .toList();
   }
 
@@ -1380,8 +1544,10 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
                   },
                   style: TextButton.styleFrom(
                     foregroundColor: _DT.brand,
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12.w,
+                      vertical: 8.h,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8.r),
                     ),
@@ -1417,14 +1583,17 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
                       int tabCount = 0;
                       if (index == 0) tabCount = expiries.length;
                       if (index == 1) {
-                        tabCount =
-                            expiries.where((n) => n.id.startsWith('vault_')).length;
+                        tabCount = expiries
+                            .where((n) => n.id.startsWith('vault_'))
+                            .length;
                       }
                       if (index == 2) {
                         tabCount = expiries
-                            .where((n) =>
-                                n.id.startsWith('maintenance_') ||
-                                n.id.startsWith('v_expiry_'))
+                            .where(
+                              (n) =>
+                                  n.id.startsWith('maintenance_') ||
+                                  n.id.startsWith('v_expiry_'),
+                            )
                             .length;
                       }
                       if (index == 3) {
@@ -1434,11 +1603,13 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
                       }
                       if (index == 4) {
                         tabCount = expiries
-                            .where((n) =>
-                                !n.id.startsWith('maintenance_') &&
-                                !n.id.startsWith('v_expiry_') &&
-                                !n.id.startsWith('expiry_') &&
-                                !n.id.startsWith('vault_'))
+                            .where(
+                              (n) =>
+                                  !n.id.startsWith('maintenance_') &&
+                                  !n.id.startsWith('v_expiry_') &&
+                                  !n.id.startsWith('expiry_') &&
+                                  !n.id.startsWith('vault_'),
+                            )
                             .length;
                       }
 
@@ -1455,7 +1626,9 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
                                   SizedBox(width: 6.w),
                                   Container(
                                     padding: EdgeInsets.symmetric(
-                                        horizontal: 6.w, vertical: 2.h),
+                                      horizontal: 6.w,
+                                      vertical: 2.h,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: isSelected
                                           ? Colors.white.withOpacity(0.2)
@@ -1564,7 +1737,8 @@ class _CelebrationsSection extends StatelessWidget {
   }
 
   Future<void> _launchWhatsApp(EmployeeEntity emp, BuildContext context) async {
-    final greeting = "Hi ${emp.fullName}, wishing you a very Happy Birthday from all of us at Xloop! Have a fantastic day ahead! 🎂🎉";
+    final greeting =
+        "Hi ${emp.fullName}, wishing you a very Happy Birthday from all of us at Xloop! Have a fantastic day ahead! 🎂🎉";
     String phone = emp.phoneNumber.replaceAll(RegExp(r'\D'), '');
     if (phone.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1578,7 +1752,8 @@ class _CelebrationsSection extends StatelessWidget {
         phone = '$cleanCc$phone';
       }
     }
-    final whatsappUrl = 'https://wa.me/$phone?text=${Uri.encodeComponent(greeting)}';
+    final whatsappUrl =
+        'https://wa.me/$phone?text=${Uri.encodeComponent(greeting)}';
     final uri = Uri.parse(whatsappUrl);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1589,7 +1764,9 @@ class _CelebrationsSection extends StatelessWidget {
 
   Future<void> _launchCall(EmployeeEntity emp, BuildContext context) async {
     String phone = emp.phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
-    if (emp.countryCode != null && emp.countryCode!.isNotEmpty && !phone.startsWith('+')) {
+    if (emp.countryCode != null &&
+        emp.countryCode!.isNotEmpty &&
+        !phone.startsWith('+')) {
       final cleanCc = emp.countryCode!.replaceAll(RegExp(r'[^\d+]'), '');
       if (!phone.startsWith(cleanCc)) {
         phone = '+$cleanCc$phone';
@@ -1597,22 +1774,26 @@ class _CelebrationsSection extends StatelessWidget {
     }
     final uri = Uri(scheme: 'tel', path: phone);
     if (!await launchUrl(uri)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not initiate call')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Could not initiate call')));
     }
   }
 
   Future<void> _launchEmail(EmployeeEntity emp, BuildContext context) async {
     if (emp.email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No email address provided for this employee')),
+        const SnackBar(
+          content: Text('No email address provided for this employee'),
+        ),
       );
       return;
     }
-    final subject = Uri.encodeComponent("Happy Birthday, ${emp.fullName}! 🎂🎉");
+    final subject = Uri.encodeComponent(
+      "Happy Birthday, ${emp.fullName}! 🎂🎉",
+    );
     final body = Uri.encodeComponent(
-      "Hi ${emp.fullName},\n\nWishing you a very Happy Birthday from everyone at Xloop! May this year bring you joy, good health, and success in everything you do!\n\nBest regards,\nThe Xloop Team"
+      "Hi ${emp.fullName},\n\nWishing you a very Happy Birthday from everyone at Xloop! May this year bring you joy, good health, and success in everything you do!\n\nBest regards,\nThe Xloop Team",
     );
     final emailUrl = 'mailto:${emp.email}?subject=$subject&body=$body';
     final uri = Uri.parse(emailUrl);
@@ -1642,11 +1823,7 @@ class _CelebrationsSection extends StatelessWidget {
             width: 40.w,
             height: 40.w,
             alignment: Alignment.center,
-            child: Icon(
-              icon,
-              size: 18.sp,
-              color: iconColor,
-            ),
+            child: Icon(icon, size: 18.sp, color: iconColor),
           ),
         ),
       ),
@@ -1676,10 +1853,8 @@ class _CelebrationsSection extends StatelessWidget {
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                 ),
-                errorWidget: (context, url, error) => const Icon(
-                  Icons.person_rounded,
-                  color: Colors.white,
-                ),
+                errorWidget: (context, url, error) =>
+                    const Icon(Icons.person_rounded, color: Colors.white),
               )
             : Center(
                 child: Text(
@@ -1707,11 +1882,7 @@ class _CelebrationsSection extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.auto_awesome,
-                size: 10.sp,
-                color: Colors.white,
-              ),
+              Icon(Icons.auto_awesome, size: 10.sp, color: Colors.white),
               SizedBox(width: 4.w),
               Text(
                 "TODAY'S BIRTHDAY",
@@ -1854,17 +2025,16 @@ class _CelebrationsSection extends StatelessWidget {
     );
   }
 
-  Widget _buildUpcomingBirthdaysList(List<EmployeeEntity> list, BuildContext context) {
+  Widget _buildUpcomingBirthdaysList(
+    List<EmployeeEntity> list,
+    BuildContext context,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(
-              Icons.upcoming_rounded,
-              size: 18.sp,
-              color: _DT.warning,
-            ),
+            Icon(Icons.upcoming_rounded, size: 18.sp, color: _DT.warning),
             SizedBox(width: 6.w),
             Text(
               'Upcoming Celebrations',
@@ -1885,10 +2055,7 @@ class _CelebrationsSection extends StatelessWidget {
           itemBuilder: (context, i) {
             final emp = list[i];
             final days = _daysUntilBirthday(emp.birthDate!);
-            return _UpcomingBirthdayCard(
-              employee: emp,
-              daysRemaining: days,
-            );
+            return _UpcomingBirthdayCard(employee: emp, daysRemaining: days);
           },
         ),
       ],
@@ -1916,8 +2083,11 @@ class _CelebrationsSection extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        upcomingBirthdays.sort((a, b) =>
-            _daysUntilBirthday(a.birthDate!).compareTo(_daysUntilBirthday(b.birthDate!)));
+        upcomingBirthdays.sort(
+          (a, b) => _daysUntilBirthday(
+            a.birthDate!,
+          ).compareTo(_daysUntilBirthday(b.birthDate!)),
+        );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1932,10 +2102,12 @@ class _CelebrationsSection extends StatelessWidget {
               ResponsiveLayout(
                 mobile: Column(
                   children: [
-                    ...todayBirthdays.map((emp) => Padding(
-                          padding: EdgeInsets.only(bottom: 16.h),
-                          child: _buildTodayBirthdayCard(emp, context),
-                        )),
+                    ...todayBirthdays.map(
+                      (emp) => Padding(
+                        padding: EdgeInsets.only(bottom: 16.h),
+                        child: _buildTodayBirthdayCard(emp, context),
+                      ),
+                    ),
                     _buildUpcomingBirthdaysList(upcomingBirthdays, context),
                   ],
                 ),
@@ -1946,17 +2118,22 @@ class _CelebrationsSection extends StatelessWidget {
                       flex: 3,
                       child: Column(
                         children: todayBirthdays
-                            .map((emp) => Padding(
-                                  padding: EdgeInsets.only(bottom: 16.h),
-                                  child: _buildTodayBirthdayCard(emp, context),
-                                ))
+                            .map(
+                              (emp) => Padding(
+                                padding: EdgeInsets.only(bottom: 16.h),
+                                child: _buildTodayBirthdayCard(emp, context),
+                              ),
+                            )
                             .toList(),
                       ),
                     ),
                     SizedBox(width: 28.w),
                     Expanded(
                       flex: 2,
-                      child: _buildUpcomingBirthdaysList(upcomingBirthdays, context),
+                      child: _buildUpcomingBirthdaysList(
+                        upcomingBirthdays,
+                        context,
+                      ),
                     ),
                   ],
                 ),
@@ -1965,10 +2142,12 @@ class _CelebrationsSection extends StatelessWidget {
               ResponsiveLayout(
                 mobile: Column(
                   children: todayBirthdays
-                      .map((emp) => Padding(
-                            padding: EdgeInsets.only(bottom: 16.h),
-                            child: _buildTodayBirthdayCard(emp, context),
-                          ))
+                      .map(
+                        (emp) => Padding(
+                          padding: EdgeInsets.only(bottom: 16.h),
+                          child: _buildTodayBirthdayCard(emp, context),
+                        ),
+                      )
                       .toList(),
                 ),
                 desktop: Row(
@@ -1977,10 +2156,12 @@ class _CelebrationsSection extends StatelessWidget {
                       flex: 3,
                       child: Column(
                         children: todayBirthdays
-                            .map((emp) => Padding(
-                                  padding: EdgeInsets.only(bottom: 16.h),
-                                  child: _buildTodayBirthdayCard(emp, context),
-                                ))
+                            .map(
+                              (emp) => Padding(
+                                padding: EdgeInsets.only(bottom: 16.h),
+                                child: _buildTodayBirthdayCard(emp, context),
+                              ),
+                            )
                             .toList(),
                       ),
                     ),
@@ -1996,7 +2177,10 @@ class _CelebrationsSection extends StatelessWidget {
                   children: [
                     Expanded(
                       flex: 2,
-                      child: _buildUpcomingBirthdaysList(upcomingBirthdays, context),
+                      child: _buildUpcomingBirthdaysList(
+                        upcomingBirthdays,
+                        context,
+                      ),
                     ),
                     SizedBox(width: 28.w),
                     const Spacer(flex: 3),
@@ -2038,8 +2222,18 @@ class _UpcomingBirthdayCardState extends State<_UpcomingBirthdayCard> {
     String dateStr = '';
     if (emp.birthDate != null) {
       final months = [
-        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
       ];
       dateStr = '${emp.birthDate!.day} ${months[emp.birthDate!.month - 1]}';
     }
@@ -2082,7 +2276,9 @@ class _UpcomingBirthdayCardState extends State<_UpcomingBirthdayCard> {
                           placeholder: (context, url) => const Center(
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(_DT.warning),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                _DT.warning,
+                              ),
                             ),
                           ),
                           errorWidget: (context, url, error) => const Icon(
@@ -2092,7 +2288,9 @@ class _UpcomingBirthdayCardState extends State<_UpcomingBirthdayCard> {
                         )
                       : Center(
                           child: Text(
-                            emp.fullName.isNotEmpty ? emp.fullName[0].toUpperCase() : '?',
+                            emp.fullName.isNotEmpty
+                                ? emp.fullName[0].toUpperCase()
+                                : '?',
                             style: GoogleFonts.inter(
                               fontSize: 16.sp,
                               fontWeight: FontWeight.w700,
@@ -2144,7 +2342,10 @@ class _UpcomingBirthdayCardState extends State<_UpcomingBirthdayCard> {
                   ),
                   SizedBox(height: 4.h),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 2.h,
+                    ),
                     decoration: BoxDecoration(
                       color: _DT.warning.withOpacity(0.1),
                       borderRadius: BorderRadius.circular(10.r),
