@@ -4,6 +4,7 @@ class FeedbackEntity extends Equatable {
   final String id;
   final DateTime dateOfTrip;
   final String driverName;
+  final String caseCode;
   final int safetyRating;
   final int professionalismRating;
   final int communicationRating;
@@ -21,6 +22,7 @@ class FeedbackEntity extends Equatable {
     required this.id,
     required this.dateOfTrip,
     required this.driverName,
+    required this.caseCode,
     required this.safetyRating,
     required this.professionalismRating,
     required this.communicationRating,
@@ -40,6 +42,7 @@ class FeedbackEntity extends Equatable {
         id,
         dateOfTrip,
         driverName,
+        caseCode,
         safetyRating,
         professionalismRating,
         communicationRating,

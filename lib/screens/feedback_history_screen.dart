@@ -16,10 +16,18 @@ class FeedbackHistoryScreen extends StatefulWidget {
   State<FeedbackHistoryScreen> createState() => _FeedbackHistoryScreenState();
 }
 
-class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen> {
+class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  // Filters
   bool _onlyIncidents = false;
+  String? _selectedDriver;
+  String? _selectedCustomer;
+  DateTimeRange? _selectedDateRange;
+  double _minRating = 0.0;
 
   // Design Tokens consistent with dashboard_screen.dart
   static const Color _bgPage = Color(0xFFF4F6FB);
@@ -37,6 +45,7 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<FeedbackProvider>().fetchLatestFeedbacks(limit: 100);
     });
@@ -50,6 +59,7 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
@@ -60,6 +70,289 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen> {
             f.punctualityRating +
             f.vehicleConditionRating) /
         5.0;
+  }
+
+  void _showFilterSheet(List<FeedbackEntity> allFeedbacks) {
+    final drivers = allFeedbacks.map((e) => e.driverName).toSet().toList()
+      ..sort();
+    final customers = allFeedbacks.map((e) => e.clientName).toSet().toList()
+      ..sort();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                padding: EdgeInsets.all(24.w),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Filter Feedbacks',
+                          style: GoogleFonts.inter(
+                            fontSize: 18.sp,
+                            fontWeight: FontWeight.bold,
+                            color: _textPrimary,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            setState(() {
+                              _selectedDriver = null;
+                              _selectedCustomer = null;
+                              _selectedDateRange = null;
+                              _minRating = 0.0;
+                              _onlyIncidents = false;
+                            });
+                            setSheetState(() {});
+                          },
+                          child: Text(
+                            'Reset',
+                            style: GoogleFonts.inter(
+                              color: _brand,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 20.h),
+                    // Driver Dropdown
+                    _buildDropdown(
+                      label: 'Driver',
+                      value: _selectedDriver,
+                      items: drivers,
+                      onChanged: (val) {
+                        setState(() => _selectedDriver = val);
+                        setSheetState(() {});
+                      },
+                    ),
+                    SizedBox(height: 16.h),
+                    // Customer Dropdown
+                    _buildDropdown(
+                      label: 'Customer',
+                      value: _selectedCustomer,
+                      items: customers,
+                      onChanged: (val) {
+                        setState(() => _selectedCustomer = val);
+                        setSheetState(() {});
+                      },
+                    ),
+                    SizedBox(height: 16.h),
+                    // Date Range
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Trip Date Range',
+                          style: GoogleFonts.inter(
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w600,
+                            color: _textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 8.h),
+                        InkWell(
+                          onTap: () async {
+                            final range = await showDateRangePicker(
+                              context: context,
+                              firstDate: DateTime(2020),
+                              lastDate: DateTime.now(),
+                              initialDateRange: _selectedDateRange,
+                              builder: (context, child) {
+                                return Theme(
+                                  data: Theme.of(context).copyWith(
+                                    colorScheme: const ColorScheme.light(
+                                      primary: _brand,
+                                      onPrimary: Colors.white,
+                                      onSurface: _textPrimary,
+                                    ),
+                                  ),
+                                  child: child!,
+                                );
+                              },
+                            );
+                            if (range != null) {
+                              setState(() => _selectedDateRange = range);
+                              setSheetState(() {});
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(10.r),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 14.h,
+                            ),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: _border),
+                              borderRadius: BorderRadius.circular(10.r),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.calendar_today,
+                                  size: 18.sp,
+                                  color: _textSecondary,
+                                ),
+                                SizedBox(width: 8.w),
+                                Text(
+                                  _selectedDateRange != null
+                                      ? '${DateFormat('MMM d').format(_selectedDateRange!.start)} - ${DateFormat('MMM d, y').format(_selectedDateRange!.end)}'
+                                      : 'Select Date Range',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14.sp,
+                                    color: _selectedDateRange != null
+                                        ? _textPrimary
+                                        : _textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 16.h),
+                    // Min Rating Slider
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Minimum Average Rating',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w600,
+                                color: _textSecondary,
+                              ),
+                            ),
+                            Text(
+                              _minRating > 0
+                                  ? '${_minRating.toStringAsFixed(1)}+'
+                                  : 'Any',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.bold,
+                                color: _brand,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Slider(
+                          value: _minRating,
+                          min: 0,
+                          max: 5,
+                          divisions: 10,
+                          activeColor: _brand,
+                          onChanged: (val) {
+                            setState(() => _minRating = val);
+                            setSheetState(() {});
+                          },
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 24.h),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48.h,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _brand,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                          elevation: 0,
+                        ),
+                        onPressed: () => Navigator.pop(context),
+                        child: Text(
+                          'Apply Filters',
+                          style: GoogleFonts.inter(
+                            fontSize: 15.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildDropdown({
+    required String label,
+    required String? value,
+    required List<String> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 13.sp,
+            fontWeight: FontWeight.w600,
+            color: _textSecondary,
+          ),
+        ),
+        SizedBox(height: 8.h),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 16.w),
+          decoration: BoxDecoration(
+            border: Border.all(color: _border),
+            borderRadius: BorderRadius.circular(10.r),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              value: value,
+              hint: Text('All', style: GoogleFonts.inter(color: _textMuted)),
+              items: [
+                DropdownMenuItem<String>(
+                  value: null,
+                  child: Text(
+                    'All',
+                    style: GoogleFonts.inter(color: _textPrimary),
+                  ),
+                ),
+                ...items.map(
+                  (e) => DropdownMenuItem(
+                    value: e,
+                    child: Text(
+                      e,
+                      style: GoogleFonts.inter(color: _textPrimary),
+                    ),
+                  ),
+                ),
+              ],
+              onChanged: onChanged,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   @override
@@ -81,17 +374,6 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen> {
             return _buildEmptyState();
           }
 
-          // Compute analytics
-          final totalCount = feedbacks.length;
-          final incidentCount = feedbacks
-              .where((f) => f.incidentReported)
-              .length;
-          double overallSum = 0;
-          for (var f in feedbacks) {
-            overallSum += _calculateAverageRating(f);
-          }
-          final averageRating = totalCount > 0 ? overallSum / totalCount : 0.0;
-
           // Filter feedbacks
           final filteredFeedbacks = feedbacks.where((f) {
             final matchesQuery =
@@ -102,25 +384,65 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen> {
                 (f.areasOfImprovement?.toLowerCase().contains(_searchQuery) ??
                     false);
             final matchesIncident = !_onlyIncidents || f.incidentReported;
-            return matchesQuery && matchesIncident;
+            final matchesDriver =
+                _selectedDriver == null || f.driverName == _selectedDriver;
+            final matchesCustomer =
+                _selectedCustomer == null || f.clientName == _selectedCustomer;
+            final matchesMinRating = _calculateAverageRating(f) >= _minRating;
+
+            bool matchesDate = true;
+            if (_selectedDateRange != null) {
+              matchesDate =
+                  f.dateOfTrip.isAfter(
+                    _selectedDateRange!.start.subtract(const Duration(days: 1)),
+                  ) &&
+                  f.dateOfTrip.isBefore(
+                    _selectedDateRange!.end.add(const Duration(days: 1)),
+                  );
+            }
+
+            return matchesQuery &&
+                matchesIncident &&
+                matchesDriver &&
+                matchesCustomer &&
+                matchesMinRating &&
+                matchesDate;
           }).toList();
 
-          return SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(24.w, 28.h, 24.w, 40.h),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildAnalyticsCards(
-                  total: totalCount,
-                  average: averageRating,
-                  incidents: incidentCount,
+          return Column(
+            children: [
+              Container(
+                color: Colors.white,
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: _brand,
+                  indicatorWeight: 3,
+                  labelColor: _brand,
+                  unselectedLabelColor: _textSecondary,
+                  labelStyle: GoogleFonts.inter(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14.sp,
+                  ),
+                  unselectedLabelStyle: GoogleFonts.inter(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 14.sp,
+                  ),
+                  tabs: const [
+                    Tab(text: 'Feedback List'),
+                    Tab(text: 'Evaluation Dashboard'),
+                  ],
                 ),
-                SizedBox(height: 32.h),
-                _buildSearchAndFilters(),
-                SizedBox(height: 20.h),
-                _buildFeedbackList(filteredFeedbacks),
-              ],
-            ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildListView(filteredFeedbacks, feedbacks),
+                    _buildEvaluationDashboard(filteredFeedbacks),
+                  ],
+                ),
+              ),
+            ],
           );
         },
       ),
@@ -203,6 +525,40 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen> {
     );
   }
 
+  // ==== TAB 1: LIST VIEW ====
+  Widget _buildListView(
+    List<FeedbackEntity> filteredFeedbacks,
+    List<FeedbackEntity> allFeedbacks,
+  ) {
+    final totalCount = filteredFeedbacks.length;
+    final incidentCount = filteredFeedbacks
+        .where((f) => f.incidentReported)
+        .length;
+    double overallSum = 0;
+    for (var f in filteredFeedbacks) {
+      overallSum += _calculateAverageRating(f);
+    }
+    final averageRating = totalCount > 0 ? overallSum / totalCount : 0.0;
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(24.w, 24.h, 24.w, 40.h),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildAnalyticsCards(
+            total: totalCount,
+            average: averageRating,
+            incidents: incidentCount,
+          ),
+          SizedBox(height: 32.h),
+          _buildSearchAndFilters(allFeedbacks),
+          SizedBox(height: 20.h),
+          _buildFeedbackList(filteredFeedbacks),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAnalyticsCards({
     required int total,
     required double average,
@@ -270,7 +626,14 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen> {
     );
   }
 
-  Widget _buildSearchAndFilters() {
+  Widget _buildSearchAndFilters(List<FeedbackEntity> allFeedbacks) {
+    int activeFiltersCount = 0;
+    if (_onlyIncidents) activeFiltersCount++;
+    if (_selectedDriver != null) activeFiltersCount++;
+    if (_selectedCustomer != null) activeFiltersCount++;
+    if (_selectedDateRange != null) activeFiltersCount++;
+    if (_minRating > 0) activeFiltersCount++;
+
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -298,7 +661,7 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen> {
                     child: TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
-                        hintText: 'Search by customer, driver, comments...',
+                        hintText: 'Search query...',
                         hintStyle: GoogleFonts.inter(
                           color: _textMuted,
                           fontSize: 14.sp,
@@ -327,46 +690,60 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen> {
               ),
             ),
           ),
-          SizedBox(width: 16.w),
-          // Incident Filter Toggle
+          SizedBox(width: 12.w),
+          // Filter Button
           InkWell(
-            onTap: () {
-              setState(() {
-                _onlyIncidents = !_onlyIncidents;
-              });
-            },
+            onTap: () => _showFilterSheet(allFeedbacks),
             borderRadius: BorderRadius.circular(10.r),
             child: Container(
               height: 48.h,
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               decoration: BoxDecoration(
-                color: _onlyIncidents ? _dangerBg : Colors.transparent,
+                color: activeFiltersCount > 0
+                    ? _brand.withOpacity(0.1)
+                    : Colors.transparent,
                 borderRadius: BorderRadius.circular(10.r),
                 border: Border.all(
-                  color: _onlyIncidents ? _dangerBorder : _border,
+                  color: activeFiltersCount > 0 ? _brand : _border,
                 ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    _onlyIncidents
-                        ? Icons.warning_rounded
-                        : Icons.warning_amber_rounded,
-                    color: _onlyIncidents ? _danger : _textSecondary,
+                    Icons.filter_list_rounded,
+                    color: activeFiltersCount > 0 ? _brand : _textSecondary,
                     size: 18.sp,
                   ),
                   SizedBox(width: 8.w),
                   Text(
-                    'Incidents Only',
+                    'Filters',
                     style: GoogleFonts.inter(
                       fontSize: 13.sp,
-                      fontWeight: _onlyIncidents
+                      fontWeight: activeFiltersCount > 0
                           ? FontWeight.bold
                           : FontWeight.w500,
-                      color: _onlyIncidents ? _danger : _textSecondary,
+                      color: activeFiltersCount > 0 ? _brand : _textSecondary,
                     ),
                   ),
+                  if (activeFiltersCount > 0) ...[
+                    SizedBox(width: 6.w),
+                    Container(
+                      padding: EdgeInsets.all(4.w),
+                      decoration: const BoxDecoration(
+                        color: _brand,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        activeFiltersCount.toString(),
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 10.sp,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -419,6 +796,217 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen> {
           avgRating: _calculateAverageRating(filteredFeedbacks[index]),
         );
       },
+    );
+  }
+
+  // ==== TAB 2: EVALUATION DASHBOARD ====
+  Widget _buildEvaluationDashboard(List<FeedbackEntity> filteredFeedbacks) {
+    if (filteredFeedbacks.isEmpty) {
+      return Center(
+        child: Text(
+          'No data to evaluate based on current filters.',
+          style: GoogleFonts.inter(color: _textSecondary, fontSize: 14.sp),
+        ),
+      );
+    }
+
+    double safety = 0;
+    double professionalism = 0;
+    double communication = 0;
+    double punctuality = 0;
+    double vehicle = 0;
+
+    Map<String, List<double>> driverRatings = {};
+
+    for (var f in filteredFeedbacks) {
+      safety += f.safetyRating;
+      professionalism += f.professionalismRating;
+      communication += f.communicationRating;
+      punctuality += f.punctualityRating;
+      vehicle += f.vehicleConditionRating;
+
+      final avg = _calculateAverageRating(f);
+      driverRatings.putIfAbsent(f.driverName, () => []).add(avg);
+    }
+
+    final total = filteredFeedbacks.length;
+    safety /= total;
+    professionalism /= total;
+    communication /= total;
+    punctuality /= total;
+    vehicle /= total;
+
+    // Driver averages
+    List<MapEntry<String, double>> driverAvg = [];
+    for (var entry in driverRatings.entries) {
+      final avg = entry.value.reduce((a, b) => a + b) / entry.value.length;
+      driverAvg.add(MapEntry(entry.key, avg));
+    }
+    driverAvg.sort((a, b) => b.value.compareTo(a.value)); // descending
+
+    return SingleChildScrollView(
+      padding: EdgeInsets.all(24.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Overall Category Averages',
+            style: GoogleFonts.inter(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.bold,
+              color: _textPrimary,
+            ),
+          ),
+          SizedBox(height: 16.h),
+          Container(
+            padding: EdgeInsets.all(24.w),
+            decoration: BoxDecoration(
+              color: _bgCard,
+              borderRadius: BorderRadius.circular(16.r),
+              border: Border.all(color: _border),
+            ),
+            child: Column(
+              children: [
+                _buildBarChartRow('Safety', safety),
+                SizedBox(height: 16.h),
+                _buildBarChartRow('Professionalism', professionalism),
+                SizedBox(height: 16.h),
+                _buildBarChartRow('Communication', communication),
+                SizedBox(height: 16.h),
+                _buildBarChartRow('Punctuality', punctuality),
+                SizedBox(height: 16.h),
+                _buildBarChartRow('Vehicle Cleanliness', vehicle),
+              ],
+            ),
+          ),
+          SizedBox(height: 32.h),
+          Text(
+            'Driver Leaderboard (Average Rating)',
+            style: GoogleFonts.inter(
+              fontSize: 18.sp,
+              fontWeight: FontWeight.bold,
+              color: _textPrimary,
+            ),
+          ),
+          SizedBox(height: 16.h),
+          Container(
+            decoration: BoxDecoration(
+              color: _bgCard,
+              borderRadius: BorderRadius.circular(16.r),
+              border: Border.all(color: _border),
+            ),
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: driverAvg.length,
+              separatorBuilder: (context, index) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final entry = driverAvg[index];
+                final isTop = index < 3;
+                return ListTile(
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 24.w,
+                    vertical: 8.h,
+                  ),
+                  leading: CircleAvatar(
+                    backgroundColor: isTop
+                        ? _warning.withOpacity(0.1)
+                        : _bgPage,
+                    child: Text(
+                      '#${index + 1}',
+                      style: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold,
+                        color: isTop ? _warning : _textSecondary,
+                      ),
+                    ),
+                  ),
+                  title: Text(
+                    entry.key,
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w600,
+                      color: _textPrimary,
+                    ),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.star_rounded,
+                        color: Colors.amber[600],
+                        size: 18.sp,
+                      ),
+                      SizedBox(width: 4.w),
+                      Text(
+                        entry.value.toStringAsFixed(1),
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16.sp,
+                          color: _textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBarChartRow(String label, double value) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 140.w,
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w500,
+              color: _textSecondary,
+            ),
+          ),
+        ),
+        SizedBox(width: 16.w),
+        Expanded(
+          child: Stack(
+            children: [
+              Container(
+                height: 12.h,
+                decoration: BoxDecoration(
+                  color: _bgPage,
+                  borderRadius: BorderRadius.circular(6.r),
+                ),
+              ),
+              FractionallySizedBox(
+                widthFactor: value / 5.0,
+                child: Container(
+                  height: 12.h,
+                  decoration: BoxDecoration(
+                    color: _brand,
+                    borderRadius: BorderRadius.circular(6.r),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(width: 16.w),
+        SizedBox(
+          width: 40.w,
+          child: Text(
+            value.toStringAsFixed(1),
+            style: GoogleFonts.inter(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.bold,
+              color: _textPrimary,
+            ),
+            textAlign: TextAlign.right,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -576,7 +1164,6 @@ class _FeedbackTileState extends State<_FeedbackTile> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Client initial Avatar
                 CircleAvatar(
                   radius: 22.r,
                   backgroundColor: f.incidentReported
@@ -596,7 +1183,6 @@ class _FeedbackTileState extends State<_FeedbackTile> {
                   ),
                 ),
                 SizedBox(width: 16.w),
-                // Client name and metadata
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -669,7 +1255,6 @@ class _FeedbackTileState extends State<_FeedbackTile> {
                         ],
                       ),
                       SizedBox(height: 6.h),
-                      // Meta details: Driver, Trip Date, Created Time
                       Wrap(
                         spacing: 16.w,
                         runSpacing: 6.h,
@@ -693,7 +1278,6 @@ class _FeedbackTileState extends State<_FeedbackTile> {
                   ),
                 ),
                 SizedBox(width: 16.w),
-                // Rating visual block
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -724,7 +1308,6 @@ class _FeedbackTileState extends State<_FeedbackTile> {
                       ],
                     ),
                     SizedBox(height: 6.h),
-                    // Dropdown Toggle
                     IconButton(
                       icon: Icon(
                         _isExpanded
@@ -745,8 +1328,6 @@ class _FeedbackTileState extends State<_FeedbackTile> {
               ],
             ),
           ),
-
-          // Collapsible sub-ratings & comments
           if (_isExpanded) ...[
             Container(height: 1.h, color: const Color(0xFFF3F4F6)),
             Padding(
@@ -759,10 +1340,8 @@ class _FeedbackTileState extends State<_FeedbackTile> {
                       padding: EdgeInsets.all(16.w),
                       margin: EdgeInsets.only(bottom: 20.h),
                       decoration: BoxDecoration(
-                        color: _FeedbackHistoryScreenState._dangerBg,
-                        border: Border.all(
-                          color: _FeedbackHistoryScreenState._dangerBorder,
-                        ),
+                        color: const Color(0xFFFFF1F2),
+                        border: Border.all(color: const Color(0xFFFFCDD2)),
                         borderRadius: BorderRadius.circular(12.r),
                       ),
                       child: Column(
@@ -772,14 +1351,14 @@ class _FeedbackTileState extends State<_FeedbackTile> {
                             children: [
                               Icon(
                                 Icons.warning_amber_rounded,
-                                color: _FeedbackHistoryScreenState._danger,
+                                color: const Color(0xFFDC2626),
                                 size: 18.sp,
                               ),
                               SizedBox(width: 8.w),
                               Text(
                                 'Reported Incident Details',
                                 style: GoogleFonts.inter(
-                                  color: _FeedbackHistoryScreenState._danger,
+                                  color: const Color(0xFFDC2626),
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13.sp,
                                 ),
@@ -800,7 +1379,6 @@ class _FeedbackTileState extends State<_FeedbackTile> {
                       ),
                     ),
                   ],
-                  // Individual Ratings Grid
                   Text(
                     'SERVICE RATINGS BREAKDOWN',
                     style: GoogleFonts.inter(
@@ -875,8 +1453,6 @@ class _FeedbackTileState extends State<_FeedbackTile> {
                       ],
                     ),
                   ),
-
-                  // Open Ended Feedback
                   if (hasDetails) ...[
                     SizedBox(height: 20.h),
                     const Divider(),

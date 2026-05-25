@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 
 import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
 import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.dart';
+import 'package:xloop_invoice/features/customer/presentation/providers/customer_provider.dart';
 import '../../domain/entities/feedback_entity.dart';
 import '../providers/feedback_provider.dart';
 
@@ -31,12 +32,14 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
   // Trip Details
   DateTime? _dateOfTrip;
   final _driverNameController = TextEditingController();
+  final _caseCodeController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<EmployeeProvider>().fetchAllEmployees();
+      context.read<CustomerProvider>().fetchAllCustomers();
     });
     if (widget.prefilledDriverName != null) {
       _driverNameController.text = widget.prefilledDriverName!;
@@ -76,6 +79,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
   @override
   void dispose() {
     _driverNameController.dispose();
+    _caseCodeController.dispose();
     _excellenceController.dispose();
     _improvementController.dispose();
     _incidentDescriptionController.dispose();
@@ -103,11 +107,68 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
       return;
     }
 
+    // Strict Case Code Validation in SnackBar
+    final enteredCode = _caseCodeController.text.trim();
+    final clientName = _clientNameController.text.trim();
+
+    if (enteredCode.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Case code is required.')),
+      );
+      return;
+    }
+
+    if (clientName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Customer name is required.')),
+      );
+      return;
+    }
+
+    final customerProvider = context.read<CustomerProvider>();
+    if (customerProvider.isLoading) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Verifying records, please wait...')),
+      );
+      return;
+    }
+
+    final matchingCustomers = customerProvider.customers.where(
+      (c) => c.name.toLowerCase() == clientName.toLowerCase(),
+    );
+
+    if (matchingCustomers.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Customer record not found. Please contact support.')),
+      );
+      return;
+    }
+
+    final customer = matchingCustomers.first;
+    if (customer.assignedCaseCodes.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No assigned case codes found. Please contact support.')),
+      );
+      return;
+    }
+
+    final isValid = customer.assignedCaseCodes.any(
+      (code) => code.toLowerCase() == enteredCode.toLowerCase(),
+    );
+
+    if (!isValid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Invalid case code entered.')),
+      );
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
       final feedback = FeedbackEntity(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         dateOfTrip: _dateOfTrip!,
         driverName: _driverNameController.text.trim(),
+        caseCode: enteredCode,
         safetyRating: _safetyRating,
         professionalismRating: _professionalismRating,
         communicationRating: _communicationRating,
@@ -123,7 +184,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
         incidentDescription: _incidentReported && _incidentDescriptionController.text.trim().isNotEmpty
             ? _incidentDescriptionController.text.trim()
             : null,
-        clientName: _clientNameController.text.trim(),
+        clientName: clientName,
         submitterName: _submitterNameController.text.trim().isNotEmpty
             ? _submitterNameController.text.trim()
             : null,
@@ -304,6 +365,16 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
                                         value == null || value.trim().isEmpty
                                             ? 'Driver name is required'
                                             : null,
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 20),
+                              _buildFieldLabel('Case Code *'),
+                              Consumer<CustomerProvider>(
+                                builder: (context, customerProvider, _) {
+                                  return _buildTextField(
+                                    controller: _caseCodeController,
+                                    hintText: "Enter case code",
                                   );
                                 },
                               ),
@@ -628,6 +699,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
                       _formKey.currentState?.reset();
                       _dateOfTrip = null;
                       _driverNameController.clear();
+                      _caseCodeController.clear();
                       _safetyRating = 0;
                       _professionalismRating = 0;
                       _communicationRating = 0;
