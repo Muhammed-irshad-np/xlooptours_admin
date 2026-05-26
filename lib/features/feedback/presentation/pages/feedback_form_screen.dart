@@ -141,68 +141,12 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
       return;
     }
 
-    // Strict Case Code / Project Code Validation in SnackBar
-    final enteredCode = _caseCodeController.text.trim();
-    final clientName = _clientNameController.text.trim();
-
-    if (enteredCode.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Case Code / Project Code is required.')),
-      );
-      return;
-    }
-
-    if (clientName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Customer name is required.')),
-      );
-      return;
-    }
-
-    final customerProvider = context.read<CustomerProvider>();
-    if (customerProvider.isLoading) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Verifying records, please wait...')),
-      );
-      return;
-    }
-
-    final matchingCustomers = customerProvider.customers.where(
-      (c) => c.name.toLowerCase() == clientName.toLowerCase(),
-    );
-
-    if (matchingCustomers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Customer record not found. Please contact support.')),
-      );
-      return;
-    }
-
-    final customer = matchingCustomers.first;
-    if (customer.assignedCaseCodes.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No assigned Case Codes / Project Codes found. Please contact support.')),
-      );
-      return;
-    }
-
-    final isValid = customer.assignedCaseCodes.any(
-      (code) => code.toLowerCase() == enteredCode.toLowerCase(),
-    );
-
-    if (!isValid) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid Case Code / Project Code entered.')),
-      );
-      return;
-    }
-
     if (_formKey.currentState!.validate()) {
       final feedback = FeedbackEntity(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         dateOfTrip: _dateOfTrip!,
         driverName: _driverNameController.text.trim(),
-        caseCode: enteredCode,
+        caseCode: _caseCodeController.text.trim(),
         safetyRating: _safetyRating,
         professionalismRating: _professionalismRating,
         communicationRating: _communicationRating,
@@ -218,7 +162,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
         incidentDescription: _incidentReported && _incidentDescriptionController.text.trim().isNotEmpty
             ? _incidentDescriptionController.text.trim()
             : null,
-        clientName: clientName,
+        clientName: _clientNameController.text.trim(),
         submitterName: _submitterNameController.text.trim().isNotEmpty
             ? _submitterNameController.text.trim()
             : null,
@@ -611,6 +555,10 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
                                     controller: _caseCodeController,
                                     hintText: "Enter case code / project code",
                                     textCapitalization: TextCapitalization.characters,
+                                    validator: (value) =>
+                                        value == null || value.trim().isEmpty
+                                            ? 'Case Code / Project Code is required'
+                                            : null,
                                   );
                                 },
                               ),
