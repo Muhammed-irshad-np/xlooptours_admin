@@ -402,17 +402,6 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
                                   );
                                 },
                               ),
-                              const SizedBox(height: 20),
-                              _buildFieldLabel('Case Code / Project Code *'),
-                              Consumer<CustomerProvider>(
-                                builder: (context, customerProvider, _) {
-                                  return _buildTextField(
-                                    controller: _caseCodeController,
-                                    hintText: "Enter case code / project code",
-                                    textCapitalization: TextCapitalization.characters,
-                                  );
-                                },
-                              ),
                             ],
                           ),
                         ),
@@ -613,6 +602,17 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
                                     value == null || value.trim().isEmpty
                                         ? 'Customer name is required'
                                         : null,
+                              ),
+                              const SizedBox(height: 20),
+                              _buildFieldLabel('Case Code / Project Code *'),
+                              Consumer<CustomerProvider>(
+                                builder: (context, customerProvider, _) {
+                                  return _buildTextField(
+                                    controller: _caseCodeController,
+                                    hintText: "Enter case code / project code",
+                                    textCapitalization: TextCapitalization.characters,
+                                  );
+                                },
                               ),
                             ],
                           ),
