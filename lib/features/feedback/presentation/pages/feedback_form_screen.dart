@@ -34,9 +34,42 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
   final _driverNameController = TextEditingController();
   final _caseCodeController = TextEditingController();
 
+  void _updateCaseCodeFormat() {
+    final text = _caseCodeController.text.toUpperCase(); // FORCE UPPERCASE
+    final selection = _caseCodeController.selection;
+
+    // Auto-hyphenation logic: Letter followed continuously by Digit
+    // Regex matches a letter group followed by a digit group
+    // We want to insert a hyphen between them if one doesn't exist.
+    final newText = text.replaceAllMapped(
+      RegExp(r'([A-Z])([0-9])'),
+      (match) => '${match.group(1)}-${match.group(2)}',
+    );
+
+    // Check if text changed due to Uppercase OR Hyphenation
+    if (newText != _caseCodeController.text) {
+      int newOffset = selection.baseOffset;
+      if (newText.length > text.length && selection.isValid) {
+        if (selection.baseOffset == text.length) {
+          newOffset = newText.length;
+        } else {
+          newOffset += 1;
+        }
+      }
+
+      _caseCodeController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(
+          offset: newOffset.clamp(0, newText.length),
+        ),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
+    _caseCodeController.addListener(_updateCaseCodeFormat);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<EmployeeProvider>().fetchAllEmployees();
       context.read<CustomerProvider>().fetchAllCustomers();
@@ -78,6 +111,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
 
   @override
   void dispose() {
+    _caseCodeController.removeListener(_updateCaseCodeFormat);
     _driverNameController.dispose();
     _caseCodeController.dispose();
     _excellenceController.dispose();
@@ -107,13 +141,13 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
       return;
     }
 
-    // Strict Case Code Validation in SnackBar
+    // Strict Case Code / Project Code Validation in SnackBar
     final enteredCode = _caseCodeController.text.trim();
     final clientName = _clientNameController.text.trim();
 
     if (enteredCode.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Case code is required.')),
+        const SnackBar(content: Text('Case Code / Project Code is required.')),
       );
       return;
     }
@@ -147,7 +181,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
     final customer = matchingCustomers.first;
     if (customer.assignedCaseCodes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No assigned case codes found. Please contact support.')),
+        const SnackBar(content: Text('No assigned Case Codes / Project Codes found. Please contact support.')),
       );
       return;
     }
@@ -158,7 +192,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
 
     if (!isValid) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid case code entered.')),
+        const SnackBar(content: Text('Invalid Case Code / Project Code entered.')),
       );
       return;
     }
@@ -369,12 +403,13 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
                                 },
                               ),
                               const SizedBox(height: 20),
-                              _buildFieldLabel('Case Code *'),
+                              _buildFieldLabel('Case Code / Project Code *'),
                               Consumer<CustomerProvider>(
                                 builder: (context, customerProvider, _) {
                                   return _buildTextField(
                                     controller: _caseCodeController,
-                                    hintText: "Enter case code",
+                                    hintText: "Enter case code / project code",
+                                    textCapitalization: TextCapitalization.characters,
                                   );
                                 },
                               ),
@@ -804,6 +839,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
     bool readOnly = false,
     Widget? suffixIcon,
     VoidCallback? onTap,
+    TextCapitalization textCapitalization = TextCapitalization.none,
   }) {
     return TextFormField(
       controller: controller,
@@ -811,6 +847,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
       validator: validator,
       readOnly: readOnly,
       onTap: onTap,
+      textCapitalization: textCapitalization,
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(color: Colors.grey[400]),
