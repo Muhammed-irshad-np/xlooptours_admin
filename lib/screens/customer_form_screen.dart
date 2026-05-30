@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:country_picker/country_picker.dart';
+import 'package:flutter/services.dart';
 import '../features/company/domain/entities/company_entity.dart';
 import '../features/company/presentation/providers/company_provider.dart';
 import '../features/customer/domain/entities/customer_entity.dart';
@@ -20,6 +22,9 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
 
+  // Country Code
+  String _countryCode = '+966';
+
   // Company Selection
   final ValueNotifier<CompanyEntity?> _selectedCompany = ValueNotifier(null);
   final ValueNotifier<List<CompanyEntity>> _availableCompanies = ValueNotifier(
@@ -29,6 +34,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
 
   // Case Code Selection
   final ValueNotifier<List<String>> _assignedCaseCodes = ValueNotifier([]);
+  final TextEditingController _newCaseCodeController = TextEditingController();
 
   final ValueNotifier<bool> _isSaving = ValueNotifier(false);
 
@@ -36,11 +42,53 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   void initState() {
     super.initState();
     _loadCompanies();
+    _newCaseCodeController.addListener(_updateCaseCodePreview);
     if (widget.customer != null) {
       final customer = widget.customer!;
       _nameController.text = customer.name;
-      _phoneController.text = customer.phone;
+      
+      // Parse phone number to extract country code and actual number
+      if (customer.phone.contains(' ')) {
+        final parts = customer.phone.split(' ');
+        if (parts.length > 1) {
+          _countryCode = parts[0];
+          _phoneController.text = parts.sublist(1).join(' ');
+        } else {
+          _phoneController.text = customer.phone;
+        }
+      } else {
+        _phoneController.text = customer.phone;
+      }
+      
       _assignedCaseCodes.value = List.from(customer.assignedCaseCodes);
+    }
+  }
+
+  void _updateCaseCodePreview() {
+    final text = _newCaseCodeController.text.toUpperCase();
+    final selection = _newCaseCodeController.selection;
+
+    final newText = text.replaceAllMapped(
+      RegExp(r'([A-Z])([0-9])'),
+      (match) => '${match.group(1)}-${match.group(2)}',
+    );
+
+    if (newText != _newCaseCodeController.text) {
+      int newOffset = selection.baseOffset;
+      if (newText.length > text.length && selection.isValid) {
+        if (selection.baseOffset == text.length) {
+          newOffset = newText.length;
+        } else {
+          newOffset += 1;
+        }
+      }
+
+      _newCaseCodeController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(
+          offset: newOffset.clamp(0, newText.length),
+        ),
+      );
     }
   }
 
@@ -79,6 +127,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _newCaseCodeController.dispose();
     _selectedCompany.dispose();
     _availableCompanies.dispose();
     _isLoadingCompanies.dispose();
@@ -92,12 +141,37 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       _isSaving.value = true;
 
       try {
+        final phoneWithCode = '$_countryCode ${_phoneController.text.trim()}';
+
+        // Check if we need to update company with new case codes
+        if (_selectedCompany.value != null && _selectedCompany.value!.usesCaseCode) {
+          final inputCodes = _assignedCaseCodes.value;
+          final currentCompanyCodes = Set<String>.from(_selectedCompany.value!.caseCodes);
+          bool companyUpdated = false;
+
+          for (var code in inputCodes) {
+            if (!currentCompanyCodes.contains(code)) {
+              currentCompanyCodes.add(code);
+              companyUpdated = true;
+            }
+          }
+
+          if (companyUpdated) {
+            final updatedCompany = _selectedCompany.value!.copyWith(
+              caseCodes: currentCompanyCodes.toList(),
+            );
+            if (mounted) {
+              await context.read<CompanyProvider>().updateCompany(updatedCompany);
+            }
+          }
+        }
+
         final customer = CustomerEntity(
           id:
               widget.customer?.id ??
               DateTime.now().millisecondsSinceEpoch.toString(),
           name: _nameController.text.trim(),
-          phone: _phoneController.text.trim(),
+          phone: phoneWithCode,
           companyId: _selectedCompany.value?.id,
           companyName: _selectedCompany.value?.companyName,
           assignedCaseCodes: _selectedCompany.value?.usesCaseCode == true
@@ -133,6 +207,18 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         if (mounted) {
           _isSaving.value = false;
         }
+      }
+    }
+  }
+
+  void _addCaseCode() {
+    final code = _newCaseCodeController.text.trim();
+    if (code.isNotEmpty) {
+      if (!_assignedCaseCodes.value.contains(code)) {
+        _assignedCaseCodes.value = [..._assignedCaseCodes.value, code];
+        _newCaseCodeController.clear();
+      } else {
+        _newCaseCodeController.clear();
       }
     }
   }
@@ -252,12 +338,56 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _phoneController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Mobile Number *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.phone),
+                border: const OutlineInputBorder(),
+                prefixIcon: InkWell(
+                  onTap: () {
+                    showCountryPicker(
+                      context: context,
+                      showPhoneCode: true,
+                      onSelect: (Country country) {
+                        setState(() {
+                          _countryCode = '+${country.phoneCode}';
+                        });
+                      },
+                      countryListTheme: CountryListThemeData(
+                        borderRadius: BorderRadius.circular(20),
+                        inputDecoration: const InputDecoration(
+                          labelText: 'Search',
+                          hintText: 'Start typing to search',
+                          prefixIcon: Icon(Icons.search),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _countryCode,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Color(0xFF334155),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.arrow_drop_down,
+                          color: Colors.grey[600],
+                          size: 18,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
               keyboardType: TextInputType.phone,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               validator: (value) => value == null || value.trim().isEmpty
                   ? 'Enter mobile number'
                   : null,
@@ -329,17 +459,36 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
                             style: const TextStyle(fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 8),
+                          TextFormField(
+                            controller: _newCaseCodeController,
+                            decoration: InputDecoration(
+                              labelText: 'Add New Case Code',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.confirmation_number_outlined),
+                              suffixIcon: IconButton(
+                                icon: const Icon(Icons.add_circle, color: Colors.blue),
+                                onPressed: _addCaseCode,
+                              ),
+                            ),
+                            textCapitalization: TextCapitalization.characters,
+                            onFieldSubmitted: (_) => _addCaseCode(),
+                          ),
+                          const SizedBox(height: 12),
                           if (selectedCompany.caseCodes.isEmpty)
                             const Text(
-                              'This company has no case codes defined.',
+                              'This company has no predefined case codes.',
                               style: TextStyle(color: Colors.grey),
                             ),
 
                           ValueListenableBuilder<List<String>>(
                             valueListenable: _assignedCaseCodes,
                             builder: (context, assignedCaseCodes, _) {
+                              // Combine company case codes with any new ones added during this session
+                              final allCodes = Set<String>.from(selectedCompany.caseCodes)
+                                ..addAll(assignedCaseCodes);
+                                
                               return Column(
-                                children: selectedCompany.caseCodes.map((code) {
+                                children: allCodes.map((code) {
                                   return CheckboxListTile(
                                     title: Text(code),
                                     value: assignedCaseCodes.contains(code),

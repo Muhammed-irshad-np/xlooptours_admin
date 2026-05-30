@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:flutter/services.dart';
+import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.dart';
 import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
@@ -100,10 +101,15 @@ class _DashboardScreenState extends State<DashboardScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final vehicleProvider = context.read<VehicleProvider>();
+      final authProvider = context.read<AuthProvider>();
+      final isAdmin = authProvider.user?.isAdmin ?? false;
+
       // Fetch vehicles + maintenance types (needed for interval config) together,
       // then refresh alerts so NotificationProvider has all data it needs.
       context.read<EmployeeProvider>().fetchAllEmployees();
-      context.read<CustomerProvider>().fetchAllCustomers();
+      if (isAdmin) {
+        context.read<CustomerProvider>().fetchAllCustomers();
+      }
       context.read<FeedbackProvider>().fetchLatestFeedbacks();
       await Future.wait([
         vehicleProvider.fetchAllVehicles(),
@@ -335,6 +341,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         SizedBox(height: 16.h),
         Consumer3<EmployeeProvider, VehicleProvider, CustomerProvider>(
           builder: (context, emp, veh, cust, _) {
+            final isAdmin = context.select<AuthProvider, bool>(
+              (auth) => auth.user?.isAdmin ?? false,
+            );
             final stats = [
               _StatData(
                 label: 'Employees',
@@ -350,13 +359,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                 startColor: const Color(0xFF10B981),
                 endColor: const Color(0xFF059669),
               ),
-              _StatData(
-                label: 'Customers',
-                value: cust.customers.length.toString(),
-                icon: Icons.people_alt_rounded,
-                startColor: const Color(0xFFF59E0B),
-                endColor: const Color(0xFFD97706),
-              ),
+              if (isAdmin)
+                _StatData(
+                  label: 'Customers',
+                  value: cust.customers.length.toString(),
+                  icon: Icons.people_alt_rounded,
+                  startColor: const Color(0xFFF59E0B),
+                  endColor: const Color(0xFFD97706),
+                ),
             ];
 
             return ResponsiveLayout(
