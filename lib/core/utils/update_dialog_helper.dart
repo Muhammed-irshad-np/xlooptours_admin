@@ -33,8 +33,8 @@ class UpdateDialogHelper {
     }
   }
 
-  /// Shows a dialog to update an employee document's expiry date, with an
-  /// optional file picker to replace the existing attachment.
+  /// Shows a dialog to update an employee document's expiry date, with all
+  /// fields matching the real edit form (number, type, country, upload, etc.).
   static void _showEmployeeExpiryUpdateDialog(
     BuildContext context,
     NotificationEntity notification,
@@ -73,6 +73,66 @@ class UpdateDialogHelper {
     XFile? pickedFile;
     bool isSaving = false;
 
+    // ── Document-specific controllers pre-filled from existing data ──────
+    final numberController = TextEditingController();
+    final nameController = TextEditingController(); // Passport name on passport
+    final countryController = TextEditingController(); // Driving license country
+
+    // Pre-fill visa type / license type from existing data
+    VisaType selectedVisaType = VisaType.singleEntry;
+    DrivingLicenseType selectedLicenseType = DrivingLicenseType.private;
+
+    // Pre-fill all document-specific fields from existing employee data
+    switch (documentType) {
+      case 'Iqama':
+        numberController.text = employee.iqama?.number ?? '';
+        selectedDate = employee.iqama?.expiryDate;
+        break;
+      case 'Bahrain Residence ID':
+        numberController.text = employee.bahrainResidence?.number ?? '';
+        selectedDate = employee.bahrainResidence?.expiryDate;
+        break;
+      case 'Health Insurance':
+        selectedDate = employee.healthInsurance?.expiryDate;
+        break;
+      case 'Passport':
+        numberController.text = employee.passport?.number ?? '';
+        nameController.text = employee.passport?.nameOnPassport ?? '';
+        selectedDate = employee.passport?.expiryDate;
+        break;
+      case 'Saudi Visa':
+        numberController.text = employee.saudiVisa?.number ?? '';
+        selectedVisaType = employee.saudiVisa?.type ?? VisaType.singleEntry;
+        selectedDate = employee.saudiVisa?.expiryDate;
+        break;
+      case 'Bahrain Visa':
+        numberController.text = employee.bahrainVisa?.number ?? '';
+        selectedVisaType = employee.bahrainVisa?.type ?? VisaType.singleEntry;
+        selectedDate = employee.bahrainVisa?.expiryDate;
+        break;
+      case 'Dubai Visa':
+        numberController.text = employee.dubaiVisa?.number ?? '';
+        selectedVisaType = employee.dubaiVisa?.type ?? VisaType.singleEntry;
+        selectedDate = employee.dubaiVisa?.expiryDate;
+        break;
+      case 'Qatar Visa':
+        numberController.text = employee.qatarVisa?.number ?? '';
+        selectedVisaType = employee.qatarVisa?.type ?? VisaType.singleEntry;
+        selectedDate = employee.qatarVisa?.expiryDate;
+        break;
+      case 'Driving License':
+        numberController.text = employee.drivingLicense?.number ?? '';
+        countryController.text = employee.drivingLicense?.countryOfOrigin ?? '';
+        selectedLicenseType = employee.drivingLicense?.type ?? DrivingLicenseType.private;
+        selectedDate = employee.drivingLicense?.expiryDate;
+        break;
+      case 'Authorization':
+        selectedDate = employee.authorization?.expiryDate;
+        break;
+      default:
+        break;
+    }
+
     // Pre-fill if it's a phone recharge
     if (documentType.startsWith('Phone Recharge')) {
       final contactId = documentType.replaceFirst('Phone Recharge ', '').trim();
@@ -95,6 +155,16 @@ class UpdateDialogHelper {
       return base.length > 30 ? '...${base.substring(base.length - 27)}' : base;
     }
 
+    // Which document types have a number field
+    const docTypesWithNumber = {
+      'Iqama', 'Bahrain Residence ID', 'Passport',
+      'Saudi Visa', 'Bahrain Visa', 'Dubai Visa', 'Qatar Visa',
+      'Driving License',
+    };
+
+    // Which document types are visas (have visa type dropdown)
+    const visaDocTypes = {'Saudi Visa', 'Bahrain Visa', 'Dubai Visa', 'Qatar Visa'};
+
     await showDialog(
       context: context,
       builder: (ctx) {
@@ -113,140 +183,237 @@ class UpdateDialogHelper {
                 'Update $documentType',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // ── Expiry date picker ───────────────────────────────
-                    CustomDatePicker(
-                      label: 'New Expiry Date',
-                      date: selectedDate,
-                      onTap: () async {
-                        final picked = await showDatePicker(
-                          context: ctx,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime(2000),
-                          lastDate: DateTime(2100),
-                        );
-                        if (picked != null) {
-                          setState(() => selectedDate = picked);
-                        }
-                      },
-                    ),
-
-                    // ── File upload (only for doc types that have attachments) ─
-                    if (supportsUpload) ...[
-                      const SizedBox(height: 20),
-                      const Divider(),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Replace Document (optional)',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      OutlinedButton.icon(
-                        icon: Icon(
-                          pickedFile != null
-                              ? Icons.check_circle
-                              : Icons.attach_file,
-                          color: pickedFile != null
-                              ? Colors.green
-                              : Colors.blue[700],
-                        ),
-                        label: Text(
-                          pickedFile != null
-                              ? _fileName(pickedFile!)
-                              : 'Choose File',
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: pickedFile != null
-                                ? Colors.green[800]
-                                : Colors.blue[700],
+              content: SizedBox(
+                width: 400,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // ── Document number field ───────────────────────────
+                      if (docTypesWithNumber.contains(documentType)) ...[
+                        TextFormField(
+                          controller: numberController,
+                          decoration: InputDecoration(
+                            labelText: documentType == 'Iqama'
+                                ? 'Iqama Number'
+                                : documentType == 'Bahrain Residence ID'
+                                    ? 'Residence ID Number'
+                                    : documentType == 'Passport'
+                                        ? 'Passport No.'
+                                        : documentType == 'Driving License'
+                                            ? 'License No.'
+                                            : 'Visa No.',
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.numbers),
                           ),
+                          keyboardType: TextInputType.text,
                         ),
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(
-                            color: pickedFile != null
-                                ? Colors.green
-                                : Colors.blue,
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
-                          ),
-                        ),
-                        onPressed: isSaving
-                            ? null
-                            : () async {
-                                final result =
-                                    await FilePicker.platform.pickFiles(
-                                  type: FileType.any,
-                                  allowMultiple: false,
-                                );
-                                if (result != null &&
-                                    result.files.isNotEmpty) {
-                                  final pf = result.files.first;
-                                  setState(
-                                    () => pickedFile = XFile(pf.path ?? ''),
-                                  );
-                                }
-                              },
-                      ),
-                      if (pickedFile != null) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          'Selected: ${_fileName(pickedFile!)}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.green[700],
-                          ),
-                        ),
+                        const SizedBox(height: 16),
                       ],
-                      const SizedBox(height: 4),
-                      Text(
-                        'Leave blank to keep the existing attachment.',
-                        style: TextStyle(fontSize: 11, color: Colors.grey[500]),
-                      ),
-                    ],
 
-                    // ── Phone recharge extra fields ───────────────────────
-                    if (documentType.startsWith('Phone Recharge')) ...[
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: costController,
-                        decoration: const InputDecoration(
-                          labelText: 'Recharge Cost',
-                          border: OutlineInputBorder(),
-                          prefixText: 'SAR ',
+                      // ── Passport: Name on Passport ─────────────────────
+                      if (documentType == 'Passport') ...[
+                        TextFormField(
+                          controller: nameController,
+                          decoration: const InputDecoration(
+                            labelText: 'Name on Passport',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.person),
+                          ),
                         ),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
+                        const SizedBox(height: 16),
+                      ],
+
+                      // ── Driving License: Country ───────────────────────
+                      if (documentType == 'Driving License') ...[
+                        TextFormField(
+                          controller: countryController,
+                          decoration: const InputDecoration(
+                            labelText: 'Country',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.public),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        initialValue: selectedHolderId,
-                        decoration: const InputDecoration(
-                          labelText: 'Assign Cost To',
-                          border: OutlineInputBorder(),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // ── Visa Type dropdown ─────────────────────────────
+                      if (visaDocTypes.contains(documentType)) ...[
+                        DropdownButtonFormField<VisaType>(
+                          value: selectedVisaType,
+                          decoration: const InputDecoration(
+                            labelText: 'Visa Type',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: VisaType.values.map((type) {
+                            return DropdownMenuItem(
+                              value: type,
+                              child: Text(type.toString().split('.').last),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => selectedVisaType = val);
+                            }
+                          },
                         ),
-                        items: employeeProvider.employees.map((e) {
-                          return DropdownMenuItem(
-                            value: e.id,
-                            child: Text(e.fullName),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // ── Driving License Type dropdown ──────────────────
+                      if (documentType == 'Driving License') ...[
+                        DropdownButtonFormField<DrivingLicenseType>(
+                          value: selectedLicenseType,
+                          decoration: const InputDecoration(
+                            labelText: 'License Type',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: DrivingLicenseType.values.map((type) {
+                            return DropdownMenuItem(
+                              value: type,
+                              child: Text(type.toString().split('.').last),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => selectedLicenseType = val);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // ── Expiry date picker ─────────────────────────────
+                      CustomDatePicker(
+                        label: 'New Expiry Date',
+                        date: selectedDate,
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: ctx,
+                            initialDate: selectedDate ?? DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
                           );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() => selectedHolderId = value);
+                          if (picked != null) {
+                            setState(() => selectedDate = picked);
+                          }
                         },
                       ),
+
+                      // ── File upload (only for doc types that have attachments) ─
+                      if (supportsUpload) ...[
+                        const SizedBox(height: 20),
+                        const Divider(),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Replace Document (optional)',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey[600],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          icon: Icon(
+                            pickedFile != null
+                                ? Icons.check_circle
+                                : Icons.attach_file,
+                            color: pickedFile != null
+                                ? Colors.green
+                                : Colors.blue[700],
+                          ),
+                          label: Text(
+                            pickedFile != null
+                                ? _fileName(pickedFile!)
+                                : 'Choose File',
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: pickedFile != null
+                                  ? Colors.green[800]
+                                  : Colors.blue[700],
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(
+                              color: pickedFile != null
+                                  ? Colors.green
+                                  : Colors.blue,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  final result =
+                                      await FilePicker.platform.pickFiles(
+                                    type: FileType.any,
+                                    allowMultiple: false,
+                                  );
+                                  if (result != null &&
+                                      result.files.isNotEmpty) {
+                                    final pf = result.files.first;
+                                    setState(
+                                      () => pickedFile = XFile(pf.path ?? ''),
+                                    );
+                                  }
+                                },
+                        ),
+                        if (pickedFile != null) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            'Selected: ${_fileName(pickedFile!)}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.green[700],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Text(
+                          'Leave blank to keep the existing attachment.',
+                          style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                        ),
+                      ],
+
+                      // ── Phone recharge extra fields ───────────────────────
+                      if (documentType.startsWith('Phone Recharge')) ...[
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: costController,
+                          decoration: const InputDecoration(
+                            labelText: 'Recharge Cost',
+                            border: OutlineInputBorder(),
+                            prefixText: 'SAR ',
+                          ),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        DropdownButtonFormField<String>(
+                          initialValue: selectedHolderId,
+                          decoration: const InputDecoration(
+                            labelText: 'Assign Cost To',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: employeeProvider.employees.map((e) {
+                            return DropdownMenuItem(
+                              value: e.id,
+                              child: Text(e.fullName),
+                            );
+                          }).toList(),
+                          onChanged: (value) {
+                            setState(() => selectedHolderId = value);
+                          },
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
               actions: [
@@ -287,19 +454,13 @@ class UpdateDialogHelper {
                                   updatedEmployee = employee.copyWith(clearIqama: true);
                                 } else {
                                   updatedEmployee = employee.copyWith(
-                                    iqama: employee.iqama != null
-                                        ? IqamaDocument(
-                                            number: employee.iqama!.number,
-                                            expiryDate: selectedDate!,
-                                            attachmentUrl: _url(
-                                              employee.iqama!.attachmentUrl,
-                                            ),
-                                          )
-                                        : IqamaDocument(
-                                            number: '',
-                                            expiryDate: selectedDate!,
-                                            attachmentUrl: newAttachmentUrl,
-                                          ),
+                                    iqama: IqamaDocument(
+                                      number: numberController.text,
+                                      expiryDate: selectedDate!,
+                                      attachmentUrl: _url(
+                                        employee.iqama?.attachmentUrl,
+                                      ),
+                                    ),
                                   );
                                 }
                                 break;
@@ -308,22 +469,13 @@ class UpdateDialogHelper {
                                   updatedEmployee = employee.copyWith(clearBahrainResidence: true);
                                 } else {
                                   updatedEmployee = employee.copyWith(
-                                    bahrainResidence:
-                                        employee.bahrainResidence != null
-                                            ? BahrainResidenceDocument(
-                                                number: employee
-                                                    .bahrainResidence!.number,
-                                                expiryDate: selectedDate!,
-                                                attachmentUrl: _url(
-                                                  employee.bahrainResidence!
-                                                      .attachmentUrl,
-                                                ),
-                                              )
-                                            : BahrainResidenceDocument(
-                                                number: '',
-                                                expiryDate: selectedDate!,
-                                                attachmentUrl: newAttachmentUrl,
-                                              ),
+                                    bahrainResidence: BahrainResidenceDocument(
+                                      number: numberController.text,
+                                      expiryDate: selectedDate!,
+                                      attachmentUrl: _url(
+                                        employee.bahrainResidence?.attachmentUrl,
+                                      ),
+                                    ),
                                   );
                                 }
                                 break;
@@ -332,19 +484,12 @@ class UpdateDialogHelper {
                                   updatedEmployee = employee.copyWith(clearHealthInsurance: true);
                                 } else {
                                   updatedEmployee = employee.copyWith(
-                                    healthInsurance: employee.healthInsurance !=
-                                            null
-                                        ? HealthInsuranceDocument(
-                                            expiryDate: selectedDate!,
-                                            attachmentUrl: _url(
-                                              employee.healthInsurance!
-                                                  .attachmentUrl,
-                                            ),
-                                          )
-                                        : HealthInsuranceDocument(
-                                            expiryDate: selectedDate!,
-                                            attachmentUrl: newAttachmentUrl,
-                                          ),
+                                    healthInsurance: HealthInsuranceDocument(
+                                      expiryDate: selectedDate!,
+                                      attachmentUrl: _url(
+                                        employee.healthInsurance?.attachmentUrl,
+                                      ),
+                                    ),
                                   );
                                 }
                                 break;
@@ -353,29 +498,15 @@ class UpdateDialogHelper {
                                   updatedEmployee = employee.copyWith(clearDrivingLicense: true);
                                 } else {
                                   updatedEmployee = employee.copyWith(
-                                    drivingLicense:
-                                        employee.drivingLicense != null
-                                            ? DrivingLicenseDocument(
-                                                countryOfOrigin: employee
-                                                    .drivingLicense!
-                                                    .countryOfOrigin,
-                                                number: employee
-                                                    .drivingLicense!.number,
-                                                expiryDate: selectedDate!,
-                                                type: employee
-                                                    .drivingLicense!.type,
-                                                attachmentUrl: _url(
-                                                  employee.drivingLicense!
-                                                      .attachmentUrl,
-                                                ),
-                                              )
-                                            : DrivingLicenseDocument(
-                                                countryOfOrigin: '',
-                                                number: '',
-                                                expiryDate: selectedDate!,
-                                                type: DrivingLicenseType.private,
-                                                attachmentUrl: newAttachmentUrl,
-                                              ),
+                                    drivingLicense: DrivingLicenseDocument(
+                                      countryOfOrigin: countryController.text,
+                                      number: numberController.text,
+                                      expiryDate: selectedDate!,
+                                      type: selectedLicenseType,
+                                      attachmentUrl: _url(
+                                        employee.drivingLicense?.attachmentUrl,
+                                      ),
+                                    ),
                                   );
                                 }
                                 break;
@@ -384,22 +515,14 @@ class UpdateDialogHelper {
                                   updatedEmployee = employee.copyWith(clearPassport: true);
                                 } else {
                                   updatedEmployee = employee.copyWith(
-                                    passport: employee.passport != null
-                                        ? PassportDocument(
-                                            nameOnPassport: employee
-                                                .passport!.nameOnPassport,
-                                            number: employee.passport!.number,
-                                            expiryDate: selectedDate!,
-                                            attachmentUrl: _url(
-                                              employee.passport!.attachmentUrl,
-                                            ),
-                                          )
-                                        : PassportDocument(
-                                            nameOnPassport: '',
-                                            number: '',
-                                            expiryDate: selectedDate!,
-                                            attachmentUrl: newAttachmentUrl,
-                                          ),
+                                    passport: PassportDocument(
+                                      nameOnPassport: nameController.text,
+                                      number: numberController.text,
+                                      expiryDate: selectedDate!,
+                                      attachmentUrl: _url(
+                                        employee.passport?.attachmentUrl,
+                                      ),
+                                    ),
                                   );
                                 }
                                 break;
@@ -408,20 +531,14 @@ class UpdateDialogHelper {
                                   updatedEmployee = employee.copyWith(clearSaudiVisa: true);
                                 } else {
                                   updatedEmployee = employee.copyWith(
-                                    saudiVisa: employee.saudiVisa != null
-                                        ? VisaDocument(
-                                            number: employee.saudiVisa!.number,
-                                            expiryDate: selectedDate!,
-                                            type: employee.saudiVisa!.type,
-                                            attachmentUrl: _url(
-                                              employee.saudiVisa!.attachmentUrl,
-                                            ),
-                                          )
-                                        : VisaDocument(
-                                            number: '',
-                                            expiryDate: selectedDate!,
-                                            attachmentUrl: newAttachmentUrl,
-                                          ),
+                                    saudiVisa: VisaDocument(
+                                      number: numberController.text,
+                                      expiryDate: selectedDate!,
+                                      type: selectedVisaType,
+                                      attachmentUrl: _url(
+                                        employee.saudiVisa?.attachmentUrl,
+                                      ),
+                                    ),
                                   );
                                 }
                                 break;
@@ -430,20 +547,14 @@ class UpdateDialogHelper {
                                   updatedEmployee = employee.copyWith(clearBahrainVisa: true);
                                 } else {
                                   updatedEmployee = employee.copyWith(
-                                    bahrainVisa: employee.bahrainVisa != null
-                                        ? VisaDocument(
-                                            number: employee.bahrainVisa!.number,
-                                            expiryDate: selectedDate!,
-                                            type: employee.bahrainVisa!.type,
-                                            attachmentUrl: _url(
-                                              employee.bahrainVisa!.attachmentUrl,
-                                            ),
-                                          )
-                                        : VisaDocument(
-                                            number: '',
-                                            expiryDate: selectedDate!,
-                                            attachmentUrl: newAttachmentUrl,
-                                          ),
+                                    bahrainVisa: VisaDocument(
+                                      number: numberController.text,
+                                      expiryDate: selectedDate!,
+                                      type: selectedVisaType,
+                                      attachmentUrl: _url(
+                                        employee.bahrainVisa?.attachmentUrl,
+                                      ),
+                                    ),
                                   );
                                 }
                                 break;
@@ -452,20 +563,14 @@ class UpdateDialogHelper {
                                   updatedEmployee = employee.copyWith(clearDubaiVisa: true);
                                 } else {
                                   updatedEmployee = employee.copyWith(
-                                    dubaiVisa: employee.dubaiVisa != null
-                                        ? VisaDocument(
-                                            number: employee.dubaiVisa!.number,
-                                            expiryDate: selectedDate!,
-                                            type: employee.dubaiVisa!.type,
-                                            attachmentUrl: _url(
-                                              employee.dubaiVisa!.attachmentUrl,
-                                            ),
-                                          )
-                                        : VisaDocument(
-                                            number: '',
-                                            expiryDate: selectedDate!,
-                                            attachmentUrl: newAttachmentUrl,
-                                          ),
+                                    dubaiVisa: VisaDocument(
+                                      number: numberController.text,
+                                      expiryDate: selectedDate!,
+                                      type: selectedVisaType,
+                                      attachmentUrl: _url(
+                                        employee.dubaiVisa?.attachmentUrl,
+                                      ),
+                                    ),
                                   );
                                 }
                                 break;
@@ -474,20 +579,14 @@ class UpdateDialogHelper {
                                   updatedEmployee = employee.copyWith(clearQatarVisa: true);
                                 } else {
                                   updatedEmployee = employee.copyWith(
-                                    qatarVisa: employee.qatarVisa != null
-                                        ? VisaDocument(
-                                            number: employee.qatarVisa!.number,
-                                            expiryDate: selectedDate!,
-                                            type: employee.qatarVisa!.type,
-                                            attachmentUrl: _url(
-                                              employee.qatarVisa!.attachmentUrl,
-                                            ),
-                                          )
-                                        : VisaDocument(
-                                            number: '',
-                                            expiryDate: selectedDate!,
-                                            attachmentUrl: newAttachmentUrl,
-                                          ),
+                                    qatarVisa: VisaDocument(
+                                      number: numberController.text,
+                                      expiryDate: selectedDate!,
+                                      type: selectedVisaType,
+                                      attachmentUrl: _url(
+                                        employee.qatarVisa?.attachmentUrl,
+                                      ),
+                                    ),
                                   );
                                 }
                                 break;
@@ -851,10 +950,12 @@ class UpdateDialogHelper {
     DateTime? selectedDate;
     XFile? pickedFile;
     bool isSaving = false;
+    final regNoController = TextEditingController();
 
     // Pre-fill existing date
     if (documentType == 'Commercial License') {
       selectedDate = vaultData.license.expiryDate;
+      regNoController.text = vaultData.license.registrationNo;
     }
 
     await showDialog(
@@ -869,6 +970,16 @@ class UpdateDialogHelper {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (documentType == 'Commercial License') ...[
+                    TextFormField(
+                      controller: regNoController,
+                      decoration: const InputDecoration(
+                        labelText: 'Registration No.',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   CustomDatePicker(
                     label: 'New Expiry Date',
                     date: selectedDate,
@@ -917,6 +1028,7 @@ class UpdateDialogHelper {
                         updatedData = vaultData.copyWith(
                           license: vaultData.license.copyWith(
                             expiryDate: selectedDate!,
+                            registrationNo: regNoController.text,
                             document: newDoc ?? vaultData.license.document,
                           ),
                         );

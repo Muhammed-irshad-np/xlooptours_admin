@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 
 import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
 import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.dart';
-import 'package:xloop_invoice/features/customer/presentation/providers/customer_provider.dart';
 import '../../domain/entities/feedback_entity.dart';
 import '../providers/feedback_provider.dart';
 
@@ -72,7 +71,6 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
     _caseCodeController.addListener(_updateCaseCodeFormat);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<EmployeeProvider>().fetchAllEmployees();
-      context.read<CustomerProvider>().fetchAllCustomers();
     });
     if (widget.prefilledDriverName != null) {
       _driverNameController.text = widget.prefilledDriverName!;
@@ -549,18 +547,14 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
                               ),
                               const SizedBox(height: 20),
                               _buildFieldLabel('Case Code / Project Code *'),
-                              Consumer<CustomerProvider>(
-                                builder: (context, customerProvider, _) {
-                                  return _buildTextField(
-                                    controller: _caseCodeController,
-                                    hintText: "Enter case code / project code",
-                                    textCapitalization: TextCapitalization.characters,
-                                    validator: (value) =>
-                                        value == null || value.trim().isEmpty
-                                            ? 'Case Code / Project Code is required'
-                                            : null,
-                                  );
-                                },
+                              _buildTextField(
+                                controller: _caseCodeController,
+                                hintText: "Enter case code / project code",
+                                textCapitalization: TextCapitalization.characters,
+                                validator: (value) =>
+                                    value == null || value.trim().isEmpty
+                                        ? 'Case Code / Project Code is required'
+                                        : null,
                               ),
                             ],
                           ),
