@@ -22,6 +22,8 @@ class CompaniesScreen extends StatefulWidget {
 }
 
 class _CompaniesScreenState extends State<CompaniesScreen> {
+  bool _showInactive = false;
+
   @override
   void initState() {
     super.initState();
@@ -117,6 +119,25 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
       appBar: AppBar(
         title: const Text('Companies'),
         actions: [
+          Row(
+            children: [
+              Text(
+                'Show Inactive',
+                style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+              ),
+              Transform.scale(
+                scale: 0.7,
+                child: Switch(
+                  value: _showInactive,
+                  onChanged: (val) {
+                    setState(() {
+                      _showInactive = val;
+                    });
+                  },
+                ),
+              ),
+            ],
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () => _navigateToForm(null),
@@ -140,24 +161,31 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
           }
 
           final companies = provider.companies;
+          final filteredCompanies = companies.where((c) {
+            if (_showInactive) return c.status == 'INACTIVE';
+            return true; // show all
+          }).toList();
 
-          if (companies.isEmpty) {
+          if (filteredCompanies.isEmpty) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Icon(Icons.business, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
-                  const Text(
-                    'No companies yet',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  Text(
+                    companies.isEmpty
+                        ? 'No companies yet'
+                        : 'No companies match the filter',
+                    style: const TextStyle(fontSize: 18, color: Colors.grey),
                   ),
                   const SizedBox(height: 8),
-                  ElevatedButton.icon(
-                    onPressed: () => _navigateToForm(null),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Add First Company'),
-                  ),
+                  if (companies.isEmpty)
+                    ElevatedButton.icon(
+                      onPressed: () => _navigateToForm(null),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add First Company'),
+                    ),
                 ],
               ),
             );
@@ -165,10 +193,10 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
 
           return ResponsiveLayout(
             mobile: ListView.builder(
-              itemCount: companies.length,
+              itemCount: filteredCompanies.length,
               padding: const EdgeInsets.all(8),
               itemBuilder: (context, index) =>
-                  _buildCompanyCard(companies[index]),
+                  _buildCompanyCard(filteredCompanies[index]),
             ),
             desktop: GridView.builder(
               padding: const EdgeInsets.all(16),
@@ -178,9 +206,9 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
                 crossAxisSpacing: 16,
                 mainAxisSpacing: 16,
               ),
-              itemCount: companies.length,
+              itemCount: filteredCompanies.length,
               itemBuilder: (context, index) =>
-                  _buildCompanyCard(companies[index]),
+                  _buildCompanyCard(filteredCompanies[index]),
             ),
           );
         },

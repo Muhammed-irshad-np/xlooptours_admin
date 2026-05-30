@@ -27,6 +27,8 @@ class CustomerListScreen extends StatefulWidget {
 }
 
 class _CustomerListScreenState extends State<CustomerListScreen> {
+  bool _showInactive = false;
+
   @override
   void initState() {
     super.initState();
@@ -126,10 +128,34 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   Widget build(BuildContext context) {
     return Consumer<CustomerProvider>(
       builder: (context, provider, child) {
+        final filteredCustomers = provider.customers.where((c) {
+          if (_showInactive) return c.status == 'INACTIVE';
+          return true; // show all
+        }).toList();
+
         return Scaffold(
           appBar: AppBar(
             title: const Text('Customers'),
             actions: [
+              Row(
+                children: [
+                  Text(
+                    'Show Inactive',
+                    style: TextStyle(fontSize: 10.sp, color: Colors.grey[600]),
+                  ),
+                  Transform.scale(
+                    scale: 0.7,
+                    child: Switch(
+                      value: _showInactive,
+                      onChanged: (val) {
+                        setState(() {
+                          _showInactive = val;
+                        });
+                      },
+                    ),
+                  ),
+                ],
+              ),
               IconButton(
                 icon: const Icon(Icons.add),
                 onPressed: () => _navigateToForm(null),
@@ -139,7 +165,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           ),
           body: provider.isLoading
               ? const Center(child: CircularProgressIndicator())
-              : provider.customers.isEmpty
+              : filteredCustomers.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -150,25 +176,28 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                         color: Colors.grey,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'No customers yet',
-                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      Text(
+                        provider.customers.isEmpty
+                            ? 'No customers yet'
+                            : 'No customers match the filter',
+                        style: const TextStyle(fontSize: 18, color: Colors.grey),
                       ),
                       const SizedBox(height: 8),
-                      ElevatedButton.icon(
-                        onPressed: () => _navigateToForm(null),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Add First Customer'),
-                      ),
+                      if (provider.customers.isEmpty)
+                        ElevatedButton.icon(
+                          onPressed: () => _navigateToForm(null),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Add First Customer'),
+                        ),
                     ],
                   ),
                 )
               : ResponsiveLayout(
                   mobile: ListView.builder(
-                    itemCount: provider.customers.length,
+                    itemCount: filteredCustomers.length,
                     padding: const EdgeInsets.all(8),
                     itemBuilder: (context, index) =>
-                        _buildCustomerCard(provider.customers[index]),
+                        _buildCustomerCard(filteredCustomers[index]),
                   ),
                   desktop: GridView.builder(
                     padding: const EdgeInsets.all(16),
@@ -179,9 +208,9 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                           crossAxisSpacing: 16,
                           mainAxisSpacing: 16,
                         ),
-                    itemCount: provider.customers.length,
+                    itemCount: filteredCustomers.length,
                     itemBuilder: (context, index) =>
-                        _buildCustomerCard(provider.customers[index]),
+                        _buildCustomerCard(filteredCustomers[index]),
                   ),
                 ),
         );

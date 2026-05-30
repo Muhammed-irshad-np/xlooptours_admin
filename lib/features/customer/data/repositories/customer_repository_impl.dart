@@ -10,12 +10,14 @@ class CustomerRepositoryImpl implements CustomerRepository {
 
   @override
   Future<List<CustomerEntity>> getAllCustomers() async {
-    return await remoteDataSource.getAllCustomers();
+    final models = await remoteDataSource.getAllCustomers();
+    return List<CustomerEntity>.from(models);
   }
 
   @override
   Future<List<CustomerEntity>> getCustomersForCompany(String companyId) async {
-    return await remoteDataSource.getCustomersForCompany(companyId);
+    final models = await remoteDataSource.getCustomersForCompany(companyId);
+    return List<CustomerEntity>.from(models);
   }
 
   @override
