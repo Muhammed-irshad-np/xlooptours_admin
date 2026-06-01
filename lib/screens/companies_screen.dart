@@ -163,7 +163,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
           final companies = provider.companies;
           final filteredCompanies = companies.where((c) {
             if (_showInactive) return c.status == 'INACTIVE';
-            return true; // show all
+            return c.status == 'ACTIVE';
           }).toList();
 
           if (filteredCompanies.isEmpty) {
