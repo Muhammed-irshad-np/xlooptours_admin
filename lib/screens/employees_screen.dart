@@ -95,6 +95,8 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     // 1. Filter by Active/Inactive
     if (_showInactive.value) {
       temp = temp.where((e) => !e.isActive).toList();
+    } else {
+      temp = temp.where((e) => e.isActive).toList();
     }
 
     // 2. Filter by Search

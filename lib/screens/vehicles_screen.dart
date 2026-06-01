@@ -23,6 +23,7 @@ class VehiclesScreen extends StatefulWidget {
 }
 
 class _VehiclesScreenState extends State<VehiclesScreen> {
+  bool _showInactive = false;
   final ValueNotifier<Map<String, EmployeeEntity>> _driversMap = ValueNotifier(
     {},
   );
@@ -116,12 +117,37 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
     final vehicles = vehicleProvider.vehicles;
 
+    final filteredVehicles = vehicles.where((v) {
+      final isActive = (v.status?.toLowerCase() ?? 'active') == 'active';
+      if (_showInactive) return !isActive;
+      return isActive;
+    }).toList();
+
     return DefaultTabController(
       length: isAdmin ? 2 : 1,
       child: Scaffold(
         appBar: ModernAppBar(
           title: 'Fleet Management',
           actions: [
+            Row(
+              children: [
+                Text(
+                  'Show Inactive',
+                  style: TextStyle(fontSize: 10.sp, color: Colors.grey[600]),
+                ),
+                Transform.scale(
+                  scale: 0.7,
+                  child: Switch(
+                    value: _showInactive,
+                    onChanged: (val) {
+                      setState(() {
+                        _showInactive = val;
+                      });
+                    },
+                  ),
+                ),
+              ],
+            ),
             IconButton(
               onPressed: () => _navigateToAddEdit(),
               icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
@@ -140,7 +166,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
             // Tab 1: Fleet List (Existing UI)
             isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : vehicles.isEmpty
+                : filteredVehicles.isEmpty
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -153,14 +179,17 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                         ),
                         SizedBox(height: 16.h),
                         Text(
-                          'No vehicles found',
+                          vehicles.isEmpty
+                              ? 'No vehicles found'
+                              : 'No vehicles match the filter',
                           style: TextStyle(color: Colors.grey, fontSize: 18.sp),
                         ),
                         SizedBox(height: 16.h),
-                        ElevatedButton(
-                          onPressed: () => _navigateToAddEdit(),
-                          child: const Text('Add Vehicle'),
-                        ),
+                        if (vehicles.isEmpty)
+                          ElevatedButton(
+                            onPressed: () => _navigateToAddEdit(),
+                            child: const Text('Add Vehicle'),
+                          ),
                       ],
                     ),
                   )
@@ -169,11 +198,11 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                     builder: (context, driversMap, _) {
                       return ListView.separated(
                         padding: EdgeInsets.all(16.w),
-                        itemCount: vehicles.length,
+                        itemCount: filteredVehicles.length,
                         separatorBuilder: (context, index) =>
                             SizedBox(height: 16.h),
                         itemBuilder: (context, index) {
-                          final vehicle = vehicles[index];
+                          final vehicle = filteredVehicles[index];
                           final driver = vehicle.currentDriverId != null
                               ? driversMap[vehicle.currentDriverId]
                               : null;

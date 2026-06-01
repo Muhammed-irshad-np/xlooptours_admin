@@ -130,7 +130,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       builder: (context, provider, child) {
         final filteredCustomers = provider.customers.where((c) {
           if (_showInactive) return c.status == 'INACTIVE';
-          return true; // show all
+          return c.status == 'ACTIVE';
         }).toList();
 
         return Scaffold(
