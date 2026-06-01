@@ -1097,6 +1097,23 @@ class UpdateDialogHelper {
     XFile? pickedFile;
     bool isSaving = false;
 
+    final employeeProvider = context.read<EmployeeProvider>();
+    if (employeeProvider.employees.isEmpty) {
+      await employeeProvider.fetchAllEmployees();
+    }
+    if (!context.mounted) return;
+
+    TafweedRecord? existingTafweed;
+    if (documentType == 'Tafweed' && driverId != null) {
+      existingTafweed = vehicle.tafweeds
+          ?.cast<TafweedRecord?>()
+          .firstWhere((t) => t?.driverId == driverId, orElse: () => null);
+    }
+
+    String? selectedDriverId = driverId;
+    DateTime? issuedDate = existingTafweed?.issuedDate ?? DateTime.now();
+    selectedDate = existingTafweed?.expiryDate;
+
     // Map doc type to internal field
     final Map<String, String> docKeys = {
       'Istimara': 'istimara',
@@ -1118,39 +1135,212 @@ class UpdateDialogHelper {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
               title: Text('Update $documentType', style: const TextStyle(fontWeight: FontWeight.bold)),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  CustomDatePicker(
-                    label: 'New Expiry Date',
-                    date: selectedDate,
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: ctx,
-                        initialDate: DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) setState(() => selectedDate = picked);
-                    },
+              content: SizedBox(
+                width: 400,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (documentType == 'Tafweed') ...[
+                        // Vehicle Details context
+                        Text(
+                          'Vehicle: ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber})',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 16),
+                        // Driver selector
+                        DropdownButtonFormField<String>(
+                          decoration: const InputDecoration(
+                            labelText: 'Authorized Driver',
+                            border: OutlineInputBorder(),
+                          ),
+                          value: selectedDriverId,
+                          items: employeeProvider.employees
+                              .where((e) => e.isActive)
+                              .map((e) {
+                            return DropdownMenuItem(
+                              value: e.id,
+                              child: Text(e.fullName),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              selectedDriverId = val;
+                              if (val != null) {
+                                final existing = vehicle.tafweeds
+                                    ?.where((t) => t.driverId == val)
+                                    .firstOrNull;
+                                if (existing != null) {
+                                  issuedDate = existing.issuedDate;
+                                  selectedDate = existing.expiryDate;
+                                } else {
+                                  issuedDate = DateTime.now();
+                                  selectedDate = null;
+                                }
+                              }
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        // Issue Date picker
+                        CustomDatePicker(
+                          label: 'Tafweed Issue Date',
+                          date: issuedDate,
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: ctx,
+                              initialDate: issuedDate ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365 * 5),
+                              ),
+                            );
+                            if (picked != null) {
+                              setState(() => issuedDate = picked);
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        // Expiry Date picker
+                        CustomDatePicker(
+                          label: 'Tafweed Expiry Date',
+                          date: selectedDate,
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: ctx,
+                              initialDate: selectedDate ?? DateTime.now(),
+                              firstDate: DateTime.now().subtract(
+                                const Duration(days: 365),
+                              ),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365 * 5),
+                              ),
+                            );
+                            if (picked != null) {
+                              setState(() => selectedDate = picked);
+                            }
+                          },
+                        ),
+                        if (selectedDriverId != null) ...[
+                          const SizedBox(height: 12),
+                          TextButton.icon(
+                            onPressed: isSaving
+                                ? null
+                                : () async {
+                                    final confirm = await showDialog<bool>(
+                                      context: ctx,
+                                      builder: (c) => AlertDialog(
+                                        title: const Text('Cancel Authorization'),
+                                        content: const Text(
+                                          'Are you sure you want to cancel the current authorization? This will record the end date as today and move it to history.',
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(c, false),
+                                            child: const Text('No'),
+                                          ),
+                                          ElevatedButton(
+                                            onPressed: () => Navigator.pop(c, true),
+                                            child: const Text('Yes'),
+                                          ),
+                                        ],
+                                      ),
+                                    ) ?? false;
+
+                                    if (!confirm) return;
+
+                                    setState(() => isSaving = true);
+                                    try {
+                                      final currentTafweeds = List<TafweedRecord>.from(vehicle.tafweeds ?? []);
+                                      final idx = currentTafweeds.indexWhere((t) => t.driverId == selectedDriverId);
+                                      if (idx != -1) {
+                                        final recordToArchive = currentTafweeds[idx];
+                                        currentTafweeds.removeAt(idx);
+
+                                        final updatedHistory = List<TafweedRecord>.from(vehicle.tafweedHistory ?? []);
+                                        updatedHistory.add(recordToArchive.copyWith(expiryDate: DateTime.now()));
+
+                                        final updatedVehicle = vehicle.copyWith(
+                                          tafweeds: currentTafweeds,
+                                          tafweedHistory: updatedHistory,
+                                        );
+
+                                        await vehicleProvider.updateVehicle(updatedVehicle);
+                                      }
+
+                                      if (ctx.mounted) {
+                                        final notifProvider = ctx.read<NotificationProvider>();
+                                        await notifProvider.markAsRead(notification.id);
+                                        await notifProvider.refreshAlerts(
+                                          vehicles: vehicleProvider.vehicles,
+                                          maintenanceTypes: vehicleProvider.maintenanceTypes,
+                                        );
+                                        if (!ctx.mounted) return;
+                                        Navigator.pop(ctx);
+                                        ScaffoldMessenger.of(ctx).showSnackBar(
+                                          const SnackBar(content: Text('Authorization cancelled successfully')),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      setState(() => isSaving = false);
+                                      if (!ctx.mounted) return;
+                                      ScaffoldMessenger.of(ctx).showSnackBar(
+                                        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                                      );
+                                    }
+                                  },
+                            icon: Icon(Icons.cancel_outlined, color: Colors.orange[700], size: 18.sp),
+                            label: Text(
+                              'Cancel Authorization',
+                              style: TextStyle(
+                                color: Colors.orange[700],
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: TextButton.styleFrom(
+                              backgroundColor: Colors.orange[50],
+                              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ] else ...[
+                        CustomDatePicker(
+                          label: 'New Expiry Date',
+                          date: selectedDate,
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: ctx,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) setState(() => selectedDate = picked);
+                          },
+                        ),
+                      ],
+                      if (supportsUpload) ...[
+                        const SizedBox(height: 20),
+                        const Divider(),
+                        const SizedBox(height: 10),
+                        OutlinedButton.icon(
+                          icon: Icon(pickedFile != null ? Icons.check_circle : Icons.attach_file),
+                          label: Text(pickedFile != null ? p.basename(pickedFile!.path) : 'Choose File'),
+                          onPressed: isSaving ? null : () async {
+                            final result = await FilePicker.platform.pickFiles(type: FileType.any);
+                            if (result != null && result.files.isNotEmpty) {
+                              setState(() => pickedFile = XFile(result.files.first.path!));
+                            }
+                          },
+                        ),
+                      ],
+                    ],
                   ),
-                  if (supportsUpload) ...[
-                    const SizedBox(height: 20),
-                    const Divider(),
-                    const SizedBox(height: 10),
-                    OutlinedButton.icon(
-                      icon: Icon(pickedFile != null ? Icons.check_circle : Icons.attach_file),
-                      label: Text(pickedFile != null ? p.basename(pickedFile!.path) : 'Choose File'),
-                      onPressed: isSaving ? null : () async {
-                        final result = await FilePicker.platform.pickFiles(type: FileType.any);
-                        if (result != null && result.files.isNotEmpty) {
-                          setState(() => pickedFile = XFile(result.files.first.path!));
-                        }
-                      },
-                    ),
-                  ],
-                ],
+                ),
               ),
               actions: [
                 TextButton(onPressed: isSaving ? null : () => Navigator.pop(ctx), child: const Text('Cancel')),
@@ -1229,25 +1419,127 @@ class UpdateDialogHelper {
                           }
                           break;
                         case 'Tafweed':
-                          if (driverId != null) {
-                            final List<TafweedRecord> currentTafweeds = List.from(vehicle.tafweeds ?? []);
-                            final targetIndex = currentTafweeds.indexWhere((t) => t.driverId == driverId);
-                            
-                            if (targetIndex != -1) {
-                              if (selectedDate == null) {
-                                currentTafweeds.removeAt(targetIndex);
-                              } else {
-                                final current = currentTafweeds[targetIndex];
-                                currentTafweeds[targetIndex] = current.copyWith(
-                                  expiryDate: selectedDate!,
-                                  attachmentUrl: url(current.attachmentUrl),
-                                );
-                              }
-                              updatedVehicle = vehicle.copyWith(
-                                tafweeds: currentTafweeds,
+                          if (selectedDriverId == null) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(content: Text('Please select an authorized driver')),
+                            );
+                            setState(() => isSaving = false);
+                            return;
+                          }
+                          if (selectedDate == null) {
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              const SnackBar(content: Text('Please select an expiry date')),
+                            );
+                            setState(() => isSaving = false);
+                            return;
+                          }
+
+                          // Check if selected driver is authorized on another vehicle
+                          final existingVehicles = vehicleProvider.vehicles
+                              .where(
+                                (v) =>
+                                    v.id != vehicle.id &&
+                                    (v.tafweeds?.any((t) => t.driverId == selectedDriverId) ??
+                                        false),
+                              )
+                              .toList();
+
+                          bool confirmSwap = true;
+                          if (existingVehicles.isNotEmpty) {
+                            if (!ctx.mounted) return;
+                            confirmSwap = await showDialog<bool>(
+                                  context: ctx,
+                                  builder: (c) => AlertDialog(
+                                    title: const Text('Driver Already Authorized'),
+                                    content: Text(
+                                      'This driver is currently authorized for '
+                                      '${existingVehicles.first.make} ${existingVehicles.first.model} '
+                                      '(${existingVehicles.first.plateNumber}). '
+                                      'Do you want to swap the driver to this vehicle? '
+                                      'They will be removed from the other vehicle\'s authorization '
+                                      'and that record will be saved to history.',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.pop(c, false),
+                                        child: const Text('Cancel'),
+                                      ),
+                                      ElevatedButton(
+                                        onPressed: () => Navigator.pop(c, true),
+                                        child: const Text('Swap'),
+                                      ),
+                                    ],
+                                  ),
+                                ) ??
+                                false;
+                          }
+
+                          if (!confirmSwap) {
+                            setState(() => isSaving = false);
+                            return;
+                          }
+
+                          // Archive from other vehicles if swap occurred
+                          for (final otherVehicle in existingVehicles) {
+                            final recordToArchive = otherVehicle.tafweeds
+                                ?.where((t) => t.driverId == selectedDriverId)
+                                .firstOrNull;
+
+                            final updatedActiveTafweeds = List<TafweedRecord>.from(
+                              otherVehicle.tafweeds ?? [],
+                            )..removeWhere((t) => t.driverId == selectedDriverId);
+
+                            final updatedHistory = List<TafweedRecord>.from(
+                              otherVehicle.tafweedHistory ?? [],
+                            );
+                            if (recordToArchive != null) {
+                              updatedHistory.add(
+                                recordToArchive.copyWith(expiryDate: DateTime.now()),
                               );
                             }
+
+                            final updatedOtherVehicle = otherVehicle.copyWith(
+                              tafweeds: updatedActiveTafweeds,
+                              tafweedHistory: updatedHistory,
+                            );
+                            await vehicleProvider.updateVehicle(updatedOtherVehicle);
                           }
+
+                          final List<TafweedRecord> currentTafweeds = List.from(vehicle.tafweeds ?? []);
+                          
+                          // Archive old driver's record if it was changed
+                          List<TafweedRecord> updatedHistory = List.from(vehicle.tafweedHistory ?? []);
+                          if (driverId != null && driverId != selectedDriverId) {
+                            final oldIndex = currentTafweeds.indexWhere((t) => t.driverId == driverId);
+                            if (oldIndex != -1) {
+                              final oldRecord = currentTafweeds[oldIndex];
+                              currentTafweeds.removeAt(oldIndex);
+                              updatedHistory.add(oldRecord.copyWith(expiryDate: DateTime.now()));
+                            }
+                          }
+
+                          final targetIndex = currentTafweeds.indexWhere((t) => t.driverId == selectedDriverId);
+                          final attachmentUrl = url(targetIndex != -1 ? currentTafweeds[targetIndex].attachmentUrl : null);
+                          final notificationDays = targetIndex != -1 ? currentTafweeds[targetIndex].notificationDays : null;
+
+                          final newRecord = TafweedRecord(
+                            driverId: selectedDriverId!,
+                            issuedDate: issuedDate ?? DateTime.now(),
+                            expiryDate: selectedDate!,
+                            attachmentUrl: attachmentUrl,
+                            notificationDays: notificationDays,
+                          );
+
+                          if (targetIndex != -1) {
+                            currentTafweeds[targetIndex] = newRecord;
+                          } else {
+                            currentTafweeds.add(newRecord);
+                          }
+
+                          updatedVehicle = vehicle.copyWith(
+                            tafweeds: currentTafweeds,
+                            tafweedHistory: updatedHistory,
+                          );
                           break;
                       }
 
@@ -1260,11 +1552,13 @@ class UpdateDialogHelper {
                           vehicles: vehicleProvider.vehicles,
                           maintenanceTypes: vehicleProvider.maintenanceTypes,
                         );
+                        if (!ctx.mounted) return;
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Updated successfully')));
                       }
                     } catch (e) {
                       setState(() => isSaving = false);
+                      if (!ctx.mounted) return;
                       ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
                     }
                   },
