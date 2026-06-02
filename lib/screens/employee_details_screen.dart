@@ -425,6 +425,20 @@ class EmployeeDetailsScreen extends StatelessWidget {
                           ],
                         ),
                       ),
+                      if (employeeTafweed != null)
+                        IconButton(
+                          icon: Icon(
+                            Icons.delete_outline,
+                            color: Colors.red[400],
+                            size: 24.sp,
+                          ),
+                          tooltip: 'Delete Tafweed',
+                          onPressed: () => _confirmDeleteTafweed(
+                            context,
+                            vehicle,
+                            employeeTafweed,
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -434,6 +448,49 @@ class EmployeeDetailsScreen extends StatelessWidget {
         }),
       ],
     );
+  }
+
+  Future<void> _confirmDeleteTafweed(
+    BuildContext context,
+    VehicleEntity vehicle,
+    TafweedRecord record,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Tafweed'),
+        content: const Text(
+          'Are you sure you want to delete this authorization? This will completely remove it from active and history records.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      try {
+        await context.read<VehicleProvider>().deleteTafweed(vehicle, record);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tafweed deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete Tafweed: $e')),
+          );
+        }
+      }
+    }
   }
 
   Widget _buildContactCard(EmployeeContact contact) {
