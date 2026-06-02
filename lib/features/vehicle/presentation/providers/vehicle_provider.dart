@@ -207,6 +207,30 @@ class VehicleProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> deleteTafweed(VehicleEntity vehicle, TafweedRecord record) async {
+    _setLoading(true);
+    try {
+      final List<TafweedRecord> updatedTafweeds = List.from(vehicle.tafweeds ?? []);
+      updatedTafweeds.remove(record);
+
+      final List<TafweedRecord> updatedHistory = List.from(vehicle.tafweedHistory ?? []);
+      updatedHistory.removeWhere((t) => t.driverId == record.driverId && t.issuedDate == record.issuedDate);
+
+      final updatedVehicle = vehicle.copyWith(
+        tafweeds: updatedTafweeds,
+        tafweedHistory: updatedHistory,
+      );
+
+      await updateVehicleUseCase(updatedVehicle);
+      await fetchAllVehicles();
+    } catch (e) {
+      _errorMessage = 'Failed to delete Tafweed record: $e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
+    }
+  }
+
   Future<String> uploadVehicleImage(XFile image, String vehicleId) async {
     _setLoading(true);
     try {

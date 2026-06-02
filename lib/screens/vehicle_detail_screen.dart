@@ -361,6 +361,13 @@ class VehicleDetailScreen extends StatelessWidget {
                           currentVehicle,
                           tafweed,
                         ),
+                        onDelete: isAdmin
+                            ? () => _confirmDeleteTafweed(
+                                  context,
+                                  currentVehicle,
+                                  tafweed,
+                                )
+                            : null,
                       );
                     }),
                   ],
@@ -920,6 +927,49 @@ class VehicleDetailScreen extends StatelessWidget {
         tafweedHistory: updatedHistory,
       );
       await context.read<VehicleProvider>().updateVehicle(updatedVehicle);
+    }
+  }
+
+  Future<void> _confirmDeleteTafweed(
+    BuildContext context,
+    VehicleEntity vehicle,
+    TafweedRecord record,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Tafweed'),
+        content: const Text(
+          'Are you sure you want to delete this authorization? This will completely remove it from active and history records.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      try {
+        await context.read<VehicleProvider>().deleteTafweed(vehicle, record);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tafweed deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete Tafweed: $e')),
+          );
+        }
+      }
     }
   }
 
