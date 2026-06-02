@@ -361,11 +361,13 @@ class VehicleDetailScreen extends StatelessWidget {
                           currentVehicle,
                           tafweed,
                         ),
-                        onDelete: () => _confirmDeleteTafweed(
-                          context,
-                          currentVehicle,
-                          tafweed,
-                        ),
+                        onDelete: isAdmin
+                            ? () => _confirmDeleteTafweed(
+                                  context,
+                                  currentVehicle,
+                                  tafweed,
+                                )
+                            : null,
                       );
                     }),
                   ],

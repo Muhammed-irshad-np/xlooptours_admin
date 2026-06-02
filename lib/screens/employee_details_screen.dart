@@ -17,6 +17,7 @@ import 'package:provider/provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
 import 'tafweed_history_view_all_screen.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 
 class EmployeeDetailsScreen extends StatelessWidget {
   final EmployeeEntity employee;
@@ -309,6 +310,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
 
   Widget _buildAuthorizedVehiclesCard(BuildContext context) {
     final vehicles = context.watch<VehicleProvider>().vehicles;
+    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
     final authorizedVehicles = vehicles.where((v) {
       if (v.tafweeds == null) return false;
       return v.tafweeds!.any((t) => t.driverId == employee.id);
@@ -425,7 +427,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      if (employeeTafweed != null)
+                      if (employeeTafweed != null && isAdmin)
                         IconButton(
                           icon: Icon(
                             Icons.delete_outline,
