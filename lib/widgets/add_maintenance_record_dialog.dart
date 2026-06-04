@@ -272,9 +272,13 @@ class _AddMaintenanceRecordDialogState
     String typeId,
     MaintenanceRecord record,
   ) {
+    final normId = typeId.toLowerCase().replaceAll(' ', '_');
+    if (normId == 'engine_oil' ||
+        normId == 'engine_oil_&_filter' ||
+        normId.contains('engine_oil')) {
+      return m.copyWith(engineOil: record);
+    }
     switch (typeId) {
-      case 'engine_oil':
-        return m.copyWith(engineOil: record);
       case 'gear_oil':
         return m.copyWith(gearOil: record);
       case 'housing_oil':

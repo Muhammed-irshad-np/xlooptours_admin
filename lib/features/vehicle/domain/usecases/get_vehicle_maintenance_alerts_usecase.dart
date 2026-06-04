@@ -43,10 +43,10 @@ class GetVehicleMaintenanceAlertsUseCase {
       final allHistory = _gatherHistory(vehicle);
       if (allHistory.isEmpty) continue;
 
-      // Group by serviceType name (case-insensitive).
+      // Group by serviceType name (case-insensitive, normalized).
       final Map<String, List<_HistoryEntry>> byType = {};
       for (final entry in allHistory) {
-        final key = entry.serviceType.toLowerCase().trim();
+        final key = _normalizeServiceType(entry.serviceType);
         byType.putIfAbsent(key, () => []).add(entry);
       }
 
@@ -60,7 +60,7 @@ class GetVehicleMaintenanceAlertsUseCase {
 
         if (intervalKm <= 0) continue;
 
-        final key = type.name.toLowerCase().trim();
+        final key = _normalizeServiceType(type.name);
         final entries = byType[key];
         if (entries == null || entries.isEmpty) continue;
 
@@ -86,6 +86,17 @@ class GetVehicleMaintenanceAlertsUseCase {
     }
 
     return alerts;
+  }
+
+  String _normalizeServiceType(String type) {
+    final t = type.toLowerCase().trim();
+    if (t == 'engine oil' ||
+        t == 'engine oil change' ||
+        t == 'oil filter' ||
+        t == 'engine oil & filter') {
+      return 'engine oil & filter';
+    }
+    return t;
   }
 
   /// Gathers all maintenance records from both the flat history list and the

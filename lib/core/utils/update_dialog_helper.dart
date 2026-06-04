@@ -806,6 +806,8 @@ class UpdateDialogHelper {
 
                     switch (category) {
                       case 'Engine Oil':
+                      case 'Engine Oil Change':
+                      case 'Engine Oil & Filter':
                         updatedMaintenance = currentMaintenance.copyWith(
                           engineOil: newRecord,
                         );
