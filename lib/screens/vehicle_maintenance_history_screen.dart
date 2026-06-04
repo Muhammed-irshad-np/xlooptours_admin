@@ -7,6 +7,7 @@ import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_documents
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'package:xloop_invoice/core/widgets/modern_app_bar.dart';
 import 'package:xloop_invoice/screens/document_viewer_screen.dart';
+import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 
 class VehicleMaintenanceHistoryScreen extends StatelessWidget {
   final VehicleEntity vehicle;
@@ -15,6 +16,7 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
     return Consumer<VehicleProvider>(
       builder: (context, vehicleProvider, child) {
         final matches = vehicleProvider.vehicles.where(
@@ -47,7 +49,12 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
                       const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final record = history[index];
-                    return _buildHistoryCard(context, currentVehicle, record);
+                    return _buildHistoryCard(
+                      context,
+                      currentVehicle,
+                      record,
+                      isAdmin: isAdmin,
+                    );
                   },
                 ),
         );
@@ -114,8 +121,9 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
   Widget _buildHistoryCard(
     BuildContext context,
     VehicleEntity currentVehicle,
-    MaintenanceRecord record,
-  ) {
+    MaintenanceRecord record, {
+    required bool isAdmin,
+  }) {
     final dateStr = DateFormat('MMM dd, yyyy').format(record.date);
 
     return Card(
@@ -150,21 +158,23 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        color: Colors.red,
-                        size: 20,
+                    if (isAdmin) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                          size: 20,
+                        ),
+                        onPressed: () => _showDeleteConfirmation(
+                          context,
+                          currentVehicle,
+                          record,
+                        ),
+                        constraints: const BoxConstraints(),
+                        padding: EdgeInsets.zero,
                       ),
-                      onPressed: () => _showDeleteConfirmation(
-                        context,
-                        currentVehicle,
-                        record,
-                      ),
-                      constraints: const BoxConstraints(),
-                      padding: EdgeInsets.zero,
-                    ),
+                    ],
                   ],
                 ),
               ],
