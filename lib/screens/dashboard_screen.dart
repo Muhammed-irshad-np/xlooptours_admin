@@ -1141,6 +1141,9 @@ class _OdometerCardState extends State<_OdometerCard> {
         ? timeago.format(v.lastOdometerUpdateDate!)
         : 'Never';
 
+    final useCase = sl<GetVehiclesNeedingOdometerUpdateUseCase>();
+    final missedCount = useCase.getMissedUpdatesCount(v);
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -1181,15 +1184,58 @@ class _OdometerCardState extends State<_OdometerCard> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${v.make} ${v.model}',
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14.sp,
-                        color: _DT.textPrimary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${v.make} ${v.model}',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14.sp,
+                              color: _DT.textPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (missedCount > 0) ...[
+                          SizedBox(width: 8.w),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 6.w,
+                              vertical: 2.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _DT.dangerBg,
+                              borderRadius: BorderRadius.circular(6.r),
+                              border: Border.all(
+                                color: _DT.dangerBorder,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 10.sp,
+                                  color: _DT.danger,
+                                ),
+                                SizedBox(width: 4.w),
+                                Text(
+                                  v.lastOdometerUpdateDate == null
+                                      ? 'Never Updated'
+                                      : 'Missed: $missedCount ${missedCount == 1 ? "week" : "weeks"}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: _DT.danger,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     SizedBox(height: 3.h),
                     Row(
