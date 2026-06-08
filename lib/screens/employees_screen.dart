@@ -216,17 +216,34 @@ class _EmployeesScreenState extends State<EmployeesScreen>
               ),
             ],
           ),
-          IconButton(
-            icon: const Icon(Icons.track_changes, color: Colors.blue),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const EmployeeExpiryTrackerScreen(),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.h),
+            child: TextButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const EmployeeExpiryTrackerScreen(),
+                  ),
+                );
+              },
+              icon: Icon(Icons.filter_list_alt, size: 16.sp, color: Colors.blue[700]),
+              label: Text(
+                'Expiry Filter',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue[700],
                 ),
-              );
-            },
-            tooltip: 'Document Tracker',
+              ),
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.blue.withOpacity(0.08),
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+              ),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
