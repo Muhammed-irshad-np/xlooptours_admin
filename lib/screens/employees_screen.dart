@@ -12,6 +12,7 @@ import '../widgets/responsive_layout.dart';
 import 'employee_details_screen.dart';
 import 'employee_form_screen.dart';
 import 'employee_master_screen.dart';
+import 'employee_expiry_tracker_screen.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
@@ -214,6 +215,18 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                 },
               ),
             ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.track_changes, color: Colors.blue),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const EmployeeExpiryTrackerScreen(),
+                ),
+              );
+            },
+            tooltip: 'Document Tracker',
           ),
           IconButton(
             icon: const Icon(Icons.add_circle_outline, color: Colors.blue),

@@ -23,6 +23,8 @@ import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.da
 import 'package:xloop_invoice/widgets/responsive_layout.dart';
 import 'package:xloop_invoice/injection_container.dart';
 import 'package:xloop_invoice/core/utils/update_dialog_helper.dart';
+import 'package:xloop_invoice/screens/employee_expiry_tracker_screen.dart';
+import 'package:xloop_invoice/screens/vehicle_expiry_tracker_screen.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 class _DT {
@@ -67,12 +69,14 @@ class _StatData {
   final IconData icon;
   final Color startColor;
   final Color endColor;
+  final VoidCallback? onTap;
   const _StatData({
     required this.label,
     required this.value,
     required this.icon,
     required this.startColor,
     required this.endColor,
+    this.onTap,
   });
 }
 
@@ -351,6 +355,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                 icon: Icons.badge_rounded,
                 startColor: const Color(0xFF3B82F6),
                 endColor: const Color(0xFF1D4ED8),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const EmployeeExpiryTrackerScreen(),
+                    ),
+                  );
+                },
               ),
               _StatData(
                 label: 'Vehicles',
@@ -358,6 +370,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                 icon: Icons.directions_bus_rounded,
                 startColor: const Color(0xFF10B981),
                 endColor: const Color(0xFF059669),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const VehicleExpiryTrackerScreen(),
+                    ),
+                  );
+                },
               ),
               if (isAdmin)
                 _StatData(
@@ -878,78 +898,116 @@ class _StatCard extends StatefulWidget {
 }
 
 class _StatCardState extends State<_StatCard> {
-  bool _hovered = false;
+  bool _badgeHovered = false;
 
   @override
   Widget build(BuildContext context) {
     final d = widget.data;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        transform: _hovered
-            ? (Matrix4.identity()..translate(0.0, -3.0))
-            : Matrix4.identity(),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [d.startColor, d.endColor],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [d.startColor, d.endColor],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20.r),
+        boxShadow: [
+          BoxShadow(
+            color: d.startColor.withOpacity(0.2),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
-          borderRadius: BorderRadius.circular(20.r),
-          boxShadow: [
-            BoxShadow(
-              color: d.startColor.withOpacity(_hovered ? 0.35 : 0.2),
-              blurRadius: _hovered ? 28 : 16,
-              offset: const Offset(0, 8),
+        ],
+      ),
+      padding: EdgeInsets.all(24.w),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(14.w),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(14.r),
+            ),
+            child: Icon(d.icon, color: Colors.white, size: 28.sp),
+          ),
+          SizedBox(width: 20.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  d.label,
+                  style: GoogleFonts.inter(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 6.h),
+                Text(
+                  d.value,
+                  style: GoogleFonts.inter(
+                    fontSize: 32.sp,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                    letterSpacing: -1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (d.onTap != null) ...[
+            SizedBox(width: 12.w),
+            MouseRegion(
+              onEnter: (_) => setState(() => _badgeHovered = true),
+              onExit: (_) => setState(() => _badgeHovered = false),
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: d.onTap,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 14.w,
+                    vertical: 8.h,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(
+                      _badgeHovered ? 0.35 : 0.18,
+                    ),
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(
+                        _badgeHovered ? 0.45 : 0.25,
+                      ),
+                      width: 1.w,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.insights_rounded,
+                        color: Colors.white,
+                        size: 14.sp,
+                      ),
+                      SizedBox(width: 6.w),
+                      Text(
+                        'Track',
+                        style: GoogleFonts.inter(
+                          color: Colors.white,
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
-        ),
-        padding: EdgeInsets.all(24.w),
-        child: Row(
-          children: [
-            Container(
-              padding: EdgeInsets.all(14.w),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(14.r),
-              ),
-              child: Icon(d.icon, color: Colors.white, size: 28.sp),
-            ),
-            SizedBox(width: 20.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    d.label,
-                    style: GoogleFonts.inter(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  SizedBox(height: 6.h),
-                  Text(
-                    d.value,
-                    style: GoogleFonts.inter(
-                      fontSize: 32.sp,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      // tabular-nums equivalent
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                      letterSpacing: -1,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -1208,9 +1266,7 @@ class _OdometerCardState extends State<_OdometerCard> {
                             decoration: BoxDecoration(
                               color: _DT.dangerBg,
                               borderRadius: BorderRadius.circular(6.r),
-                              border: Border.all(
-                                color: _DT.dangerBorder,
-                              ),
+                              border: Border.all(color: _DT.dangerBorder),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,

@@ -30,6 +30,7 @@ class GetVehicleMaintenanceAlertsUseCase {
   List<VehicleMaintenanceAlert> call({
     required List<VehicleEntity> vehicles,
     required List<MaintenanceTypeEntity> maintenanceTypes,
+    bool includeAll = false,
   }) {
     if (maintenanceTypes.isEmpty) return [];
 
@@ -70,7 +71,7 @@ class GetVehicleMaintenanceAlertsUseCase {
 
         final nextDue = lastService.mileage + intervalKm;
 
-        if (currentMileage >= nextDue) {
+        if (includeAll || currentMileage >= nextDue) {
           alerts.add(
             VehicleMaintenanceAlert(
               vehicle: vehicle,

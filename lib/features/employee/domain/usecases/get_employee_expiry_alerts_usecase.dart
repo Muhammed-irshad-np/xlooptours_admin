@@ -6,7 +6,7 @@ class GetEmployeeExpiryAlertsUseCase {
 
   GetEmployeeExpiryAlertsUseCase(this.repository);
 
-  Future<List<EmployeeExpiryAlert>> call() async {
+  Future<List<EmployeeExpiryAlert>> call({bool includeAll = false}) async {
     final employees = await repository.getAllEmployees();
     final settings = await repository.getEmployeeSettings();
     final List<EmployeeExpiryAlert> alerts = [];
@@ -19,7 +19,7 @@ class GetEmployeeExpiryAlertsUseCase {
       if (employee.iqama != null) {
         final days = employee.iqama!.expiryDate.difference(now).inDays;
         final alertDays = settings.iqamaAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -36,7 +36,7 @@ class GetEmployeeExpiryAlertsUseCase {
       if (employee.drivingLicense != null) {
         final days = employee.drivingLicense!.expiryDate.difference(now).inDays;
         final alertDays = settings.drivingLicenseAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -53,7 +53,7 @@ class GetEmployeeExpiryAlertsUseCase {
       if (employee.passport != null) {
         final days = employee.passport!.expiryDate.difference(now).inDays;
         final alertDays = settings.passportAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -70,7 +70,7 @@ class GetEmployeeExpiryAlertsUseCase {
       if (employee.saudiVisa != null) {
         final days = employee.saudiVisa!.expiryDate.difference(now).inDays;
         final alertDays = settings.saudiVisaAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -87,7 +87,7 @@ class GetEmployeeExpiryAlertsUseCase {
       if (employee.bahrainResidence != null) {
         final days = employee.bahrainResidence!.expiryDate.difference(now).inDays;
         final alertDays = settings.bahrainResidenceAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -104,7 +104,7 @@ class GetEmployeeExpiryAlertsUseCase {
       if (employee.bahrainVisa != null) {
         final days = employee.bahrainVisa!.expiryDate.difference(now).inDays;
         final alertDays = settings.bahrainVisaAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -121,7 +121,7 @@ class GetEmployeeExpiryAlertsUseCase {
       if (employee.dubaiVisa != null) {
         final days = employee.dubaiVisa!.expiryDate.difference(now).inDays;
         final alertDays = settings.dubaiVisaAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -138,7 +138,7 @@ class GetEmployeeExpiryAlertsUseCase {
       if (employee.qatarVisa != null) {
         final days = employee.qatarVisa!.expiryDate.difference(now).inDays;
         final alertDays = settings.qatarVisaAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -155,7 +155,7 @@ class GetEmployeeExpiryAlertsUseCase {
       if (employee.healthInsurance != null) {
         final days = employee.healthInsurance!.expiryDate.difference(now).inDays;
         final alertDays = settings.healthInsuranceAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -172,7 +172,7 @@ class GetEmployeeExpiryAlertsUseCase {
       if (employee.authorization != null) {
         final days = employee.authorization!.expiryDate.difference(now).inDays;
         final alertDays = settings.tafweedAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             EmployeeExpiryAlert(
               employeeId: employee.id,
@@ -190,7 +190,7 @@ class GetEmployeeExpiryAlertsUseCase {
         if (contact.rechargeExpiryDate != null) {
           final days = contact.rechargeExpiryDate!.difference(now).inDays;
           final alertDays = settings.phoneRechargeAlertDays;
-          if (days <= alertDays) {
+          if (includeAll || days <= alertDays) {
             // Tag alert to the current holder if SIM is swapped
             final holderId = contact.currentHolderId ?? employee.id;
             final holderName = contact.currentHolderName ?? employee.fullName;

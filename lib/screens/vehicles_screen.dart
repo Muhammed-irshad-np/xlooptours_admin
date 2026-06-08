@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:xloop_invoice/screens/vehicle_master_screen.dart'; // Added
 import 'package:xloop_invoice/screens/vehicle_detail_screen.dart';
+import 'package:xloop_invoice/screens/vehicle_expiry_tracker_screen.dart';
 import 'package:provider/provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../widgets/add_maintenance_record_dialog.dart';
@@ -147,6 +148,18 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                   ),
                 ),
               ],
+            ),
+            IconButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const VehicleExpiryTrackerScreen(),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.track_changes, color: Colors.blue),
+              tooltip: 'Document Tracker',
             ),
             IconButton(
               onPressed: () => _navigateToAddEdit(),
