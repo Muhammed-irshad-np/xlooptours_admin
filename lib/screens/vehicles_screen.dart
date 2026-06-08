@@ -149,7 +149,9 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                 ),
               ],
             ),
-            IconButton(
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.h),
+            child: TextButton.icon(
               onPressed: () {
                 Navigator.push(
                   context,
@@ -158,9 +160,24 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                   ),
                 );
               },
-              icon: const Icon(Icons.track_changes, color: Colors.blue),
-              tooltip: 'Document Tracker',
+              icon: Icon(Icons.filter_list_alt, size: 16.sp, color: Colors.blue[700]),
+              label: Text(
+                'Expiry Filter',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue[700],
+                ),
+              ),
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.blue.withOpacity(0.08),
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+              ),
             ),
+          ),
             IconButton(
               onPressed: () => _navigateToAddEdit(),
               icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
