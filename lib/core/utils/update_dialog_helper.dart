@@ -16,6 +16,7 @@ import '../../features/employee/domain/entities/employee_entity.dart';
 import '../../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../../features/xloop_vault/presentation/providers/vault_provider.dart';
 import '../../features/xloop_vault/domain/entities/vault_data.dart';
+import '../utils/activity_logger.dart';
 
 class UpdateDialogHelper {
   static void showUpdateDialog(
@@ -633,6 +634,13 @@ class UpdateDialogHelper {
                                     vehicleProvider.maintenanceTypes,
                               );
 
+                              await ActivityLogger.log(
+                                ctx,
+                                title: 'Employee Document Updated',
+                                message: '${employee.fullName}\'s $documentType has been updated.',
+                                relatedId: employee.id,
+                              );
+
                               navigator.pop();
                               messenger.showSnackBar(
                                 const SnackBar(
@@ -912,6 +920,13 @@ class UpdateDialogHelper {
                     await vehicleProvider.updateVehicle(updatedVehicle);
 
                     if (context.mounted) {
+                      await ActivityLogger.log(
+                        context,
+                        title: 'Maintenance Updated',
+                        message: 'Maintenance record for $category updated on vehicle ${vehicle.plateNumber}.',
+                        relatedId: vehicle.id,
+                      );
+                      
                       final notificationProvider = context
                           .read<NotificationProvider>();
                       final messenger = ScaffoldMessenger.of(context);
@@ -1045,6 +1060,13 @@ class UpdateDialogHelper {
                       await vaultProvider.updateVaultData(updatedData);
 
                       if (ctx.mounted) {
+                        await ActivityLogger.log(
+                          ctx,
+                          title: 'Company Document Updated',
+                          message: '$documentType expiry details have been updated.',
+                          relatedId: 'vault',
+                        );
+                        
                         final notifProvider = ctx.read<NotificationProvider>();
                         final vehicleProvider = ctx.read<VehicleProvider>();
                         await notifProvider.markAsRead(notification.id);
@@ -1272,6 +1294,12 @@ class UpdateDialogHelper {
                                       }
 
                                       if (ctx.mounted) {
+                                        await ActivityLogger.log(
+                                          ctx,
+                                          title: 'Authorization Cancelled',
+                                          message: 'Tafweed authorization for vehicle ${vehicle.plateNumber} has been cancelled.',
+                                          relatedId: vehicle.id,
+                                        );
                                         final notifProvider = ctx.read<NotificationProvider>();
                                         await notifProvider.markAsRead(notification.id);
                                         await notifProvider.refreshAlerts(
@@ -1548,6 +1576,12 @@ class UpdateDialogHelper {
                       await vehicleProvider.updateVehicle(updatedVehicle);
 
                       if (ctx.mounted) {
+                        await ActivityLogger.log(
+                          ctx,
+                          title: 'Vehicle Document Updated',
+                          message: '$documentType details updated for vehicle ${vehicle.plateNumber}.',
+                          relatedId: vehicle.id,
+                        );
                         final notifProvider = ctx.read<NotificationProvider>();
                         await notifProvider.markAsRead(notification.id);
                         await notifProvider.refreshAlerts(

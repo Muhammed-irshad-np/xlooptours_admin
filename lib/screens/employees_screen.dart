@@ -16,6 +16,7 @@ import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../core/widgets/action_items_dialog.dart';
+import '../core/utils/activity_logger.dart';
 
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({super.key});
@@ -173,6 +174,14 @@ class _EmployeesScreenState extends State<EmployeesScreen>
 
     if (confirmed == true && mounted) {
       await context.read<EmployeeProvider>().deleteEmployee(employee.id);
+      if (mounted) {
+        await ActivityLogger.log(
+          context,
+          title: 'Employee Deleted',
+          message: 'Employee ${employee.fullName} has been deleted.',
+          relatedId: employee.id,
+        );
+      }
       _loadEmployees();
     }
   }
@@ -181,6 +190,14 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     final updatedEmployee = employee.copyWith(isActive: isActive);
     if (mounted) {
       await context.read<EmployeeProvider>().updateEmployee(updatedEmployee);
+      if (mounted) {
+        await ActivityLogger.log(
+          context,
+          title: 'Employee Status Updated',
+          message: 'Employee ${employee.fullName} is now ${isActive ? 'ACTIVE' : 'INACTIVE'}.',
+          relatedId: employee.id,
+        );
+      }
       _loadEmployees();
     }
   }

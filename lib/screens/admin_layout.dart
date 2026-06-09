@@ -59,9 +59,9 @@ class _AdminLayoutState extends State<AdminLayout> {
       activeIcon: Icons.add_location_alt_rounded,
     ),
     _NavItem(
-      label: 'Activity',
-      icon: Icons.notifications_outlined,
-      activeIcon: Icons.notifications_rounded,
+      label: 'Activity Logs',
+      icon: Icons.history_outlined,
+      activeIcon: Icons.history_rounded,
       hasBadge: true,
     ),
     _NavItem(

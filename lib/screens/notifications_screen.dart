@@ -16,7 +16,7 @@ class NotificationsScreen extends StatelessWidget {
       backgroundColor: Colors.grey[50], // Light background
       appBar: AppBar(
         title: Text(
-          'Activity & Notifications',
+          'Activity Logs',
           style: GoogleFonts.inter(
             fontWeight: FontWeight.bold,
             fontSize: 24.sp,
@@ -75,7 +75,7 @@ class NotificationsScreen extends StatelessWidget {
                   ),
                   SizedBox(height: 16.h),
                   Text(
-                    'No notifications yet',
+                    'No activity logs yet',
                     style: GoogleFonts.inter(
                       color: Colors.grey,
                       fontSize: 16.sp,
@@ -117,11 +117,16 @@ class NotificationsScreen extends StatelessWidget {
         icon = Icons.receipt;
         color = Colors.blue;
         break;
+      case NotificationType.activity:
+        icon = Icons.bolt;
+        color = Colors.indigo;
+        break;
       case NotificationType.expiry:
         icon = Icons.warning_amber_rounded;
         color = Colors.red;
         break;
       case NotificationType.system:
+      default:
         icon = Icons.info;
         color = Colors.orange;
         break;
@@ -140,14 +145,38 @@ class NotificationsScreen extends StatelessWidget {
           backgroundColor: color.withOpacity(0.1),
           child: Icon(icon, color: color),
         ),
-        title: Text(
-          notification.title,
-          style: GoogleFonts.inter(
-            fontWeight: notification.isRead
-                ? FontWeight.normal
-                : FontWeight.bold,
-            fontSize: 16.sp,
-          ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                notification.title,
+                style: GoogleFonts.inter(
+                  fontWeight: notification.isRead
+                      ? FontWeight.normal
+                      : FontWeight.bold,
+                  fontSize: 16.sp,
+                ),
+              ),
+            ),
+            if (notification.userName != null) ...[
+              SizedBox(width: 8.w),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(6.r),
+                ),
+                child: Text(
+                  notification.userName!,
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[800],
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -173,19 +202,6 @@ class NotificationsScreen extends StatelessWidget {
         trailing: Wrap(
           spacing: 8,
           children: [
-            if (notification.type == NotificationType.expiry)
-              ElevatedButton(
-                onPressed: () =>
-                    UpdateDialogHelper.showUpdateDialog(context, notification),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: color,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                ),
-                child: const Text('Update'),
-              ),
             if (!notification.isRead)
               IconButton(
                 icon: const Icon(Icons.mark_email_read, color: Colors.blue),

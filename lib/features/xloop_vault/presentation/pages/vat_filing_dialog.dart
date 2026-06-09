@@ -8,6 +8,7 @@ import '../../domain/entities/vault_data.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/utils/activity_logger.dart';
 
 class VatFilingDialog extends StatefulWidget {
   final VatFiling? filing;
@@ -162,6 +163,12 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
     if (mounted) {
       setState(() => _isSaving = false);
       if (success) {
+        await ActivityLogger.log(
+          context,
+          title: widget.filing == null ? 'VAT Filing Added' : 'VAT Filing Updated',
+          message: 'VAT filing for bill ${_billNumberController.text.trim()} has been ${widget.filing == null ? 'added' : 'updated'}.',
+          relatedId: 'vault',
+        );
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('VAT filing saved successfully')),

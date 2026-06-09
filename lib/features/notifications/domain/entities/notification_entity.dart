@@ -1,6 +1,6 @@
 import 'package:equatable/equatable.dart';
 
-enum NotificationType { registration, invoice, system, expiry }
+enum NotificationType { registration, invoice, system, expiry, activity }
 
 class NotificationEntity extends Equatable {
   final String id;
@@ -10,6 +10,7 @@ class NotificationEntity extends Equatable {
   final bool isRead;
   final NotificationType type;
   final String? relatedId;
+  final String? userName;
 
   const NotificationEntity({
     required this.id,
@@ -19,6 +20,7 @@ class NotificationEntity extends Equatable {
     this.isRead = false,
     this.type = NotificationType.system,
     this.relatedId,
+    this.userName,
   });
 
   @override
@@ -30,6 +32,7 @@ class NotificationEntity extends Equatable {
     isRead,
     type,
     relatedId,
+    userName,
   ];
 
   NotificationEntity copyWith({
@@ -40,6 +43,7 @@ class NotificationEntity extends Equatable {
     bool? isRead,
     NotificationType? type,
     String? relatedId,
+    String? userName,
   }) {
     return NotificationEntity(
       id: id ?? this.id,
@@ -49,6 +53,7 @@ class NotificationEntity extends Equatable {
       isRead: isRead ?? this.isRead,
       type: type ?? this.type,
       relatedId: relatedId ?? this.relatedId,
+      userName: userName ?? this.userName,
     );
   }
 }

@@ -14,6 +14,7 @@ import '../features/notifications/presentation/providers/notification_provider.d
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
 import '../core/widgets/action_items_dialog.dart';
+import '../core/utils/activity_logger.dart';
 
 class VehiclesScreen extends StatefulWidget {
   const VehiclesScreen({super.key});
@@ -105,7 +106,20 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     );
 
     if (confirmed == true && mounted) {
-      await context.read<VehicleProvider>().deleteVehicle(id);
+      // Find the vehicle to get its details for the log
+      final vehicleProvider = context.read<VehicleProvider>();
+      final vehicle = vehicleProvider.vehicles.firstWhere((v) => v.id == id);
+      
+      await vehicleProvider.deleteVehicle(id);
+      
+      if (mounted) {
+        await ActivityLogger.log(
+          context,
+          title: 'Vehicle Deleted',
+          message: 'Vehicle ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}) has been deleted.',
+          relatedId: id,
+        );
+      }
       _loadData();
     }
   }

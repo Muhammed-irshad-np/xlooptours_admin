@@ -11,6 +11,7 @@ import '../features/customer/presentation/providers/customer_provider.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../widgets/responsive_layout.dart';
+import '../core/utils/activity_logger.dart';
 
 class CustomerListScreen extends StatefulWidget {
   final Function(CustomerEntity)? onCustomerSelected;
@@ -58,19 +59,12 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     );
 
     if (confirmed == true) {
-      // Create Notification for Deletion
-      final notification = NotificationEntity(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        title: 'Customer Deleted',
-        message: 'Customer ${customer.name} has been deleted.',
-        timestamp: DateTime.now(),
-        type: NotificationType.system,
-        relatedId: customer.id,
-      );
-
       if (context.mounted) {
-        await context.read<NotificationProvider>().insertNotification(
-          notification,
+        await ActivityLogger.log(
+          context,
+          title: 'Customer Deleted',
+          message: 'Customer ${customer.name} has been deleted.',
+          relatedId: customer.id,
         );
 
         try {
@@ -114,6 +108,14 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     try {
       if (context.mounted) {
         await context.read<CustomerProvider>().updateCustomer(updatedCustomer);
+        if (context.mounted) {
+          await ActivityLogger.log(
+            context,
+            title: 'Customer Status Updated',
+            message: 'Customer ${customer.name} is now ${isActive ? 'ACTIVE' : 'INACTIVE'}.',
+            relatedId: customer.id,
+          );
+        }
       }
     } catch (e) {
       if (context.mounted) {
