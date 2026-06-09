@@ -42,6 +42,8 @@ class _VehicleExpiryTrackerScreenState
   List<dynamic> _filteredAlerts = [];
   String _selectedType = 'All';
   final List<String> _types = ['All', 'Maintenance'];
+  String _selectedSubMaintenanceType = 'All Maintenance';
+  final List<String> _subMaintenanceTypes = ['All Maintenance'];
 
   @override
   void initState() {
@@ -74,6 +76,14 @@ class _VehicleExpiryTrackerScreenState
       _types.clear();
       _types.addAll(types);
 
+      // Extract unique maintenance types
+      final Set<String> maintCategories = {'All Maintenance'};
+      for (var alert in _allMaintenanceAlerts) {
+        maintCategories.add(alert.category);
+      }
+      _subMaintenanceTypes.clear();
+      _subMaintenanceTypes.addAll(maintCategories);
+
       _filterAlerts();
     } catch (e) {
       debugPrint('Error loading vehicle alerts: $e');
@@ -89,7 +99,13 @@ class _VehicleExpiryTrackerScreenState
       _filteredAlerts.addAll(_allAlerts);
       _filteredAlerts.addAll(_allMaintenanceAlerts);
     } else if (_selectedType == 'Maintenance') {
-      _filteredAlerts.addAll(_allMaintenanceAlerts);
+      if (_selectedSubMaintenanceType == 'All Maintenance') {
+        _filteredAlerts.addAll(_allMaintenanceAlerts);
+      } else {
+        _filteredAlerts.addAll(
+          _allMaintenanceAlerts.where((a) => a.category == _selectedSubMaintenanceType),
+        );
+      }
     } else {
       _filteredAlerts.addAll(
         _allAlerts.where((a) => a.documentType == _selectedType),
@@ -227,6 +243,7 @@ class _VehicleExpiryTrackerScreenState
                       if (selected) {
                         setState(() {
                           _selectedType = type;
+                          _selectedSubMaintenanceType = 'All Maintenance';
                           _filterAlerts();
                         });
                       }
@@ -250,6 +267,96 @@ class _VehicleExpiryTrackerScreenState
               }).toList(),
             ),
           ),
+          if (_selectedType == 'Maintenance' && _subMaintenanceTypes.length > 1) ...[
+            SizedBox(height: 16.h),
+            const Divider(height: 1),
+            SizedBox(height: 12.h),
+            Text(
+              'Maintenance Type Filter',
+              style: GoogleFonts.inter(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w600,
+                color: _DT.textPrimary,
+              ),
+            ),
+            SizedBox(height: 10.h),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: _subMaintenanceTypes.map((subType) {
+                  final isSelected = _selectedSubMaintenanceType == subType;
+                  int count = 0;
+                  if (subType == 'All Maintenance') {
+                    count = _allMaintenanceAlerts.length;
+                  } else {
+                    count = _allMaintenanceAlerts
+                        .where((a) => a.category == subType)
+                        .length;
+                  }
+
+                  return Padding(
+                    padding: EdgeInsets.only(right: 8.w),
+                    child: ChoiceChip(
+                      label: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(subType),
+                          if (count > 0) ...[
+                            SizedBox(width: 6.w),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 6.w,
+                                vertical: 2.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Colors.white.withOpacity(0.2)
+                                    : _DT.brand.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12.r),
+                              ),
+                              child: Text(
+                                count.toString(),
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.sp,
+                                  fontWeight: FontWeight.bold,
+                                  color: isSelected ? Colors.white : _DT.brand,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      selected: isSelected,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _selectedSubMaintenanceType = subType;
+                            _filterAlerts();
+                          });
+                        }
+                      },
+                      backgroundColor: Colors.white,
+                      selectedColor: _DT.brand,
+                      labelStyle: GoogleFonts.inter(
+                        color: isSelected ? Colors.white : _DT.textSecondary,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                        fontSize: 12.sp,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20.r),
+                        side: BorderSide(
+                          color: isSelected ? _DT.brand : _DT.border,
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
         ],
       ),
     );
