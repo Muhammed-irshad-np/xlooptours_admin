@@ -19,6 +19,9 @@ import 'features/invoice/presentation/providers/invoice_provider.dart';
 import 'features/analytics/presentation/providers/analytics_provider.dart';
 import 'features/xloop_vault/presentation/providers/vault_provider.dart';
 import 'features/feedback/presentation/providers/feedback_provider.dart';
+import 'features/driver_evaluation/presentation/providers/admin_evaluation_provider.dart';
+import 'features/driver_evaluation/presentation/providers/driver_form_provider.dart';
+import 'features/driver_evaluation/presentation/pages/driver_web_form_screen.dart';
 
 import 'screens/invoice_form_screen.dart';
 import 'screens/pdf_preview_screen.dart';
@@ -136,17 +139,18 @@ class _MyAppState extends State<MyApp> {
       redirect: (context, state) {
         final authProvider = di.sl<AuthProvider>();
         final isLoggedIn = authProvider.user != null;
-        final isLoggingIn = state.uri.path == '/login';
-        final isRegistering = state.uri.path == '/register';
-        final isFeedback = state.uri.path == '/feedback';
+        final isLoggingIn =
+            state.uri.path == '/login' || state.uri.path == '/login/';
+        final isRegistering = state.uri.path.startsWith('/register');
+        final isFeedback = state.uri.path.startsWith('/feedback');
+        final isEvaluate = state.uri.path.startsWith('/evaluate');
         final isRoot = state.uri.path == '/';
 
-        // Allow public access to registration and feedback
-        // Maintenance Screen logic:
-        // - In Release Mode: Always show maintenance screen at root '/'
-        // - In Debug/Profile Mode: Bypass maintenance, treat '/' as normal app root (login or home)
+        debugPrint(
+          'GoRouter Redirect: path=${state.uri.path}, isLoggedIn=$isLoggedIn, isEvaluate=$isEvaluate, isRoot=$isRoot',
+        );
 
-        if (isRegistering || isFeedback) {
+        if (isRegistering || isFeedback || isEvaluate) {
           return null;
         }
 
@@ -223,6 +227,13 @@ class _MyAppState extends State<MyApp> {
           },
         ),
         GoRoute(
+          path: '/evaluate',
+          builder: (context, state) {
+            final evaluationId = state.uri.queryParameters['id'] ?? '';
+            return DriverWebFormScreen(evaluationId: evaluationId);
+          },
+        ),
+        GoRoute(
           path: '/companies',
           builder: (context, state) {
             final isSelectionMode =
@@ -285,6 +296,8 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => di.sl<AnalyticsProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<VaultProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<FeedbackProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<AdminEvaluationProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<DriverFormProvider>()),
       ],
       child: ScreenUtilInit(
         designSize: const Size(1440, 900),

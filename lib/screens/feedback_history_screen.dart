@@ -5,6 +5,12 @@ import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:intl/intl.dart';
 
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../features/customer/domain/entities/customer_entity.dart';
+import '../features/customer/presentation/providers/customer_provider.dart';
+import '../features/employee/presentation/providers/employee_provider.dart';
+import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/feedback/domain/entities/feedback_entity.dart';
 import '../features/feedback/presentation/providers/feedback_provider.dart';
 import '../widgets/responsive_layout.dart';
@@ -449,6 +455,13 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen>
     );
   }
 
+  void _showGenerateFeedbackLinkDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => const _GenerateFeedbackLinkDialog(),
+    );
+  }
+
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
       backgroundColor: Colors.white,
@@ -485,6 +498,30 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen>
           ),
         ],
       ),
+      actions: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.w),
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _brand,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              elevation: 0,
+            ),
+            onPressed: _showGenerateFeedbackLinkDialog,
+            icon: Icon(Icons.link, size: 18.sp),
+            label: Text(
+              'Generate Link',
+              style: GoogleFonts.inter(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
       bottom: PreferredSize(
         preferredSize: Size.fromHeight(1.h),
         child: Container(height: 1.h, color: _border),
@@ -1612,6 +1649,686 @@ class _FeedbackTileState extends State<_FeedbackTile> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GenerateFeedbackLinkDialog extends StatefulWidget {
+  const _GenerateFeedbackLinkDialog();
+
+  @override
+  State<_GenerateFeedbackLinkDialog> createState() => _GenerateFeedbackLinkDialogState();
+}
+
+class _GenerateFeedbackLinkDialogState extends State<_GenerateFeedbackLinkDialog> {
+  final TextEditingController _customerSearchController = TextEditingController();
+  final TextEditingController _driverSearchController = TextEditingController();
+  String _customerQuery = '';
+  String _driverQuery = '';
+
+  CustomerEntity? _selectedCustomer;
+  EmployeeEntity? _selectedDriver;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CustomerProvider>().fetchAllCustomers();
+      context.read<EmployeeProvider>().fetchAllEmployees();
+    });
+    _customerSearchController.addListener(() {
+      setState(() {
+        _customerQuery = _customerSearchController.text.trim();
+      });
+    });
+    _driverSearchController.addListener(() {
+      setState(() {
+        _driverQuery = _driverSearchController.text.trim();
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _customerSearchController.dispose();
+    _driverSearchController.dispose();
+    super.dispose();
+  }
+
+  String _generateFeedbackUrl(CustomerEntity customer, EmployeeEntity driver) {
+    final currentUrl = Uri.base.toString();
+    final baseUrl = currentUrl.contains('#')
+        ? currentUrl.substring(0, currentUrl.indexOf('#'))
+        : currentUrl;
+    final finalBaseUrl = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+
+    final uri = Uri.parse(finalBaseUrl);
+    final hostUrl = '${uri.scheme}://${uri.host}${uri.hasPort ? ":${uri.port}" : ""}';
+    final clientNameEncoded = Uri.encodeComponent(customer.name);
+    final companyNameEncoded = customer.companyName != null ? Uri.encodeComponent(customer.companyName!) : '';
+    final driverNameEncoded = Uri.encodeComponent(driver.fullName);
+    return '$hostUrl/feedback?clientName=$clientNameEncoded&companyName=$companyNameEncoded&driverName=$driverNameEncoded';
+  }
+
+  Future<void> _shareToWhatsApp(CustomerEntity customer, EmployeeEntity driver, String url) async {
+    String country = driver.countryCode ?? '';
+    country = country.replaceAll(RegExp(r'[^0-9]'), '');
+    if (country.isEmpty) country = '966'; // Default KSA country code
+    String phone = driver.phoneNumber.replaceAll(RegExp(r'[^0-9]'), '');
+    if (phone.startsWith('0')) {
+      phone = phone.substring(1);
+    }
+    final cleanPhone = '$country$phone';
+
+    final text = 'Hi ${driver.fullName},\n\nPlease ask the customer (${customer.name}) to fill out their feedback using this link:\n\n$url';
+    final whatsappUrl = 'https://wa.me/$cleanPhone?text=${Uri.encodeComponent(text)}';
+    
+    final Uri uri = Uri.parse(whatsappUrl);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      debugPrint('Could not launch WhatsApp link');
+    }
+  }
+
+  Future<void> _shareViaEmail(CustomerEntity customer, EmployeeEntity driver, String url) async {
+    final subject = Uri.encodeComponent('Feedback Link for Customer ${customer.name}');
+    final body = Uri.encodeComponent(
+      'Hi ${driver.fullName},\n\nPlease share this link with the customer (${customer.name}) to collect their feedback:\n\n$url\n\nBest regards,\nAdmin Team',
+    );
+    final emailUrl = 'mailto:${driver.email}?subject=$subject&body=$body';
+    final Uri uri = Uri.parse(emailUrl);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      debugPrint('Could not launch Email link');
+    }
+  }
+
+  Future<void> _copyToClipboard(String url) async {
+    await Clipboard.setData(ClipboardData(text: url));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Feedback link copied to clipboard!'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_selectedCustomer != null && _selectedDriver != null) {
+      return _buildShareDialog(_selectedCustomer!, _selectedDriver!);
+    }
+
+    if (_selectedCustomer != null) {
+      return _buildSelectDriverDialog(_selectedCustomer!);
+    }
+
+    return _buildSelectCustomerDialog();
+  }
+
+  Widget _buildSelectCustomerDialog() {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+      child: Container(
+        width: 500.w,
+        padding: EdgeInsets.all(24.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Generate Feedback Link',
+                  style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'Step 1 of 2: Select a customer to generate a unique feedback link.',
+              style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+            ),
+            Divider(height: 32.h),
+            // Search field
+            TextField(
+              controller: _customerSearchController,
+              decoration: InputDecoration(
+                hintText: 'Search customer by name...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _customerQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _customerSearchController.clear();
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+              ),
+            ),
+            SizedBox(height: 16.h),
+            // Customers List
+            Flexible(
+              child: Consumer<CustomerProvider>(
+                builder: (context, provider, child) {
+                  if (provider.isLoading) {
+                    return Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24.w),
+                        child: const CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  final activeCustomers = provider.customers
+                      .where((c) => c.status == 'ACTIVE')
+                      .toList();
+
+                  final filteredCustomers = activeCustomers.where((c) {
+                    return c.name.toLowerCase().contains(_customerQuery.toLowerCase()) ||
+                        (c.companyName?.toLowerCase().contains(_customerQuery.toLowerCase()) ?? false);
+                  }).toList();
+
+                  if (filteredCustomers.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24.w),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.people_outline, size: 48.sp, color: Colors.grey[400]),
+                            SizedBox(height: 8.h),
+                            Text(
+                              'No active customers found',
+                              style: TextStyle(color: Colors.grey[600], fontSize: 15.sp),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.4,
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: filteredCustomers.length,
+                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final customer = filteredCustomers[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFF4F46E5).withOpacity(0.1),
+                            child: Text(
+                              customer.name.isNotEmpty ? customer.name[0].toUpperCase() : 'C',
+                              style: const TextStyle(
+                                color: Color(0xFF4F46E5),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          title: Text(
+                            customer.name,
+                            style: TextStyle(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF111827),
+                            ),
+                          ),
+                          subtitle: Text(
+                            customer.companyName != null && customer.companyName!.isNotEmpty
+                                ? '${customer.companyName} • ${customer.phone}'
+                                : customer.phone,
+                            style: TextStyle(color: Colors.grey[500], fontSize: 13.sp),
+                          ),
+                          onTap: () {
+                            setState(() {
+                              _selectedCustomer = customer;
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectDriverDialog(CustomerEntity customer) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+      child: Container(
+        width: 500.w,
+        padding: EdgeInsets.all(24.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Select Driver',
+                  style: TextStyle(fontSize: 22.sp, fontWeight: FontWeight.bold),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            SizedBox(height: 8.h),
+            Row(
+              children: [
+                Text(
+                  'Customer: ',
+                  style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  customer.name,
+                  style: TextStyle(fontSize: 14.sp, color: const Color(0xFF4F46E5), fontWeight: FontWeight.w600),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedCustomer = null;
+                    });
+                  },
+                  child: const Text('Change'),
+                ),
+              ],
+            ),
+            Text(
+              'Step 2 of 2: Select a driver to generate the unique feedback link.',
+              style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+            ),
+            Divider(height: 20.h),
+            // Search field
+            TextField(
+              controller: _driverSearchController,
+              decoration: InputDecoration(
+                hintText: 'Search driver by name...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _driverQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () {
+                          _driverSearchController.clear();
+                        },
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+              ),
+            ),
+            SizedBox(height: 16.h),
+            // Drivers List
+            Flexible(
+              child: Consumer<EmployeeProvider>(
+                builder: (context, provider, child) {
+                  if (provider.isLoading) {
+                    return Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24.w),
+                        child: const CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  final allEmployees = provider.employees;
+                  final drivers = allEmployees.where((e) =>
+                      e.isActive &&
+                      (e.position.toLowerCase().contains('driver') ||
+                          e.driverType != null)).toList();
+
+                  final filteredDrivers = drivers.where((driver) {
+                    return driver.fullName.toLowerCase().contains(_driverQuery.toLowerCase());
+                  }).toList();
+
+                  if (filteredDrivers.isEmpty) {
+                    return Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(24.w),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.person_off_outlined, size: 48.sp, color: Colors.grey[400]),
+                            SizedBox(height: 8.h),
+                            Text(
+                              'No drivers found',
+                              style: TextStyle(color: Colors.grey[600], fontSize: 15.sp),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.4,
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: filteredDrivers.length,
+                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      itemBuilder: (context, index) {
+                        final driver = filteredDrivers[index];
+                        return ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFF1C9E73).withOpacity(0.1),
+                            backgroundImage: driver.imageUrl != null && driver.imageUrl!.isNotEmpty
+                                ? NetworkImage(driver.imageUrl!)
+                                : null,
+                            child: driver.imageUrl == null || driver.imageUrl!.isEmpty
+                                ? Text(
+                                    driver.fullName.isNotEmpty ? driver.fullName[0].toUpperCase() : 'D',
+                                    style: const TextStyle(
+                                      color: Color(0xFF1B4E41),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                : null,
+                          ),
+                          title: Text(
+                            driver.fullName,
+                            style: TextStyle(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF111827),
+                            ),
+                          ),
+                          subtitle: Text(
+                            driver.phoneNumber,
+                            style: TextStyle(color: Colors.grey[500], fontSize: 13.sp),
+                          ),
+                          onTap: () {
+                            setState(() {
+                              _selectedDriver = driver;
+                            });
+                          },
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShareDialog(CustomerEntity customer, EmployeeEntity driver) {
+    final feedbackUrl = _generateFeedbackUrl(customer, driver);
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+      child: Container(
+        width: 450.w,
+        padding: EdgeInsets.all(24.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Feedback Link Ready!',
+                  style: TextStyle(
+                    fontSize: 20.sp,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF4F46E5),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            SizedBox(height: 12.h),
+            // Customer and Driver Info
+            Container(
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4F46E5).withOpacity(0.03),
+                borderRadius: BorderRadius.circular(12.r),
+                border: Border.all(color: const Color(0xFF4F46E5).withOpacity(0.1)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.person, color: Color(0xFF4F46E5), size: 18),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          'Customer: ${customer.name}',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF1A1A1A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 16),
+                  Row(
+                    children: [
+                      const Icon(Icons.directions_car, color: Color(0xFF1C9E73), size: 18),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          'Driver: ${driver.fullName}',
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF1A1A1A),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 20.h),
+            // Link container box
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F6F2),
+                borderRadius: BorderRadius.circular(10.r),
+                border: Border.all(color: Colors.grey[200]!),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      feedbackUrl,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey[700],
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  IconButton(
+                    icon: Icon(Icons.copy, color: const Color(0xFF4F46E5), size: 18.sp),
+                    onPressed: () => _copyToClipboard(feedbackUrl),
+                    tooltip: 'Copy Feedback Link',
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 20.h),
+            // Share actions list
+            InkWell(
+              onTap: () => _shareToWhatsApp(customer, driver, feedbackUrl),
+              borderRadius: BorderRadius.circular(12.r),
+              child: Container(
+                padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[200]!),
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8.w),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE8F5E9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.chat_bubble_outline, color: const Color(0xFF25D366), size: 22.w),
+                    ),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: Text(
+                        'Send to Driver via WhatsApp',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, color: Colors.grey[400]),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 10.h),
+            InkWell(
+              onTap: () => _shareViaEmail(customer, driver, feedbackUrl),
+              borderRadius: BorderRadius.circular(12.r),
+              child: Container(
+                padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[200]!),
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8.w),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFEBEE),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.email_outlined, color: Colors.redAccent, size: 22.w),
+                    ),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: Text(
+                        'Share with Driver via Email',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, color: Colors.grey[400]),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 10.h),
+            InkWell(
+              onTap: () => _copyToClipboard(feedbackUrl),
+              borderRadius: BorderRadius.circular(12.r),
+              child: Container(
+                padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey[200]!),
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(8.w),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE3F2FD),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(Icons.link, color: const Color(0xFF4F46E5), size: 22.w),
+                    ),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: Text(
+                        'Copy Link to Clipboard',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    Icon(Icons.chevron_right, color: Colors.grey[400]),
+                  ],
+                ),
+              ),
+            ),
+            SizedBox(height: 24.h),
+            // Dialog Footer navigation
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _selectedDriver = null;
+                    });
+                  },
+                  icon: const Icon(Icons.arrow_back),
+                  label: const Text('Change Driver'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey[700],
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4F46E5),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                  ),
+                  child: const Text('Close'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
