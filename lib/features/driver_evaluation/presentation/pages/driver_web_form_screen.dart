@@ -255,7 +255,15 @@ class _DriverWebFormScreenState extends State<DriverWebFormScreen> {
         const SizedBox(height: 16),
         _buildInfoTile('Driver Name', evaluation.driverName, Icons.person),
         _buildInfoTile('Date of Evaluation', DateFormat('dd MMMM yyyy').format(DateTime.now()), Icons.calendar_today),
-        _buildInfoTile('Vehicle Status', evaluation.vehicleId != null ? 'Assigned' : 'No Vehicle Assigned', Icons.directions_car),
+        _buildInfoTile(
+          'Vehicle info',
+          evaluation.vehicleId != null
+              ? (provider.vehicleInfo != null
+                  ? '${provider.vehicleInfo!['make']} ${provider.vehicleInfo!['model']} (${provider.vehicleInfo!['plateNumber']})'
+                  : 'Loading vehicle details…')
+              : 'No Vehicle Assigned',
+          Icons.directions_car,
+        ),
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(16),
