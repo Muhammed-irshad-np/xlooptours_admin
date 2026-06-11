@@ -12,6 +12,7 @@ import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.dart';
 import 'package:xloop_invoice/core/utils/share_dialog.dart';
 import 'package:xloop_invoice/features/driver_evaluation/domain/entities/evaluation_entity.dart';
+import 'package:xloop_invoice/widgets/searchable_dropdown.dart';
 
 class PendingEvaluationsScreen extends StatefulWidget {
   const PendingEvaluationsScreen({super.key});
@@ -373,18 +374,12 @@ class _PendingEvaluationsScreenState extends State<PendingEvaluationsScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    DropdownButtonFormField<EmployeeEntity>(
-                      decoration: const InputDecoration(
-                        labelText: 'Select Driver',
-                        border: OutlineInputBorder(),
-                      ),
-                      initialValue: selectedEmployee,
-                      items: employees.map((employee) {
-                        return DropdownMenuItem<EmployeeEntity>(
-                          value: employee,
-                          child: Text(employee.fullName),
-                        );
-                      }).toList(),
+                    SearchableDropdown<EmployeeEntity>(
+                      labelText: 'Select Driver',
+                      searchHint: 'Search driver by name…',
+                      items: employees,
+                      value: selectedEmployee,
+                      itemToString: (emp) => emp.fullName,
                       onChanged: (val) {
                         setState(() {
                           selectedEmployee = val;
@@ -392,20 +387,13 @@ class _PendingEvaluationsScreenState extends State<PendingEvaluationsScreen>
                       },
                     ),
                     SizedBox(height: 16.h),
-                    DropdownButtonFormField<VehicleEntity>(
-                      decoration: const InputDecoration(
-                        labelText: 'Select Vehicle (Optional)',
-                        border: OutlineInputBorder(),
-                      ),
-                      initialValue: selectedVehicle,
-                      items: vehicles.map((vehicle) {
-                        return DropdownMenuItem<VehicleEntity>(
-                          value: vehicle,
-                          child: Text(
-                            '${vehicle.make} ${vehicle.model} (${vehicle.plateNumber})',
-                          ),
-                        );
-                      }).toList(),
+                    SearchableDropdown<VehicleEntity>(
+                      labelText: 'Select Vehicle (Optional)',
+                      searchHint: 'Search vehicle make, model, or plate…',
+                      items: vehicles,
+                      value: selectedVehicle,
+                      itemToString: (veh) =>
+                          '${veh.make} ${veh.model} (${veh.plateNumber})',
                       onChanged: (val) {
                         setState(() {
                           selectedVehicle = val;
