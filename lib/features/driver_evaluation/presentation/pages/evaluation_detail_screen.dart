@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:xloop_invoice/features/driver_evaluation/domain/entities/evaluation_entity.dart';
 import 'package:xloop_invoice/features/driver_evaluation/presentation/providers/admin_evaluation_provider.dart';
+import 'package:xloop_invoice/widgets/web_safe_image.dart';
 
 class EvaluationDetailScreen extends StatefulWidget {
   final EvaluationEntity evaluation;
@@ -503,11 +503,11 @@ class _EvaluationDetailScreenState extends State<EvaluationDetailScreen> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              CachedNetworkImage(
+              WebSafeImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
-                placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                errorWidget: (context, url, error) => const Icon(Icons.error),
+                placeholder: const Center(child: CircularProgressIndicator()),
+                errorWidget: const Icon(Icons.error),
               ),
               // Gradient bottom overlay
               Positioned(
@@ -581,11 +581,11 @@ class _EvaluationDetailScreenState extends State<EvaluationDetailScreen> {
               InteractiveViewer(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16.r),
-                  child: CachedNetworkImage(
+                  child: WebSafeImage(
                     imageUrl: url,
                     fit: BoxFit.contain,
-                    placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                    errorWidget: (context, url, error) => const Icon(Icons.error, color: Colors.white),
+                    placeholder: const Center(child: CircularProgressIndicator()),
+                    errorWidget: const Icon(Icons.error, color: Colors.white),
                   ),
                 ),
               ),

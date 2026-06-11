@@ -3,7 +3,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:google_fonts/google_fonts.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xloop_invoice/features/driver_evaluation/presentation/providers/admin_evaluation_provider.dart';
 import 'package:xloop_invoice/features/driver_evaluation/presentation/pages/evaluation_detail_screen.dart';
 import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
@@ -13,6 +12,7 @@ import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.da
 import 'package:xloop_invoice/core/utils/share_dialog.dart';
 import 'package:xloop_invoice/features/driver_evaluation/domain/entities/evaluation_entity.dart';
 import 'package:xloop_invoice/widgets/searchable_dropdown.dart';
+import 'package:xloop_invoice/widgets/web_safe_image.dart';
 
 class PendingEvaluationsScreen extends StatefulWidget {
   const PendingEvaluationsScreen({super.key});
@@ -1381,15 +1381,15 @@ class _EvaluationTileState extends State<_EvaluationTile> {
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
-                                  CachedNetworkImage(
+                                  WebSafeImage(
                                     imageUrl: url,
                                     fit: BoxFit.cover,
-                                    placeholder: (_, __) => const Center(
+                                    placeholder: const Center(
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
                                       ),
                                     ),
-                                    errorWidget: (_, __, ___) =>
+                                    errorWidget:
                                         const Icon(Icons.error, size: 20),
                                   ),
                                   Positioned.fill(
@@ -1537,12 +1537,12 @@ class _EvaluationTileState extends State<_EvaluationTile> {
               InteractiveViewer(
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16.r),
-                  child: CachedNetworkImage(
+                  child: WebSafeImage(
                     imageUrl: url,
                     fit: BoxFit.contain,
-                    placeholder: (_, __) =>
+                    placeholder:
                         const Center(child: CircularProgressIndicator()),
-                    errorWidget: (_, __, ___) =>
+                    errorWidget:
                         const Icon(Icons.error, color: Colors.white),
                   ),
                 ),
