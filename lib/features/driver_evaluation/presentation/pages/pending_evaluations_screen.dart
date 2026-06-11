@@ -25,11 +25,14 @@ class PendingEvaluationsScreen extends StatefulWidget {
 class _PendingEvaluationsScreenState extends State<PendingEvaluationsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TextEditingController _leaderboardSearchController =
+      TextEditingController();
+  String _leaderboardQuery = '';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AdminEvaluationProvider>().loadPendingEvaluations();
       context.read<EmployeeProvider>().fetchAllEmployees();
@@ -40,6 +43,7 @@ class _PendingEvaluationsScreenState extends State<PendingEvaluationsScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _leaderboardSearchController.dispose();
     super.dispose();
   }
 
@@ -137,6 +141,7 @@ class _PendingEvaluationsScreenState extends State<PendingEvaluationsScreen>
                           tabs: const [
                             Tab(text: 'Pending'),
                             Tab(text: 'Evaluated'),
+                            Tab(text: 'Leaderboard'),
                           ],
                         ),
                       ),
@@ -155,6 +160,10 @@ class _PendingEvaluationsScreenState extends State<PendingEvaluationsScreen>
                               employeeProvider.employees,
                               vehicleProvider.vehicles,
                               isPendingTab: false,
+                            ),
+                            _buildLeaderboardTab(
+                              adminProvider.evaluatedEvaluations,
+                              employeeProvider.employees,
                             ),
                           ],
                         ),
@@ -266,6 +275,520 @@ class _PendingEvaluationsScreenState extends State<PendingEvaluationsScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildLeaderboardTab(
+    List<EvaluationEntity> evaluatedEvaluations,
+    List<EmployeeEntity> employees,
+  ) {
+    // Group evaluations by driverId
+    final Map<String, List<EvaluationEntity>> grouped = {};
+    for (var e in evaluatedEvaluations) {
+      if (e.scores != null) {
+        grouped.putIfAbsent(e.driverId, () => []).add(e);
+      }
+    }
+
+    final entries = <_DriverLeaderboardEntry>[];
+    grouped.forEach((driverId, evals) {
+      double totalScore = 0.0;
+      int passCount = 0;
+      for (var eval in evals) {
+        final app = eval.scores!['appearance'] as int? ?? 0;
+        final veh = eval.scores!['vehicle'] as int? ?? 0;
+        totalScore += (app + veh) / 2.0;
+        if (eval.scores!['passed'] as bool? ?? true) {
+          passCount++;
+        }
+      }
+      final avg = evals.isNotEmpty ? totalScore / evals.length : 0.0;
+      final passRate = evals.isNotEmpty ? passCount / evals.length : 0.0;
+      final driverName = evals.first.driverName;
+      final empIdx = employees.indexWhere((e) => e.id == driverId);
+      final emp = empIdx != -1 ? employees[empIdx] : null;
+
+      entries.add(
+        _DriverLeaderboardEntry(
+          driverId: driverId,
+          driverName: driverName,
+          averageScore: avg,
+          completedCount: evals.length,
+          passRate: passRate,
+          employee: emp,
+        ),
+      );
+    });
+
+    // Sort entries by averageScore desc, then completedCount desc
+    entries.sort((a, b) {
+      int cmp = b.averageScore.compareTo(a.averageScore);
+      if (cmp != 0) return cmp;
+      return b.completedCount.compareTo(a.completedCount);
+    });
+
+    // Filter based on search query
+    final filteredEntries = entries.where((entry) {
+      return entry.driverName.toLowerCase().contains(_leaderboardQuery);
+    }).toList();
+
+    if (entries.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.emoji_events_outlined,
+              size: 64.r,
+              color: const Color(0xFF94A3B8),
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              'Leaderboard is empty',
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF64748B),
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'Rankings will appear once drivers are evaluated.',
+              style: TextStyle(fontSize: 14.sp, color: const Color(0xFF94A3B8)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final top3 = filteredEntries.take(3).toList();
+    final others = filteredEntries.skip(3).toList();
+
+    return ListView(
+      padding: EdgeInsets.all(24.r),
+      children: [
+        // Search Field
+        TextField(
+          controller: _leaderboardSearchController,
+          onChanged: (val) {
+            setState(() {
+              _leaderboardQuery = val.trim().toLowerCase();
+            });
+          },
+          style: GoogleFonts.inter(
+            fontSize: 14.sp,
+            color: const Color(0xFF0F172A),
+          ),
+          decoration: InputDecoration(
+            hintText: 'Search driver on leaderboard…',
+            hintStyle: GoogleFonts.inter(
+              fontSize: 14.sp,
+              color: const Color(0xFF94A3B8),
+            ),
+            prefixIcon: Icon(
+              Icons.search,
+              size: 20.sp,
+              color: const Color(0xFF64748B),
+            ),
+            suffixIcon: _leaderboardQuery.isNotEmpty
+                ? IconButton(
+                    icon: Icon(
+                      Icons.clear,
+                      size: 18.sp,
+                      color: const Color(0xFF64748B),
+                    ),
+                    onPressed: () {
+                      _leaderboardSearchController.clear();
+                      setState(() {
+                        _leaderboardQuery = '';
+                      });
+                    },
+                  )
+                : null,
+            fillColor: Colors.white,
+            filled: true,
+            contentPadding: EdgeInsets.symmetric(
+              vertical: 12.h,
+              horizontal: 16.w,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.r),
+              borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.r),
+              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12.r),
+              borderSide: const BorderSide(
+                color: Color(0xFF13B1F2),
+                width: 1.5,
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: 24.h),
+
+        // Podium (only show if search query is empty)
+        if (top3.isNotEmpty && _leaderboardQuery.isEmpty) ...[
+          _buildPodium(top3),
+          SizedBox(height: 32.h),
+        ],
+
+        if (filteredEntries.isEmpty)
+          Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 40.h),
+              child: Text(
+                'No drivers match your search',
+                style: TextStyle(
+                  fontSize: 14.sp,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+            ),
+          ),
+
+        // Ranked List
+        if (others.isNotEmpty ||
+            (filteredEntries.isNotEmpty && _leaderboardQuery.isNotEmpty)) ...[
+          Text(
+            _leaderboardQuery.isNotEmpty ? 'SEARCH RESULTS' : 'OTHER RANKINGS',
+            style: GoogleFonts.inter(
+              fontSize: 11.sp,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.0,
+              color: const Color(0xFF64748B),
+            ),
+          ),
+          SizedBox(height: 12.h),
+          ...List.generate(
+            _leaderboardQuery.isNotEmpty
+                ? filteredEntries.length
+                : others.length,
+            (index) {
+              final entry = _leaderboardQuery.isNotEmpty
+                  ? filteredEntries[index]
+                  : others[index];
+              final rank = _leaderboardQuery.isNotEmpty
+                  ? entries.indexOf(entry) + 1
+                  : index + 4;
+              return _buildLeaderboardTile(entry, rank);
+            },
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPodium(List<_DriverLeaderboardEntry> top3) {
+    final hasSecond = top3.length > 1;
+    final hasThird = top3.length > 2;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        if (hasSecond) ...[
+          Expanded(child: _buildPodiumCard(top3[1], 2)),
+          SizedBox(width: 16.w),
+        ],
+        Expanded(child: _buildPodiumCard(top3[0], 1)),
+        if (hasThird) ...[
+          SizedBox(width: 16.w),
+          Expanded(child: _buildPodiumCard(top3[2], 3)),
+        ] else if (!hasSecond) ...[
+          const Spacer(),
+          const Spacer(),
+        ] else ...[
+          const Spacer(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPodiumCard(_DriverLeaderboardEntry entry, int rank) {
+    Color medalColor;
+    Color bgHighlight;
+    Color borderColor;
+    IconData icon;
+    double height;
+    double crownSize;
+
+    if (rank == 1) {
+      medalColor = const Color(0xFFD97706);
+      bgHighlight = const Color(0xFFFFFBEB);
+      borderColor = const Color(0xFFFBBF24);
+      icon = Icons.emoji_events;
+      height = 230.h;
+      crownSize = 32.sp;
+    } else if (rank == 2) {
+      medalColor = const Color(0xFF475569);
+      bgHighlight = const Color(0xFFF8FAFC);
+      borderColor = const Color(0xFFCBD5E1);
+      icon = Icons.emoji_events;
+      height = 195.h;
+      crownSize = 26.sp;
+    } else {
+      medalColor = const Color(0xFF9A3412);
+      bgHighlight = const Color(0xFFFFF7ED);
+      borderColor = const Color(0xFFFDBA74);
+      icon = Icons.emoji_events;
+      height = 180.h;
+      crownSize = 24.sp;
+    }
+
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: borderColor, width: rank == 1 ? 2.w : 1.w),
+        boxShadow: [
+          BoxShadow(
+            color: medalColor.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          Positioned(
+            top: rank == 1 ? -10.h : -5.h,
+            child: Icon(icon, color: borderColor, size: crownSize * 1.5),
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 16.h),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                CircleAvatar(
+                  radius: rank == 1 ? 26.r : 20.r,
+                  backgroundColor: bgHighlight,
+                  child: Text(
+                    entry.driverName.isNotEmpty
+                        ? entry.driverName[0].toUpperCase()
+                        : '?',
+                    style: TextStyle(
+                      color: medalColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: rank == 1 ? 18.sp : 14.sp,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 8.h),
+                Text(
+                  entry.driverName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: rank == 1 ? 14.sp : 12.sp,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                SizedBox(height: 4.h),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.star_rounded,
+                      color: const Color(0xFFFBBF24),
+                      size: 16.sp,
+                    ),
+                    SizedBox(width: 4.w),
+                    Text(
+                      entry.averageScore.toStringAsFixed(1),
+                      style: GoogleFonts.inter(
+                        fontSize: rank == 1 ? 15.sp : 13.sp,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 6.h),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(100.r),
+                  ),
+                  child: Text(
+                    '${entry.completedCount} evals',
+                    style: TextStyle(
+                      fontSize: 10.sp,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            top: 12.h,
+            left: 12.w,
+            child: Container(
+              padding: EdgeInsets.all(6.r),
+              decoration: BoxDecoration(
+                color: borderColor,
+                shape: BoxShape.circle,
+              ),
+              child: Text(
+                '#$rank',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 10.sp,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLeaderboardTile(_DriverLeaderboardEntry entry, int rank) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 12.h),
+      padding: EdgeInsets.all(16.r),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x02000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 32.r,
+            height: 32.r,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: Color(0xFFF1F5F9),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              '#$rank',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.bold,
+                fontSize: 13.sp,
+                color: const Color(0xFF475569),
+              ),
+            ),
+          ),
+          SizedBox(width: 16.w),
+          CircleAvatar(
+            radius: 18.r,
+            backgroundColor: const Color(0xFFF1F5F9),
+            child: Text(
+              entry.driverName.isNotEmpty
+                  ? entry.driverName[0].toUpperCase()
+                  : '?',
+              style: TextStyle(
+                color: const Color(0xFF64748B),
+                fontWeight: FontWeight.bold,
+                fontSize: 12.sp,
+              ),
+            ),
+          ),
+          SizedBox(width: 16.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.driverName,
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14.sp,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                SizedBox(height: 6.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(100.r),
+                        child: LinearProgressIndicator(
+                          value: entry.averageScore / 5.0,
+                          backgroundColor: const Color(0xFFF1F5F9),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            entry.averageScore >= 4.0
+                                ? const Color(0xFF10B981)
+                                : entry.averageScore >= 3.0
+                                ? const Color(0xFFF59E0B)
+                                : const Color(0xFFEF4444),
+                          ),
+                          minHeight: 6.h,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    Text(
+                      '${entry.completedCount} evals',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 24.w),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.star_rounded,
+                    color: Colors.amber[600],
+                    size: 18.sp,
+                  ),
+                  SizedBox(width: 4.w),
+                  Text(
+                    entry.averageScore.toStringAsFixed(1),
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15.sp,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 4.h),
+              Text(
+                'Pass: ${(entry.passRate * 100).toStringAsFixed(0)}%',
+                style: GoogleFonts.inter(
+                  fontSize: 11.sp,
+                  fontWeight: FontWeight.w600,
+                  color: entry.passRate >= 0.8
+                      ? const Color(0xFF059669)
+                      : entry.passRate >= 0.5
+                      ? const Color(0xFFD97706)
+                      : const Color(0xFFDC2626),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -471,8 +994,9 @@ class _EvaluationTileState extends State<_EvaluationTile> {
 
   double _calculateAvgRating() {
     if (widget.evaluation.scores == null) return 0.0;
-    final app = widget.evaluation.scores!['appearance'] as int? ?? 0;
-    final veh = widget.evaluation.scores!['vehicle'] as int? ?? 0;
+    final app = (widget.evaluation.scores!['appearance'] as num? ?? 0)
+        .toDouble();
+    final veh = (widget.evaluation.scores!['vehicle'] as num? ?? 0).toDouble();
     return (app + veh) / 2.0;
   }
 
@@ -482,6 +1006,7 @@ class _EvaluationTileState extends State<_EvaluationTile> {
     final isSubmitted = e.submittedAt != null;
     final isEvaluated = e.status == 'evaluated';
     final hasPhotos = e.media.isNotEmpty;
+    final details = e.scores?['details'] as Map<String, dynamic>?;
 
     // Determine status badge color
     Color badgeBg;
@@ -686,23 +1211,117 @@ class _EvaluationTileState extends State<_EvaluationTile> {
                       ),
                     ),
                     SizedBox(height: 12.h),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildBreakdownRow(
-                            'Driver Appearance',
-                            e.scores?['appearance'] as int? ?? 0,
-                          ),
+                    if (details != null) ...[
+                      Text(
+                        'APPEARANCE DETAILS',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.sp,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                          color: const Color(0xFF64748B),
                         ),
-                        SizedBox(width: 32.w),
-                        Expanded(
-                          child: _buildBreakdownRow(
-                            'Vehicle Condition',
-                            e.scores?['vehicle'] as int? ?? 0,
+                      ),
+                      SizedBox(height: 8.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildBreakdownRow(
+                              'Uniform (Full Body)',
+                              (details['full_body'] as num? ?? 0).round(),
+                            ),
                           ),
+                          SizedBox(width: 32.w),
+                          Expanded(
+                            child: _buildBreakdownRow(
+                              'Shoes Condition',
+                              (details['shoes'] as num? ?? 0).round(),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      Text(
+                        'VEHICLE DETAILS',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.sp,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.0,
+                          color: const Color(0xFF64748B),
                         ),
-                      ],
-                    ),
+                      ),
+                      SizedBox(height: 8.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildBreakdownRow(
+                              'Vehicle Front',
+                              (details['vehicle_front'] as num? ?? 0).round(),
+                            ),
+                          ),
+                          SizedBox(width: 32.w),
+                          Expanded(
+                            child: _buildBreakdownRow(
+                              'Vehicle Back',
+                              (details['vehicle_back'] as num? ?? 0).round(),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildBreakdownRow(
+                              'Vehicle Left',
+                              (details['vehicle_left'] as num? ?? 0).round(),
+                            ),
+                          ),
+                          SizedBox(width: 32.w),
+                          Expanded(
+                            child: _buildBreakdownRow(
+                              'Vehicle Right',
+                              (details['vehicle_right'] as num? ?? 0).round(),
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 8.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildBreakdownRow(
+                              'Cabin Front',
+                              (details['cabin_front'] as num? ?? 0).round(),
+                            ),
+                          ),
+                          SizedBox(width: 32.w),
+                          Expanded(
+                            child: _buildBreakdownRow(
+                              'Cabin Rear',
+                              (details['cabin_rear'] as num? ?? 0).round(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildBreakdownRow(
+                              'Driver Appearance',
+                              (e.scores?['appearance'] as num? ?? 0).round(),
+                            ),
+                          ),
+                          SizedBox(width: 32.w),
+                          Expanded(
+                            child: _buildBreakdownRow(
+                              'Vehicle Condition',
+                              (e.scores?['vehicle'] as num? ?? 0).round(),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                     if (e.scores?['remarks'] != null &&
                         (e.scores!['remarks'] as String).isNotEmpty) ...[
                       SizedBox(height: 16.h),
@@ -987,4 +1606,22 @@ class _EvaluationTileState extends State<_EvaluationTile> {
         return key;
     }
   }
+}
+
+class _DriverLeaderboardEntry {
+  final String driverId;
+  final String driverName;
+  final double averageScore;
+  final int completedCount;
+  final double passRate;
+  final EmployeeEntity? employee;
+
+  _DriverLeaderboardEntry({
+    required this.driverId,
+    required this.driverName,
+    required this.averageScore,
+    required this.completedCount,
+    required this.passRate,
+    this.employee,
+  });
 }

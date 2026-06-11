@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
@@ -27,6 +28,9 @@ class DriverFormProvider extends ChangeNotifier {
   EvaluationEntity? _evaluation;
   EvaluationEntity? get evaluation => _evaluation;
 
+  Map<String, dynamic>? _vehicleInfo;
+  Map<String, dynamic>? get vehicleInfo => _vehicleInfo;
+
   bool _isLoading = false;
   bool get isLoading => _isLoading;
 
@@ -50,6 +54,8 @@ class DriverFormProvider extends ChangeNotifier {
       (entity) {
         _evaluation = entity;
         _errorMessage = null;
+        _vehicleInfo = null; // Reset
+        
         // Pre-populate media uploads if any already exist on the server
         if (entity.media.isNotEmpty) {
           entity.media.forEach((key, data) {
@@ -63,6 +69,27 @@ class DriverFormProvider extends ChangeNotifier {
           });
         }
         notifyListeners();
+
+        // Fetch vehicle details if vehicleId is set
+        if (entity.vehicleId != null) {
+          FirebaseFirestore.instance
+              .collection('vehicles')
+              .doc(entity.vehicleId)
+              .get()
+              .then((doc) {
+            if (doc.exists && doc.data() != null) {
+              final data = doc.data()!;
+              _vehicleInfo = {
+                'make': data['make'] ?? '',
+                'model': data['model'] ?? '',
+                'plateNumber': data['plateNumber'] ?? '',
+              };
+              notifyListeners();
+            }
+          }).catchError((err) {
+            // Ignore error silently
+          });
+        }
       },
     );
   }
