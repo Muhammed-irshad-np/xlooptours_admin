@@ -26,9 +26,9 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   final _formKey = GlobalKey<FormState>();
   final _contractRefController = TextEditingController();
   final _taxRateController = TextEditingController(
-    text: '15.0',
+    text: '5',
   ); // Updated default valid tax rate
-  final _discountController = TextEditingController(text: '0.0');
+  final _discountController = TextEditingController(text: '0');
   final _paymentTermsController = TextEditingController();
   final List<String> _paymentTermsOptions = const [
     'Advance 100% Cash',
@@ -65,7 +65,21 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   Future<void> _loadDraft() async {
     final draft = await _storageService.getInvoiceDraft();
     if (draft != null && mounted) {
-      _loadInvoice(draft);
+      // Migrate old default 15% WHT to new default 5% WHT
+      final migratedDraft = draft.taxRate == 15.0
+          ? InvoiceEntity(
+              id: draft.id,
+              date: draft.date,
+              invoiceNumber: draft.invoiceNumber,
+              contractReference: draft.contractReference,
+              paymentTerms: draft.paymentTerms,
+              company: draft.company,
+              lineItems: draft.lineItems,
+              taxRate: 5.0,
+              discount: draft.discount,
+            )
+          : draft;
+      _loadInvoice(migratedDraft);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Draft restored'),
@@ -80,8 +94,12 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   void _loadInvoice(InvoiceEntity invoice) {
     _selectedDate.value = invoice.date;
     _contractRefController.text = invoice.contractReference;
-    _taxRateController.text = invoice.taxRate.toString();
-    _discountController.text = invoice.discount.toString();
+    _taxRateController.text = invoice.taxRate % 1 == 0
+        ? invoice.taxRate.toInt().toString()
+        : invoice.taxRate.toString();
+    _discountController.text = invoice.discount % 1 == 0
+        ? invoice.discount.toInt().toString()
+        : invoice.discount.toString();
     _selectedCompany.value = invoice.company;
     _lineItems.value = List.from(invoice.lineItems);
 
@@ -98,8 +116,8 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   void _resetForm() {
     _selectedDate.value = DateTime.now();
     _contractRefController.clear();
-    _taxRateController.text = '15.0';
-    _discountController.text = '0.0';
+    _taxRateController.text = '5';
+    _discountController.text = '0';
     _selectedCompany.value = null;
     _selectedPaymentTermsOption.value = _paymentTermsOptions.first;
     _paymentTermsController.text = _selectedPaymentTermsOption.value;
@@ -253,7 +271,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       paymentTerms: _useCustomPaymentTerms.value
           ? _paymentTermsController.text
           : _selectedPaymentTermsOption.value,
-      taxRate: double.tryParse(_taxRateController.text) ?? 15.0,
+      taxRate: double.tryParse(_taxRateController.text) ?? 5.0,
       discount: double.tryParse(_discountController.text) ?? 0.0,
       company: _selectedCompany.value,
       lineItems: validItems,
@@ -302,7 +320,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
         paymentTerms: _useCustomPaymentTerms.value
             ? _paymentTermsController.text
             : _selectedPaymentTermsOption.value,
-        taxRate: double.tryParse(_taxRateController.text) ?? 15.0,
+        taxRate: double.tryParse(_taxRateController.text) ?? 5.0,
         discount: double.tryParse(_discountController.text) ?? 0.0,
         company: _selectedCompany.value,
         lineItems: validItems,
@@ -465,7 +483,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
                                                           'WHT Rate (%)',
                                                           Icons.percent,
                                                         ).copyWith(
-                                                          hintText: '15.0',
+                                                          hintText: '5.0',
                                                         ),
                                                     validator: (value) {
                                                       if (value == null ||
@@ -671,7 +689,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
                     decoration: _buildInputDecoration(
                       'WHT Rate (%)',
                       Icons.percent,
-                    ).copyWith(hintText: '15.0'),
+                    ).copyWith(hintText: '5.0'),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Required';
@@ -953,7 +971,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
           paymentTerms: _useCustomPaymentTerms.value
               ? _paymentTermsController.text.trim()
               : _selectedPaymentTermsOption.value,
-          taxRate: double.tryParse(_taxRateController.text) ?? 15.0,
+          taxRate: double.tryParse(_taxRateController.text) ?? 5.0,
           discount: double.tryParse(_discountController.text) ?? 0.0,
           company: _selectedCompany.value,
           lineItems: _getActiveLineItems(),
