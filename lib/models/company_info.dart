@@ -37,7 +37,7 @@ class CompanyInfo {
   static const String accountName = 'Xloop Tours W.L.L';
   static const String accountNumber = '0012 328654 001';
   static const String iban = 'BH78AUBB00012328654001';
-  static const String bankName = 'AHLI UNITED BANK';
+  static const String bankName = 'Kuwait Finance House B.S.C. (c)';
   static const String swiftCode = 'AUBBBHBM';
   static const String currency = 'SAR/BHD';
 
