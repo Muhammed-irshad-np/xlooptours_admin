@@ -30,12 +30,21 @@ class _MaintenanceEntry {
   final TextEditingController notesController = TextEditingController();
   List<XFile> pickedFiles = [];
 
+  bool isFollowUpRequired = false;
+  final TextEditingController followUpReasonController = TextEditingController();
+  DateTime? followUpDate;
+  final TextEditingController followUpDateController = TextEditingController();
+  final TextEditingController followUpKmController = TextEditingController();
+
   void dispose() {
     customTypeController.dispose();
     dateController.dispose();
     serviceKmController.dispose();
     costController.dispose();
     notesController.dispose();
+    followUpReasonController.dispose();
+    followUpDateController.dispose();
+    followUpKmController.dispose();
   }
 }
 
@@ -103,6 +112,24 @@ class _AddMaintenanceRecordDialogState
       setState(() {
         entry.date = picked;
         entry.dateController.text = DateFormat('MMM dd, yyyy').format(picked);
+      });
+    }
+  }
+
+  Future<void> _selectFollowUpDate(
+    BuildContext context,
+    _MaintenanceEntry entry,
+  ) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: entry.followUpDate ?? DateTime.now().add(const Duration(days: 30)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        entry.followUpDate = picked;
+        entry.followUpDateController.text = DateFormat('MMM dd, yyyy').format(picked);
       });
     }
   }
@@ -212,6 +239,11 @@ class _AddMaintenanceRecordDialogState
             serviceType: typeName,
             attachmentUrl: primaryUrl,
             attachmentUrls: uploadedUrls.isNotEmpty ? uploadedUrls : null,
+            isFollowUpRequired: entry.isFollowUpRequired,
+            followUpReason: entry.isFollowUpRequired ? entry.followUpReasonController.text.trim() : null,
+            nextServiceDate: entry.isFollowUpRequired ? entry.followUpDate : null,
+            nextServiceMileage: entry.isFollowUpRequired ? int.tryParse(entry.followUpKmController.text) : null,
+            isFollowUpCompleted: entry.isFollowUpRequired ? false : null,
           ),
         ));
       }
@@ -543,6 +575,89 @@ class _AddMaintenanceRecordDialogState
                                     if (entry.maintenanceTypeId == _kOtherId &&
                                         (v == null || v.trim().isEmpty)) {
                                       return 'Please enter a type name';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+
+                        // ── Checkbox for Follow-up / Revisit ──
+                        SizedBox(height: 12.h),
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: entry.isFollowUpRequired,
+                              onChanged: (val) {
+                                setState(() {
+                                  entry.isFollowUpRequired = val ?? false;
+                                });
+                              },
+                            ),
+                            Text(
+                              'Requires Follow-up / Revisit (Recommended by mechanic/workshop)',
+                              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
+
+                        if (entry.isFollowUpRequired) ...[
+                          SizedBox(height: 12.h),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(width: 8.w),
+                              Expanded(
+                                flex: 2,
+                                child: TextFormField(
+                                  controller: entry.followUpReasonController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Follow-up Reason',
+                                    hintText: 'e.g. Recheck brake pads, leak inspection',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                  ),
+                                  validator: (v) {
+                                    if (entry.isFollowUpRequired && (v == null || v.trim().isEmpty)) {
+                                      return 'Reason is required';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              SizedBox(width: 16.w),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: entry.followUpDateController,
+                                  readOnly: true,
+                                  onTap: () => _selectFollowUpDate(context, entry),
+                                  decoration: InputDecoration(
+                                    labelText: 'Follow-up Date (Optional)',
+                                    suffixIcon: const Icon(Icons.calendar_today),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 16.w),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: entry.followUpKmController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Follow-up Odometer (Optional)',
+                                    suffixText: 'km',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  validator: (v) {
+                                    if (entry.isFollowUpRequired && (v != null && v.isNotEmpty) && int.tryParse(v) == null) {
+                                      return 'Invalid number';
                                     }
                                     return null;
                                   },

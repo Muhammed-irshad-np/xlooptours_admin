@@ -30,6 +30,8 @@ class UpdateDialogHelper {
       _showVaultExpiryUpdateDialog(context, notification);
     } else if (notification.id.startsWith('v_expiry_')) {
       _showVehicleExpiryUpdateDialog(context, notification);
+    } else if (notification.id.startsWith('followup_')) {
+      _showFollowUpResolveDialog(context, notification);
     }
   }
 
@@ -1569,6 +1571,95 @@ class UpdateDialogHelper {
               ],
             );
           },
+        );
+      },
+    );
+  }
+
+  static void _showFollowUpResolveDialog(
+    BuildContext context,
+    NotificationEntity notification,
+  ) async {
+    final relatedId = notification.relatedId;
+    if (relatedId == null) return;
+
+    final vehicleProvider = context.read<VehicleProvider>();
+    final vehicle = vehicleProvider.vehicles.cast<VehicleEntity?>().firstWhere(
+      (v) => v?.id == relatedId,
+      orElse: () => null,
+    );
+
+    if (vehicle == null) return;
+
+    final parts = notification.id.split('_');
+    final timestamp = parts.length > 2 ? int.tryParse(parts[2]) : null;
+    
+    MaintenanceRecord? record;
+    if (timestamp != null) {
+      record = vehicle.maintenanceHistory?.cast<MaintenanceRecord?>().firstWhere(
+        (r) => r?.date.millisecondsSinceEpoch == timestamp,
+        orElse: () => null,
+      );
+    }
+
+    if (record == null) return;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Resolve Follow-up'),
+          content: Text(
+            'Vehicle: ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber})\n\n'
+            'Reason: ${record!.followUpReason ?? "General Revisit"}\n\n'
+            'Do you want to mark this follow-up as completed?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final updatedHistory = (vehicle.maintenanceHistory ?? []).map((r) {
+                  if (r == record) {
+                    return r.copyWith(isFollowUpCompleted: true);
+                  }
+                  return r;
+                }).toList();
+
+                final updatedVehicle = vehicle.copyWith(
+                  maintenanceHistory: updatedHistory,
+                );
+
+                final messenger = ScaffoldMessenger.of(ctx);
+                final navigator = Navigator.of(ctx);
+                final notifProvider = ctx.read<NotificationProvider>();
+
+                try {
+                  await vehicleProvider.updateVehicle(updatedVehicle);
+                  await notifProvider.markAsRead(notification.id);
+                  await notifProvider.refreshAlerts(
+                    vehicles: vehicleProvider.vehicles,
+                    maintenanceTypes: vehicleProvider.maintenanceTypes,
+                  );
+                  navigator.pop();
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('Follow-up marked as completed'),
+                    ),
+                  );
+                } catch (e) {
+                  messenger.showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to update follow-up: $e'),
+                    ),
+                  );
+                }
+              },
+              child: const Text('Mark Completed'),
+            ),
+          ],
         );
       },
     );

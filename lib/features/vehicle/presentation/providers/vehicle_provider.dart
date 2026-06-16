@@ -22,6 +22,7 @@ import '../../domain/usecases/delete_maintenance_type_usecase.dart';
 import '../../domain/usecases/get_vehicle_settings_usecase.dart';
 import '../../domain/usecases/update_vehicle_settings_usecase.dart';
 import '../../domain/entities/vehicle_settings_entity.dart';
+import '../../domain/usecases/extend_vehicle_maintenance_usecase.dart';
 
 class VehicleProvider extends ChangeNotifier {
   final GetAllVehiclesUseCase getAllVehiclesUseCase;
@@ -43,6 +44,7 @@ class VehicleProvider extends ChangeNotifier {
 
   final GetVehicleSettingsUseCase getVehicleSettingsUseCase;
   final UpdateVehicleSettingsUseCase updateVehicleSettingsUseCase;
+  final ExtendVehicleMaintenanceUseCase extendVehicleMaintenanceUseCase;
 
   List<VehicleEntity> _vehicles = [];
   List<VehicleMakeEntity> _vehicleMakes = [];
@@ -68,6 +70,7 @@ class VehicleProvider extends ChangeNotifier {
     required this.deleteMaintenanceTypeUseCase,
     required this.getVehicleSettingsUseCase,
     required this.updateVehicleSettingsUseCase,
+    required this.extendVehicleMaintenanceUseCase,
   });
 
   List<VehicleEntity> get vehicles => _vehicles;
@@ -407,6 +410,29 @@ class VehicleProvider extends ChangeNotifier {
       rethrow;
     } finally {
       _setLoading(false);
+    }
+  }
+
+  Future<void> extendVehicleMaintenance({
+    required VehicleEntity vehicle,
+    required String category,
+    required int extensionKm,
+    required String reason,
+  }) async {
+    _setLoading(true);
+    try {
+      await extendVehicleMaintenanceUseCase(
+        vehicle: vehicle,
+        category: category,
+        extensionKm: extensionKm,
+        reason: reason,
+      );
+      await fetchAllVehicles();
+    } catch (e) {
+      _errorMessage = 'Failed to extend maintenance: \$e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
     }
   }
 

@@ -605,6 +605,54 @@ class VehicleDetailScreen extends StatelessWidget {
                 color: Colors.grey[600],
               ),
             ),
+            if (record.isFollowUpRequired == true) ...[
+              SizedBox(height: 4.h),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: record.isFollowUpCompleted == true
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(
+                        color: record.isFollowUpCompleted == true
+                            ? Colors.green.shade200
+                            : Colors.orange.shade200,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          record.isFollowUpCompleted == true
+                              ? Icons.check
+                              : Icons.warning,
+                          size: 10.sp,
+                          color: record.isFollowUpCompleted == true
+                              ? Colors.green.shade700
+                              : Colors.orange.shade700,
+                        ),
+                        const SizedBox(width: 2),
+                        Text(
+                          record.isFollowUpCompleted == true
+                              ? 'Follow-up Done'
+                              : 'Follow-up Needed',
+                          style: TextStyle(
+                            fontSize: 10.sp,
+                            fontWeight: FontWeight.bold,
+                            color: record.isFollowUpCompleted == true
+                                ? Colors.green.shade700
+                                : Colors.orange.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (record.notes != null && record.notes!.isNotEmpty) ...[
               SizedBox(height: 4.h),
               Text(
