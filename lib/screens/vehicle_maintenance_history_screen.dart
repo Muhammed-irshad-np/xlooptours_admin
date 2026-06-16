@@ -9,10 +9,19 @@ import 'package:xloop_invoice/core/widgets/modern_app_bar.dart';
 import 'package:xloop_invoice/screens/document_viewer_screen.dart';
 import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 
-class VehicleMaintenanceHistoryScreen extends StatelessWidget {
+class VehicleMaintenanceHistoryScreen extends StatefulWidget {
   final VehicleEntity vehicle;
 
   const VehicleMaintenanceHistoryScreen({super.key, required this.vehicle});
+
+  @override
+  State<VehicleMaintenanceHistoryScreen> createState() =>
+      _VehicleMaintenanceHistoryScreenState();
+}
+
+class _VehicleMaintenanceHistoryScreenState
+    extends State<VehicleMaintenanceHistoryScreen> {
+  String _selectedFilter = 'All'; // 'All', 'Follow-ups', 'Extensions'
 
   @override
   Widget build(BuildContext context) {
@@ -20,45 +29,108 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
     return Consumer<VehicleProvider>(
       builder: (context, vehicleProvider, child) {
         final matches = vehicleProvider.vehicles.where(
-          (v) => v.id == vehicle.id,
+          (v) => v.id == widget.vehicle.id,
         );
         final VehicleEntity currentVehicle = matches.isNotEmpty
             ? matches.first
-            : vehicle;
+            : widget.vehicle;
 
         final List<MaintenanceRecord> history = _gatherAllHistory(
           currentVehicle,
         );
         history.sort((a, b) => b.date.compareTo(a.date));
 
+        final filteredHistory = history.where((record) {
+          if (_selectedFilter == 'Follow-ups') {
+            return record.isFollowUpRequired == true;
+          } else if (_selectedFilter == 'Extensions') {
+            return record.isExtended == true ||
+                (record.serviceType != null &&
+                    record.serviceType!.startsWith('Extension:'));
+          }
+          return true; // 'All'
+        }).toList();
+
         return Scaffold(
           appBar: ModernAppBar(
             title: '${currentVehicle.make} ${currentVehicle.model} - History',
           ),
-          body: history.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No maintenance history available.',
-                    style: TextStyle(fontSize: 16, color: Colors.grey),
-                  ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: history.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    final record = history[index];
-                    return _buildHistoryCard(
-                      context,
-                      currentVehicle,
-                      record,
-                      isAdmin: isAdmin,
-                    );
-                  },
-                ),
+          body: Column(
+            children: [
+              _buildFilterBar(),
+              Expanded(
+                child: filteredHistory.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No ${_selectedFilter.toLowerCase()} available.',
+                          style: const TextStyle(fontSize: 16, color: Colors.grey),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: filteredHistory.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 16),
+                        itemBuilder: (context, index) {
+                          final record = filteredHistory[index];
+                          return _buildHistoryCard(
+                            context,
+                            currentVehicle,
+                            record,
+                            isAdmin: isAdmin,
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildFilterBar() {
+    final filters = ['All', 'Follow-ups', 'Extensions'];
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
+      color: Colors.white,
+      child: Row(
+        children: filters.map((filter) {
+          final isSelected = _selectedFilter == filter;
+          return Padding(
+            padding: EdgeInsets.only(right: 8.w),
+            child: ChoiceChip(
+              label: Text(
+                filter,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.grey[700],
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  fontSize: 13.sp,
+                ),
+              ),
+              selected: isSelected,
+              onSelected: (val) {
+                if (val) {
+                  setState(() {
+                    _selectedFilter = filter;
+                  });
+                }
+              },
+              selectedColor: Colors.blue[700],
+              backgroundColor: Colors.grey[100],
+              checkmarkColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20.r),
+                side: BorderSide(
+                  color: isSelected
+                      ? Colors.blue.shade700
+                      : Colors.grey.shade300,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
     );
   }
 
