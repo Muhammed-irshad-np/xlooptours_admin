@@ -16,6 +16,9 @@ import '../../features/employee/domain/entities/employee_entity.dart';
 import '../../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../../features/xloop_vault/presentation/providers/vault_provider.dart';
 import '../../features/xloop_vault/domain/entities/vault_data.dart';
+import '../../features/vehicle/presentation/widgets/maintenance_extension_dialog.dart';
+import '../../features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
+import '../../injection_container.dart';
 
 class UpdateDialogHelper {
   static void showUpdateDialog(
@@ -775,6 +778,52 @@ class UpdateDialogHelper {
                   onPressed: () => Navigator.pop(context),
                   child: const Text('Cancel'),
                 ),
+                TextButton(
+                  onPressed: () async {
+                    final maintenanceUseCase = sl<GetVehicleMaintenanceAlertsUseCase>();
+                    final alerts = maintenanceUseCase(
+                      vehicles: vehicleProvider.vehicles,
+                      maintenanceTypes: vehicleProvider.maintenanceTypes,
+                      includeAll: true,
+                    );
+                    final alert = alerts.firstWhere(
+                      (a) =>
+                          a.vehicle.id == vehicle.id &&
+                          a.category.toLowerCase() == category.toLowerCase(),
+                      orElse: () => VehicleMaintenanceAlert(
+                        vehicle: vehicle,
+                        category: category,
+                        currentMileage: vehicle.currentOdometer ?? 0,
+                        lastServiceMileage: 0,
+                        nextServiceMileage: vehicle.currentOdometer ?? 0,
+                        kmOverdue: 0,
+                      ),
+                    );
+
+                    final extended = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => MaintenanceExtensionDialog(
+                        vehicle: vehicle,
+                        alert: alert,
+                      ),
+                    );
+                    if (extended == true) {
+                      if (context.mounted) {
+                        final notifProvider = context.read<NotificationProvider>();
+                        await notifProvider.markAsRead(notification.id);
+                        await notifProvider.refreshAlerts(
+                          vehicles: vehicleProvider.vehicles,
+                          maintenanceTypes: vehicleProvider.maintenanceTypes,
+                        );
+                        Navigator.pop(context);
+                      }
+                    }
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFD97706),
+                  ),
+                  child: const Text('Extend Alert'),
+                ),
                 ElevatedButton(
                   onPressed: () async {
                     if (selectedDate == null) {
@@ -931,7 +980,7 @@ class UpdateDialogHelper {
                       );
                     }
                   },
-                  child: const Text('Save'),
+                  child: const Text('Mark Completed'),
                 ),
               ],
             );
