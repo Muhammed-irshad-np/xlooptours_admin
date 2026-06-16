@@ -735,6 +735,12 @@ class UpdateDialogHelper {
     final costController = TextEditingController();
     final notesController = TextEditingController();
 
+    bool isFollowUpRequired = false;
+    final followUpReasonController = TextEditingController();
+    DateTime? followUpDate;
+    final followUpDateController = TextEditingController();
+    final followUpKmController = TextEditingController();
+
     if (vehicle.currentOdometer != null) {
       mileageController.text = vehicle.currentOdometer.toString();
     }
@@ -804,6 +810,76 @@ class UpdateDialogHelper {
                       ),
                       maxLines: 3,
                     ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: isFollowUpRequired,
+                          onChanged: (val) {
+                            setState(() {
+                              isFollowUpRequired = val ?? false;
+                            });
+                          },
+                        ),
+                        const Expanded(
+                          child: Text(
+                            'Requires Follow-up / Revisit (Recommended by mechanic/workshop)',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (isFollowUpRequired) ...[
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: followUpReasonController,
+                        decoration: const InputDecoration(
+                          labelText: 'Follow-up Reason',
+                          hintText: 'e.g. Recheck brake pads, leak inspection',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: followUpDateController,
+                        readOnly: true,
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate:
+                                followUpDate ??
+                                DateTime.now().add(const Duration(days: 30)),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              followUpDate = picked;
+                              followUpDateController.text =
+                                  "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+                            });
+                          }
+                        },
+                        decoration: const InputDecoration(
+                          labelText: 'Follow-up Date (Optional)',
+                          suffixIcon: Icon(Icons.calendar_today),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: followUpKmController,
+                        decoration: const InputDecoration(
+                          labelText: 'Follow-up Odometer (Optional)',
+                          suffixText: 'km',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -885,6 +961,15 @@ class UpdateDialogHelper {
                       cost: double.tryParse(costController.text),
                       notes: notesController.text,
                       serviceType: category,
+                      isFollowUpRequired: isFollowUpRequired,
+                      followUpReason: isFollowUpRequired
+                          ? followUpReasonController.text.trim()
+                          : null,
+                      nextServiceDate: isFollowUpRequired ? followUpDate : null,
+                      nextServiceMileage: isFollowUpRequired
+                          ? int.tryParse(followUpKmController.text)
+                          : null,
+                      isFollowUpCompleted: isFollowUpRequired ? false : null,
                     );
 
                     final currentMaintenance =
