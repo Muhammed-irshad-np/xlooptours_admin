@@ -179,8 +179,95 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
                 ),
               ],
             ),
+            if (record.isFollowUpRequired == true) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: record.isFollowUpCompleted == true
+                          ? Colors.green.withValues(alpha: 0.1)
+                          : Colors.orange.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: record.isFollowUpCompleted == true
+                            ? Colors.green.shade300
+                            : Colors.orange.shade300,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          record.isFollowUpCompleted == true
+                              ? Icons.check_circle_outline
+                              : Icons.warning_amber_rounded,
+                          size: 14,
+                          color: record.isFollowUpCompleted == true
+                              ? Colors.green.shade700
+                              : Colors.orange.shade700,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          record.isFollowUpCompleted == true
+                              ? 'Follow-up Completed'
+                              : 'Follow-up Pending',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: record.isFollowUpCompleted == true
+                                ? Colors.green.shade700
+                                : Colors.orange.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (record.isFollowUpCompleted != true) ...[
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: () => _markFollowUpAsCompleted(
+                        context,
+                        currentVehicle,
+                        record,
+                      ),
+                      icon: const Icon(Icons.check, size: 14),
+                      label: const Text(
+                        'Mark Completed',
+                        style: TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
             const Divider(height: 24),
             _buildInfoRow(Icons.speed, 'Mileage', '${record.mileage} KM'),
+            if (record.isFollowUpRequired == true) ...[
+              _buildInfoRow(
+                Icons.info_outline,
+                'Follow-up Reason',
+                record.followUpReason ?? 'General Revisit',
+              ),
+              if (record.nextServiceDate != null)
+                _buildInfoRow(
+                  Icons.calendar_month,
+                  'Follow-up Date',
+                  DateFormat('MMM dd, yyyy').format(record.nextServiceDate!),
+                ),
+              if (record.nextServiceMileage != null && record.nextServiceMileage! > 0)
+                _buildInfoRow(
+                  Icons.speed,
+                  'Follow-up Odometer',
+                  '${record.nextServiceMileage} KM',
+                ),
+            ],
             if (record.serviceProvider != null &&
                 record.serviceProvider!.isNotEmpty)
               _buildInfoRow(
@@ -276,6 +363,39 @@ class VehicleMaintenanceHistoryScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _markFollowUpAsCompleted(
+    BuildContext context,
+    VehicleEntity currentVehicle,
+    MaintenanceRecord record,
+  ) async {
+    final updatedHistory = (currentVehicle.maintenanceHistory ?? []).map((r) {
+      if (r == record) {
+        return r.copyWith(isFollowUpCompleted: true);
+      }
+      return r;
+    }).toList();
+
+    final updatedVehicle = currentVehicle.copyWith(
+      maintenanceHistory: updatedHistory,
+    );
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await context.read<VehicleProvider>().updateVehicle(updatedVehicle);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Follow-up marked as completed'),
+        ),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Failed to update follow-up: $e'),
+        ),
+      );
+    }
   }
 
   void _showDeleteConfirmation(

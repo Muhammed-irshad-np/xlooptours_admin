@@ -86,6 +86,15 @@ class MaintenanceRecord extends Equatable {
   final String? notes;
   final int? nextServiceMileage;
   final DateTime? nextServiceDate;
+  final bool? isFollowUpRequired;
+  final String? followUpReason;
+  final bool? isFollowUpCompleted;
+  
+  // Extension fields
+  final int? extendedMileage;
+  final DateTime? extendedDate;
+  final String? extensionReason;
+  final bool? isExtended;
 
   const MaintenanceRecord({
     required this.date,
@@ -103,6 +112,13 @@ class MaintenanceRecord extends Equatable {
     this.notes,
     this.nextServiceMileage,
     this.nextServiceDate,
+    this.isFollowUpRequired,
+    this.followUpReason,
+    this.isFollowUpCompleted,
+    this.extendedMileage,
+    this.extendedDate,
+    this.extensionReason,
+    this.isExtended,
   });
 
   MaintenanceRecord copyWith({
@@ -121,6 +137,13 @@ class MaintenanceRecord extends Equatable {
     String? notes,
     int? nextServiceMileage,
     DateTime? nextServiceDate,
+    bool? isFollowUpRequired,
+    String? followUpReason,
+    bool? isFollowUpCompleted,
+    int? extendedMileage,
+    DateTime? extendedDate,
+    String? extensionReason,
+    bool? isExtended,
   }) {
     return MaintenanceRecord(
       date: date ?? this.date,
@@ -138,6 +161,13 @@ class MaintenanceRecord extends Equatable {
       notes: notes ?? this.notes,
       nextServiceMileage: nextServiceMileage ?? this.nextServiceMileage,
       nextServiceDate: nextServiceDate ?? this.nextServiceDate,
+      isFollowUpRequired: isFollowUpRequired ?? this.isFollowUpRequired,
+      followUpReason: followUpReason ?? this.followUpReason,
+      isFollowUpCompleted: isFollowUpCompleted ?? this.isFollowUpCompleted,
+      extendedMileage: extendedMileage ?? this.extendedMileage,
+      extendedDate: extendedDate ?? this.extendedDate,
+      extensionReason: extensionReason ?? this.extensionReason,
+      isExtended: isExtended ?? this.isExtended,
     );
   }
 
@@ -158,6 +188,13 @@ class MaintenanceRecord extends Equatable {
     notes,
     nextServiceMileage,
     nextServiceDate,
+    isFollowUpRequired,
+    followUpReason,
+    isFollowUpCompleted,
+    extendedMileage,
+    extendedDate,
+    extensionReason,
+    isExtended,
   ];
 }
 

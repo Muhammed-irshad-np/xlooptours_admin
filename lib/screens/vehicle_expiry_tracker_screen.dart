@@ -9,6 +9,8 @@ import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_pr
 import 'package:xloop_invoice/injection_container.dart';
 import 'package:xloop_invoice/core/widgets/modern_app_bar.dart';
 import 'package:provider/provider.dart';
+import 'package:xloop_invoice/widgets/add_maintenance_record_dialog.dart';
+import 'package:xloop_invoice/features/vehicle/presentation/widgets/maintenance_extension_dialog.dart';
 
 class _DT {
   static const bgPage = Color(0xFFF4F6FB);
@@ -160,6 +162,7 @@ class _VehicleExpiryTrackerScreenState
                             } else {
                               return _VehicleMaintenanceCard(
                                 alert: alert as VehicleMaintenanceAlert,
+                                onRefresh: _loadAlerts,
                               );
                             }
                           },
@@ -569,7 +572,8 @@ class _VehicleExpiryCardState extends State<_VehicleExpiryCard> {
 
 class _VehicleMaintenanceCard extends StatefulWidget {
   final VehicleMaintenanceAlert alert;
-  const _VehicleMaintenanceCard({required this.alert});
+  final VoidCallback? onRefresh;
+  const _VehicleMaintenanceCard({required this.alert, this.onRefresh});
 
   @override
   State<_VehicleMaintenanceCard> createState() =>
@@ -578,6 +582,40 @@ class _VehicleMaintenanceCard extends StatefulWidget {
 
 class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
   bool _hovered = false;
+
+  void _extendAlert(BuildContext context) {
+    showDialog<bool>(
+      context: context,
+      builder: (context) => MaintenanceExtensionDialog(
+        vehicle: widget.alert.vehicle,
+        alert: widget.alert,
+      ),
+    ).then((success) {
+      if (success == true && widget.onRefresh != null) {
+        widget.onRefresh!();
+      }
+    });
+  }
+
+  void _markAsReplaced(BuildContext context) {
+    final provider = context.read<VehicleProvider>();
+    final matches = provider.maintenanceTypes.where(
+      (t) => t.name.toLowerCase() == widget.alert.category.toLowerCase()
+    );
+    final typeId = matches.isNotEmpty ? matches.first.id : null;
+
+    showDialog<bool>(
+      context: context,
+      builder: (context) => AddMaintenanceRecordDialog(
+        vehicle: widget.alert.vehicle,
+        initialMaintenanceTypeId: typeId,
+      ),
+    ).then((success) {
+      if (success == true && widget.onRefresh != null) {
+        widget.onRefresh!();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -617,88 +655,137 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
           ],
         ),
         padding: EdgeInsets.all(16.w),
-        child: Row(
+        child: Column(
           children: [
-            Container(
-              padding: EdgeInsets.all(12.w),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.build_circle_outlined,
-                color: color,
-                size: 24.sp,
-              ),
-            ),
-            SizedBox(width: 16.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    a.vehicle.plateNumber,
-                    style: GoogleFonts.inter(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w800,
-                      color: _DT.textPrimary,
-                    ),
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    shape: BoxShape.circle,
                   ),
-                  SizedBox(height: 6.h),
-                  Row(
+                  child: Icon(
+                    Icons.build_circle_outlined,
+                    color: color,
+                    size: 24.sp,
+                  ),
+                ),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 8.w,
-                          vertical: 2.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _DT.border,
-                          borderRadius: BorderRadius.circular(4.r),
-                        ),
-                        child: Text(
-                          a.category,
-                          style: GoogleFonts.inter(
-                            fontSize: 11.sp,
-                            fontWeight: FontWeight.w600,
-                            color: _DT.textSecondary,
-                          ),
+                      Text(
+                        a.vehicle.plateNumber,
+                        style: GoogleFonts.inter(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w800,
+                          color: _DT.textPrimary,
                         ),
                       ),
-                      SizedBox(width: 8.w),
-                      Text(
-                        'Due at: ${a.nextServiceMileage} km',
-                        style: GoogleFonts.inter(
-                          fontSize: 13.sp,
-                          color: _DT.textSecondary,
-                        ),
+                      SizedBox(height: 6.h),
+                      Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8.w,
+                              vertical: 2.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _DT.border,
+                              borderRadius: BorderRadius.circular(4.r),
+                            ),
+                            child: Text(
+                              a.category,
+                              style: GoogleFonts.inter(
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w600,
+                                color: _DT.textSecondary,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                          Text(
+                            'Due at: ${a.nextServiceMileage} km',
+                            style: GoogleFonts.inter(
+                              fontSize: 13.sp,
+                              color: _DT.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                SizedBox(width: 16.w),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      isOverdue ? 'Overdue' : 'Upcoming',
+                      style: GoogleFonts.inter(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                      ),
+                    ),
+                    Text(
+                      isOverdue
+                          ? '${a.kmOverdue} km past'
+                          : '${a.nextServiceMileage - a.currentMileage} km left',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        color: color.withOpacity(0.8),
+                        fontWeight: FontWeight.w500,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            SizedBox(width: 16.w),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            SizedBox(height: 12.h),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Text(
-                  isOverdue ? 'Overdue' : 'Upcoming',
-                  style: GoogleFonts.inter(
-                    fontSize: 16.sp,
-                    fontWeight: FontWeight.w800,
-                    color: color,
+                OutlinedButton.icon(
+                  onPressed: () => _extendAlert(context),
+                  icon: Icon(Icons.snooze, size: 14.sp),
+                  label: Text(
+                    'Extend Alert',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _DT.brand,
+                    side: const BorderSide(color: _DT.brand),
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
                   ),
                 ),
-                Text(
-                  isOverdue
-                      ? '${a.kmOverdue} km past'
-                      : '${a.nextServiceMileage - a.currentMileage} km left',
-                  style: GoogleFonts.inter(
-                    fontSize: 11.sp,
-                    color: color.withOpacity(0.8),
-                    fontWeight: FontWeight.w500,
-                    fontFeatures: const [FontFeature.tabularFigures()],
+                SizedBox(width: 8.w),
+                ElevatedButton.icon(
+                  onPressed: () => _markAsReplaced(context),
+                  icon: Icon(Icons.build, size: 14.sp),
+                  label: Text(
+                    'Mark Replaced',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _DT.brand,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
                   ),
                 ),
               ],

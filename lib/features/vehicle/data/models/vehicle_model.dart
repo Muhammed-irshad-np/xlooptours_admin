@@ -162,6 +162,13 @@ class VehicleModel extends VehicleEntity {
       'notes': record.notes,
       'nextServiceMileage': record.nextServiceMileage,
       'nextServiceDate': record.nextServiceDate?.toIso8601String(),
+      'isFollowUpRequired': record.isFollowUpRequired,
+      'followUpReason': record.followUpReason,
+      'isFollowUpCompleted': record.isFollowUpCompleted,
+      'extendedMileage': record.extendedMileage,
+      'extendedDate': record.extendedDate?.toIso8601String(),
+      'extensionReason': record.extensionReason,
+      'isExtended': record.isExtended,
     };
   }
 
@@ -324,6 +331,15 @@ class VehicleModel extends VehicleEntity {
       nextServiceDate: json['nextServiceDate'] != null
           ? DateTime.parse(json['nextServiceDate'] as String)
           : null,
+      isFollowUpRequired: json['isFollowUpRequired'] as bool?,
+      followUpReason: json['followUpReason'] as String?,
+      isFollowUpCompleted: json['isFollowUpCompleted'] as bool?,
+      extendedMileage: json['extendedMileage'] as int?,
+      extendedDate: json['extendedDate'] != null
+          ? DateTime.parse(json['extendedDate'] as String)
+          : null,
+      extensionReason: json['extensionReason'] as String?,
+      isExtended: json['isExtended'] as bool?,
     );
   }
 

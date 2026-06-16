@@ -1,5 +1,6 @@
 import '../entities/vehicle_entity.dart';
 import '../entities/maintenance_type_entity.dart';
+import '../entities/vehicle_documents.dart';
 
 class VehicleMaintenanceAlert {
   final VehicleEntity vehicle;
@@ -69,7 +70,12 @@ class GetVehicleMaintenanceAlertsUseCase {
         entries.sort((a, b) => b.mileage.compareTo(a.mileage));
         final lastService = entries.first;
 
-        final nextDue = lastService.mileage + intervalKm;
+        int nextDue = lastService.mileage + intervalKm;
+        if (lastService.originalRecord != null &&
+            lastService.originalRecord!.isExtended == true &&
+            lastService.originalRecord!.nextServiceMileage != null) {
+          nextDue = lastService.originalRecord!.nextServiceMileage!;
+        }
 
         if (includeAll || currentMileage >= nextDue) {
           alerts.add(
@@ -109,14 +115,14 @@ class GetVehicleMaintenanceAlertsUseCase {
     for (final r in vehicle.maintenanceHistory ?? []) {
       final type = r.serviceType;
       if (type != null && type.isNotEmpty) {
-        result.add(_HistoryEntry(serviceType: type, mileage: r.mileage));
+        result.add(_HistoryEntry(serviceType: type, mileage: r.mileage, originalRecord: r));
       }
     }
 
     // Typed fields (legacy / secondary source).
     final m = vehicle.maintenance;
     if (m != null) {
-      void add(dynamic record, String name) {
+      void add(MaintenanceRecord? record, String name) {
         if (record == null) return;
         // Avoid double-counting if already present in flat history.
         final already = result.any(
@@ -125,7 +131,7 @@ class GetVehicleMaintenanceAlertsUseCase {
               e.mileage == record.mileage,
         );
         if (!already) {
-          result.add(_HistoryEntry(serviceType: name, mileage: record.mileage));
+          result.add(_HistoryEntry(serviceType: name, mileage: record.mileage, originalRecord: record));
         }
       }
 
@@ -154,5 +160,6 @@ class GetVehicleMaintenanceAlertsUseCase {
 class _HistoryEntry {
   final String serviceType;
   final int mileage;
-  _HistoryEntry({required this.serviceType, required this.mileage});
+  final MaintenanceRecord? originalRecord;
+  _HistoryEntry({required this.serviceType, required this.mileage, this.originalRecord});
 }
