@@ -81,7 +81,8 @@ class UpdateDialogHelper {
     // ── Document-specific controllers pre-filled from existing data ──────
     final numberController = TextEditingController();
     final nameController = TextEditingController(); // Passport name on passport
-    final countryController = TextEditingController(); // Driving license country
+    final countryController =
+        TextEditingController(); // Driving license country
 
     // Pre-fill visa type / license type from existing data
     VisaType selectedVisaType = VisaType.singleEntry;
@@ -128,7 +129,8 @@ class UpdateDialogHelper {
       case 'Driving License':
         numberController.text = employee.drivingLicense?.number ?? '';
         countryController.text = employee.drivingLicense?.countryOfOrigin ?? '';
-        selectedLicenseType = employee.drivingLicense?.type ?? DrivingLicenseType.private;
+        selectedLicenseType =
+            employee.drivingLicense?.type ?? DrivingLicenseType.private;
         selectedDate = employee.drivingLicense?.expiryDate;
         break;
       case 'Authorization':
@@ -162,13 +164,23 @@ class UpdateDialogHelper {
 
     // Which document types have a number field
     const docTypesWithNumber = {
-      'Iqama', 'Bahrain Residence ID', 'Passport',
-      'Saudi Visa', 'Bahrain Visa', 'Dubai Visa', 'Qatar Visa',
+      'Iqama',
+      'Bahrain Residence ID',
+      'Passport',
+      'Saudi Visa',
+      'Bahrain Visa',
+      'Dubai Visa',
+      'Qatar Visa',
       'Driving License',
     };
 
     // Which document types are visas (have visa type dropdown)
-    const visaDocTypes = {'Saudi Visa', 'Bahrain Visa', 'Dubai Visa', 'Qatar Visa'};
+    const visaDocTypes = {
+      'Saudi Visa',
+      'Bahrain Visa',
+      'Dubai Visa',
+      'Qatar Visa',
+    };
 
     await showDialog(
       context: context,
@@ -203,12 +215,12 @@ class UpdateDialogHelper {
                             labelText: documentType == 'Iqama'
                                 ? 'Iqama Number'
                                 : documentType == 'Bahrain Residence ID'
-                                    ? 'Residence ID Number'
-                                    : documentType == 'Passport'
-                                        ? 'Passport No.'
-                                        : documentType == 'Driving License'
-                                            ? 'License No.'
-                                            : 'Visa No.',
+                                ? 'Residence ID Number'
+                                : documentType == 'Passport'
+                                ? 'Passport No.'
+                                : documentType == 'Driving License'
+                                ? 'License No.'
+                                : 'Visa No.',
                             border: const OutlineInputBorder(),
                             prefixIcon: const Icon(Icons.numbers),
                           ),
@@ -354,11 +366,11 @@ class UpdateDialogHelper {
                           onPressed: isSaving
                               ? null
                               : () async {
-                                  final result =
-                                      await FilePicker.platform.pickFiles(
-                                    type: FileType.any,
-                                    allowMultiple: false,
-                                  );
+                                  final result = await FilePicker.platform
+                                      .pickFiles(
+                                        type: FileType.any,
+                                        allowMultiple: false,
+                                      );
                                   if (result != null &&
                                       result.files.isNotEmpty) {
                                     final pf = result.files.first;
@@ -381,7 +393,10 @@ class UpdateDialogHelper {
                         const SizedBox(height: 4),
                         Text(
                           'Leave blank to keep the existing attachment.',
-                          style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[500],
+                          ),
                         ),
                       ],
 
@@ -423,8 +438,7 @@ class UpdateDialogHelper {
               ),
               actions: [
                 TextButton(
-                  onPressed:
-                      isSaving ? null : () => Navigator.pop(ctx),
+                  onPressed: isSaving ? null : () => Navigator.pop(ctx),
                   child: const Text('Cancel'),
                 ),
                 ElevatedButton(
@@ -438,13 +452,12 @@ class UpdateDialogHelper {
                             String? newAttachmentUrl;
                             if (pickedFile != null &&
                                 docTypeKeys.containsKey(documentType)) {
-                              newAttachmentUrl =
-                                  await employeeProvider
-                                      .uploadDocumentAttachment(
-                                        pickedFile!,
-                                        employee.id,
-                                        docTypeKeys[documentType]!,
-                                      );
+                              newAttachmentUrl = await employeeProvider
+                                  .uploadDocumentAttachment(
+                                    pickedFile!,
+                                    employee.id,
+                                    docTypeKeys[documentType]!,
+                                  );
                             }
 
                             // ── Build updated employee with new date (+url) ─
@@ -456,7 +469,9 @@ class UpdateDialogHelper {
                             switch (documentType) {
                               case 'Iqama':
                                 if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(clearIqama: true);
+                                  updatedEmployee = employee.copyWith(
+                                    clearIqama: true,
+                                  );
                                 } else {
                                   updatedEmployee = employee.copyWith(
                                     iqama: IqamaDocument(
@@ -471,14 +486,18 @@ class UpdateDialogHelper {
                                 break;
                               case 'Bahrain Residence ID':
                                 if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(clearBahrainResidence: true);
+                                  updatedEmployee = employee.copyWith(
+                                    clearBahrainResidence: true,
+                                  );
                                 } else {
                                   updatedEmployee = employee.copyWith(
                                     bahrainResidence: BahrainResidenceDocument(
                                       number: numberController.text,
                                       expiryDate: selectedDate!,
                                       attachmentUrl: _url(
-                                        employee.bahrainResidence?.attachmentUrl,
+                                        employee
+                                            .bahrainResidence
+                                            ?.attachmentUrl,
                                       ),
                                     ),
                                   );
@@ -486,7 +505,9 @@ class UpdateDialogHelper {
                                 break;
                               case 'Health Insurance':
                                 if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(clearHealthInsurance: true);
+                                  updatedEmployee = employee.copyWith(
+                                    clearHealthInsurance: true,
+                                  );
                                 } else {
                                   updatedEmployee = employee.copyWith(
                                     healthInsurance: HealthInsuranceDocument(
@@ -500,7 +521,9 @@ class UpdateDialogHelper {
                                 break;
                               case 'Driving License':
                                 if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(clearDrivingLicense: true);
+                                  updatedEmployee = employee.copyWith(
+                                    clearDrivingLicense: true,
+                                  );
                                 } else {
                                   updatedEmployee = employee.copyWith(
                                     drivingLicense: DrivingLicenseDocument(
@@ -517,7 +540,9 @@ class UpdateDialogHelper {
                                 break;
                               case 'Passport':
                                 if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(clearPassport: true);
+                                  updatedEmployee = employee.copyWith(
+                                    clearPassport: true,
+                                  );
                                 } else {
                                   updatedEmployee = employee.copyWith(
                                     passport: PassportDocument(
@@ -533,7 +558,9 @@ class UpdateDialogHelper {
                                 break;
                               case 'Saudi Visa':
                                 if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(clearSaudiVisa: true);
+                                  updatedEmployee = employee.copyWith(
+                                    clearSaudiVisa: true,
+                                  );
                                 } else {
                                   updatedEmployee = employee.copyWith(
                                     saudiVisa: VisaDocument(
@@ -549,7 +576,9 @@ class UpdateDialogHelper {
                                 break;
                               case 'Bahrain Visa':
                                 if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(clearBahrainVisa: true);
+                                  updatedEmployee = employee.copyWith(
+                                    clearBahrainVisa: true,
+                                  );
                                 } else {
                                   updatedEmployee = employee.copyWith(
                                     bahrainVisa: VisaDocument(
@@ -565,7 +594,9 @@ class UpdateDialogHelper {
                                 break;
                               case 'Dubai Visa':
                                 if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(clearDubaiVisa: true);
+                                  updatedEmployee = employee.copyWith(
+                                    clearDubaiVisa: true,
+                                  );
                                 } else {
                                   updatedEmployee = employee.copyWith(
                                     dubaiVisa: VisaDocument(
@@ -581,7 +612,9 @@ class UpdateDialogHelper {
                                 break;
                               case 'Qatar Visa':
                                 if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(clearQatarVisa: true);
+                                  updatedEmployee = employee.copyWith(
+                                    clearQatarVisa: true,
+                                  );
                                 } else {
                                   updatedEmployee = employee.copyWith(
                                     qatarVisa: VisaDocument(
@@ -598,21 +631,22 @@ class UpdateDialogHelper {
                               default:
                                 // Phone Recharge contacts
                                 if (documentType.startsWith('Phone Recharge')) {
-                                  final updatedContacts =
-                                      employee.contacts.map((c) {
-                                    final contactId =
-                                        '${c.countryCode} ${c.phoneNumber}';
-                                    if (documentType.contains(contactId)) {
-                                      return c.copyWith(
-                                        rechargeExpiryDate: selectedDate,
-                                        rechargeCost: double.tryParse(
-                                          costController.text,
-                                        ),
-                                        currentHolderId: selectedHolderId,
-                                      );
-                                    }
-                                    return c;
-                                  }).toList();
+                                  final updatedContacts = employee.contacts.map(
+                                    (c) {
+                                      final contactId =
+                                          '${c.countryCode} ${c.phoneNumber}';
+                                      if (documentType.contains(contactId)) {
+                                        return c.copyWith(
+                                          rechargeExpiryDate: selectedDate,
+                                          rechargeCost: double.tryParse(
+                                            costController.text,
+                                          ),
+                                          currentHolderId: selectedHolderId,
+                                        );
+                                      }
+                                      return c;
+                                    },
+                                  ).toList();
                                   updatedEmployee = employee.copyWith(
                                     contacts: updatedContacts,
                                   );
@@ -620,14 +654,15 @@ class UpdateDialogHelper {
                                 break;
                             }
 
-                            await employeeProvider
-                                .updateEmployee(updatedEmployee);
+                            await employeeProvider.updateEmployee(
+                              updatedEmployee,
+                            );
 
                             if (ctx.mounted) {
-                              final notifProvider =
-                                  ctx.read<NotificationProvider>();
-                              final vehicleProvider =
-                                  ctx.read<VehicleProvider>();
+                              final notifProvider = ctx
+                                  .read<NotificationProvider>();
+                              final vehicleProvider = ctx
+                                  .read<VehicleProvider>();
                               final messenger = ScaffoldMessenger.of(ctx);
                               final navigator = Navigator.of(ctx);
 
@@ -675,7 +710,6 @@ class UpdateDialogHelper {
       },
     );
   }
-
 
   static void _showVehicleMaintenanceUpdateDialog(
     BuildContext context,
@@ -780,7 +814,8 @@ class UpdateDialogHelper {
                 ),
                 TextButton(
                   onPressed: () async {
-                    final maintenanceUseCase = sl<GetVehicleMaintenanceAlertsUseCase>();
+                    final maintenanceUseCase =
+                        sl<GetVehicleMaintenanceAlertsUseCase>();
                     final alerts = maintenanceUseCase(
                       vehicles: vehicleProvider.vehicles,
                       maintenanceTypes: vehicleProvider.maintenanceTypes,
@@ -809,7 +844,8 @@ class UpdateDialogHelper {
                     );
                     if (extended == true) {
                       if (context.mounted) {
-                        final notifProvider = context.read<NotificationProvider>();
+                        final notifProvider = context
+                            .read<NotificationProvider>();
                         await notifProvider.markAsRead(notification.id);
                         await notifProvider.refreshAlerts(
                           vehicles: vehicleProvider.vehicles,
@@ -998,7 +1034,9 @@ class UpdateDialogHelper {
     final vaultData = vaultProvider.vaultData;
     if (vaultData == null) return;
 
-    final documentType = notification.id.substring('vault_'.length).replaceAll('_', ' ');
+    final documentType = notification.id
+        .substring('vault_'.length)
+        .replaceAll('_', ' ');
 
     DateTime? selectedDate;
     XFile? pickedFile;
@@ -1017,8 +1055,13 @@ class UpdateDialogHelper {
         return StatefulBuilder(
           builder: (ctx, setState) {
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
-              title: Text('Update $documentType', style: const TextStyle(fontWeight: FontWeight.bold)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16.r),
+              ),
+              title: Text(
+                'Update $documentType',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1050,68 +1093,114 @@ class UpdateDialogHelper {
                   const Divider(),
                   const SizedBox(height: 10),
                   OutlinedButton.icon(
-                    icon: Icon(pickedFile != null ? Icons.check_circle : Icons.attach_file),
-                    label: Text(pickedFile != null ? p.basename(pickedFile!.path) : 'Choose File'),
-                    onPressed: isSaving ? null : () async {
-                      final result = await FilePicker.platform.pickFiles(type: FileType.any);
-                      if (result != null && result.files.isNotEmpty) {
-                        setState(() => pickedFile = XFile(result.files.first.path!));
-                      }
-                    },
+                    icon: Icon(
+                      pickedFile != null
+                          ? Icons.check_circle
+                          : Icons.attach_file,
+                    ),
+                    label: Text(
+                      pickedFile != null
+                          ? p.basename(pickedFile!.path)
+                          : 'Choose File',
+                    ),
+                    onPressed: isSaving
+                        ? null
+                        : () async {
+                            final result = await FilePicker.platform.pickFiles(
+                              type: FileType.any,
+                            );
+                            if (result != null && result.files.isNotEmpty) {
+                              setState(
+                                () => pickedFile = XFile(
+                                  result.files.first.path!,
+                                ),
+                              );
+                            }
+                          },
                   ),
                 ],
               ),
               actions: [
-                TextButton(onPressed: isSaving ? null : () => Navigator.pop(ctx), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
                 ElevatedButton(
-                  onPressed: isSaving ? null : () async {
-                    if (selectedDate == null) return;
-                    setState(() => isSaving = true);
-                    try {
-                      VaultDocument? newDoc;
-                      if (pickedFile != null) {
-                        newDoc = await vaultProvider.uploadDocument(
-                          pickedFile!,
-                          'vault/company_documents',
-                        );
-                      }
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (selectedDate == null) return;
+                          setState(() => isSaving = true);
+                          try {
+                            VaultDocument? newDoc;
+                            if (pickedFile != null) {
+                              newDoc = await vaultProvider.uploadDocument(
+                                pickedFile!,
+                                'vault/company_documents',
+                              );
+                            }
 
-                      VaultData updatedData = vaultData;
-                      if (documentType == 'Commercial License') {
-                        updatedData = vaultData.copyWith(
-                          license: vaultData.license.copyWith(
-                            expiryDate: selectedDate!,
-                            registrationNo: regNoController.text,
-                            document: newDoc ?? vaultData.license.document,
+                            VaultData updatedData = vaultData;
+                            if (documentType == 'Commercial License') {
+                              updatedData = vaultData.copyWith(
+                                license: vaultData.license.copyWith(
+                                  expiryDate: selectedDate!,
+                                  registrationNo: regNoController.text,
+                                  document:
+                                      newDoc ?? vaultData.license.document,
+                                ),
+                              );
+                            } else if (documentType == 'VAT Certificate') {
+                              updatedData = vaultData.copyWith(
+                                vatCertificate: vaultData.vatCertificate
+                                    .copyWith(
+                                      document:
+                                          newDoc ??
+                                          vaultData.vatCertificate.document,
+                                    ),
+                              );
+                            }
+
+                            await vaultProvider.updateVaultData(updatedData);
+
+                            if (ctx.mounted) {
+                              final notifProvider = ctx
+                                  .read<NotificationProvider>();
+                              final vehicleProvider = ctx
+                                  .read<VehicleProvider>();
+                              await notifProvider.markAsRead(notification.id);
+                              await notifProvider.refreshAlerts(
+                                vehicles: vehicleProvider.vehicles,
+                                maintenanceTypes:
+                                    vehicleProvider.maintenanceTypes,
+                              );
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Updated successfully'),
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            setState(() => isSaving = false);
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
                           ),
-                        );
-                      } else if (documentType == 'VAT Certificate') {
-                        updatedData = vaultData.copyWith(
-                          vatCertificate: vaultData.vatCertificate.copyWith(
-                            document: newDoc ?? vaultData.vatCertificate.document,
-                          ),
-                        );
-                      }
-
-                      await vaultProvider.updateVaultData(updatedData);
-
-                      if (ctx.mounted) {
-                        final notifProvider = ctx.read<NotificationProvider>();
-                        final vehicleProvider = ctx.read<VehicleProvider>();
-                        await notifProvider.markAsRead(notification.id);
-                        await notifProvider.refreshAlerts(
-                          vehicles: vehicleProvider.vehicles,
-                          maintenanceTypes: vehicleProvider.maintenanceTypes,
-                        );
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Updated successfully')));
-                      }
-                    } catch (e) {
-                      setState(() => isSaving = false);
-                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
-                    }
-                  },
-                  child: isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Save'),
+                        )
+                      : const Text('Save'),
                 ),
               ],
             );
@@ -1158,9 +1247,10 @@ class UpdateDialogHelper {
 
     TafweedRecord? existingTafweed;
     if (documentType == 'Tafweed' && driverId != null) {
-      existingTafweed = vehicle.tafweeds
-          ?.cast<TafweedRecord?>()
-          .firstWhere((t) => t?.driverId == driverId, orElse: () => null);
+      existingTafweed = vehicle.tafweeds?.cast<TafweedRecord?>().firstWhere(
+        (t) => t?.driverId == driverId,
+        orElse: () => null,
+      );
     }
 
     String? selectedDriverId = driverId;
@@ -1181,13 +1271,18 @@ class UpdateDialogHelper {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setState) {
-            // For Tafweed, the user has requested it to be strictly read-only in the vehicle details, 
+            // For Tafweed, the user has requested it to be strictly read-only in the vehicle details,
             // but updatable from Action Items.
             final supportsUpload = docKeys.containsKey(documentType);
 
             return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
-              title: Text('Update $documentType', style: const TextStyle(fontWeight: FontWeight.bold)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16.r),
+              ),
+              title: Text(
+                'Update $documentType',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               content: SizedBox(
                 width: 400,
                 child: SingleChildScrollView(
@@ -1212,11 +1307,12 @@ class UpdateDialogHelper {
                           items: employeeProvider.employees
                               .where((e) => e.isActive)
                               .map((e) {
-                            return DropdownMenuItem(
-                              value: e.id,
-                              child: Text(e.fullName),
-                            );
-                          }).toList(),
+                                return DropdownMenuItem(
+                                  value: e.id,
+                                  child: Text(e.fullName),
+                                );
+                              })
+                              .toList(),
                           onChanged: (val) {
                             setState(() {
                               selectedDriverId = val;
@@ -1281,69 +1377,105 @@ class UpdateDialogHelper {
                             onPressed: isSaving
                                 ? null
                                 : () async {
-                                    final confirm = await showDialog<bool>(
-                                      context: ctx,
-                                      builder: (c) => AlertDialog(
-                                        title: const Text('Cancel Authorization'),
-                                        content: const Text(
-                                          'Are you sure you want to cancel the current authorization? This will record the end date as today and move it to history.',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(c, false),
-                                            child: const Text('No'),
+                                    final confirm =
+                                        await showDialog<bool>(
+                                          context: ctx,
+                                          builder: (c) => AlertDialog(
+                                            title: const Text(
+                                              'Cancel Authorization',
+                                            ),
+                                            content: const Text(
+                                              'Are you sure you want to cancel the current authorization? This will record the end date as today and move it to history.',
+                                            ),
+                                            actions: [
+                                              TextButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(c, false),
+                                                child: const Text('No'),
+                                              ),
+                                              ElevatedButton(
+                                                onPressed: () =>
+                                                    Navigator.pop(c, true),
+                                                child: const Text('Yes'),
+                                              ),
+                                            ],
                                           ),
-                                          ElevatedButton(
-                                            onPressed: () => Navigator.pop(c, true),
-                                            child: const Text('Yes'),
-                                          ),
-                                        ],
-                                      ),
-                                    ) ?? false;
+                                        ) ??
+                                        false;
 
                                     if (!confirm) return;
 
                                     setState(() => isSaving = true);
                                     try {
-                                      final currentTafweeds = List<TafweedRecord>.from(vehicle.tafweeds ?? []);
-                                      final idx = currentTafweeds.indexWhere((t) => t.driverId == selectedDriverId);
+                                      final currentTafweeds =
+                                          List<TafweedRecord>.from(
+                                            vehicle.tafweeds ?? [],
+                                          );
+                                      final idx = currentTafweeds.indexWhere(
+                                        (t) => t.driverId == selectedDriverId,
+                                      );
                                       if (idx != -1) {
-                                        final recordToArchive = currentTafweeds[idx];
+                                        final recordToArchive =
+                                            currentTafweeds[idx];
                                         currentTafweeds.removeAt(idx);
 
-                                        final updatedHistory = List<TafweedRecord>.from(vehicle.tafweedHistory ?? []);
-                                        updatedHistory.add(recordToArchive.copyWith(expiryDate: DateTime.now()));
+                                        final updatedHistory =
+                                            List<TafweedRecord>.from(
+                                              vehicle.tafweedHistory ?? [],
+                                            );
+                                        updatedHistory.add(
+                                          recordToArchive.copyWith(
+                                            expiryDate: DateTime.now(),
+                                          ),
+                                        );
 
                                         final updatedVehicle = vehicle.copyWith(
                                           tafweeds: currentTafweeds,
                                           tafweedHistory: updatedHistory,
                                         );
 
-                                        await vehicleProvider.updateVehicle(updatedVehicle);
+                                        await vehicleProvider.updateVehicle(
+                                          updatedVehicle,
+                                        );
                                       }
 
                                       if (ctx.mounted) {
-                                        final notifProvider = ctx.read<NotificationProvider>();
-                                        await notifProvider.markAsRead(notification.id);
+                                        final notifProvider = ctx
+                                            .read<NotificationProvider>();
+                                        await notifProvider.markAsRead(
+                                          notification.id,
+                                        );
                                         await notifProvider.refreshAlerts(
                                           vehicles: vehicleProvider.vehicles,
-                                          maintenanceTypes: vehicleProvider.maintenanceTypes,
+                                          maintenanceTypes:
+                                              vehicleProvider.maintenanceTypes,
                                         );
                                         if (!ctx.mounted) return;
                                         Navigator.pop(ctx);
                                         ScaffoldMessenger.of(ctx).showSnackBar(
-                                          const SnackBar(content: Text('Authorization cancelled successfully')),
+                                          const SnackBar(
+                                            content: Text(
+                                              'Authorization cancelled successfully',
+                                            ),
+                                          ),
                                         );
                                       }
                                     } catch (e) {
                                       setState(() => isSaving = false);
                                       if (!ctx.mounted) return;
                                       ScaffoldMessenger.of(ctx).showSnackBar(
-                                        SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+                                        SnackBar(
+                                          content: Text('Error: $e'),
+                                          backgroundColor: Colors.red,
+                                        ),
                                       );
                                     }
                                   },
-                            icon: Icon(Icons.cancel_outlined, color: Colors.orange[700], size: 18.sp),
+                            icon: Icon(
+                              Icons.cancel_outlined,
+                              color: Colors.orange[700],
+                              size: 18.sp,
+                            ),
                             label: Text(
                               'Cancel Authorization',
                               style: TextStyle(
@@ -1354,7 +1486,10 @@ class UpdateDialogHelper {
                             ),
                             style: TextButton.styleFrom(
                               backgroundColor: Colors.orange[50],
-                              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12.w,
+                                vertical: 8.h,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8.r),
                               ),
@@ -1372,7 +1507,8 @@ class UpdateDialogHelper {
                               firstDate: DateTime(2000),
                               lastDate: DateTime(2100),
                             );
-                            if (picked != null) setState(() => selectedDate = picked);
+                            if (picked != null)
+                              setState(() => selectedDate = picked);
                           },
                         ),
                       ],
@@ -1381,14 +1517,30 @@ class UpdateDialogHelper {
                         const Divider(),
                         const SizedBox(height: 10),
                         OutlinedButton.icon(
-                          icon: Icon(pickedFile != null ? Icons.check_circle : Icons.attach_file),
-                          label: Text(pickedFile != null ? p.basename(pickedFile!.path) : 'Choose File'),
-                          onPressed: isSaving ? null : () async {
-                            final result = await FilePicker.platform.pickFiles(type: FileType.any);
-                            if (result != null && result.files.isNotEmpty) {
-                              setState(() => pickedFile = XFile(result.files.first.path!));
-                            }
-                          },
+                          icon: Icon(
+                            pickedFile != null
+                                ? Icons.check_circle
+                                : Icons.attach_file,
+                          ),
+                          label: Text(
+                            pickedFile != null
+                                ? p.basename(pickedFile!.path)
+                                : 'Choose File',
+                          ),
+                          onPressed: isSaving
+                              ? null
+                              : () async {
+                                  final result = await FilePicker.platform
+                                      .pickFiles(type: FileType.any);
+                                  if (result != null &&
+                                      result.files.isNotEmpty) {
+                                    setState(
+                                      () => pickedFile = XFile(
+                                        result.files.first.path!,
+                                      ),
+                                    );
+                                  }
+                                },
                         ),
                       ],
                     ],
@@ -1396,226 +1548,335 @@ class UpdateDialogHelper {
                 ),
               ),
               actions: [
-                TextButton(onPressed: isSaving ? null : () => Navigator.pop(ctx), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: isSaving ? null : () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
                 ElevatedButton(
-                  onPressed: isSaving ? null : () async {
-                    setState(() => isSaving = true);
-                    try {
-                      String? newUrl;
-                      if (pickedFile != null && docKeys.containsKey(documentType)) {
-                        newUrl = await vehicleProvider.uploadVehicleDocument(
-                          pickedFile!,
-                          vehicle.id,
-                          docKeys[documentType]!,
-                        );
-                      }
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          setState(() => isSaving = true);
+                          try {
+                            String? newUrl;
+                            if (pickedFile != null &&
+                                docKeys.containsKey(documentType)) {
+                              newUrl = await vehicleProvider
+                                  .uploadVehicleDocument(
+                                    pickedFile!,
+                                    vehicle.id,
+                                    docKeys[documentType]!,
+                                  );
+                            }
 
-                      VehicleEntity updatedVehicle = vehicle;
-                      String? url(String? existing) => newUrl ?? existing;
+                            VehicleEntity updatedVehicle = vehicle;
+                            String? url(String? existing) => newUrl ?? existing;
 
-                      switch (documentType) {
-                        case 'Istimara':
-                          if (selectedDate == null) {
-                            updatedVehicle = vehicle.copyWith(clearRegistration: true);
-                          } else {
-                            updatedVehicle = vehicle.copyWith(
-                              registration: (vehicle.registration ??
-                                      VehicleDocument(expiryDate: selectedDate!))
-                                  .copyWith(
-                                expiryDate: selectedDate!,
-                                attachmentUrl: url(vehicle.registration?.attachmentUrl),
-                              ),
-                            );
-                          }
-                          break;
-                        case 'Insurance':
-                          if (selectedDate == null) {
-                            updatedVehicle = vehicle.copyWith(clearInsurance: true);
-                          } else {
-                            updatedVehicle = vehicle.copyWith(
-                              insurance: (vehicle.insurance ??
-                                      VehicleDocument(expiryDate: selectedDate!))
-                                  .copyWith(
-                                expiryDate: selectedDate!,
-                                attachmentUrl: url(vehicle.insurance?.attachmentUrl),
-                              ),
-                            );
-                          }
-                          break;
-                        case 'Fahas':
-                          if (selectedDate == null) {
-                            updatedVehicle = vehicle.copyWith(clearFahas: true);
-                          } else {
-                            updatedVehicle = vehicle.copyWith(
-                              fahas: (vehicle.fahas ??
-                                      VehicleDocument(expiryDate: selectedDate!))
-                                  .copyWith(
-                                expiryDate: selectedDate!,
-                                attachmentUrl: url(vehicle.fahas?.attachmentUrl),
-                              ),
-                            );
-                          }
-                          break;
-                        case 'Bahrain Insurance':
-                          if (selectedDate == null) {
-                            updatedVehicle = vehicle.copyWith(clearBahrainInsurance: true);
-                          } else {
-                            updatedVehicle = vehicle.copyWith(
-                              bahrainInsurance: (vehicle.bahrainInsurance ??
-                                      VehicleDocument(expiryDate: selectedDate!))
-                                  .copyWith(
-                                expiryDate: selectedDate!,
-                                attachmentUrl:
-                                    url(vehicle.bahrainInsurance?.attachmentUrl),
-                              ),
-                            );
-                          }
-                          break;
-                        case 'Tafweed':
-                          if (selectedDriverId == null) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(content: Text('Please select an authorized driver')),
-                            );
-                            setState(() => isSaving = false);
-                            return;
-                          }
-                          if (selectedDate == null) {
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              const SnackBar(content: Text('Please select an expiry date')),
-                            );
-                            setState(() => isSaving = false);
-                            return;
-                          }
-
-                          // Check if selected driver is authorized on another vehicle
-                          final existingVehicles = vehicleProvider.vehicles
-                              .where(
-                                (v) =>
-                                    v.id != vehicle.id &&
-                                    (v.tafweeds?.any((t) => t.driverId == selectedDriverId) ??
-                                        false),
-                              )
-                              .toList();
-
-                          bool confirmSwap = true;
-                          if (existingVehicles.isNotEmpty) {
-                            if (!ctx.mounted) return;
-                            confirmSwap = await showDialog<bool>(
-                                  context: ctx,
-                                  builder: (c) => AlertDialog(
-                                    title: const Text('Driver Already Authorized'),
-                                    content: Text(
-                                      'This driver is currently authorized for '
-                                      '${existingVehicles.first.make} ${existingVehicles.first.model} '
-                                      '(${existingVehicles.first.plateNumber}). '
-                                      'Do you want to swap the driver to this vehicle? '
-                                      'They will be removed from the other vehicle\'s authorization '
-                                      'and that record will be saved to history.',
+                            switch (documentType) {
+                              case 'Istimara':
+                                if (selectedDate == null) {
+                                  updatedVehicle = vehicle.copyWith(
+                                    clearRegistration: true,
+                                  );
+                                } else {
+                                  updatedVehicle = vehicle.copyWith(
+                                    registration:
+                                        (vehicle.registration ??
+                                                VehicleDocument(
+                                                  expiryDate: selectedDate!,
+                                                ))
+                                            .copyWith(
+                                              expiryDate: selectedDate!,
+                                              attachmentUrl: url(
+                                                vehicle
+                                                    .registration
+                                                    ?.attachmentUrl,
+                                              ),
+                                            ),
+                                  );
+                                }
+                                break;
+                              case 'Insurance':
+                                if (selectedDate == null) {
+                                  updatedVehicle = vehicle.copyWith(
+                                    clearInsurance: true,
+                                  );
+                                } else {
+                                  updatedVehicle = vehicle.copyWith(
+                                    insurance:
+                                        (vehicle.insurance ??
+                                                VehicleDocument(
+                                                  expiryDate: selectedDate!,
+                                                ))
+                                            .copyWith(
+                                              expiryDate: selectedDate!,
+                                              attachmentUrl: url(
+                                                vehicle
+                                                    .insurance
+                                                    ?.attachmentUrl,
+                                              ),
+                                            ),
+                                  );
+                                }
+                                break;
+                              case 'Fahas':
+                                if (selectedDate == null) {
+                                  updatedVehicle = vehicle.copyWith(
+                                    clearFahas: true,
+                                  );
+                                } else {
+                                  updatedVehicle = vehicle.copyWith(
+                                    fahas:
+                                        (vehicle.fahas ??
+                                                VehicleDocument(
+                                                  expiryDate: selectedDate!,
+                                                ))
+                                            .copyWith(
+                                              expiryDate: selectedDate!,
+                                              attachmentUrl: url(
+                                                vehicle.fahas?.attachmentUrl,
+                                              ),
+                                            ),
+                                  );
+                                }
+                                break;
+                              case 'Bahrain Insurance':
+                                if (selectedDate == null) {
+                                  updatedVehicle = vehicle.copyWith(
+                                    clearBahrainInsurance: true,
+                                  );
+                                } else {
+                                  updatedVehicle = vehicle.copyWith(
+                                    bahrainInsurance:
+                                        (vehicle.bahrainInsurance ??
+                                                VehicleDocument(
+                                                  expiryDate: selectedDate!,
+                                                ))
+                                            .copyWith(
+                                              expiryDate: selectedDate!,
+                                              attachmentUrl: url(
+                                                vehicle
+                                                    .bahrainInsurance
+                                                    ?.attachmentUrl,
+                                              ),
+                                            ),
+                                  );
+                                }
+                                break;
+                              case 'Tafweed':
+                                if (selectedDriverId == null) {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please select an authorized driver',
+                                      ),
                                     ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(c, false),
-                                        child: const Text('Cancel'),
+                                  );
+                                  setState(() => isSaving = false);
+                                  return;
+                                }
+                                if (selectedDate == null) {
+                                  ScaffoldMessenger.of(ctx).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Please select an expiry date',
                                       ),
-                                      ElevatedButton(
-                                        onPressed: () => Navigator.pop(c, true),
-                                        child: const Text('Swap'),
+                                    ),
+                                  );
+                                  setState(() => isSaving = false);
+                                  return;
+                                }
+
+                                // Check if selected driver is authorized on another vehicle
+                                final existingVehicles = vehicleProvider
+                                    .vehicles
+                                    .where(
+                                      (v) =>
+                                          v.id != vehicle.id &&
+                                          (v.tafweeds?.any(
+                                                (t) =>
+                                                    t.driverId ==
+                                                    selectedDriverId,
+                                              ) ??
+                                              false),
+                                    )
+                                    .toList();
+
+                                bool confirmSwap = true;
+                                if (existingVehicles.isNotEmpty) {
+                                  if (!ctx.mounted) return;
+                                  confirmSwap =
+                                      await showDialog<bool>(
+                                        context: ctx,
+                                        builder: (c) => AlertDialog(
+                                          title: const Text(
+                                            'Driver Already Authorized',
+                                          ),
+                                          content: Text(
+                                            'This driver is currently authorized for '
+                                            '${existingVehicles.first.make} ${existingVehicles.first.model} '
+                                            '(${existingVehicles.first.plateNumber}). '
+                                            'Do you want to swap the driver to this vehicle? '
+                                            'They will be removed from the other vehicle\'s authorization '
+                                            'and that record will be saved to history.',
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(c, false),
+                                              child: const Text('Cancel'),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () =>
+                                                  Navigator.pop(c, true),
+                                              child: const Text('Swap'),
+                                            ),
+                                          ],
+                                        ),
+                                      ) ??
+                                      false;
+                                }
+
+                                if (!confirmSwap) {
+                                  setState(() => isSaving = false);
+                                  return;
+                                }
+
+                                // Archive from other vehicles if swap occurred
+                                for (final otherVehicle in existingVehicles) {
+                                  final recordToArchive = otherVehicle.tafweeds
+                                      ?.where(
+                                        (t) => t.driverId == selectedDriverId,
+                                      )
+                                      .firstOrNull;
+
+                                  final updatedActiveTafweeds =
+                                      List<TafweedRecord>.from(
+                                        otherVehicle.tafweeds ?? [],
+                                      )..removeWhere(
+                                        (t) => t.driverId == selectedDriverId,
+                                      );
+
+                                  final updatedHistory =
+                                      List<TafweedRecord>.from(
+                                        otherVehicle.tafweedHistory ?? [],
+                                      );
+                                  if (recordToArchive != null) {
+                                    updatedHistory.add(
+                                      recordToArchive.copyWith(
+                                        expiryDate: DateTime.now(),
                                       ),
-                                    ],
-                                  ),
-                                ) ??
-                                false;
-                          }
+                                    );
+                                  }
 
-                          if (!confirmSwap) {
-                            setState(() => isSaving = false);
-                            return;
-                          }
+                                  final updatedOtherVehicle = otherVehicle
+                                      .copyWith(
+                                        tafweeds: updatedActiveTafweeds,
+                                        tafweedHistory: updatedHistory,
+                                      );
+                                  await vehicleProvider.updateVehicle(
+                                    updatedOtherVehicle,
+                                  );
+                                }
 
-                          // Archive from other vehicles if swap occurred
-                          for (final otherVehicle in existingVehicles) {
-                            final recordToArchive = otherVehicle.tafweeds
-                                ?.where((t) => t.driverId == selectedDriverId)
-                                .firstOrNull;
+                                final List<TafweedRecord> currentTafweeds =
+                                    List.from(vehicle.tafweeds ?? []);
 
-                            final updatedActiveTafweeds = List<TafweedRecord>.from(
-                              otherVehicle.tafweeds ?? [],
-                            )..removeWhere((t) => t.driverId == selectedDriverId);
+                                // Archive old driver's record if it was changed
+                                List<TafweedRecord> updatedHistory = List.from(
+                                  vehicle.tafweedHistory ?? [],
+                                );
+                                if (driverId != null &&
+                                    driverId != selectedDriverId) {
+                                  final oldIndex = currentTafweeds.indexWhere(
+                                    (t) => t.driverId == driverId,
+                                  );
+                                  if (oldIndex != -1) {
+                                    final oldRecord = currentTafweeds[oldIndex];
+                                    currentTafweeds.removeAt(oldIndex);
+                                    updatedHistory.add(
+                                      oldRecord.copyWith(
+                                        expiryDate: DateTime.now(),
+                                      ),
+                                    );
+                                  }
+                                }
 
-                            final updatedHistory = List<TafweedRecord>.from(
-                              otherVehicle.tafweedHistory ?? [],
-                            );
-                            if (recordToArchive != null) {
-                              updatedHistory.add(
-                                recordToArchive.copyWith(expiryDate: DateTime.now()),
+                                final targetIndex = currentTafweeds.indexWhere(
+                                  (t) => t.driverId == selectedDriverId,
+                                );
+                                final attachmentUrl = url(
+                                  targetIndex != -1
+                                      ? currentTafweeds[targetIndex]
+                                            .attachmentUrl
+                                      : null,
+                                );
+                                final notificationDays = targetIndex != -1
+                                    ? currentTafweeds[targetIndex]
+                                          .notificationDays
+                                    : null;
+
+                                final newRecord = TafweedRecord(
+                                  driverId: selectedDriverId!,
+                                  issuedDate: issuedDate ?? DateTime.now(),
+                                  expiryDate: selectedDate!,
+                                  attachmentUrl: attachmentUrl,
+                                  notificationDays: notificationDays,
+                                );
+
+                                if (targetIndex != -1) {
+                                  currentTafweeds[targetIndex] = newRecord;
+                                } else {
+                                  currentTafweeds.add(newRecord);
+                                }
+
+                                updatedVehicle = vehicle.copyWith(
+                                  tafweeds: currentTafweeds,
+                                  tafweedHistory: updatedHistory,
+                                );
+                                break;
+                            }
+
+                            await vehicleProvider.updateVehicle(updatedVehicle);
+
+                            if (ctx.mounted) {
+                              final notifProvider = ctx
+                                  .read<NotificationProvider>();
+                              await notifProvider.markAsRead(notification.id);
+                              await notifProvider.refreshAlerts(
+                                vehicles: vehicleProvider.vehicles,
+                                maintenanceTypes:
+                                    vehicleProvider.maintenanceTypes,
+                              );
+                              if (!ctx.mounted) return;
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Updated successfully'),
+                                ),
                               );
                             }
-
-                            final updatedOtherVehicle = otherVehicle.copyWith(
-                              tafweeds: updatedActiveTafweeds,
-                              tafweedHistory: updatedHistory,
+                          } catch (e) {
+                            setState(() => isSaving = false);
+                            if (!ctx.mounted) return;
+                            ScaffoldMessenger.of(ctx).showSnackBar(
+                              SnackBar(
+                                content: Text('Error: $e'),
+                                backgroundColor: Colors.red,
+                              ),
                             );
-                            await vehicleProvider.updateVehicle(updatedOtherVehicle);
                           }
-
-                          final List<TafweedRecord> currentTafweeds = List.from(vehicle.tafweeds ?? []);
-                          
-                          // Archive old driver's record if it was changed
-                          List<TafweedRecord> updatedHistory = List.from(vehicle.tafweedHistory ?? []);
-                          if (driverId != null && driverId != selectedDriverId) {
-                            final oldIndex = currentTafweeds.indexWhere((t) => t.driverId == driverId);
-                            if (oldIndex != -1) {
-                              final oldRecord = currentTafweeds[oldIndex];
-                              currentTafweeds.removeAt(oldIndex);
-                              updatedHistory.add(oldRecord.copyWith(expiryDate: DateTime.now()));
-                            }
-                          }
-
-                          final targetIndex = currentTafweeds.indexWhere((t) => t.driverId == selectedDriverId);
-                          final attachmentUrl = url(targetIndex != -1 ? currentTafweeds[targetIndex].attachmentUrl : null);
-                          final notificationDays = targetIndex != -1 ? currentTafweeds[targetIndex].notificationDays : null;
-
-                          final newRecord = TafweedRecord(
-                            driverId: selectedDriverId!,
-                            issuedDate: issuedDate ?? DateTime.now(),
-                            expiryDate: selectedDate!,
-                            attachmentUrl: attachmentUrl,
-                            notificationDays: notificationDays,
-                          );
-
-                          if (targetIndex != -1) {
-                            currentTafweeds[targetIndex] = newRecord;
-                          } else {
-                            currentTafweeds.add(newRecord);
-                          }
-
-                          updatedVehicle = vehicle.copyWith(
-                            tafweeds: currentTafweeds,
-                            tafweedHistory: updatedHistory,
-                          );
-                          break;
-                      }
-
-                      await vehicleProvider.updateVehicle(updatedVehicle);
-
-                      if (ctx.mounted) {
-                        final notifProvider = ctx.read<NotificationProvider>();
-                        await notifProvider.markAsRead(notification.id);
-                        await notifProvider.refreshAlerts(
-                          vehicles: vehicleProvider.vehicles,
-                          maintenanceTypes: vehicleProvider.maintenanceTypes,
-                        );
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Updated successfully')));
-                      }
-                    } catch (e) {
-                      setState(() => isSaving = false);
-                      if (!ctx.mounted) return;
-                      ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
-                    }
-                  },
-                  child: isSaving ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)) : const Text('Save'),
+                        },
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Save'),
                 ),
               ],
             );
@@ -1642,13 +1903,15 @@ class UpdateDialogHelper {
 
     final parts = notification.id.split('_');
     final timestamp = parts.length > 2 ? int.tryParse(parts[2]) : null;
-    
+
     MaintenanceRecord? record;
     if (timestamp != null) {
-      record = vehicle.maintenanceHistory?.cast<MaintenanceRecord?>().firstWhere(
-        (r) => r?.date.millisecondsSinceEpoch == timestamp,
-        orElse: () => null,
-      );
+      record = vehicle.maintenanceHistory
+          ?.cast<MaintenanceRecord?>()
+          .firstWhere(
+            (r) => r?.date.millisecondsSinceEpoch == timestamp,
+            orElse: () => null,
+          );
     }
 
     if (record == null) return;
@@ -1670,7 +1933,9 @@ class UpdateDialogHelper {
             ),
             ElevatedButton(
               onPressed: () async {
-                final updatedHistory = (vehicle.maintenanceHistory ?? []).map((r) {
+                final updatedHistory = (vehicle.maintenanceHistory ?? []).map((
+                  r,
+                ) {
                   if (r == record) {
                     return r.copyWith(isFollowUpCompleted: true);
                   }
@@ -1700,9 +1965,7 @@ class UpdateDialogHelper {
                   );
                 } catch (e) {
                   messenger.showSnackBar(
-                    SnackBar(
-                      content: Text('Failed to update follow-up: $e'),
-                    ),
+                    SnackBar(content: Text('Failed to update follow-up: $e')),
                   );
                 }
               },

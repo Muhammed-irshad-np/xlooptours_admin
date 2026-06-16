@@ -5,6 +5,11 @@ import 'package:provider/provider.dart';
 import '../../features/notifications/domain/entities/notification_entity.dart';
 import '../../features/notifications/presentation/providers/notification_provider.dart';
 import '../utils/update_dialog_helper.dart';
+import '../../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../../features/vehicle/presentation/widgets/maintenance_extension_dialog.dart';
+import '../../features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
+import '../../features/vehicle/domain/entities/vehicle_entity.dart';
+import '../../injection_container.dart';
 
 class ActionItemsDialog extends StatelessWidget {
   final String title;
@@ -35,7 +40,7 @@ class ActionItemsDialog extends StatelessWidget {
             borderRadius: BorderRadius.circular(20.r),
           ),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 500.w, maxHeight: 600.h),
+            constraints: BoxConstraints(maxWidth: 750.w, maxHeight: 600.h),
             child: Padding(
               padding: EdgeInsets.all(24.w),
               child: Column(
@@ -160,9 +165,65 @@ class _ExpiryCard extends StatefulWidget {
 class _ExpiryCardState extends State<_ExpiryCard> {
   bool _hovered = false;
 
+  void _extendAlert() {
+    final relatedId = widget.alert.relatedId;
+    if (relatedId == null) return;
+
+    final vehicleProvider = context.read<VehicleProvider>();
+    final vehicle = vehicleProvider.vehicles.cast<VehicleEntity?>().firstWhere(
+      (v) => v?.id == relatedId,
+      orElse: () => null,
+    );
+    if (vehicle == null) return;
+
+    final prefix = 'maintenance_${relatedId}_';
+    final categoryEncoded = widget.alert.id.substring(prefix.length);
+    final category = categoryEncoded.replaceAll('_', ' ');
+
+    final maintenanceUseCase = sl<GetVehicleMaintenanceAlertsUseCase>();
+    final alerts = maintenanceUseCase(
+      vehicles: vehicleProvider.vehicles,
+      maintenanceTypes: vehicleProvider.maintenanceTypes,
+      includeAll: true,
+    );
+    final alert = alerts.firstWhere(
+      (a) =>
+          a.vehicle.id == vehicle.id &&
+          a.category.toLowerCase() == category.toLowerCase(),
+      orElse: () => VehicleMaintenanceAlert(
+        vehicle: vehicle,
+        category: category,
+        currentMileage: vehicle.currentOdometer ?? 0,
+        lastServiceMileage: 0,
+        nextServiceMileage: vehicle.currentOdometer ?? 0,
+        kmOverdue: 0,
+      ),
+    );
+
+    showDialog<bool>(
+      context: context,
+      builder: (context) => MaintenanceExtensionDialog(
+        vehicle: vehicle,
+        alert: alert,
+      ),
+    ).then((success) {
+      if (success == true) {
+        if (mounted) {
+          final notifProvider = context.read<NotificationProvider>();
+          notifProvider.markAsRead(widget.alert.id);
+          notifProvider.refreshAlerts(
+            vehicles: vehicleProvider.vehicles,
+            maintenanceTypes: vehicleProvider.maintenanceTypes,
+          );
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     const danger = Color(0xFFDC2626);
+    const brand = Color(0xFF4F46E5);
     const dangerBg = Color(0xFFFFF1F2);
     const dangerBorder = Color(0xFFFFCDD2);
 
@@ -230,11 +291,38 @@ class _ExpiryCardState extends State<_ExpiryCard> {
                 ),
               ),
               SizedBox(width: 8.w),
-              _ActionButton(
-                label: 'Update',
-                color: danger,
-                onPressed: widget.onUpdate,
-              ),
+              if (widget.alert.id.startsWith('maintenance_')) ...[
+                OutlinedButton(
+                  onPressed: _extendAlert,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: brand,
+                    side: const BorderSide(color: brand),
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                  ),
+                  child: Text(
+                    'Extend Alert',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                _ActionButton(
+                  label: 'Mark Completed',
+                  color: danger,
+                  onPressed: widget.onUpdate,
+                ),
+              ] else ...[
+                _ActionButton(
+                  label: 'Update',
+                  color: danger,
+                  onPressed: widget.onUpdate,
+                ),
+              ],
             ],
           ),
         ),
