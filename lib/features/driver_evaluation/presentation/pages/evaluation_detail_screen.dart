@@ -36,14 +36,14 @@ class _EvaluationDetailScreenState extends State<EvaluationDetailScreen> {
       if (widget.evaluation.scores != null) {
         final details = widget.evaluation.scores!['details'] as Map<String, dynamic>?;
         if (details != null) {
-          _fullBodyScore = details['full_body'] as int? ?? 0;
-          _shoesScore = details['shoes'] as int? ?? 0;
-          _vehicleFrontScore = details['vehicle_front'] as int? ?? 0;
-          _vehicleBackScore = details['vehicle_back'] as int? ?? 0;
-          _vehicleLeftScore = details['vehicle_left'] as int? ?? 0;
-          _vehicleRightScore = details['vehicle_right'] as int? ?? 0;
-          _cabinFrontScore = details['cabin_front'] as int? ?? 0;
-          _cabinRearScore = details['cabin_rear'] as int? ?? 0;
+          _fullBodyScore = (details['full_body'] as num?)?.toInt() ?? 0;
+          _shoesScore = (details['shoes'] as num?)?.toInt() ?? 0;
+          _vehicleFrontScore = (details['vehicle_front'] as num?)?.toInt() ?? 0;
+          _vehicleBackScore = (details['vehicle_back'] as num?)?.toInt() ?? 0;
+          _vehicleLeftScore = (details['vehicle_left'] as num?)?.toInt() ?? 0;
+          _vehicleRightScore = (details['vehicle_right'] as num?)?.toInt() ?? 0;
+          _cabinFrontScore = (details['cabin_front'] as num?)?.toInt() ?? 0;
+          _cabinRearScore = (details['cabin_rear'] as num?)?.toInt() ?? 0;
         } else {
           // Fallback to legacy averages
           final legacyApp = (widget.evaluation.scores!['appearance'] as num? ?? 0).round();

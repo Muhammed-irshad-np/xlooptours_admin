@@ -295,8 +295,8 @@ class _PendingEvaluationsScreenState extends State<PendingEvaluationsScreen>
       double totalScore = 0.0;
       int passCount = 0;
       for (var eval in evals) {
-        final app = eval.scores!['appearance'] as int? ?? 0;
-        final veh = eval.scores!['vehicle'] as int? ?? 0;
+        final app = (eval.scores!['appearance'] as num?)?.toDouble() ?? 0.0;
+        final veh = (eval.scores!['vehicle'] as num?)?.toDouble() ?? 0.0;
         totalScore += (app + veh) / 2.0;
         if (eval.scores!['passed'] as bool? ?? true) {
           passCount++;
