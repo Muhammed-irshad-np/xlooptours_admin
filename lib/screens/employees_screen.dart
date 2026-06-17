@@ -12,6 +12,7 @@ import '../widgets/responsive_layout.dart';
 import 'employee_details_screen.dart';
 import 'employee_form_screen.dart';
 import 'employee_master_screen.dart';
+import 'employee_expiry_tracker_screen.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
@@ -214,6 +215,35 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                 },
               ),
             ],
+          ),
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.h),
+            child: TextButton.icon(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const EmployeeExpiryTrackerScreen(),
+                  ),
+                );
+              },
+              icon: Icon(Icons.filter_list_alt, size: 16.sp, color: Colors.blue[700]),
+              label: Text(
+                'Expiry Filter',
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.blue[700],
+                ),
+              ),
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.blue.withOpacity(0.08),
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+              ),
+            ),
           ),
           IconButton(
             icon: const Icon(Icons.add_circle_outline, color: Colors.blue),

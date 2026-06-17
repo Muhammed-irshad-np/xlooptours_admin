@@ -77,10 +77,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           const SizedBox(height: 24),
           Text(
             widget.title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
@@ -99,10 +96,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
             icon: const Icon(Icons.open_in_new),
             label: const Text('Open / Download Document'),
             style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 14,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
@@ -145,7 +139,9 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         placeholder: (context, url) =>
             const Center(child: CircularProgressIndicator()),
         errorWidget: (context, url, error) {
-          return _buildFallbackView('Failed to load image. You can view or download it directly.');
+          return _buildFallbackView(
+            'Failed to load image. You can view or download it directly.',
+          );
         },
       ),
     );
@@ -187,8 +183,10 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           child: isPdf
               ? _buildPdfViewer()
               : (isImage
-                  ? _buildImageViewer()
-                  : _buildFallbackView('This document format cannot be previewed inline.')),
+                    ? _buildImageViewer()
+                    : _buildFallbackView(
+                        'This document format cannot be previewed inline.',
+                      )),
         ),
       ),
     );
