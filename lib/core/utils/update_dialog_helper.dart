@@ -740,6 +740,9 @@ class UpdateDialogHelper {
     DateTime? followUpDate;
     final followUpDateController = TextEditingController();
     final followUpKmController = TextEditingController();
+    String followUpType = 'one_time';
+    final followUpIntervalKmController = TextEditingController();
+    final followUpTimesController = TextEditingController();
 
     if (vehicle.currentOdometer != null) {
       mileageController.text = vehicle.currentOdometer.toString();
@@ -843,42 +846,97 @@ class UpdateDialogHelper {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
-                        controller: followUpDateController,
-                        readOnly: true,
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate:
-                                followUpDate ??
-                                DateTime.now().add(const Duration(days: 30)),
-                            firstDate: DateTime(2000),
-                            lastDate: DateTime(2100),
-                          );
-                          if (picked != null) {
-                            setState(() {
-                              followUpDate = picked;
-                              followUpDateController.text =
-                                  "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
-                            });
-                          }
-                        },
-                        decoration: const InputDecoration(
-                          labelText: 'Follow-up Date (Optional)',
-                          suffixIcon: Icon(Icons.calendar_today),
-                          border: OutlineInputBorder(),
-                        ),
+                      Row(
+                        children: [
+                          const Text(
+                            'Schedule Type: ',
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(width: 12),
+                          ChoiceChip(
+                            label: const Text('One-Time'),
+                            selected: followUpType == 'one_time',
+                            onSelected: (selected) {
+                              if (selected) {
+                                setState(() {
+                                  followUpType = 'one_time';
+                                });
+                              }
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: const Text('Interval / Recurring'),
+                            selected: followUpType == 'recurring',
+                            onSelected: (selected) {
+                              if (selected) {
+                                setState(() {
+                                  followUpType = 'recurring';
+                                });
+                              }
+                            },
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
-                        controller: followUpKmController,
-                        decoration: const InputDecoration(
-                          labelText: 'Follow-up Odometer (Optional)',
-                          suffixText: 'km',
-                          border: OutlineInputBorder(),
+                      if (followUpType == 'one_time') ...[
+                        TextFormField(
+                          controller: followUpDateController,
+                          readOnly: true,
+                          onTap: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate:
+                                  followUpDate ??
+                                  DateTime.now().add(const Duration(days: 30)),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                followUpDate = picked;
+                                followUpDateController.text =
+                                    "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+                              });
+                            }
+                          },
+                          decoration: const InputDecoration(
+                            labelText: 'Follow-up Date (Optional)',
+                            suffixIcon: Icon(Icons.calendar_today),
+                            border: OutlineInputBorder(),
+                          ),
                         ),
-                        keyboardType: TextInputType.number,
-                      ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: followUpKmController,
+                          decoration: const InputDecoration(
+                            labelText: 'Follow-up Odometer (Optional)',
+                            suffixText: 'km',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ] else ...[
+                        TextFormField(
+                          controller: followUpIntervalKmController,
+                          decoration: const InputDecoration(
+                            labelText: 'Interval Mileage (KM)',
+                            hintText: 'e.g. 5000',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: followUpTimesController,
+                          decoration: const InputDecoration(
+                            labelText: 'Repeat Times',
+                            hintText: 'e.g. 5',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                        ),
+                      ],
                     ],
                   ],
                 ),
@@ -955,6 +1013,10 @@ class UpdateDialogHelper {
                     }
 
                     final newMileage = int.parse(mileageController.text);
+                    final bool isRecurring = isFollowUpRequired && followUpType == 'recurring';
+                    final int? intervalKm = isRecurring ? int.tryParse(followUpIntervalKmController.text) : null;
+                    final int? timesCount = isRecurring ? int.tryParse(followUpTimesController.text) : null;
+
                     final newRecord = MaintenanceRecord(
                       date: selectedDate!,
                       mileage: newMileage,
@@ -965,11 +1027,16 @@ class UpdateDialogHelper {
                       followUpReason: isFollowUpRequired
                           ? followUpReasonController.text.trim()
                           : null,
-                      nextServiceDate: isFollowUpRequired ? followUpDate : null,
+                      nextServiceDate: (isFollowUpRequired && !isRecurring) ? followUpDate : null,
                       nextServiceMileage: isFollowUpRequired
-                          ? int.tryParse(followUpKmController.text)
+                          ? (isRecurring
+                              ? newMileage + (intervalKm ?? 0)
+                              : int.tryParse(followUpKmController.text))
                           : null,
                       isFollowUpCompleted: isFollowUpRequired ? false : null,
+                      followUpIntervalKm: intervalKm,
+                      followUpTimesCount: timesCount,
+                      followUpCompletions: isFollowUpRequired ? const [] : null,
                     );
 
                     final currentMaintenance =
