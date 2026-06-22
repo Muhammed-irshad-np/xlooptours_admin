@@ -77,6 +77,7 @@ class FollowUpCompletion extends Equatable {
   final String? notes;
   final String? attachmentUrl;
   final List<String>? attachmentUrls;
+  final String? performedBy;
 
   const FollowUpCompletion({
     required this.date,
@@ -85,6 +86,7 @@ class FollowUpCompletion extends Equatable {
     this.notes,
     this.attachmentUrl,
     this.attachmentUrls,
+    this.performedBy,
   });
 
   FollowUpCompletion copyWith({
@@ -94,6 +96,7 @@ class FollowUpCompletion extends Equatable {
     String? notes,
     String? attachmentUrl,
     List<String>? attachmentUrls,
+    String? performedBy,
   }) {
     return FollowUpCompletion(
       date: date ?? this.date,
@@ -102,6 +105,7 @@ class FollowUpCompletion extends Equatable {
       notes: notes ?? this.notes,
       attachmentUrl: attachmentUrl ?? this.attachmentUrl,
       attachmentUrls: attachmentUrls ?? this.attachmentUrls,
+      performedBy: performedBy ?? this.performedBy,
     );
   }
 
@@ -113,6 +117,7 @@ class FollowUpCompletion extends Equatable {
         notes,
         attachmentUrl,
         attachmentUrls,
+        performedBy,
       ];
 }
 
@@ -147,6 +152,9 @@ class MaintenanceRecord extends Equatable {
   final int? followUpTimesCount;
   final List<FollowUpCompletion>? followUpCompletions;
 
+  // Track who did it (login email username)
+  final String? performedBy;
+
   const MaintenanceRecord({
     required this.date,
     required this.mileage,
@@ -173,6 +181,7 @@ class MaintenanceRecord extends Equatable {
     this.followUpIntervalKm,
     this.followUpTimesCount,
     this.followUpCompletions,
+    this.performedBy,
   });
 
   MaintenanceRecord copyWith({
@@ -201,6 +210,7 @@ class MaintenanceRecord extends Equatable {
     int? followUpIntervalKm,
     int? followUpTimesCount,
     List<FollowUpCompletion>? followUpCompletions,
+    String? performedBy,
   }) {
     return MaintenanceRecord(
       date: date ?? this.date,
@@ -228,6 +238,7 @@ class MaintenanceRecord extends Equatable {
       followUpIntervalKm: followUpIntervalKm ?? this.followUpIntervalKm,
       followUpTimesCount: followUpTimesCount ?? this.followUpTimesCount,
       followUpCompletions: followUpCompletions ?? this.followUpCompletions,
+      performedBy: performedBy ?? this.performedBy,
     );
   }
 
@@ -258,6 +269,7 @@ class MaintenanceRecord extends Equatable {
     followUpIntervalKm,
     followUpTimesCount,
     followUpCompletions,
+    performedBy,
   ];
 }
 

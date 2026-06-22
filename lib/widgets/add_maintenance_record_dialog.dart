@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 
 /// Special sentinel IDs for built-in extras that are not part of the
 /// Firestore-managed maintenance-type master list.
@@ -31,12 +32,14 @@ class _MaintenanceEntry {
   List<XFile> pickedFiles = [];
 
   bool isFollowUpRequired = false;
-  final TextEditingController followUpReasonController = TextEditingController();
+  final TextEditingController followUpReasonController =
+      TextEditingController();
   DateTime? followUpDate;
   final TextEditingController followUpDateController = TextEditingController();
   final TextEditingController followUpKmController = TextEditingController();
   String followUpType = 'one_time'; // 'one_time' or 'recurring'
-  final TextEditingController followUpIntervalKmController = TextEditingController();
+  final TextEditingController followUpIntervalKmController =
+      TextEditingController();
   final TextEditingController followUpTimesController = TextEditingController();
 
   void dispose() {
@@ -127,14 +130,17 @@ class _AddMaintenanceRecordDialogState
   ) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: entry.followUpDate ?? DateTime.now().add(const Duration(days: 30)),
+      initialDate:
+          entry.followUpDate ?? DateTime.now().add(const Duration(days: 30)),
       firstDate: DateTime.now(),
       lastDate: DateTime(2100),
     );
     if (picked != null) {
       setState(() {
         entry.followUpDate = picked;
-        entry.followUpDateController.text = DateFormat('MMM dd, yyyy').format(picked);
+        entry.followUpDateController.text = DateFormat(
+          'MMM dd, yyyy',
+        ).format(picked);
       });
     }
   }
@@ -187,6 +193,15 @@ class _AddMaintenanceRecordDialogState
   Future<void> _saveRecords() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final user = context.read<AuthProvider>().user;
+    final email = user?.email;
+    final username =
+        (user?.displayName != null && user!.displayName!.isNotEmpty)
+        ? user.displayName
+        : (email != null && email.contains('@')
+              ? email.split('@').first
+              : (email ?? 'System'));
+
     // Validate type selection
     for (final entry in _entries) {
       if (entry.maintenanceTypeId == null) {
@@ -201,7 +216,9 @@ class _AddMaintenanceRecordDialogState
           entry.customTypeController.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please enter a name for the custom maintenance type.'),
+            content: Text(
+              'Please enter a name for the custom maintenance type.',
+            ),
           ),
         );
         return;
@@ -223,20 +240,35 @@ class _AddMaintenanceRecordDialogState
 
         // Upload picked files sequentially
         final List<String> uploadedUrls = [];
-        for (int fileIndex = 0; fileIndex < entry.pickedFiles.length; fileIndex++) {
+        for (
+          int fileIndex = 0;
+          fileIndex < entry.pickedFiles.length;
+          fileIndex++
+        ) {
           final file = entry.pickedFiles[fileIndex];
           // Construct unique docType to prevent collision/overwrite in Firebase Storage
-          final docType = 'maintenance_${DateTime.now().millisecondsSinceEpoch}_${entryIndex}_$fileIndex';
-          final url = await provider.uploadVehicleDocument(file, widget.vehicle.id, docType);
+          final docType =
+              'maintenance_${DateTime.now().millisecondsSinceEpoch}_${entryIndex}_$fileIndex';
+          final url = await provider.uploadVehicleDocument(
+            file,
+            widget.vehicle.id,
+            docType,
+          );
           uploadedUrls.add(url);
         }
 
         final primaryUrl = uploadedUrls.isNotEmpty ? uploadedUrls.first : null;
 
-        final int currentOdo = int.tryParse(entry.serviceKmController.text) ?? 0;
-        final bool isRecurring = entry.isFollowUpRequired && entry.followUpType == 'recurring';
-        final int? intervalKm = isRecurring ? int.tryParse(entry.followUpIntervalKmController.text) : null;
-        final int? timesCount = isRecurring ? int.tryParse(entry.followUpTimesController.text) : null;
+        final int currentOdo =
+            int.tryParse(entry.serviceKmController.text) ?? 0;
+        final bool isRecurring =
+            entry.isFollowUpRequired && entry.followUpType == 'recurring';
+        final int? intervalKm = isRecurring
+            ? int.tryParse(entry.followUpIntervalKmController.text)
+            : null;
+        final int? timesCount = isRecurring
+            ? int.tryParse(entry.followUpTimesController.text)
+            : null;
 
         recordsToAdd.add((
           typeId: entry.maintenanceTypeId!,
@@ -250,17 +282,22 @@ class _AddMaintenanceRecordDialogState
             attachmentUrl: primaryUrl,
             attachmentUrls: uploadedUrls.isNotEmpty ? uploadedUrls : null,
             isFollowUpRequired: entry.isFollowUpRequired,
-            followUpReason: entry.isFollowUpRequired ? entry.followUpReasonController.text.trim() : null,
-            nextServiceDate: (entry.isFollowUpRequired && !isRecurring) ? entry.followUpDate : null,
+            followUpReason: entry.isFollowUpRequired
+                ? entry.followUpReasonController.text.trim()
+                : null,
+            nextServiceDate: (entry.isFollowUpRequired && !isRecurring)
+                ? entry.followUpDate
+                : null,
             nextServiceMileage: entry.isFollowUpRequired
                 ? (isRecurring
-                    ? currentOdo + (intervalKm ?? 0)
-                    : int.tryParse(entry.followUpKmController.text))
+                      ? currentOdo + (intervalKm ?? 0)
+                      : int.tryParse(entry.followUpKmController.text))
                 : null,
             isFollowUpCompleted: entry.isFollowUpRequired ? false : null,
             followUpIntervalKm: intervalKm,
             followUpTimesCount: timesCount,
             followUpCompletions: entry.isFollowUpRequired ? const [] : null,
+            performedBy: username,
           ),
         ));
       }
@@ -410,7 +447,7 @@ class _AddMaintenanceRecordDialogState
                             Expanded(
                               flex: 2,
                               child: DropdownButtonFormField<String>(
-                              initialValue: entry.maintenanceTypeId,
+                                initialValue: entry.maintenanceTypeId,
                                 decoration: InputDecoration(
                                   labelText: 'Maintenance Type',
                                   border: OutlineInputBorder(
@@ -524,9 +561,10 @@ class _AddMaintenanceRecordDialogState
                                     borderRadius: BorderRadius.circular(8.r),
                                   ),
                                 ),
-                                keyboardType: const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
                               ),
                             ),
                             SizedBox(width: 16.w),
@@ -583,11 +621,11 @@ class _AddMaintenanceRecordDialogState
                                       borderRadius: BorderRadius.circular(8.r),
                                     ),
                                     filled: true,
-                                    fillColor:
-                                        Colors.deepPurple.withValues(alpha: 0.03),
+                                    fillColor: Colors.deepPurple.withValues(
+                                      alpha: 0.03,
+                                    ),
                                   ),
-                                  textCapitalization:
-                                      TextCapitalization.words,
+                                  textCapitalization: TextCapitalization.words,
                                   validator: (v) {
                                     if (entry.maintenanceTypeId == _kOtherId &&
                                         (v == null || v.trim().isEmpty)) {
@@ -615,7 +653,10 @@ class _AddMaintenanceRecordDialogState
                             ),
                             Text(
                               'Requires Follow-up / Revisit (Recommended by mechanic/workshop)',
-                              style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           ],
                         ),
@@ -630,13 +671,15 @@ class _AddMaintenanceRecordDialogState
                                   controller: entry.followUpReasonController,
                                   decoration: InputDecoration(
                                     labelText: 'Follow-up Reason',
-                                    hintText: 'e.g. Recheck brake pads, leak inspection',
+                                    hintText:
+                                        'e.g. Recheck brake pads, leak inspection',
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8.r),
                                     ),
                                   ),
                                   validator: (v) {
-                                    if (entry.isFollowUpRequired && (v == null || v.trim().isEmpty)) {
+                                    if (entry.isFollowUpRequired &&
+                                        (v == null || v.trim().isEmpty)) {
                                       return 'Reason is required';
                                     }
                                     return null;
@@ -651,7 +694,11 @@ class _AddMaintenanceRecordDialogState
                               SizedBox(width: 8.w),
                               Text(
                                 'Schedule Type: ',
-                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.grey[700]),
+                                style: TextStyle(
+                                  fontSize: 13.sp,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[700],
+                                ),
                               ),
                               SizedBox(width: 12.w),
                               ChoiceChip(
@@ -689,12 +736,17 @@ class _AddMaintenanceRecordDialogState
                                   child: TextFormField(
                                     controller: entry.followUpDateController,
                                     readOnly: true,
-                                    onTap: () => _selectFollowUpDate(context, entry),
+                                    onTap: () =>
+                                        _selectFollowUpDate(context, entry),
                                     decoration: InputDecoration(
                                       labelText: 'Follow-up Date (Optional)',
-                                      suffixIcon: const Icon(Icons.calendar_today),
+                                      suffixIcon: const Icon(
+                                        Icons.calendar_today,
+                                      ),
                                       border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8.r),
+                                        borderRadius: BorderRadius.circular(
+                                          8.r,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -704,10 +756,13 @@ class _AddMaintenanceRecordDialogState
                                   child: TextFormField(
                                     controller: entry.followUpKmController,
                                     decoration: InputDecoration(
-                                      labelText: 'Follow-up Odometer (Optional)',
+                                      labelText:
+                                          'Follow-up Odometer (Optional)',
                                       suffixText: 'km',
                                       border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8.r),
+                                        borderRadius: BorderRadius.circular(
+                                          8.r,
+                                        ),
                                       ),
                                     ),
                                     keyboardType: TextInputType.number,
@@ -731,20 +786,27 @@ class _AddMaintenanceRecordDialogState
                                 SizedBox(width: 8.w),
                                 Expanded(
                                   child: TextFormField(
-                                    controller: entry.followUpIntervalKmController,
+                                    controller:
+                                        entry.followUpIntervalKmController,
                                     decoration: InputDecoration(
                                       labelText: 'Interval Mileage',
                                       suffixText: 'km',
                                       hintText: 'e.g. 5000',
                                       border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8.r),
+                                        borderRadius: BorderRadius.circular(
+                                          8.r,
+                                        ),
                                       ),
                                     ),
                                     keyboardType: TextInputType.number,
                                     validator: (v) {
-                                      if (entry.isFollowUpRequired && entry.followUpType == 'recurring') {
-                                        if (v == null || v.isEmpty) return 'Interval mileage is required';
-                                        if (int.tryParse(v) == null || int.parse(v) <= 0) return 'Must be > 0';
+                                      if (entry.isFollowUpRequired &&
+                                          entry.followUpType == 'recurring') {
+                                        if (v == null || v.isEmpty)
+                                          return 'Interval mileage is required';
+                                        if (int.tryParse(v) == null ||
+                                            int.parse(v) <= 0)
+                                          return 'Must be > 0';
                                       }
                                       return null;
                                     },
@@ -758,14 +820,20 @@ class _AddMaintenanceRecordDialogState
                                       labelText: 'Repeat Times',
                                       hintText: 'e.g. 5',
                                       border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(8.r),
+                                        borderRadius: BorderRadius.circular(
+                                          8.r,
+                                        ),
                                       ),
                                     ),
                                     keyboardType: TextInputType.number,
                                     validator: (v) {
-                                      if (entry.isFollowUpRequired && entry.followUpType == 'recurring') {
-                                        if (v == null || v.isEmpty) return 'Repeat count is required';
-                                        if (int.tryParse(v) == null || int.parse(v) <= 0) return 'Must be > 0';
+                                      if (entry.isFollowUpRequired &&
+                                          entry.followUpType == 'recurring') {
+                                        if (v == null || v.isEmpty)
+                                          return 'Repeat count is required';
+                                        if (int.tryParse(v) == null ||
+                                            int.parse(v) <= 0)
+                                          return 'Must be > 0';
                                       }
                                       return null;
                                     },
@@ -804,7 +872,9 @@ class _AddMaintenanceRecordDialogState
                             Expanded(
                               child: entry.pickedFiles.isEmpty
                                   ? Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 8.h),
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 8.h,
+                                      ),
                                       child: Text(
                                         'No documents attached',
                                         style: TextStyle(
@@ -817,29 +887,41 @@ class _AddMaintenanceRecordDialogState
                                   : Wrap(
                                       spacing: 8.w,
                                       runSpacing: 8.h,
-                                      children: entry.pickedFiles.asMap().entries.map((fileEntry) {
-                                        final fileIdx = fileEntry.key;
-                                        final file = fileEntry.value;
-                                        return InputChip(
-                                          label: Text(
-                                            file.name,
-                                            style: TextStyle(fontSize: 12.sp),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          onDeleted: () {
-                                            setState(() {
-                                              entry.pickedFiles.removeAt(fileIdx);
-                                            });
-                                          },
-                                          deleteIconColor: Colors.red[700],
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(20.r),
-                                            side: BorderSide(color: Colors.grey.shade300),
-                                          ),
-                                          backgroundColor: Colors.blue.withValues(alpha: 0.05),
-                                        );
-                                      }).toList(),
+                                      children: entry.pickedFiles
+                                          .asMap()
+                                          .entries
+                                          .map((fileEntry) {
+                                            final fileIdx = fileEntry.key;
+                                            final file = fileEntry.value;
+                                            return InputChip(
+                                              label: Text(
+                                                file.name,
+                                                style: TextStyle(
+                                                  fontSize: 12.sp,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              onDeleted: () {
+                                                setState(() {
+                                                  entry.pickedFiles.removeAt(
+                                                    fileIdx,
+                                                  );
+                                                });
+                                              },
+                                              deleteIconColor: Colors.red[700],
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(20.r),
+                                                side: BorderSide(
+                                                  color: Colors.grey.shade300,
+                                                ),
+                                              ),
+                                              backgroundColor: Colors.blue
+                                                  .withValues(alpha: 0.05),
+                                            );
+                                          })
+                                          .toList(),
                                     ),
                             ),
                           ],

@@ -18,6 +18,7 @@ import '../../features/xloop_vault/presentation/providers/vault_provider.dart';
 import '../../features/xloop_vault/domain/entities/vault_data.dart';
 import '../../features/vehicle/presentation/widgets/maintenance_extension_dialog.dart';
 import '../../features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
+import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../injection_container.dart';
 
 class UpdateDialogHelper {
@@ -1013,9 +1014,24 @@ class UpdateDialogHelper {
                     }
 
                     final newMileage = int.parse(mileageController.text);
-                    final bool isRecurring = isFollowUpRequired && followUpType == 'recurring';
-                    final int? intervalKm = isRecurring ? int.tryParse(followUpIntervalKmController.text) : null;
-                    final int? timesCount = isRecurring ? int.tryParse(followUpTimesController.text) : null;
+                    final bool isRecurring =
+                        isFollowUpRequired && followUpType == 'recurring';
+                    final int? intervalKm = isRecurring
+                        ? int.tryParse(followUpIntervalKmController.text)
+                        : null;
+                    final int? timesCount = isRecurring
+                        ? int.tryParse(followUpTimesController.text)
+                        : null;
+
+                    final user = context.read<AuthProvider>().user;
+                    final email = user?.email;
+                    final username =
+                        (user?.displayName != null &&
+                            user!.displayName!.isNotEmpty)
+                        ? user.displayName
+                        : (email != null && email.contains('@')
+                              ? email.split('@').first
+                              : (email ?? 'System'));
 
                     final newRecord = MaintenanceRecord(
                       date: selectedDate!,
@@ -1027,16 +1043,19 @@ class UpdateDialogHelper {
                       followUpReason: isFollowUpRequired
                           ? followUpReasonController.text.trim()
                           : null,
-                      nextServiceDate: (isFollowUpRequired && !isRecurring) ? followUpDate : null,
+                      nextServiceDate: (isFollowUpRequired && !isRecurring)
+                          ? followUpDate
+                          : null,
                       nextServiceMileage: isFollowUpRequired
                           ? (isRecurring
-                              ? newMileage + (intervalKm ?? 0)
-                              : int.tryParse(followUpKmController.text))
+                                ? newMileage + (intervalKm ?? 0)
+                                : int.tryParse(followUpKmController.text))
                           : null,
                       isFollowUpCompleted: isFollowUpRequired ? false : null,
                       followUpIntervalKm: intervalKm,
                       followUpTimesCount: timesCount,
                       followUpCompletions: isFollowUpRequired ? const [] : null,
+                      performedBy: username,
                     );
 
                     final currentMaintenance =
@@ -2085,11 +2104,23 @@ class UpdateDialogHelper {
             ),
             ElevatedButton(
               onPressed: () async {
+                final user = ctx.read<AuthProvider>().user;
+                final email = user?.email;
+                final username =
+                    (user?.displayName != null && user!.displayName!.isNotEmpty)
+                    ? user.displayName
+                    : (email != null && email.contains('@')
+                          ? email.split('@').first
+                          : (email ?? 'System'));
+
                 final updatedHistory = (vehicle.maintenanceHistory ?? []).map((
                   r,
                 ) {
                   if (r == record) {
-                    return r.copyWith(isFollowUpCompleted: true);
+                    return r.copyWith(
+                      isFollowUpCompleted: true,
+                      performedBy: username,
+                    );
                   }
                   return r;
                 }).toList();

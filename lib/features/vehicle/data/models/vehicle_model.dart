@@ -178,7 +178,9 @@ class VehicleModel extends VehicleEntity {
         'notes': c.notes,
         'attachmentUrl': c.attachmentUrl,
         'attachmentUrls': c.attachmentUrls,
+        'performedBy': c.performedBy,
       }).toList(),
+      'performedBy': record.performedBy,
     };
   }
 
@@ -334,6 +336,7 @@ class VehicleModel extends VehicleEntity {
         notes: cMap['notes'] as String?,
         attachmentUrl: cMap['attachmentUrl'] as String?,
         attachmentUrls: urls?.map((e) => e as String).toList(),
+        performedBy: cMap['performedBy'] as String?,
       );
     }).toList();
 
@@ -367,6 +370,7 @@ class VehicleModel extends VehicleEntity {
       followUpIntervalKm: json['followUpIntervalKm'] as int?,
       followUpTimesCount: json['followUpTimesCount'] as int?,
       followUpCompletions: completions,
+      performedBy: json['performedBy'] as String?,
     );
   }
 

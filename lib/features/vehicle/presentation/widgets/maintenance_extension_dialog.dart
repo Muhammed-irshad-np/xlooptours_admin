@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.dart';
 import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
+import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 
 class MaintenanceExtensionDialog extends StatefulWidget {
   final VehicleEntity vehicle;
@@ -43,15 +44,23 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
   }
 
   void _recalculateThreshold() {
-    final currentOdo = widget.vehicle.currentOdometer ?? 0;
+    final baseOdo = widget.alert.nextServiceMileage;
     final extVal = int.tryParse(_extensionController.text) ?? 0;
     setState(() {
-      _calculatedThreshold = currentOdo + extVal;
+      _calculatedThreshold = baseOdo + extVal;
     });
   }
 
   Future<void> _submitExtension() async {
     if (!_formKey.currentState!.validate()) return;
+
+    final user = context.read<AuthProvider>().user;
+    final email = user?.email;
+    final username = (user?.displayName != null && user!.displayName!.isNotEmpty)
+        ? user.displayName
+        : (email != null && email.contains('@')
+            ? email.split('@').first
+            : (email ?? 'System'));
 
     setState(() {
       _isLoading = true;
@@ -67,6 +76,8 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
         category: widget.alert.category,
         extensionKm: extensionKm,
         reason: reason,
+        performedBy: username,
+        baseOdometer: widget.alert.nextServiceMileage,
       );
 
       if (mounted) {
