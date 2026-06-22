@@ -418,6 +418,8 @@ class VehicleProvider extends ChangeNotifier {
     required String category,
     required int extensionKm,
     required String reason,
+    String? performedBy,
+    int? baseOdometer,
   }) async {
     _setLoading(true);
     try {
@@ -426,10 +428,12 @@ class VehicleProvider extends ChangeNotifier {
         category: category,
         extensionKm: extensionKm,
         reason: reason,
+        performedBy: performedBy,
+        baseOdometer: baseOdometer,
       );
       await fetchAllVehicles();
     } catch (e) {
-      _errorMessage = 'Failed to extend maintenance: \$e';
+      _errorMessage = 'Failed to extend maintenance: $e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;

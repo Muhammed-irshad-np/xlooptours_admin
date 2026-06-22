@@ -12,10 +12,10 @@ class ExtendVehicleMaintenanceUseCase {
     required String category,
     required int extensionKm,
     required String reason,
+    String? performedBy,
+    int? baseOdometer,
   }) async {
     final currentOdometer = vehicle.currentOdometer ?? 0;
-    final newAlertThreshold = currentOdometer + extensionKm;
-
     final List<MaintenanceRecord> updatedHistory = List.from(vehicle.maintenanceHistory ?? []);
 
     // 1. Find and update the latest actual MaintenanceRecord in history for this category
@@ -35,6 +35,9 @@ class ExtendVehicleMaintenanceUseCase {
       }
     }
 
+    final resolvedBaseOdometer = baseOdometer ?? (latestRecord?.nextServiceMileage ?? currentOdometer);
+    final newAlertThreshold = resolvedBaseOdometer + extensionKm;
+
     MaintenanceRecord updatedRecord;
     if (latestRecord != null) {
       updatedRecord = latestRecord.copyWith(
@@ -42,6 +45,7 @@ class ExtendVehicleMaintenanceUseCase {
         extendedMileage: extensionKm,
         extensionReason: reason,
         nextServiceMileage: newAlertThreshold,
+        performedBy: performedBy,
       );
       updatedHistory[latestIndex] = updatedRecord;
     } else {
@@ -54,6 +58,7 @@ class ExtendVehicleMaintenanceUseCase {
         extendedMileage: extensionKm,
         extensionReason: reason,
         nextServiceMileage: newAlertThreshold,
+        performedBy: performedBy,
       );
       updatedHistory.add(updatedRecord);
     }
@@ -65,6 +70,7 @@ class ExtendVehicleMaintenanceUseCase {
       serviceType: 'Extension: $category',
       notes: 'Alert extended by $extensionKm km. New due mileage: $newAlertThreshold km. Reason: $reason',
       cost: 0.0,
+      performedBy: performedBy,
     );
     updatedHistory.add(auditRecord);
 

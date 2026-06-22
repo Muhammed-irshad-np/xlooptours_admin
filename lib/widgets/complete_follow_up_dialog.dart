@@ -9,6 +9,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 
 class CompleteFollowUpDialog extends StatefulWidget {
   final VehicleEntity vehicle;
@@ -130,6 +131,14 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
   Future<void> _saveCompletion() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final user = context.read<AuthProvider>().user;
+    final email = user?.email;
+    final username = (user?.displayName != null && user!.displayName!.isNotEmpty)
+        ? user.displayName
+        : (email != null && email.contains('@')
+            ? email.split('@').first
+            : (email ?? 'System'));
+
     setState(() {
       _isSaving = true;
     });
@@ -153,6 +162,7 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
         attachmentUrl: uploadedUrls.isNotEmpty ? uploadedUrls.first : null,
         attachmentUrls: uploadedUrls.isNotEmpty ? uploadedUrls : null,
+        performedBy: username,
       );
 
       final existingCompletions = List<FollowUpCompletion>.from(widget.record.followUpCompletions ?? []);

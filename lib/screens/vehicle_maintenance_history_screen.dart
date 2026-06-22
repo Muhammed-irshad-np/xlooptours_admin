@@ -363,6 +363,8 @@ class _VehicleMaintenanceHistoryScreenState
               ),
             if (record.notes != null && record.notes!.isNotEmpty)
               _buildInfoRow(Icons.notes, 'Notes', record.notes!),
+            if (record.performedBy != null && record.performedBy!.isNotEmpty)
+              _buildInfoRow(Icons.person_outline, 'Logged by', record.performedBy!),
             if (record.followUpCompletions != null && record.followUpCompletions!.isNotEmpty) ...[
               const Divider(height: 24),
               Text(
@@ -428,6 +430,22 @@ class _VehicleMaintenanceHistoryScreenState
                             color: Colors.grey[700],
                             fontStyle: FontStyle.italic,
                           ),
+                        ),
+                      ],
+                      if (completion.performedBy != null && completion.performedBy!.isNotEmpty) ...[
+                        SizedBox(height: 4.h),
+                        Row(
+                          children: [
+                            Icon(Icons.person_outline, size: 12.sp, color: Colors.grey[600]),
+                            SizedBox(width: 4.w),
+                            Text(
+                              'Completed by: ${completion.performedBy!}',
+                              style: TextStyle(
+                                fontSize: 11.sp,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                       if (completion.attachmentUrls != null && completion.attachmentUrls!.isNotEmpty) ...[
