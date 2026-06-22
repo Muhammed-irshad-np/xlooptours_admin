@@ -65,6 +65,11 @@ class GetVehicleFollowUpAlertsUseCase {
 
           // If it's overdue, or if we want to include all pending ones (for diagnostics/listings)
           if (includeAll || isOverdue) {
+            final completionsCount = record.followUpCompletions?.length ?? 0;
+            final totalCount = record.followUpTimesCount ?? 1;
+            final visitInfo = (record.followUpIntervalKm != null && record.followUpIntervalKm! > 0 && record.followUpTimesCount != null)
+                ? ' (Visit ${completionsCount + 1} of $totalCount)'
+                : '';
             alerts.add(
               VehicleFollowUpAlert(
                 vehicle: vehicle,
@@ -72,7 +77,7 @@ class GetVehicleFollowUpAlertsUseCase {
                 currentMileage: currentMileage,
                 nextServiceMileage: record.nextServiceMileage,
                 nextServiceDate: record.nextServiceDate,
-                reason: record.followUpReason ?? 'General Follow-up',
+                reason: '${record.followUpReason ?? 'General Follow-up'}$visitInfo',
                 isOverdue: isOverdue,
               ),
             );

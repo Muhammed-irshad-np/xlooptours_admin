@@ -130,5 +130,62 @@ void main() {
       expect(resultAll.length, 1);
       expect(resultAll.first.isOverdue, false);
     });
+
+    test('should trigger alert with Visit progress information when recurring follow-up is set', () {
+      final record = MaintenanceRecord(
+        date: DateTime.now().subtract(const Duration(days: 10)),
+        mileage: 10000,
+        isFollowUpRequired: true,
+        isFollowUpCompleted: false,
+        followUpReason: 'Brake inspection',
+        nextServiceMileage: 15000,
+        followUpIntervalKm: 5000,
+        followUpTimesCount: 5,
+        followUpCompletions: const [],
+      );
+      final vehicles = [
+        createVehicle(id: '1', maintenanceHistory: [record], currentOdometer: 15000),
+      ];
+
+      final result = useCase(vehicles: vehicles);
+      expect(result.length, 1);
+      expect(result.first.reason, 'Brake inspection (Visit 1 of 5)');
+      expect(result.first.isOverdue, true);
+    });
+
+    test('should trigger alert relative to last completion mileage when completions exist', () {
+      final completion1 = FollowUpCompletion(
+        date: DateTime.now().subtract(const Duration(days: 5)),
+        mileage: 15200,
+        cost: 50.0,
+        notes: 'First completion',
+      );
+      final record = MaintenanceRecord(
+        date: DateTime.now().subtract(const Duration(days: 10)),
+        mileage: 10000,
+        isFollowUpRequired: true,
+        isFollowUpCompleted: false,
+        followUpReason: 'Brake inspection',
+        nextServiceMileage: 20200, // 15200 + 5000
+        followUpIntervalKm: 5000,
+        followUpTimesCount: 5,
+        followUpCompletions: [completion1],
+      );
+      
+      // Odometer is at 20100 (not overdue yet)
+      final vehiclesNotDue = [
+        createVehicle(id: '1', maintenanceHistory: [record], currentOdometer: 20100),
+      ];
+      expect(useCase(vehicles: vehiclesNotDue), isEmpty);
+
+      // Odometer is at 20300 (overdue now)
+      final vehiclesDue = [
+        createVehicle(id: '1', maintenanceHistory: [record], currentOdometer: 20300),
+      ];
+      final result = useCase(vehicles: vehiclesDue);
+      expect(result.length, 1);
+      expect(result.first.reason, 'Brake inspection (Visit 2 of 5)');
+      expect(result.first.isOverdue, true);
+    });
   });
 }

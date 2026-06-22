@@ -70,6 +70,52 @@ class TafweedRecord extends Equatable {
   List<Object?> get props => [driverId, issuedDate, expiryDate, attachmentUrl, notificationDays];
 }
 
+class FollowUpCompletion extends Equatable {
+  final DateTime date;
+  final int mileage;
+  final double cost;
+  final String? notes;
+  final String? attachmentUrl;
+  final List<String>? attachmentUrls;
+
+  const FollowUpCompletion({
+    required this.date,
+    required this.mileage,
+    required this.cost,
+    this.notes,
+    this.attachmentUrl,
+    this.attachmentUrls,
+  });
+
+  FollowUpCompletion copyWith({
+    DateTime? date,
+    int? mileage,
+    double? cost,
+    String? notes,
+    String? attachmentUrl,
+    List<String>? attachmentUrls,
+  }) {
+    return FollowUpCompletion(
+      date: date ?? this.date,
+      mileage: mileage ?? this.mileage,
+      cost: cost ?? this.cost,
+      notes: notes ?? this.notes,
+      attachmentUrl: attachmentUrl ?? this.attachmentUrl,
+      attachmentUrls: attachmentUrls ?? this.attachmentUrls,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        date,
+        mileage,
+        cost,
+        notes,
+        attachmentUrl,
+        attachmentUrls,
+      ];
+}
+
 class MaintenanceRecord extends Equatable {
   final DateTime date;
   final int mileage; // in KM
@@ -96,6 +142,11 @@ class MaintenanceRecord extends Equatable {
   final String? extensionReason;
   final bool? isExtended;
 
+  // New Follow-up fields
+  final int? followUpIntervalKm;
+  final int? followUpTimesCount;
+  final List<FollowUpCompletion>? followUpCompletions;
+
   const MaintenanceRecord({
     required this.date,
     required this.mileage,
@@ -119,6 +170,9 @@ class MaintenanceRecord extends Equatable {
     this.extendedDate,
     this.extensionReason,
     this.isExtended,
+    this.followUpIntervalKm,
+    this.followUpTimesCount,
+    this.followUpCompletions,
   });
 
   MaintenanceRecord copyWith({
@@ -144,6 +198,9 @@ class MaintenanceRecord extends Equatable {
     DateTime? extendedDate,
     String? extensionReason,
     bool? isExtended,
+    int? followUpIntervalKm,
+    int? followUpTimesCount,
+    List<FollowUpCompletion>? followUpCompletions,
   }) {
     return MaintenanceRecord(
       date: date ?? this.date,
@@ -168,6 +225,9 @@ class MaintenanceRecord extends Equatable {
       extendedDate: extendedDate ?? this.extendedDate,
       extensionReason: extensionReason ?? this.extensionReason,
       isExtended: isExtended ?? this.isExtended,
+      followUpIntervalKm: followUpIntervalKm ?? this.followUpIntervalKm,
+      followUpTimesCount: followUpTimesCount ?? this.followUpTimesCount,
+      followUpCompletions: followUpCompletions ?? this.followUpCompletions,
     );
   }
 
@@ -195,6 +255,9 @@ class MaintenanceRecord extends Equatable {
     extendedDate,
     extensionReason,
     isExtended,
+    followUpIntervalKm,
+    followUpTimesCount,
+    followUpCompletions,
   ];
 }
 

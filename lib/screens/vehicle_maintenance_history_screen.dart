@@ -8,6 +8,7 @@ import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_pr
 import 'package:xloop_invoice/core/widgets/modern_app_bar.dart';
 import 'package:xloop_invoice/screens/document_viewer_screen.dart';
 import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
+import 'package:xloop_invoice/widgets/complete_follow_up_dialog.dart';
 
 class VehicleMaintenanceHistoryScreen extends StatefulWidget {
   final VehicleEntity vehicle;
@@ -362,6 +363,110 @@ class _VehicleMaintenanceHistoryScreenState
               ),
             if (record.notes != null && record.notes!.isNotEmpty)
               _buildInfoRow(Icons.notes, 'Notes', record.notes!),
+            if (record.followUpCompletions != null && record.followUpCompletions!.isNotEmpty) ...[
+              const Divider(height: 24),
+              Text(
+                'Follow-up Visits Logged (${record.followUpCompletions!.length}/${record.followUpTimesCount ?? 1}):',
+                style: TextStyle(
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[800],
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...record.followUpCompletions!.asMap().entries.map((entry) {
+                final index = entry.key;
+                final completion = entry.value;
+                final dateStr = DateFormat('MMM dd, yyyy').format(completion.date);
+                
+                return Container(
+                  margin: EdgeInsets.only(bottom: 8.h),
+                  padding: EdgeInsets.all(10.w),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.03),
+                    borderRadius: BorderRadius.circular(8.r),
+                    border: Border.all(color: Colors.blue.withValues(alpha: 0.08)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Visit #${index + 1}',
+                            style: TextStyle(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.blue[700],
+                            ),
+                          ),
+                          Text(
+                            dateStr,
+                            style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 4.h),
+                      Row(
+                        children: [
+                          Icon(Icons.speed, size: 12.sp, color: Colors.grey[600]),
+                          SizedBox(width: 4.w),
+                          Text('${completion.mileage} KM', style: TextStyle(fontSize: 12.sp)),
+                          SizedBox(width: 16.w),
+                          Icon(Icons.attach_money, size: 12.sp, color: Colors.grey[600]),
+                          SizedBox(width: 4.w),
+                          Text('${completion.cost.toStringAsFixed(2)} SAR', style: TextStyle(fontSize: 12.sp)),
+                        ],
+                      ),
+                      if (completion.notes != null && completion.notes!.isNotEmpty) ...[
+                        SizedBox(height: 4.h),
+                        Text(
+                          'Notes: ${completion.notes!}',
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            color: Colors.grey[700],
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                      if (completion.attachmentUrls != null && completion.attachmentUrls!.isNotEmpty) ...[
+                        SizedBox(height: 4.h),
+                        Wrap(
+                          spacing: 6.w,
+                          children: completion.attachmentUrls!.asMap().entries.map((attachEntry) {
+                            final fileIdx = attachEntry.key;
+                            final url = attachEntry.value;
+                            return ActionChip(
+                              avatar: Icon(
+                                Icons.file_present_rounded,
+                                size: 12.sp,
+                                color: Colors.blue.shade700,
+                              ),
+                              label: Text('Receipt #${fileIdx + 1}', style: TextStyle(fontSize: 10.sp)),
+                              padding: EdgeInsets.zero,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              backgroundColor: Colors.blue.shade50.withValues(alpha: 0.5),
+                              onPressed: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => DocumentViewerScreen(
+                                      attachmentUrl: url,
+                                      title: 'Completion Receipt',
+                                    ),
+                                  ),
+                                );
+                              },
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }),
+            ],
             (() {
               final List<String> urls = [];
               if (record.attachmentUrls != null && record.attachmentUrls!.isNotEmpty) {
@@ -442,32 +547,13 @@ class _VehicleMaintenanceHistoryScreenState
     VehicleEntity currentVehicle,
     MaintenanceRecord record,
   ) async {
-    final updatedHistory = (currentVehicle.maintenanceHistory ?? []).map((r) {
-      if (r == record) {
-        return r.copyWith(isFollowUpCompleted: true);
-      }
-      return r;
-    }).toList();
-
-    final updatedVehicle = currentVehicle.copyWith(
-      maintenanceHistory: updatedHistory,
+    showDialog(
+      context: context,
+      builder: (context) => CompleteFollowUpDialog(
+        vehicle: currentVehicle,
+        record: record,
+      ),
     );
-
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await context.read<VehicleProvider>().updateVehicle(updatedVehicle);
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Follow-up marked as completed'),
-        ),
-      );
-    } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text('Failed to update follow-up: $e'),
-        ),
-      );
-    }
   }
 
   void _showDeleteConfirmation(

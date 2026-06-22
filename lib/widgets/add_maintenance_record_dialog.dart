@@ -35,6 +35,9 @@ class _MaintenanceEntry {
   DateTime? followUpDate;
   final TextEditingController followUpDateController = TextEditingController();
   final TextEditingController followUpKmController = TextEditingController();
+  String followUpType = 'one_time'; // 'one_time' or 'recurring'
+  final TextEditingController followUpIntervalKmController = TextEditingController();
+  final TextEditingController followUpTimesController = TextEditingController();
 
   void dispose() {
     customTypeController.dispose();
@@ -45,6 +48,8 @@ class _MaintenanceEntry {
     followUpReasonController.dispose();
     followUpDateController.dispose();
     followUpKmController.dispose();
+    followUpIntervalKmController.dispose();
+    followUpTimesController.dispose();
   }
 }
 
@@ -228,11 +233,16 @@ class _AddMaintenanceRecordDialogState
 
         final primaryUrl = uploadedUrls.isNotEmpty ? uploadedUrls.first : null;
 
+        final int currentOdo = int.tryParse(entry.serviceKmController.text) ?? 0;
+        final bool isRecurring = entry.isFollowUpRequired && entry.followUpType == 'recurring';
+        final int? intervalKm = isRecurring ? int.tryParse(entry.followUpIntervalKmController.text) : null;
+        final int? timesCount = isRecurring ? int.tryParse(entry.followUpTimesController.text) : null;
+
         recordsToAdd.add((
           typeId: entry.maintenanceTypeId!,
           record: MaintenanceRecord(
             date: entry.date,
-            mileage: int.tryParse(entry.serviceKmController.text) ?? 0,
+            mileage: currentOdo,
             cost: double.tryParse(entry.costController.text),
             serviceProvider: '',
             notes: entry.notesController.text,
@@ -241,9 +251,16 @@ class _AddMaintenanceRecordDialogState
             attachmentUrls: uploadedUrls.isNotEmpty ? uploadedUrls : null,
             isFollowUpRequired: entry.isFollowUpRequired,
             followUpReason: entry.isFollowUpRequired ? entry.followUpReasonController.text.trim() : null,
-            nextServiceDate: entry.isFollowUpRequired ? entry.followUpDate : null,
-            nextServiceMileage: entry.isFollowUpRequired ? int.tryParse(entry.followUpKmController.text) : null,
+            nextServiceDate: (entry.isFollowUpRequired && !isRecurring) ? entry.followUpDate : null,
+            nextServiceMileage: entry.isFollowUpRequired
+                ? (isRecurring
+                    ? currentOdo + (intervalKm ?? 0)
+                    : int.tryParse(entry.followUpKmController.text))
+                : null,
             isFollowUpCompleted: entry.isFollowUpRequired ? false : null,
+            followUpIntervalKm: intervalKm,
+            followUpTimesCount: timesCount,
+            followUpCompletions: entry.isFollowUpRequired ? const [] : null,
           ),
         ));
       }
@@ -606,11 +623,9 @@ class _AddMaintenanceRecordDialogState
                         if (entry.isFollowUpRequired) ...[
                           SizedBox(height: 12.h),
                           Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               SizedBox(width: 8.w),
                               Expanded(
-                                flex: 2,
                                 child: TextFormField(
                                   controller: entry.followUpReasonController,
                                   decoration: InputDecoration(
@@ -628,43 +643,136 @@ class _AddMaintenanceRecordDialogState
                                   },
                                 ),
                               ),
-                              SizedBox(width: 16.w),
-                              Expanded(
-                                child: TextFormField(
-                                  controller: entry.followUpDateController,
-                                  readOnly: true,
-                                  onTap: () => _selectFollowUpDate(context, entry),
-                                  decoration: InputDecoration(
-                                    labelText: 'Follow-up Date (Optional)',
-                                    suffixIcon: const Icon(Icons.calendar_today),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8.r),
-                                    ),
-                                  ),
-                                ),
+                            ],
+                          ),
+                          SizedBox(height: 12.h),
+                          Row(
+                            children: [
+                              SizedBox(width: 8.w),
+                              Text(
+                                'Schedule Type: ',
+                                style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.bold, color: Colors.grey[700]),
                               ),
-                              SizedBox(width: 16.w),
-                              Expanded(
-                                child: TextFormField(
-                                  controller: entry.followUpKmController,
-                                  decoration: InputDecoration(
-                                    labelText: 'Follow-up Odometer (Optional)',
-                                    suffixText: 'km',
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(8.r),
-                                    ),
-                                  ),
-                                  keyboardType: TextInputType.number,
-                                  validator: (v) {
-                                    if (entry.isFollowUpRequired && (v != null && v.isNotEmpty) && int.tryParse(v) == null) {
-                                      return 'Invalid number';
-                                    }
-                                    return null;
-                                  },
-                                ),
+                              SizedBox(width: 12.w),
+                              ChoiceChip(
+                                label: const Text('One-Time'),
+                                selected: entry.followUpType == 'one_time',
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    setState(() {
+                                      entry.followUpType = 'one_time';
+                                    });
+                                  }
+                                },
+                              ),
+                              SizedBox(width: 8.w),
+                              ChoiceChip(
+                                label: const Text('Interval / Recurring'),
+                                selected: entry.followUpType == 'recurring',
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    setState(() {
+                                      entry.followUpType = 'recurring';
+                                    });
+                                  }
+                                },
                               ),
                             ],
                           ),
+                          SizedBox(height: 12.h),
+                          if (entry.followUpType == 'one_time')
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(width: 8.w),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: entry.followUpDateController,
+                                    readOnly: true,
+                                    onTap: () => _selectFollowUpDate(context, entry),
+                                    decoration: InputDecoration(
+                                      labelText: 'Follow-up Date (Optional)',
+                                      suffixIcon: const Icon(Icons.calendar_today),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8.r),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 16.w),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: entry.followUpKmController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Follow-up Odometer (Optional)',
+                                      suffixText: 'km',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8.r),
+                                      ),
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                    validator: (v) {
+                                      if (entry.isFollowUpRequired &&
+                                          entry.followUpType == 'one_time' &&
+                                          (v != null && v.isNotEmpty) &&
+                                          int.tryParse(v) == null) {
+                                        return 'Invalid number';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SizedBox(width: 8.w),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: entry.followUpIntervalKmController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Interval Mileage',
+                                      suffixText: 'km',
+                                      hintText: 'e.g. 5000',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8.r),
+                                      ),
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                    validator: (v) {
+                                      if (entry.isFollowUpRequired && entry.followUpType == 'recurring') {
+                                        if (v == null || v.isEmpty) return 'Interval mileage is required';
+                                        if (int.tryParse(v) == null || int.parse(v) <= 0) return 'Must be > 0';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                                SizedBox(width: 16.w),
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: entry.followUpTimesController,
+                                    decoration: InputDecoration(
+                                      labelText: 'Repeat Times',
+                                      hintText: 'e.g. 5',
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8.r),
+                                      ),
+                                    ),
+                                    keyboardType: TextInputType.number,
+                                    validator: (v) {
+                                      if (entry.isFollowUpRequired && entry.followUpType == 'recurring') {
+                                        if (v == null || v.isEmpty) return 'Repeat count is required';
+                                        if (int.tryParse(v) == null || int.parse(v) <= 0) return 'Must be > 0';
+                                      }
+                                      return null;
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
                         ],
 
                         // ── File attachments ──
