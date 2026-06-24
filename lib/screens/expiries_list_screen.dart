@@ -12,6 +12,8 @@ import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_pr
 import 'package:xloop_invoice/features/vehicle/presentation/widgets/maintenance_extension_dialog.dart';
 import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.dart';
+import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
+import 'package:xloop_invoice/features/xloop_vault/presentation/providers/vault_provider.dart';
 import 'package:xloop_invoice/injection_container.dart';
 
 class _DT {
@@ -48,7 +50,9 @@ class _ExpiriesListScreenState extends State<ExpiriesListScreen> {
     if (_selectedTabIndex == 2) {
       return allExpiries
           .where((n) =>
-              n.id.startsWith('maintenance_') || n.id.startsWith('v_expiry_'))
+              n.id.startsWith('maintenance_') ||
+              n.id.startsWith('v_expiry_') ||
+              n.id.startsWith('followup_'))
           .toList();
     }
     if (_selectedTabIndex == 3) {
@@ -59,7 +63,8 @@ class _ExpiriesListScreenState extends State<ExpiriesListScreen> {
             !n.id.startsWith('maintenance_') &&
             !n.id.startsWith('v_expiry_') &&
             !n.id.startsWith('expiry_') &&
-            !n.id.startsWith('vault_'))
+            !n.id.startsWith('vault_') &&
+            !n.id.startsWith('followup_'))
         .toList();
   }
 
@@ -117,7 +122,8 @@ class _ExpiriesListScreenState extends State<ExpiriesListScreen> {
                             tabCount = expiries
                                 .where((n) =>
                                     n.id.startsWith('maintenance_') ||
-                                    n.id.startsWith('v_expiry_'))
+                                    n.id.startsWith('v_expiry_') ||
+                                    n.id.startsWith('followup_'))
                                 .length;
                           }
                           if (index == 3) {
@@ -131,7 +137,8 @@ class _ExpiriesListScreenState extends State<ExpiriesListScreen> {
                                     !n.id.startsWith('maintenance_') &&
                                     !n.id.startsWith('v_expiry_') &&
                                     !n.id.startsWith('expiry_') &&
-                                    !n.id.startsWith('vault_'))
+                                    !n.id.startsWith('vault_') &&
+                                    !n.id.startsWith('followup_'))
                                 .length;
                           }
 
@@ -312,10 +319,16 @@ class _ExpiryCardState extends State<_ExpiryCard> {
       if (success == true) {
         if (mounted) {
           final notifProvider = context.read<NotificationProvider>();
+          final employeeProvider = context.read<EmployeeProvider>();
+          final vaultProvider = context.read<VaultProvider>();
           notifProvider.markAsRead(widget.alert.id);
           notifProvider.refreshAlerts(
             vehicles: vehicleProvider.vehicles,
             maintenanceTypes: vehicleProvider.maintenanceTypes,
+            employees: employeeProvider.employees,
+            employeeSettings: employeeProvider.settings,
+            vehicleSettings: vehicleProvider.settings,
+            vaultData: vaultProvider.vaultData,
           );
         }
       }

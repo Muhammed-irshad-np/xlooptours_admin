@@ -1,4 +1,7 @@
 import 'package:xloop_invoice/features/employee/domain/repositories/employee_repository.dart';
+import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.dart';
+import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.dart';
+import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_settings_entity.dart';
 import '../entities/vehicle_expiry_alert.dart';
 import '../repositories/vehicle_repository.dart';
 
@@ -8,10 +11,15 @@ class GetVehicleExpiryAlertsUseCase {
 
   GetVehicleExpiryAlertsUseCase(this.repository, this.employeeRepository);
 
-  Future<List<VehicleExpiryAlert>> call({bool includeAll = false}) async {
-    final vehicles = await repository.getAllVehicles();
-    final settings = await repository.getVehicleSettings();
-    final employees = await employeeRepository.getAllEmployees();
+  Future<List<VehicleExpiryAlert>> call({
+    bool includeAll = false,
+    List<VehicleEntity>? localVehicles,
+    VehicleSettingsEntity? localSettings,
+    List<EmployeeEntity>? localEmployees,
+  }) async {
+    final vehicles = localVehicles ?? await repository.getAllVehicles();
+    final settings = localSettings ?? await repository.getVehicleSettings();
+    final employees = localEmployees ?? await employeeRepository.getAllEmployees();
 
     // Create a map of employee ID to employee full name for O(1) lookups
     final Map<String, String> employeeNameMap = {

@@ -114,12 +114,17 @@ class VehicleProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await updateVehicleUseCase(vehicle);
-      await fetchAllVehicles();
+      final index = _vehicles.indexWhere((v) => v.id == vehicle.id);
+      if (index != -1) {
+        _vehicles[index] = vehicle;
+      }
+      _errorMessage = null;
     } catch (e) {
-      _errorMessage = 'Failed to update vehicle: \$e';
+      _errorMessage = 'Failed to update vehicle: $e';
       debugPrint(_errorMessage);
-      _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -133,13 +138,15 @@ class VehicleProvider extends ChangeNotifier {
           lastOdometerUpdateDate: DateTime.now(),
         );
         await updateVehicleUseCase(updatedVehicle);
-        await fetchAllVehicles();
+        _vehicles[vehicleIndex] = updatedVehicle;
       }
+      _errorMessage = null;
     } catch (e) {
-      _errorMessage = 'Failed to update odometer: \$e';
+      _errorMessage = 'Failed to update odometer: $e';
       debugPrint(_errorMessage);
-      _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -147,12 +154,14 @@ class VehicleProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await deleteVehicleUseCase(id);
-      await fetchAllVehicles();
+      _vehicles.removeWhere((v) => v.id == id);
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to delete vehicle: $e';
       debugPrint(_errorMessage);
-      _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -172,12 +181,17 @@ class VehicleProvider extends ChangeNotifier {
       );
 
       await updateVehicleUseCase(updatedVehicle);
-      await fetchAllVehicles();
+      final index = _vehicles.indexWhere((v) => v.id == vehicle.id);
+      if (index != -1) {
+        _vehicles[index] = updatedVehicle;
+      }
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to delete maintenance record: $e';
       debugPrint(_errorMessage);
-      _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -201,12 +215,17 @@ class VehicleProvider extends ChangeNotifier {
       }
 
       await updateVehicleUseCase(updatedVehicle);
-      await fetchAllVehicles();
+      final index = _vehicles.indexWhere((v) => v.id == vehicle.id);
+      if (index != -1) {
+        _vehicles[index] = updatedVehicle;
+      }
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to delete document: $e';
       debugPrint(_errorMessage);
-      _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -225,12 +244,17 @@ class VehicleProvider extends ChangeNotifier {
       );
 
       await updateVehicleUseCase(updatedVehicle);
-      await fetchAllVehicles();
+      final index = _vehicles.indexWhere((v) => v.id == vehicle.id);
+      if (index != -1) {
+        _vehicles[index] = updatedVehicle;
+      }
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to delete Tafweed record: $e';
       debugPrint(_errorMessage);
-      _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 

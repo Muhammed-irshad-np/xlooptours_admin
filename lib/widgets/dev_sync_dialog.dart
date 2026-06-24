@@ -12,6 +12,7 @@ import 'package:xloop_invoice/features/customer/presentation/providers/customer_
 import 'package:xloop_invoice/features/feedback/presentation/providers/feedback_provider.dart';
 import 'package:xloop_invoice/features/notifications/presentation/providers/notification_provider.dart';
 import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
+import 'package:xloop_invoice/features/xloop_vault/presentation/providers/vault_provider.dart';
 
 class DevSyncDialog extends StatefulWidget {
   const DevSyncDialog({super.key});
@@ -103,23 +104,29 @@ class _DevSyncDialogState extends State<DevSyncDialog>
       final vehicleProvider = context.read<VehicleProvider>();
       final authProvider = context.read<AuthProvider>();
       final isAdmin = authProvider.user?.isAdmin ?? false;
+      final employeeProvider = context.read<EmployeeProvider>();
+      final vaultProvider = context.read<VaultProvider>();
 
-      // Refresh providers
-      context.read<EmployeeProvider>().fetchAllEmployees();
-      if (isAdmin) {
-        context.read<CustomerProvider>().fetchAllCustomers();
-      }
-      context.read<FeedbackProvider>().fetchLatestFeedbacks();
-
+      // Refresh providers in parallel
       await Future.wait([
+        employeeProvider.fetchAllEmployees(),
+        employeeProvider.fetchEmployeeSettings(),
         vehicleProvider.fetchAllVehicles(),
         vehicleProvider.fetchAllMaintenanceTypes(),
+        vehicleProvider.fetchVehicleSettings(),
+        vaultProvider.loadVaultData(),
+        context.read<FeedbackProvider>().fetchLatestFeedbacks(),
+        if (isAdmin) context.read<CustomerProvider>().fetchAllCustomers(),
       ]);
 
       if (mounted) {
         await context.read<NotificationProvider>().refreshAlerts(
           vehicles: vehicleProvider.vehicles,
           maintenanceTypes: vehicleProvider.maintenanceTypes,
+          employees: employeeProvider.employees,
+          employeeSettings: employeeProvider.settings,
+          vehicleSettings: vehicleProvider.settings,
+          vaultData: vaultProvider.vaultData,
         );
       }
 
