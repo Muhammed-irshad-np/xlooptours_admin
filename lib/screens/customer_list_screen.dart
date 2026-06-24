@@ -229,6 +229,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
   Widget _buildCustomerCard(CustomerEntity customer) {
     bool isActive = customer.status == 'ACTIVE';
+    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
 
     return Card(
       elevation: 0,

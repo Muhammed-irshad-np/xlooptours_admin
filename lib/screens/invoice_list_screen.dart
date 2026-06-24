@@ -303,6 +303,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     NumberFormat currencyFormat,
     DateFormat dateFormat,
   ) {
+    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
