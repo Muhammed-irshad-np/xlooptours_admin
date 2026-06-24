@@ -8,7 +8,7 @@ class GetVehicleExpiryAlertsUseCase {
 
   GetVehicleExpiryAlertsUseCase(this.repository, this.employeeRepository);
 
-  Future<List<VehicleExpiryAlert>> call() async {
+  Future<List<VehicleExpiryAlert>> call({bool includeAll = false}) async {
     final vehicles = await repository.getAllVehicles();
     final settings = await repository.getVehicleSettings();
     final employees = await employeeRepository.getAllEmployees();
@@ -28,7 +28,7 @@ class GetVehicleExpiryAlertsUseCase {
       if (vehicle.registration != null) {
         final days = vehicle.registration!.expiryDate.difference(now).inDays;
         final alertDays = vehicle.registration!.notificationDays ?? settings.isthimaraAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             VehicleExpiryAlert(
               vehicleId: vehicle.id,
@@ -45,7 +45,7 @@ class GetVehicleExpiryAlertsUseCase {
       if (vehicle.fahas != null) {
         final days = vehicle.fahas!.expiryDate.difference(now).inDays;
         final alertDays = vehicle.fahas!.notificationDays ?? settings.fahasAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             VehicleExpiryAlert(
               vehicleId: vehicle.id,
@@ -62,7 +62,7 @@ class GetVehicleExpiryAlertsUseCase {
       if (vehicle.insurance != null) {
         final days = vehicle.insurance!.expiryDate.difference(now).inDays;
         final alertDays = vehicle.insurance!.notificationDays ?? settings.insuranceAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             VehicleExpiryAlert(
               vehicleId: vehicle.id,
@@ -79,7 +79,7 @@ class GetVehicleExpiryAlertsUseCase {
       if (vehicle.bahrainInsurance != null) {
         final days = vehicle.bahrainInsurance!.expiryDate.difference(now).inDays;
         final alertDays = vehicle.bahrainInsurance!.notificationDays ?? settings.bahrainInsuranceAlertDays;
-        if (days <= alertDays) {
+        if (includeAll || days <= alertDays) {
           alerts.add(
             VehicleExpiryAlert(
               vehicleId: vehicle.id,
@@ -97,7 +97,7 @@ class GetVehicleExpiryAlertsUseCase {
         for (var tafweed in vehicle.tafweeds!) {
           final days = tafweed.expiryDate.difference(now).inDays;
           final alertDays = tafweed.notificationDays ?? settings.tafweedAlertDays;
-          if (days <= alertDays) {
+          if (includeAll || days <= alertDays) {
             final driverName = employeeNameMap[tafweed.driverId];
             alerts.add(
               VehicleExpiryAlert(

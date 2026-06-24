@@ -9,6 +9,7 @@ import 'trip_creation_screen.dart';
 import 'notifications_screen.dart';
 import 'dashboard_screen.dart';
 import 'feedback_history_screen.dart';
+import '../features/driver_evaluation/presentation/pages/pending_evaluations_screen.dart';
 
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
@@ -39,6 +40,7 @@ class _AdminLayoutState extends State<AdminLayout> {
     const CustomerListScreen(),
     const HomeScreen(), // Invoices
     const FeedbackHistoryScreen(), // Feedback
+    const PendingEvaluationsScreen(), // Evaluations
   ];
 
   static const Color _sidebarBg = Color(0xFF0B0F1A);
@@ -93,6 +95,11 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'Feedback',
       icon: Icons.rate_review_outlined,
       activeIcon: Icons.rate_review_rounded,
+    ),
+    _NavItem(
+      label: 'Evaluations',
+      icon: Icons.assignment_outlined,
+      activeIcon: Icons.assignment_rounded,
     ),
   ];
 

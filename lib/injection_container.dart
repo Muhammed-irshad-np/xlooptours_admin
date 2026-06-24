@@ -103,6 +103,18 @@ import 'features/feedback/domain/usecases/submit_feedback_usecase.dart';
 import 'features/feedback/domain/usecases/get_latest_feedbacks_usecase.dart';
 import 'features/feedback/presentation/providers/feedback_provider.dart';
 
+import 'features/driver_evaluation/data/datasources/evaluation_remote_data_source.dart';
+import 'features/driver_evaluation/data/repositories/evaluation_repository_impl.dart';
+import 'features/driver_evaluation/domain/repositories/evaluation_repository.dart';
+import 'features/driver_evaluation/domain/usecases/generate_evaluation_link_usecase.dart';
+import 'features/driver_evaluation/domain/usecases/get_pending_evaluations_usecase.dart';
+import 'features/driver_evaluation/domain/usecases/submit_admin_score_usecase.dart';
+import 'features/driver_evaluation/domain/usecases/submit_driver_form_usecase.dart';
+import 'features/driver_evaluation/domain/usecases/get_evaluation_by_id_usecase.dart';
+import 'features/driver_evaluation/domain/usecases/delete_evaluation_usecase.dart';
+import 'features/driver_evaluation/presentation/providers/admin_evaluation_provider.dart';
+import 'features/driver_evaluation/presentation/providers/driver_form_provider.dart';
+
 final sl = GetIt.instance; // sl stands for Service Locator
 
 Future<void> init() async {
@@ -413,6 +425,41 @@ Future<void> init() async {
   // Data sources
   sl.registerLazySingleton<FeedbackRemoteDataSource>(
     () => FeedbackRemoteDataSourceImpl(firestore: sl()),
+  );
+
+  //! Features - Driver Evaluation
+  // State Management (Provider)
+  sl.registerFactory(
+    () => AdminEvaluationProvider(
+      generateLinkUseCase: sl(),
+      getPendingEvaluationsUseCase: sl(),
+      submitAdminScoreUseCase: sl(),
+      deleteEvaluationUseCase: sl(),
+    ),
+  );
+  sl.registerFactory(
+    () => DriverFormProvider(
+      getEvaluationByIdUseCase: sl(),
+      submitDriverFormUseCase: sl(),
+    ),
+  );
+
+  // UseCases
+  sl.registerLazySingleton(() => GenerateEvaluationLinkUseCase(sl()));
+  sl.registerLazySingleton(() => GetPendingEvaluationsUseCase(sl()));
+  sl.registerLazySingleton(() => SubmitAdminScoreUseCase(sl()));
+  sl.registerLazySingleton(() => SubmitDriverFormUseCase(sl()));
+  sl.registerLazySingleton(() => GetEvaluationByIdUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteEvaluationUseCase(sl()));
+
+  // Repositories
+  sl.registerLazySingleton<EvaluationRepository>(
+    () => EvaluationRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data sources
+  sl.registerLazySingleton<EvaluationRemoteDataSource>(
+    () => EvaluationRemoteDataSourceImpl(firestore: sl()),
   );
 
   //! Core

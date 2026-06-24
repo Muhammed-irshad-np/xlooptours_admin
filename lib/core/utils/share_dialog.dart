@@ -6,35 +6,59 @@ import 'package:url_launcher/url_launcher.dart';
 class ShareDialog extends StatelessWidget {
   final String url;
   final String title;
+  final String? recipientPhone;
+  final String? recipientEmail;
+  final String? recipientName;
+  final String? shareMessage;
 
-  const ShareDialog({super.key, required this.url, required this.title});
+  const ShareDialog({
+    super.key,
+    required this.url,
+    required this.title,
+    this.recipientPhone,
+    this.recipientEmail,
+    this.recipientName,
+    this.shareMessage,
+  });
 
   Future<void> _launchUrl(String urlString) async {
     final Uri uri = Uri.parse(urlString);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      throw Exception('Could not launch $urlString');
+      debugPrint('Could not launch $urlString');
     }
   }
 
   void _shareToWhatsApp() {
-    final text = 'Check out this document: $title\n$url';
-    final whatsappUrl = 'https://wa.me/?text=${Uri.encodeComponent(text)}';
+    String messageText = shareMessage ?? 'Check out this link: $title\n$url';
+    
+    String cleanPhone = '';
+    if (recipientPhone != null && recipientPhone!.isNotEmpty) {
+      String phone = recipientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
+      if (phone.startsWith('0')) {
+        phone = phone.substring(1);
+      }
+      // If no country code, default to KSA '966'
+      if (phone.length <= 9) {
+        cleanPhone = '966$phone';
+      } else {
+        cleanPhone = phone;
+      }
+    }
+
+    final whatsappUrl = 'https://wa.me/$cleanPhone?text=${Uri.encodeComponent(messageText)}';
     _launchUrl(whatsappUrl);
   }
 
   void _shareViaEmail() {
-    final subject = Uri.encodeComponent('Document: $title');
-    final body = Uri.encodeComponent(
-      'Hi,\n\nPlease find the document below:\n\n$title\n$url',
-    );
-    final emailUrl = 'mailto:?subject=$subject&body=$body';
+    final subject = Uri.encodeComponent(title);
+    final body = Uri.encodeComponent(shareMessage ?? 'Hi,\n\nPlease find the link below:\n\n$title\n$url');
+    final email = recipientEmail ?? '';
+    final emailUrl = 'mailto:$email?subject=$subject&body=$body';
     _launchUrl(emailUrl);
   }
 
-  /*
   void _copyToClipboard(BuildContext context) {
     Clipboard.setData(ClipboardData(text: url));
-    Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Link copied to clipboard!'),
@@ -42,7 +66,6 @@ class ShareDialog extends StatelessWidget {
       ),
     );
   }
-  */
 
   @override
   Widget build(BuildContext context) {
@@ -62,14 +85,16 @@ class ShareDialog extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Share Document',
+                  'Share Link',
                   style: theme.textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: brandColor,
+                    fontSize: 20.sp,
                   ),
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
+                  tooltip: 'Close share dialog',
                   icon: const Icon(Icons.close),
                 ),
               ],
@@ -79,10 +104,22 @@ class ShareDialog extends StatelessWidget {
               title,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: Colors.grey[600],
+                fontSize: 14.sp,
               ),
-              maxLines: 1,
+              maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+            if (recipientName != null) ...[
+              SizedBox(height: 6.h),
+              Text(
+                'Recipient: $recipientName',
+                style: TextStyle(
+                  fontSize: 13.sp,
+                  color: Colors.grey[500],
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             SizedBox(height: 24.h),
             _buildShareOption(
               context,
@@ -99,16 +136,17 @@ class ShareDialog extends StatelessWidget {
               onTap: _shareViaEmail,
               color: Colors.redAccent,
             ),
-            /*
             SizedBox(height: 12.h),
             _buildShareOption(
               context,
               icon: Icons.link,
               label: 'Copy Link',
-              onTap: () => _copyToClipboard(context),
+              onTap: () {
+                _copyToClipboard(context);
+                Navigator.pop(context);
+              },
               color: brandColor,
             ),
-            */
           ],
         ),
       ),
@@ -126,7 +164,7 @@ class ShareDialog extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12.r),
       child: Container(
-        padding: EdgeInsets.symmetric(vertical: 16.h, horizontal: 16.w),
+        padding: EdgeInsets.symmetric(vertical: 14.h, horizontal: 16.w),
         decoration: BoxDecoration(
           border: Border.all(color: Colors.grey[200]!),
           borderRadius: BorderRadius.circular(12.r),
@@ -139,14 +177,17 @@ class ShareDialog extends StatelessWidget {
                 color: color.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: color, size: 24.w),
+              child: Icon(icon, color: color, size: 22.w),
             ),
             SizedBox(width: 16.w),
             Text(
               label,
               style: Theme.of(
                 context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+              ).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14.sp,
+                  ),
             ),
             const Spacer(),
             Icon(Icons.chevron_right, color: Colors.grey[400]),
