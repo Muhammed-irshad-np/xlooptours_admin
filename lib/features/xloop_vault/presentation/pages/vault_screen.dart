@@ -9,6 +9,7 @@ import '../../../../widgets/responsive_layout.dart';
 import '../../../../core/widgets/modern_app_bar.dart';
 import '../../../../core/widgets/modern_tab_bar.dart';
 import 'vat_filing_dialog.dart';
+import '../../../../core/utils/activity_logger.dart';
 import '../../domain/entities/vault_data.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:file_picker/file_picker.dart';
@@ -1243,6 +1244,15 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
     );
     final newData = VaultData(license: newLicense, vatCertificate: currentData.vatCertificate);
     await provider.updateVaultData(newData);
+    
+    if (mounted) {
+      await ActivityLogger.log(
+        context,
+        title: 'Company License Updated',
+        message: 'Company Commercial License details have been updated.',
+        relatedId: 'vault',
+      );
+    }
   }
 
   Future<void> _updateVatCert(VaultProvider provider, {DateTime? issueDate, String? vatAccountNo, VaultDocument? document, int? alertDays}) async {
@@ -1255,6 +1265,15 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
     );
     final newData = VaultData(license: currentData.license, vatCertificate: newCert);
     await provider.updateVaultData(newData);
+    
+    if (mounted) {
+      await ActivityLogger.log(
+        context,
+        title: 'VAT Certificate Updated',
+        message: 'Company VAT Certificate details have been updated.',
+        relatedId: 'vault',
+      );
+    }
   }
 
   void _showAddFilingDialog(BuildContext context, {VatFiling? filing}) {
@@ -1288,6 +1307,12 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
               if (mounted) {
                 Navigator.pop(context);
                 if (success) {
+                  await ActivityLogger.log(
+                    context,
+                    title: 'VAT Filing Deleted',
+                    message: 'VAT filing for bill ${filing.billNumber} has been deleted.',
+                    relatedId: 'vault',
+                  );
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('VAT filing deleted successfully')),
                   );

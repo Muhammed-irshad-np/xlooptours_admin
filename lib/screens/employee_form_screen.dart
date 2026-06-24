@@ -17,6 +17,7 @@ import '../widgets/custom_date_picker.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
+import '../core/utils/activity_logger.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
   // ... (rest of class)
@@ -565,8 +566,24 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       if (mounted) {
         if (widget.employee == null) {
           await provider.addEmployee(newEmployee);
+          if (mounted) {
+            await ActivityLogger.log(
+              context,
+              title: 'Employee Added',
+              message: 'Employee ${newEmployee.fullName} has been added.',
+              relatedId: newEmployee.id,
+            );
+          }
         } else {
           await provider.updateEmployee(newEmployee);
+          if (mounted) {
+            await ActivityLogger.log(
+              context,
+              title: 'Employee Updated',
+              message: 'Employee ${newEmployee.fullName} has been updated.',
+              relatedId: newEmployee.id,
+            );
+          }
         }
       }
 

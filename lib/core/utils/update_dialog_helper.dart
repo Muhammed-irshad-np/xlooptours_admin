@@ -22,6 +22,7 @@ import '../../features/vehicle/presentation/widgets/maintenance_extension_dialog
 import '../../features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../injection_container.dart';
+import '../utils/activity_logger.dart';
 
 class UpdateDialogHelper {
   static void showUpdateDialog(
@@ -417,7 +418,9 @@ class UpdateDialogHelper {
                             decimal: true,
                           ),
                           inputFormatters: [
-                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'^\d*\.?\d*'),
+                            ),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -669,8 +672,7 @@ class UpdateDialogHelper {
                                   .read<NotificationProvider>();
                               final vehicleProvider = ctx
                                   .read<VehicleProvider>();
-                              final vaultProvider = ctx
-                                  .read<VaultProvider>();
+                              final vaultProvider = ctx.read<VaultProvider>();
                               final messenger = ScaffoldMessenger.of(ctx);
                               final navigator = Navigator.of(ctx);
 
@@ -683,6 +685,14 @@ class UpdateDialogHelper {
                                 employeeSettings: employeeProvider.settings,
                                 vehicleSettings: vehicleProvider.settings,
                                 vaultData: vaultProvider.vaultData,
+                              );
+
+                              await ActivityLogger.log(
+                                ctx,
+                                title: 'Employee Document Updated',
+                                message:
+                                    '${employee.fullName}\'s $documentType has been updated.',
+                                relatedId: employee.id,
                               );
 
                               navigator.pop();
@@ -814,7 +824,9 @@ class UpdateDialogHelper {
                         decimal: true,
                       ),
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d*'),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -870,7 +882,9 @@ class UpdateDialogHelper {
                                   context: context,
                                   initialDate:
                                       followUpDate ??
-                                      DateTime.now().add(const Duration(days: 30)),
+                                      DateTime.now().add(
+                                        const Duration(days: 30),
+                                      ),
                                   firstDate: DateTime(2000),
                                   lastDate: DateTime(2100),
                                 );
@@ -899,7 +913,9 @@ class UpdateDialogHelper {
                                 border: OutlineInputBorder(),
                               ),
                               keyboardType: TextInputType.number,
-                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                              ],
                             ),
                           ),
                         ],
@@ -949,8 +965,7 @@ class UpdateDialogHelper {
                             .read<NotificationProvider>();
                         final employeeProvider = context
                             .read<EmployeeProvider>();
-                        final vaultProvider = context
-                            .read<VaultProvider>();
+                        final vaultProvider = context.read<VaultProvider>();
                         await notifProvider.markAsRead(notification.id);
                         await notifProvider.refreshAlerts(
                           vehicles: vehicleProvider.vehicles,
@@ -1009,9 +1024,7 @@ class UpdateDialogHelper {
                       followUpReason: isFollowUpRequired
                           ? followUpReasonController.text.trim()
                           : null,
-                      nextServiceDate: isFollowUpRequired
-                          ? followUpDate
-                          : null,
+                      nextServiceDate: isFollowUpRequired ? followUpDate : null,
                       nextServiceMileage: isFollowUpRequired
                           ? int.tryParse(followUpKmController.text)
                           : null,
@@ -1134,12 +1147,18 @@ class UpdateDialogHelper {
                     await vehicleProvider.updateVehicle(updatedVehicle);
 
                     if (context.mounted) {
+                      await ActivityLogger.log(
+                        context,
+                        title: 'Maintenance Updated',
+                        message:
+                            'Maintenance record for $category updated on vehicle ${vehicle.plateNumber}.',
+                        relatedId: vehicle.id,
+                      );
+
                       final notificationProvider = context
                           .read<NotificationProvider>();
-                      final employeeProvider = context
-                          .read<EmployeeProvider>();
-                      final vaultProvider = context
-                          .read<VaultProvider>();
+                      final employeeProvider = context.read<EmployeeProvider>();
+                      final vaultProvider = context.read<VaultProvider>();
                       final messenger = ScaffoldMessenger.of(context);
                       final navigator = Navigator.of(context);
 
@@ -1589,6 +1608,13 @@ class UpdateDialogHelper {
                                       }
 
                                       if (ctx.mounted) {
+                                        await ActivityLogger.log(
+                                          ctx,
+                                          title: 'Authorization Cancelled',
+                                          message:
+                                              'Tafweed authorization for vehicle ${vehicle.plateNumber} has been cancelled.',
+                                          relatedId: vehicle.id,
+                                        );
                                         final notifProvider = ctx
                                             .read<NotificationProvider>();
                                         final employeeProvider = ctx
@@ -1603,8 +1629,10 @@ class UpdateDialogHelper {
                                           maintenanceTypes:
                                               vehicleProvider.maintenanceTypes,
                                           employees: employeeProvider.employees,
-                                          employeeSettings: employeeProvider.settings,
-                                          vehicleSettings: vehicleProvider.settings,
+                                          employeeSettings:
+                                              employeeProvider.settings,
+                                          vehicleSettings:
+                                              vehicleProvider.settings,
                                           vaultData: vaultProvider.vaultData,
                                         );
                                         if (!ctx.mounted) return;
@@ -2001,8 +2029,7 @@ class UpdateDialogHelper {
                                   .read<NotificationProvider>();
                               final employeeProvider = ctx
                                   .read<EmployeeProvider>();
-                              final vaultProvider = ctx
-                                  .read<VaultProvider>();
+                              final vaultProvider = ctx.read<VaultProvider>();
                               await notifProvider.markAsRead(notification.id);
                               await notifProvider.refreshAlerts(
                                 vehicles: vehicleProvider.vehicles,
@@ -2084,10 +2111,7 @@ class UpdateDialogHelper {
     await showDialog(
       context: context,
       builder: (ctx) {
-        return CompleteFollowUpDialog(
-          vehicle: vehicle,
-          record: record!,
-        );
+        return CompleteFollowUpDialog(vehicle: vehicle, record: record!);
       },
     );
   }

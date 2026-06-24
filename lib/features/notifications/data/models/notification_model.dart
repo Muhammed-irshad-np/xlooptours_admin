@@ -10,6 +10,7 @@ class NotificationModel extends NotificationEntity {
     super.isRead,
     super.type,
     super.relatedId,
+    super.userName,
   });
 
   Map<String, dynamic> toJson() {
@@ -21,6 +22,7 @@ class NotificationModel extends NotificationEntity {
       'isRead': isRead,
       'type': type.name, // Store as string
       'relatedId': relatedId,
+      'userName': userName,
     };
   }
 
@@ -36,6 +38,7 @@ class NotificationModel extends NotificationEntity {
         orElse: () => NotificationType.system,
       ),
       relatedId: json['relatedId'] as String?,
+      userName: json['userName'] as String?,
     );
   }
 
@@ -48,6 +51,7 @@ class NotificationModel extends NotificationEntity {
       isRead: entity.isRead,
       type: entity.type,
       relatedId: entity.relatedId,
+      userName: entity.userName,
     );
   }
 
@@ -60,6 +64,7 @@ class NotificationModel extends NotificationEntity {
     bool? isRead,
     NotificationType? type,
     String? relatedId,
+    String? userName,
   }) {
     return NotificationModel(
       id: id ?? this.id,
@@ -69,6 +74,7 @@ class NotificationModel extends NotificationEntity {
       isRead: isRead ?? this.isRead,
       type: type ?? this.type,
       relatedId: relatedId ?? this.relatedId,
+      userName: userName ?? this.userName,
     );
   }
 }
