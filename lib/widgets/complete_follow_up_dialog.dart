@@ -11,6 +11,9 @@ import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
+import '../features/notifications/presentation/providers/notification_provider.dart';
+import '../features/employee/presentation/providers/employee_provider.dart';
+import '../features/xloop_vault/presentation/providers/vault_provider.dart';
 
 class CompleteFollowUpDialog extends StatefulWidget {
   final VehicleEntity vehicle;
@@ -132,7 +135,13 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
   Future<void> _saveCompletion() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final user = context.read<AuthProvider>().user;
+    final navigator = Navigator.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    final notifProvider = context.read<NotificationProvider>();
+    final provider = context.read<VehicleProvider>();
+    final authProvider = context.read<AuthProvider>();
+
+    final user = authProvider.user;
     final email = user?.email;
     final username = (user?.displayName != null && user!.displayName!.isNotEmpty)
         ? user.displayName
@@ -145,7 +154,6 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
     });
 
     try {
-      final provider = context.read<VehicleProvider>();
 
       // Upload files
       final List<String> uploadedUrls = [];
@@ -210,9 +218,26 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
 
       await provider.updateVehicle(updatedVehicle);
 
+      // Mark the corresponding virtual notification as read and refresh alerts
+      final notifId = 'followup_${widget.vehicle.id}_${widget.record.date.millisecondsSinceEpoch}';
+      await notifProvider.markAsRead(notifId);
+      
       if (mounted) {
-        Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
+        final employeeProvider = context.read<EmployeeProvider>();
+        final vaultProvider = context.read<VaultProvider>();
+        await notifProvider.refreshAlerts(
+          vehicles: provider.vehicles,
+          maintenanceTypes: provider.maintenanceTypes,
+          employees: employeeProvider.employees,
+          employeeSettings: employeeProvider.settings,
+          vehicleSettings: provider.settings,
+          vaultData: vaultProvider.vaultData,
+        );
+      }
+
+      if (mounted) {
+        navigator.pop(true);
+        scaffoldMessenger.showSnackBar(
           const SnackBar(
             content: Text('Follow-up completion logged successfully'),
           ),
@@ -256,7 +281,9 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
               ),
               SizedBox(height: 4.h),
               Text(
-                'Logging Visit $visitIndexStr • ${widget.record.followUpReason ?? 'General Follow-up'}',
+                (widget.record.followUpTimesCount != null && widget.record.followUpIntervalKm != null) 
+                    ? 'Logging Visit $visitIndexStr • ${widget.record.followUpReason ?? 'General Follow-up'}'
+                    : widget.record.followUpReason ?? 'General Follow-up',
                 style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.grey[600]),
               ),
               SizedBox(height: 20.h),

@@ -17,6 +17,7 @@ import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_pr
 import 'package:xloop_invoice/features/customer/presentation/providers/customer_provider.dart';
 import 'package:xloop_invoice/features/feedback/presentation/providers/feedback_provider.dart';
 import 'package:xloop_invoice/features/notifications/presentation/providers/notification_provider.dart';
+import 'package:xloop_invoice/features/xloop_vault/presentation/providers/vault_provider.dart';
 import 'package:xloop_invoice/features/notifications/domain/entities/notification_entity.dart';
 import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicles_needing_odo_update_usecase.dart';
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.dart';
@@ -119,24 +120,32 @@ class _DashboardScreenState extends State<DashboardScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final vehicleProvider = context.read<VehicleProvider>();
+      final employeeProvider = context.read<EmployeeProvider>();
+      final vaultProvider = context.read<VaultProvider>();
       final authProvider = context.read<AuthProvider>();
       final isAdmin = authProvider.user?.isAdmin ?? false;
 
-      // Fetch vehicles + maintenance types (needed for interval config) together,
-      // then refresh alerts so NotificationProvider has all data it needs.
-      context.read<EmployeeProvider>().fetchAllEmployees();
-      if (isAdmin) {
-        context.read<CustomerProvider>().fetchAllCustomers();
-      }
-      context.read<FeedbackProvider>().fetchLatestFeedbacks();
-      await Future.wait([
+      // Fetch all required data in parallel on startup so it is cached in providers,
+      // avoiding multiple subsequent database reads.
+      await Future.wait<dynamic>(<Future<dynamic>>[
+        employeeProvider.fetchAllEmployees(),
+        employeeProvider.fetchEmployeeSettings(),
         vehicleProvider.fetchAllVehicles(),
         vehicleProvider.fetchAllMaintenanceTypes(),
+        vehicleProvider.fetchVehicleSettings(),
+        vaultProvider.loadVaultData(),
+        context.read<FeedbackProvider>().fetchLatestFeedbacks(),
+        if (isAdmin) context.read<CustomerProvider>().fetchAllCustomers(),
       ]);
+
       if (!mounted) return;
       await context.read<NotificationProvider>().refreshAlerts(
         vehicles: vehicleProvider.vehicles,
         maintenanceTypes: vehicleProvider.maintenanceTypes,
+        employees: employeeProvider.employees,
+        employeeSettings: employeeProvider.settings,
+        vehicleSettings: vehicleProvider.settings,
+        vaultData: vaultProvider.vaultData,
       );
     });
   }
@@ -1132,10 +1141,16 @@ class _ExpiryCardState extends State<_ExpiryCard> {
       if (success == true) {
         if (mounted) {
           final notifProvider = context.read<NotificationProvider>();
+          final employeeProvider = context.read<EmployeeProvider>();
+          final vaultProvider = context.read<VaultProvider>();
           notifProvider.markAsRead(widget.alert.id);
           notifProvider.refreshAlerts(
             vehicles: vehicleProvider.vehicles,
             maintenanceTypes: vehicleProvider.maintenanceTypes,
+            employees: employeeProvider.employees,
+            employeeSettings: employeeProvider.settings,
+            vehicleSettings: vehicleProvider.settings,
+            vaultData: vaultProvider.vaultData,
           );
         }
       }
@@ -1749,7 +1764,9 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
       return allExpiries
           .where(
             (n) =>
-                n.id.startsWith('maintenance_') || n.id.startsWith('v_expiry_'),
+                n.id.startsWith('maintenance_') ||
+                n.id.startsWith('v_expiry_') ||
+                n.id.startsWith('followup_'),
           )
           .toList();
     }
@@ -1764,7 +1781,8 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
               !n.id.startsWith('maintenance_') &&
               !n.id.startsWith('v_expiry_') &&
               !n.id.startsWith('expiry_') &&
-              !n.id.startsWith('vault_'),
+              !n.id.startsWith('vault_') &&
+              !n.id.startsWith('followup_'),
         )
         .toList();
   }
@@ -1846,7 +1864,8 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
                             .where(
                               (n) =>
                                   n.id.startsWith('maintenance_') ||
-                                  n.id.startsWith('v_expiry_'),
+                                  n.id.startsWith('v_expiry_') ||
+                                  n.id.startsWith('followup_'),
                             )
                             .length;
                       }
@@ -1862,7 +1881,8 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
                                   !n.id.startsWith('maintenance_') &&
                                   !n.id.startsWith('v_expiry_') &&
                                   !n.id.startsWith('expiry_') &&
-                                  !n.id.startsWith('vault_'),
+                                  !n.id.startsWith('vault_') &&
+                                  !n.id.startsWith('followup_'),
                             )
                             .length;
                       }

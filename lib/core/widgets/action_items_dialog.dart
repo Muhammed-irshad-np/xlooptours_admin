@@ -6,6 +6,8 @@ import '../../features/notifications/domain/entities/notification_entity.dart';
 import '../../features/notifications/presentation/providers/notification_provider.dart';
 import '../utils/update_dialog_helper.dart';
 import '../../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../../features/employee/presentation/providers/employee_provider.dart';
+import '../../features/xloop_vault/presentation/providers/vault_provider.dart';
 import '../../features/vehicle/presentation/widgets/maintenance_extension_dialog.dart';
 import '../../features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
 import '../../features/vehicle/domain/entities/vehicle_entity.dart';
@@ -210,10 +212,16 @@ class _ExpiryCardState extends State<_ExpiryCard> {
       if (success == true) {
         if (mounted) {
           final notifProvider = context.read<NotificationProvider>();
+          final employeeProvider = context.read<EmployeeProvider>();
+          final vaultProvider = context.read<VaultProvider>();
           notifProvider.markAsRead(widget.alert.id);
           notifProvider.refreshAlerts(
             vehicles: vehicleProvider.vehicles,
             maintenanceTypes: vehicleProvider.maintenanceTypes,
+            employees: employeeProvider.employees,
+            employeeSettings: employeeProvider.settings,
+            vehicleSettings: vehicleProvider.settings,
+            vaultData: vaultProvider.vaultData,
           );
         }
       }

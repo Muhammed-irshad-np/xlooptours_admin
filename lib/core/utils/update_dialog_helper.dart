@@ -10,6 +10,7 @@ import '../../features/employee/presentation/providers/employee_provider.dart';
 import '../../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../../features/notifications/presentation/providers/notification_provider.dart';
 import '../../widgets/custom_date_picker.dart';
+import '../../widgets/complete_follow_up_dialog.dart';
 import '../../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../../features/employee/domain/entities/employee_contact.dart';
 import '../../features/employee/domain/entities/employee_documents.dart';
@@ -668,6 +669,8 @@ class UpdateDialogHelper {
                                   .read<NotificationProvider>();
                               final vehicleProvider = ctx
                                   .read<VehicleProvider>();
+                              final vaultProvider = ctx
+                                  .read<VaultProvider>();
                               final messenger = ScaffoldMessenger.of(ctx);
                               final navigator = Navigator.of(ctx);
 
@@ -676,6 +679,10 @@ class UpdateDialogHelper {
                                 vehicles: vehicleProvider.vehicles,
                                 maintenanceTypes:
                                     vehicleProvider.maintenanceTypes,
+                                employees: employeeProvider.employees,
+                                employeeSettings: employeeProvider.settings,
+                                vehicleSettings: vehicleProvider.settings,
+                                vaultData: vaultProvider.vaultData,
                               );
 
                               navigator.pop();
@@ -745,9 +752,6 @@ class UpdateDialogHelper {
     DateTime? followUpDate;
     final followUpDateController = TextEditingController();
     final followUpKmController = TextEditingController();
-    String followUpType = 'one_time';
-    final followUpIntervalKmController = TextEditingController();
-    final followUpTimesController = TextEditingController();
 
     if (vehicle.currentOdometer != null) {
       mileageController.text = vehicle.currentOdometer.toString();
@@ -857,98 +861,49 @@ class UpdateDialogHelper {
                       const SizedBox(height: 12),
                       Row(
                         children: [
-                          const Text(
-                            'Schedule Type: ',
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                          Expanded(
+                            child: TextFormField(
+                              controller: followUpDateController,
+                              readOnly: true,
+                              onTap: () async {
+                                final picked = await showDatePicker(
+                                  context: context,
+                                  initialDate:
+                                      followUpDate ??
+                                      DateTime.now().add(const Duration(days: 30)),
+                                  firstDate: DateTime(2000),
+                                  lastDate: DateTime(2100),
+                                );
+                                if (picked != null) {
+                                  setState(() {
+                                    followUpDate = picked;
+                                    followUpDateController.text =
+                                        "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+                                  });
+                                }
+                              },
+                              decoration: const InputDecoration(
+                                labelText: 'Follow-up Date (Optional)',
+                                suffixIcon: Icon(Icons.calendar_today),
+                                border: OutlineInputBorder(),
+                              ),
+                            ),
                           ),
                           const SizedBox(width: 12),
-                          ChoiceChip(
-                            label: const Text('One-Time'),
-                            selected: followUpType == 'one_time',
-                            onSelected: (selected) {
-                              if (selected) {
-                                setState(() {
-                                  followUpType = 'one_time';
-                                });
-                              }
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          ChoiceChip(
-                            label: const Text('Interval / Recurring'),
-                            selected: followUpType == 'recurring',
-                            onSelected: (selected) {
-                              if (selected) {
-                                setState(() {
-                                  followUpType = 'recurring';
-                                });
-                              }
-                            },
+                          Expanded(
+                            child: TextFormField(
+                              controller: followUpKmController,
+                              decoration: const InputDecoration(
+                                labelText: 'Follow-up Odometer (Optional)',
+                                suffixText: 'km',
+                                border: OutlineInputBorder(),
+                              ),
+                              keyboardType: TextInputType.number,
+                              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      if (followUpType == 'one_time') ...[
-                        TextFormField(
-                          controller: followUpDateController,
-                          readOnly: true,
-                          onTap: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate:
-                                  followUpDate ??
-                                  DateTime.now().add(const Duration(days: 30)),
-                              firstDate: DateTime(2000),
-                              lastDate: DateTime(2100),
-                            );
-                            if (picked != null) {
-                              setState(() {
-                                followUpDate = picked;
-                                followUpDateController.text =
-                                    "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
-                              });
-                            }
-                          },
-                          decoration: const InputDecoration(
-                            labelText: 'Follow-up Date (Optional)',
-                            suffixIcon: Icon(Icons.calendar_today),
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: followUpKmController,
-                          decoration: const InputDecoration(
-                            labelText: 'Follow-up Odometer (Optional)',
-                            suffixText: 'km',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        ),
-                      ] else ...[
-                        TextFormField(
-                          controller: followUpIntervalKmController,
-                          decoration: const InputDecoration(
-                            labelText: 'Interval Mileage (KM)',
-                            hintText: 'e.g. 5000',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: followUpTimesController,
-                          decoration: const InputDecoration(
-                            labelText: 'Repeat Times',
-                            hintText: 'e.g. 5',
-                            border: OutlineInputBorder(),
-                          ),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                        ),
-                      ],
                     ],
                   ],
                 ),
@@ -992,10 +947,18 @@ class UpdateDialogHelper {
                       if (context.mounted) {
                         final notifProvider = context
                             .read<NotificationProvider>();
+                        final employeeProvider = context
+                            .read<EmployeeProvider>();
+                        final vaultProvider = context
+                            .read<VaultProvider>();
                         await notifProvider.markAsRead(notification.id);
                         await notifProvider.refreshAlerts(
                           vehicles: vehicleProvider.vehicles,
                           maintenanceTypes: vehicleProvider.maintenanceTypes,
+                          employees: employeeProvider.employees,
+                          employeeSettings: employeeProvider.settings,
+                          vehicleSettings: vehicleProvider.settings,
+                          vaultData: vaultProvider.vaultData,
                         );
                         Navigator.pop(context);
                       }
@@ -1025,14 +988,6 @@ class UpdateDialogHelper {
                     }
 
                     final newMileage = int.parse(mileageController.text);
-                    final bool isRecurring =
-                        isFollowUpRequired && followUpType == 'recurring';
-                    final int? intervalKm = isRecurring
-                        ? int.tryParse(followUpIntervalKmController.text)
-                        : null;
-                    final int? timesCount = isRecurring
-                        ? int.tryParse(followUpTimesController.text)
-                        : null;
 
                     final user = context.read<AuthProvider>().user;
                     final email = user?.email;
@@ -1054,17 +1009,15 @@ class UpdateDialogHelper {
                       followUpReason: isFollowUpRequired
                           ? followUpReasonController.text.trim()
                           : null,
-                      nextServiceDate: (isFollowUpRequired && !isRecurring)
+                      nextServiceDate: isFollowUpRequired
                           ? followUpDate
                           : null,
                       nextServiceMileage: isFollowUpRequired
-                          ? (isRecurring
-                                ? newMileage + (intervalKm ?? 0)
-                                : int.tryParse(followUpKmController.text))
+                          ? int.tryParse(followUpKmController.text)
                           : null,
                       isFollowUpCompleted: isFollowUpRequired ? false : null,
-                      followUpIntervalKm: intervalKm,
-                      followUpTimesCount: timesCount,
+                      followUpIntervalKm: null,
+                      followUpTimesCount: null,
                       followUpCompletions: isFollowUpRequired ? const [] : null,
                       performedBy: username,
                     );
@@ -1183,6 +1136,10 @@ class UpdateDialogHelper {
                     if (context.mounted) {
                       final notificationProvider = context
                           .read<NotificationProvider>();
+                      final employeeProvider = context
+                          .read<EmployeeProvider>();
+                      final vaultProvider = context
+                          .read<VaultProvider>();
                       final messenger = ScaffoldMessenger.of(context);
                       final navigator = Navigator.of(context);
 
@@ -1190,6 +1147,10 @@ class UpdateDialogHelper {
                       await notificationProvider.refreshAlerts(
                         vehicles: vehicleProvider.vehicles,
                         maintenanceTypes: vehicleProvider.maintenanceTypes,
+                        employees: employeeProvider.employees,
+                        employeeSettings: employeeProvider.settings,
+                        vehicleSettings: vehicleProvider.settings,
+                        vaultData: vaultProvider.vaultData,
                       );
 
                       navigator.pop();
@@ -1350,11 +1311,17 @@ class UpdateDialogHelper {
                                   .read<NotificationProvider>();
                               final vehicleProvider = ctx
                                   .read<VehicleProvider>();
+                              final employeeProvider = ctx
+                                  .read<EmployeeProvider>();
                               await notifProvider.markAsRead(notification.id);
                               await notifProvider.refreshAlerts(
                                 vehicles: vehicleProvider.vehicles,
                                 maintenanceTypes:
                                     vehicleProvider.maintenanceTypes,
+                                employees: employeeProvider.employees,
+                                employeeSettings: employeeProvider.settings,
+                                vehicleSettings: vehicleProvider.settings,
+                                vaultData: vaultProvider.vaultData,
                               );
                               Navigator.pop(ctx);
                               ScaffoldMessenger.of(ctx).showSnackBar(
@@ -1624,6 +1591,10 @@ class UpdateDialogHelper {
                                       if (ctx.mounted) {
                                         final notifProvider = ctx
                                             .read<NotificationProvider>();
+                                        final employeeProvider = ctx
+                                            .read<EmployeeProvider>();
+                                        final vaultProvider = ctx
+                                            .read<VaultProvider>();
                                         await notifProvider.markAsRead(
                                           notification.id,
                                         );
@@ -1631,6 +1602,10 @@ class UpdateDialogHelper {
                                           vehicles: vehicleProvider.vehicles,
                                           maintenanceTypes:
                                               vehicleProvider.maintenanceTypes,
+                                          employees: employeeProvider.employees,
+                                          employeeSettings: employeeProvider.settings,
+                                          vehicleSettings: vehicleProvider.settings,
+                                          vaultData: vaultProvider.vaultData,
                                         );
                                         if (!ctx.mounted) return;
                                         Navigator.pop(ctx);
@@ -2024,11 +1999,19 @@ class UpdateDialogHelper {
                             if (ctx.mounted) {
                               final notifProvider = ctx
                                   .read<NotificationProvider>();
+                              final employeeProvider = ctx
+                                  .read<EmployeeProvider>();
+                              final vaultProvider = ctx
+                                  .read<VaultProvider>();
                               await notifProvider.markAsRead(notification.id);
                               await notifProvider.refreshAlerts(
                                 vehicles: vehicleProvider.vehicles,
                                 maintenanceTypes:
                                     vehicleProvider.maintenanceTypes,
+                                employees: employeeProvider.employees,
+                                employeeSettings: employeeProvider.settings,
+                                vehicleSettings: vehicleProvider.settings,
+                                vaultData: vaultProvider.vaultData,
                               );
                               if (!ctx.mounted) return;
                               Navigator.pop(ctx);
@@ -2101,71 +2084,9 @@ class UpdateDialogHelper {
     await showDialog(
       context: context,
       builder: (ctx) {
-        return AlertDialog(
-          title: const Text('Resolve Follow-up'),
-          content: Text(
-            'Vehicle: ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber})\n\n'
-            'Reason: ${record!.followUpReason ?? "General Revisit"}\n\n'
-            'Do you want to mark this follow-up as completed?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                final user = ctx.read<AuthProvider>().user;
-                final email = user?.email;
-                final username =
-                    (user?.displayName != null && user!.displayName!.isNotEmpty)
-                    ? user.displayName
-                    : (email != null && email.contains('@')
-                          ? email.split('@').first
-                          : (email ?? 'System'));
-
-                final updatedHistory = (vehicle.maintenanceHistory ?? []).map((
-                  r,
-                ) {
-                  if (r == record) {
-                    return r.copyWith(
-                      isFollowUpCompleted: true,
-                      performedBy: username,
-                    );
-                  }
-                  return r;
-                }).toList();
-
-                final updatedVehicle = vehicle.copyWith(
-                  maintenanceHistory: updatedHistory,
-                );
-
-                final messenger = ScaffoldMessenger.of(ctx);
-                final navigator = Navigator.of(ctx);
-                final notifProvider = ctx.read<NotificationProvider>();
-
-                try {
-                  await vehicleProvider.updateVehicle(updatedVehicle);
-                  await notifProvider.markAsRead(notification.id);
-                  await notifProvider.refreshAlerts(
-                    vehicles: vehicleProvider.vehicles,
-                    maintenanceTypes: vehicleProvider.maintenanceTypes,
-                  );
-                  navigator.pop();
-                  messenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('Follow-up marked as completed'),
-                    ),
-                  );
-                } catch (e) {
-                  messenger.showSnackBar(
-                    SnackBar(content: Text('Failed to update follow-up: $e')),
-                  );
-                }
-              },
-              child: const Text('Mark Completed'),
-            ),
-          ],
+        return CompleteFollowUpDialog(
+          vehicle: vehicle,
+          record: record!,
         );
       },
     );

@@ -12,6 +12,7 @@ import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
+import '../features/xloop_vault/presentation/providers/vault_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
 import '../core/widgets/action_items_dialog.dart';
@@ -56,10 +57,17 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
 
       if (mounted) {
         _driversMap.value = driversMap;
+        final employeeProvider = context.read<EmployeeProvider>();
+        final vehicleProvider = context.read<VehicleProvider>();
+        final vaultProvider = context.read<VaultProvider>();
         // Refresh alerts whenever data changes
         context.read<NotificationProvider>().refreshAlerts(
-          vehicles: context.read<VehicleProvider>().vehicles,
-          maintenanceTypes: context.read<VehicleProvider>().maintenanceTypes,
+          vehicles: vehicleProvider.vehicles,
+          maintenanceTypes: vehicleProvider.maintenanceTypes,
+          employees: employeeProvider.employees,
+          employeeSettings: employeeProvider.settings,
+          vehicleSettings: vehicleProvider.settings,
+          vaultData: vaultProvider.vaultData,
         );
       }
     } catch (e) {
