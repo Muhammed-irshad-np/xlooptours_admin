@@ -19,6 +19,7 @@ import '../widgets/custom_date_picker.dart';
 import 'package:file_picker/file_picker.dart';
 import '../services/image_service.dart';
 import 'document_viewer_screen.dart';
+import '../core/utils/activity_logger.dart';
 
 class VehicleFormScreen extends StatefulWidget {
   final VehicleEntity? vehicle;
@@ -607,8 +608,24 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       final provider = context.read<VehicleProvider>();
       if (widget.vehicle != null) {
         await provider.updateVehicle(vehicle);
+        if (mounted) {
+          await ActivityLogger.log(
+            context,
+            title: 'Vehicle Updated',
+            message: 'Vehicle ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}) has been updated.',
+            relatedId: vehicleId,
+          );
+        }
       } else {
         await provider.addVehicle(vehicle);
+        if (mounted) {
+          await ActivityLogger.log(
+            context,
+            title: 'Vehicle Added',
+            message: 'Vehicle ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}) has been added.',
+            relatedId: vehicleId,
+          );
+        }
       }
       debugPrint('VehicleFormScreen: Save complete.');
 

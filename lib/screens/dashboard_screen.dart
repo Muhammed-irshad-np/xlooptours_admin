@@ -514,7 +514,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _SectionLabel(
-                  label: 'Recent Activity',
+                  label: 'Activity Logs',
                   icon: Icons.history_rounded,
                   iconColor: _DT.brand,
                   count: activities.length,
@@ -522,7 +522,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                 SizedBox(height: 16.h),
                 if (activities.isEmpty)
                   const _DashboardEmptyState(
-                    message: 'No recent activity yet',
+                    message: 'No activity logs yet',
                     icon: Icons.hourglass_empty_rounded,
                     color: _DT.textMuted,
                   )
@@ -1275,6 +1275,7 @@ class _ActivityTile extends StatelessWidget {
     final (icon, color) = switch (activity.type) {
       NotificationType.registration => (Icons.person_add_rounded, _DT.success),
       NotificationType.invoice => (Icons.receipt_long_rounded, _DT.brand),
+      NotificationType.activity => (Icons.bolt_rounded, _DT.brand),
       _ => (Icons.info_outline_rounded, _DT.warning),
     };
 
@@ -1295,15 +1296,39 @@ class _ActivityTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  activity.title,
-                  style: GoogleFonts.inter(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14.sp,
-                    color: _DT.textPrimary,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        activity.title,
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14.sp,
+                          color: _DT.textPrimary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (activity.userName != null) ...[
+                      SizedBox(width: 8.w),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                        decoration: BoxDecoration(
+                          color: _DT.borderLight,
+                          borderRadius: BorderRadius.circular(4.r),
+                        ),
+                        child: Text(
+                          activity.userName!,
+                          style: GoogleFonts.inter(
+                            fontSize: 10.sp,
+                            fontWeight: FontWeight.w500,
+                            color: _DT.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
                 SizedBox(height: 3.h),
                 Text(
@@ -1791,7 +1816,7 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
   Widget build(BuildContext context) {
     return Consumer<NotificationProvider>(
       builder: (context, provider, _) {
-        final expiries = provider.notifications
+        final expiries = provider.expiryAlerts
             .where((n) => n.type == NotificationType.expiry)
             .toList();
 

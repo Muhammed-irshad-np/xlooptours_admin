@@ -64,7 +64,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1014331668523',
     projectId: 'xloop-tours-dev',
     storageBucket: 'xloop-tours-dev.firebasestorage.app',
-    iosClientId: '1014331668523-51e9riafn4samfp8c213gf27ueinndi8.apps.googleusercontent.com',
+    iosClientId:
+        '1014331668523-51e9riafn4samfp8c213gf27ueinndi8.apps.googleusercontent.com',
     iosBundleId: 'com.example.xloopInvoice',
   );
 
@@ -74,7 +75,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1014331668523',
     projectId: 'xloop-tours-dev',
     storageBucket: 'xloop-tours-dev.firebasestorage.app',
-    iosClientId: '1014331668523-51e9riafn4samfp8c213gf27ueinndi8.apps.googleusercontent.com',
+    iosClientId:
+        '1014331668523-51e9riafn4samfp8c213gf27ueinndi8.apps.googleusercontent.com',
     iosBundleId: 'com.example.xloopInvoice',
   );
 
@@ -87,5 +89,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'xloop-tours-dev.firebasestorage.app',
     measurementId: 'G-CP22YLDKMG',
   );
-
 }

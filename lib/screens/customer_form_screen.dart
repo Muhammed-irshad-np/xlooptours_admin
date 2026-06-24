@@ -7,6 +7,7 @@ import '../features/company/presentation/providers/company_provider.dart';
 import '../features/customer/domain/entities/customer_entity.dart';
 import '../features/customer/presentation/providers/customer_provider.dart';
 import '../widgets/responsive_layout.dart';
+import '../core/utils/activity_logger.dart';
 
 class CustomerFormScreen extends StatefulWidget {
   final CustomerEntity? customer;
@@ -185,8 +186,24 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         if (mounted) {
           if (widget.customer != null) {
             await context.read<CustomerProvider>().updateCustomer(customer);
+            if (mounted) {
+              await ActivityLogger.log(
+                context,
+                title: 'Customer Updated',
+                message: 'Customer ${customer.name} has been updated.',
+                relatedId: customer.id,
+              );
+            }
           } else {
             await context.read<CustomerProvider>().addCustomer(customer);
+            if (mounted) {
+              await ActivityLogger.log(
+                context,
+                title: 'Customer Added',
+                message: 'Customer ${customer.name} has been added.',
+                relatedId: customer.id,
+              );
+            }
           }
         }
 

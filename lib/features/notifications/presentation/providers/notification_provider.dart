@@ -63,11 +63,12 @@ class NotificationProvider extends ChangeNotifier {
     _init();
   }
 
-  List<NotificationEntity> get notifications => _notifications;
+  List<NotificationEntity> get notifications => _dbNotifications;
+  List<NotificationEntity> get expiryAlerts => _computedNotifications;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
-  int get unreadCount => _notifications.where((n) => !n.isRead).length;
+  int get unreadCount => _dbNotifications.where((n) => !n.isRead).length + _computedNotifications.where((n) => !n.isRead).length;
 
   void _init() {
     _setLoading(true);
@@ -80,7 +81,7 @@ class NotificationProvider extends ChangeNotifier {
     _subscription = _getNotifications().listen(
       (data) {
         _dbNotifications = List.from(data);
-        _combineAndSort();
+        _dbNotifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
         _errorMessage = null;
         _setLoading(false);
       },
@@ -92,8 +93,7 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   void _combineAndSort() {
-    _notifications = [..._dbNotifications, ..._computedNotifications];
-    _notifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    _computedNotifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     notifyListeners();
   }
 
@@ -376,7 +376,8 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   List<NotificationEntity> getNotificationsByRelatedId(String relatedId) {
-    return _notifications.where((n) => n.relatedId == relatedId).toList();
+    return _dbNotifications.where((n) => n.relatedId == relatedId).toList()
+      ..addAll(_computedNotifications.where((n) => n.relatedId == relatedId));
   }
 
   void clearError() {

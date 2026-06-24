@@ -10,6 +10,7 @@ import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
+import '../core/utils/activity_logger.dart';
 
 /// Special sentinel IDs for built-in extras that are not part of the
 /// Firestore-managed maintenance-type master list.
@@ -313,6 +314,16 @@ class _AddMaintenanceRecordDialogState
       );
 
       await provider.updateVehicle(updatedVehicle);
+
+      if (mounted) {
+        await ActivityLogger.log(
+          context,
+          title: 'Maintenance Added',
+          message:
+              '${recordsToAdd.length} maintenance record(s) added for ${widget.vehicle.make} ${widget.vehicle.model} (${widget.vehicle.plateNumber}).',
+          relatedId: widget.vehicle.id,
+        );
+      }
 
       if (mounted) {
         Navigator.pop(context, true);

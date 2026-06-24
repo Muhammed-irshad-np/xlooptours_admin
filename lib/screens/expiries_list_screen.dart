@@ -93,7 +93,7 @@ class _ExpiriesListScreenState extends State<ExpiriesListScreen> {
       ),
       body: Consumer<NotificationProvider>(
         builder: (context, provider, _) {
-          final expiries = provider.notifications
+          final expiries = provider.expiryAlerts
               .where((n) => n.type == NotificationType.expiry)
               .toList();
           final filtered = _getFilteredExpiries(expiries);
