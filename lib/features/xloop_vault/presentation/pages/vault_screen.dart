@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -1105,6 +1106,16 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
 
   Future<void> _editText(String label, String value, Function(String) onUpdate, {TextInputType? keyboardType}) async {
     final controller = TextEditingController(text: value);
+    // Automatically derive inputFormatters from keyboardType
+    List<TextInputFormatter>? formatters;
+    if (keyboardType == TextInputType.number) {
+      formatters = [FilteringTextInputFormatter.digitsOnly];
+    } else if (keyboardType != null &&
+        keyboardType.toString().contains('number')) {
+      formatters = [
+        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+      ];
+    }
     final result = await showDialog<String>(
       context: context,
       builder: (context) {
@@ -1114,6 +1125,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
           content: TextField(
             controller: controller,
             keyboardType: keyboardType,
+            inputFormatters: formatters,
             autofocus: true,
             decoration: InputDecoration(
               filled: true,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -316,9 +317,20 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
   }
 
   Widget _buildTextField({required TextEditingController controller, required String label, required IconData icon, TextInputType? keyboardType, String? hint}) {
+    // Automatically derive inputFormatters from keyboardType
+    List<TextInputFormatter>? formatters;
+    if (keyboardType == TextInputType.number) {
+      formatters = [FilteringTextInputFormatter.digitsOnly];
+    } else if (keyboardType != null &&
+        keyboardType.toString().contains('number')) {
+      formatters = [
+        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+      ];
+    }
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      inputFormatters: formatters,
       style: GoogleFonts.plusJakartaSans(
         fontSize: 14.sp, 
         fontWeight: FontWeight.w600,

@@ -1646,6 +1646,7 @@ class _OdometerDialog extends StatelessWidget {
             TextField(
               controller: controller,
               keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               autofocus: true,
               style: GoogleFonts.inter(
                 fontSize: 16.sp,

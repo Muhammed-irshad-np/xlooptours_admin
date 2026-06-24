@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -174,6 +175,7 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
               TextFormField(
                 controller: _extensionController,
                 keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
                   labelText: 'Extension Mileage (KM)',
                   hintText: 'e.g., 20000',
