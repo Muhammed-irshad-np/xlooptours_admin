@@ -6,7 +6,7 @@ import '../features/notifications/domain/entities/notification_entity.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../core/utils/update_dialog_helper.dart';
 import 'package:timeago/timeago.dart' as timeago;
-
+import 'package:intl/intl.dart';
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
 
@@ -190,12 +190,24 @@ class NotificationsScreen extends StatelessWidget {
               ),
             ),
             SizedBox(height: 4.h),
-            Text(
-              timeago.format(notification.timestamp),
-              style: GoogleFonts.inter(
-                fontSize: 12.sp,
-                color: Colors.grey[500],
-              ),
+            Row(
+              children: [
+                Text(
+                  DateFormat('MMM dd, yyyy hh:mm a').format(notification.timestamp),
+                  style: GoogleFonts.inter(
+                    fontSize: 12.sp,
+                    color: Colors.grey[500],
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                Text(
+                  '(${timeago.format(notification.timestamp)})',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    color: Colors.grey[400],
+                  ),
+                ),
+              ],
             ),
           ],
         ),

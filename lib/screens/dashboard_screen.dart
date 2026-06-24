@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.dart';
 import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
+import 'package:intl/intl.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'package:xloop_invoice/features/customer/presentation/providers/customer_provider.dart';
 import 'package:xloop_invoice/features/feedback/presentation/providers/feedback_provider.dart';
@@ -1344,13 +1345,28 @@ class _ActivityTile extends StatelessWidget {
             ),
           ),
           SizedBox(width: 10.w),
-          Text(
-            timeago.format(activity.timestamp),
-            style: GoogleFonts.inter(
-              fontSize: 11.sp,
-              color: _DT.textMuted,
-              fontWeight: FontWeight.w500,
-            ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                DateFormat('MMM dd, yyyy hh:mm a').format(activity.timestamp),
+                style: GoogleFonts.inter(
+                  fontSize: 11.sp,
+                  color: _DT.textMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: 2.h),
+              Text(
+                '(${timeago.format(activity.timestamp)})',
+                style: GoogleFonts.inter(
+                  fontSize: 10.sp,
+                  color: _DT.textMuted.withOpacity(0.8),
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ],
           ),
         ],
       ),
