@@ -27,6 +27,8 @@ import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicle_maint
 import 'package:xloop_invoice/core/utils/update_dialog_helper.dart';
 import 'package:xloop_invoice/screens/employee_expiry_tracker_screen.dart';
 import 'package:xloop_invoice/screens/vehicle_expiry_tracker_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xloop_invoice/widgets/dev_sync_dialog.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 class _DT {
@@ -93,6 +95,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _fadeIn;
+  String? _lastSyncTime;
+
+  void _loadLastSyncTime() {
+    final prefs = sl<SharedPreferences>();
+    setState(() {
+      _lastSyncTime = prefs.getString('last_db_sync_time');
+    });
+  }
 
   @override
   void initState() {
@@ -103,6 +113,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
     _fadeIn = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
+
+    _loadLastSyncTime();
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
@@ -231,7 +243,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
       actions: [
-        if (const String.fromEnvironment('ENV', defaultValue: 'prod') == 'dev')
+        if (const String.fromEnvironment('ENV', defaultValue: 'prod') == 'dev') ...[
           Padding(
             padding: EdgeInsets.only(right: 8.w),
             child: Container(
@@ -258,6 +270,51 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ),
           ),
+          Padding(
+            padding: EdgeInsets.only(right: 8.w),
+            child: Tooltip(
+              message: 'Sync DEV Database from PROD',
+              child: InkWell(
+                onTap: () async {
+                  final result = await showDialog<bool>(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const DevSyncDialog(),
+                  );
+                  if (result == true) {
+                    _loadLastSyncTime();
+                  }
+                },
+                borderRadius: BorderRadius.circular(20.r),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+                  decoration: BoxDecoration(
+                    color: _DT.brand.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20.r),
+                    border: Border.all(color: _DT.brand.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.sync_rounded, size: 14.sp, color: _DT.brand),
+                      SizedBox(width: 6.w),
+                      Text(
+                        _lastSyncTime != null
+                            ? 'Sync from PROD (Last: $_lastSyncTime)'
+                            : 'Sync from PROD',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.sp,
+                          color: _DT.brand,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
         Padding(
           padding: EdgeInsets.only(right: 16.w),
           child: _AppBarChip(
