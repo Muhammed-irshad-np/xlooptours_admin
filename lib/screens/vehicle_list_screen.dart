@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
@@ -63,6 +64,13 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   }
 
   Future<void> _deleteVehicle(String id) async {
+    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    if (!isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only admins can delete vehicles.')),
+      );
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -93,6 +101,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     final vehicleProvider = context.watch<VehicleProvider>();
     final isLoading = vehicleProvider.isLoading;
     final vehicles = vehicleProvider.vehicles;
+    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -283,23 +292,24 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                                     ],
                                   ),
                                 ),
-                                const PopupMenuItem(
-                                  value: 'delete',
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.delete,
-                                        color: Colors.red,
-                                        size: 20,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'Delete',
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ],
+                                if (isAdmin)
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.delete,
+                                          color: Colors.red,
+                                          size: 20,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          'Delete',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
                               ],
                               onSelected: (value) {
                                 if (value == 'edit') {

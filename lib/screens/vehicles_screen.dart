@@ -95,6 +95,13 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   }
 
   Future<void> _deleteVehicle(String id) async {
+    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    if (!isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only admins can delete vehicles.')),
+      );
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -274,6 +281,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   }
 
   Widget _buildVehicleCard(VehicleEntity vehicle, EmployeeEntity? driver) {
+    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
     return Card(
       child: ListTile(
         leading: Container(
@@ -409,16 +417,17 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                     ],
                   ),
                 ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, color: Colors.red, size: 20),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Colors.red)),
-                    ],
+                if (isAdmin)
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, color: Colors.red, size: 20),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
                   ),
-                ),
               ],
               onSelected: (value) {
                 if (value == 'add_maintenance') {
