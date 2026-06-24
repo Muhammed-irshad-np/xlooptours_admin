@@ -205,7 +205,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
               itemCount: filteredCompanies.length,
               padding: const EdgeInsets.all(8),
               itemBuilder: (context, index) =>
-                  _buildCompanyCard(filteredCompanies[index]),
+                  _buildCompanyCard(filteredCompanies[index], isAdmin),
             ),
             desktop: GridView.builder(
               padding: const EdgeInsets.all(16),
@@ -217,7 +217,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
               ),
               itemCount: filteredCompanies.length,
               itemBuilder: (context, index) =>
-                  _buildCompanyCard(filteredCompanies[index]),
+                  _buildCompanyCard(filteredCompanies[index], isAdmin),
             ),
           );
         },
@@ -225,7 +225,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
     );
   }
 
-  Widget _buildCompanyCard(CompanyEntity company) {
+  Widget _buildCompanyCard(CompanyEntity company, bool isAdmin) {
     bool isActive = company.status == 'ACTIVE';
 
     return Card(
