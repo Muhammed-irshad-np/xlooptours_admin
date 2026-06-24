@@ -17,14 +17,19 @@ import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_pr
 import 'package:xloop_invoice/features/customer/presentation/providers/customer_provider.dart';
 import 'package:xloop_invoice/features/feedback/presentation/providers/feedback_provider.dart';
 import 'package:xloop_invoice/features/notifications/presentation/providers/notification_provider.dart';
+import 'package:xloop_invoice/features/xloop_vault/presentation/providers/vault_provider.dart';
 import 'package:xloop_invoice/features/notifications/domain/entities/notification_entity.dart';
 import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicles_needing_odo_update_usecase.dart';
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.dart';
 import 'package:xloop_invoice/widgets/responsive_layout.dart';
 import 'package:xloop_invoice/injection_container.dart';
+import 'package:xloop_invoice/features/vehicle/presentation/widgets/maintenance_extension_dialog.dart';
+import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
 import 'package:xloop_invoice/core/utils/update_dialog_helper.dart';
 import 'package:xloop_invoice/screens/employee_expiry_tracker_screen.dart';
 import 'package:xloop_invoice/screens/vehicle_expiry_tracker_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:xloop_invoice/widgets/dev_sync_dialog.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 class _DT {
@@ -91,6 +96,14 @@ class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _animController;
   late Animation<double> _fadeIn;
+  String? _lastSyncTime;
+
+  void _loadLastSyncTime() {
+    final prefs = sl<SharedPreferences>();
+    setState(() {
+      _lastSyncTime = prefs.getString('last_db_sync_time');
+    });
+  }
 
   @override
   void initState() {
@@ -102,27 +115,37 @@ class _DashboardScreenState extends State<DashboardScreen>
     _fadeIn = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     _animController.forward();
 
+    _loadLastSyncTime();
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       final vehicleProvider = context.read<VehicleProvider>();
+      final employeeProvider = context.read<EmployeeProvider>();
+      final vaultProvider = context.read<VaultProvider>();
       final authProvider = context.read<AuthProvider>();
       final isAdmin = authProvider.user?.isAdmin ?? false;
 
-      // Fetch vehicles + maintenance types (needed for interval config) together,
-      // then refresh alerts so NotificationProvider has all data it needs.
-      context.read<EmployeeProvider>().fetchAllEmployees();
-      if (isAdmin) {
-        context.read<CustomerProvider>().fetchAllCustomers();
-      }
-      context.read<FeedbackProvider>().fetchLatestFeedbacks();
-      await Future.wait([
+      // Fetch all required data in parallel on startup so it is cached in providers,
+      // avoiding multiple subsequent database reads.
+      await Future.wait<dynamic>(<Future<dynamic>>[
+        employeeProvider.fetchAllEmployees(),
+        employeeProvider.fetchEmployeeSettings(),
         vehicleProvider.fetchAllVehicles(),
         vehicleProvider.fetchAllMaintenanceTypes(),
+        vehicleProvider.fetchVehicleSettings(),
+        vaultProvider.loadVaultData(),
+        context.read<FeedbackProvider>().fetchLatestFeedbacks(),
+        if (isAdmin) context.read<CustomerProvider>().fetchAllCustomers(),
       ]);
+
       if (!mounted) return;
       await context.read<NotificationProvider>().refreshAlerts(
         vehicles: vehicleProvider.vehicles,
         maintenanceTypes: vehicleProvider.maintenanceTypes,
+        employees: employeeProvider.employees,
+        employeeSettings: employeeProvider.settings,
+        vehicleSettings: vehicleProvider.settings,
+        vaultData: vaultProvider.vaultData,
       );
     });
   }
@@ -229,7 +252,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
       actions: [
-        if (const String.fromEnvironment('ENV', defaultValue: 'prod') == 'dev')
+        if (const String.fromEnvironment('ENV', defaultValue: 'prod') == 'dev') ...[
           Padding(
             padding: EdgeInsets.only(right: 8.w),
             child: Container(
@@ -256,6 +279,51 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ),
           ),
+          Padding(
+            padding: EdgeInsets.only(right: 8.w),
+            child: Tooltip(
+              message: 'Sync DEV Database from PROD',
+              child: InkWell(
+                onTap: () async {
+                  final result = await showDialog<bool>(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => const DevSyncDialog(),
+                  );
+                  if (result == true) {
+                    _loadLastSyncTime();
+                  }
+                },
+                borderRadius: BorderRadius.circular(20.r),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+                  decoration: BoxDecoration(
+                    color: _DT.brand.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20.r),
+                    border: Border.all(color: _DT.brand.withOpacity(0.3)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.sync_rounded, size: 14.sp, color: _DT.brand),
+                      SizedBox(width: 6.w),
+                      Text(
+                        _lastSyncTime != null
+                            ? 'Sync from PROD (Last: $_lastSyncTime)'
+                            : 'Sync from PROD',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.sp,
+                          color: _DT.brand,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
         Padding(
           padding: EdgeInsets.only(right: 16.w),
           child: _AppBarChip(
@@ -1028,6 +1096,67 @@ class _ExpiryCard extends StatefulWidget {
 class _ExpiryCardState extends State<_ExpiryCard> {
   bool _hovered = false;
 
+  void _extendAlert() {
+    final relatedId = widget.alert.relatedId;
+    if (relatedId == null) return;
+
+    final vehicleProvider = context.read<VehicleProvider>();
+    final vehicle = vehicleProvider.vehicles.cast<VehicleEntity?>().firstWhere(
+      (v) => v?.id == relatedId,
+      orElse: () => null,
+    );
+    if (vehicle == null) return;
+
+    final prefix = 'maintenance_${relatedId}_';
+    final categoryEncoded = widget.alert.id.substring(prefix.length);
+    final category = categoryEncoded.replaceAll('_', ' ');
+
+    final maintenanceUseCase = sl<GetVehicleMaintenanceAlertsUseCase>();
+    final alerts = maintenanceUseCase(
+      vehicles: vehicleProvider.vehicles,
+      maintenanceTypes: vehicleProvider.maintenanceTypes,
+      includeAll: true,
+    );
+    final alert = alerts.firstWhere(
+      (a) =>
+          a.vehicle.id == vehicle.id &&
+          a.category.toLowerCase() == category.toLowerCase(),
+      orElse: () => VehicleMaintenanceAlert(
+        vehicle: vehicle,
+        category: category,
+        currentMileage: vehicle.currentOdometer ?? 0,
+        lastServiceMileage: 0,
+        nextServiceMileage: vehicle.currentOdometer ?? 0,
+        kmOverdue: 0,
+      ),
+    );
+
+    showDialog<bool>(
+      context: context,
+      builder: (context) => MaintenanceExtensionDialog(
+        vehicle: vehicle,
+        alert: alert,
+      ),
+    ).then((success) {
+      if (success == true) {
+        if (mounted) {
+          final notifProvider = context.read<NotificationProvider>();
+          final employeeProvider = context.read<EmployeeProvider>();
+          final vaultProvider = context.read<VaultProvider>();
+          notifProvider.markAsRead(widget.alert.id);
+          notifProvider.refreshAlerts(
+            vehicles: vehicleProvider.vehicles,
+            maintenanceTypes: vehicleProvider.maintenanceTypes,
+            employees: employeeProvider.employees,
+            employeeSettings: employeeProvider.settings,
+            vehicleSettings: vehicleProvider.settings,
+            vaultData: vaultProvider.vaultData,
+          );
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return MouseRegion(
@@ -1094,11 +1223,38 @@ class _ExpiryCardState extends State<_ExpiryCard> {
                 ),
               ),
               SizedBox(width: 12.w),
-              _ActionButton(
-                label: 'Update',
-                color: _DT.danger,
-                onPressed: widget.onUpdate,
-              ),
+              if (widget.alert.id.startsWith('maintenance_')) ...[
+                OutlinedButton(
+                  onPressed: _extendAlert,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: _DT.brand,
+                    side: const BorderSide(color: _DT.brand),
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                  ),
+                  child: Text(
+                    'Extend Alert',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                _ActionButton(
+                  label: 'Mark Completed',
+                  color: _DT.danger,
+                  onPressed: widget.onUpdate,
+                ),
+              ] else ...[
+                _ActionButton(
+                  label: 'Update',
+                  color: _DT.danger,
+                  onPressed: widget.onUpdate,
+                ),
+              ],
             ],
           ),
         ),
@@ -1505,6 +1661,7 @@ class _OdometerDialog extends StatelessWidget {
             TextField(
               controller: controller,
               keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
               autofocus: true,
               style: GoogleFonts.inter(
                 fontSize: 16.sp,
@@ -1607,7 +1764,9 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
       return allExpiries
           .where(
             (n) =>
-                n.id.startsWith('maintenance_') || n.id.startsWith('v_expiry_'),
+                n.id.startsWith('maintenance_') ||
+                n.id.startsWith('v_expiry_') ||
+                n.id.startsWith('followup_'),
           )
           .toList();
     }
@@ -1622,7 +1781,8 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
               !n.id.startsWith('maintenance_') &&
               !n.id.startsWith('v_expiry_') &&
               !n.id.startsWith('expiry_') &&
-              !n.id.startsWith('vault_'),
+              !n.id.startsWith('vault_') &&
+              !n.id.startsWith('followup_'),
         )
         .toList();
   }
@@ -1704,7 +1864,8 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
                             .where(
                               (n) =>
                                   n.id.startsWith('maintenance_') ||
-                                  n.id.startsWith('v_expiry_'),
+                                  n.id.startsWith('v_expiry_') ||
+                                  n.id.startsWith('followup_'),
                             )
                             .length;
                       }
@@ -1720,7 +1881,8 @@ class _ExpiriesSectionState extends State<_ExpiriesSection> {
                                   !n.id.startsWith('maintenance_') &&
                                   !n.id.startsWith('v_expiry_') &&
                                   !n.id.startsWith('expiry_') &&
-                                  !n.id.startsWith('vault_'),
+                                  !n.id.startsWith('vault_') &&
+                                  !n.id.startsWith('followup_'),
                             )
                             .length;
                       }

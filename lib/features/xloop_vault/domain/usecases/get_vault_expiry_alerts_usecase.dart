@@ -1,3 +1,4 @@
+import 'package:xloop_invoice/features/xloop_vault/domain/entities/vault_data.dart';
 import '../entities/vault_expiry_alert.dart';
 import '../repositories/vault_repository.dart';
 
@@ -6,8 +7,8 @@ class GetVaultExpiryAlertsUseCase {
 
   GetVaultExpiryAlertsUseCase(this.repository);
 
-  Future<List<VaultExpiryAlert>> call() async {
-    final vaultData = await repository.getVaultData();
+  Future<List<VaultExpiryAlert>> call({VaultData? localVaultData}) async {
+    final vaultData = localVaultData ?? await repository.getVaultData();
     final List<VaultExpiryAlert> alerts = [];
     final now = DateTime.now();
 

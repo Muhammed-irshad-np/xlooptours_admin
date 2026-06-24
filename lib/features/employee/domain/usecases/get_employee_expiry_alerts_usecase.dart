@@ -1,3 +1,5 @@
+import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.dart';
+import 'package:xloop_invoice/features/employee/domain/entities/employee_settings_entity.dart';
 import '../entities/employee_expiry_alert.dart';
 import '../repositories/employee_repository.dart';
 
@@ -6,9 +8,13 @@ class GetEmployeeExpiryAlertsUseCase {
 
   GetEmployeeExpiryAlertsUseCase(this.repository);
 
-  Future<List<EmployeeExpiryAlert>> call({bool includeAll = false}) async {
-    final employees = await repository.getAllEmployees();
-    final settings = await repository.getEmployeeSettings();
+  Future<List<EmployeeExpiryAlert>> call({
+    bool includeAll = false,
+    List<EmployeeEntity>? localEmployees,
+    EmployeeSettingsEntity? localSettings,
+  }) async {
+    final employees = localEmployees ?? await repository.getAllEmployees();
+    final settings = localSettings ?? await repository.getEmployeeSettings();
     final List<EmployeeExpiryAlert> alerts = [];
     final now = DateTime.now();
 

@@ -70,6 +70,57 @@ class TafweedRecord extends Equatable {
   List<Object?> get props => [driverId, issuedDate, expiryDate, attachmentUrl, notificationDays];
 }
 
+class FollowUpCompletion extends Equatable {
+  final DateTime date;
+  final int mileage;
+  final double cost;
+  final String? notes;
+  final String? attachmentUrl;
+  final List<String>? attachmentUrls;
+  final String? performedBy;
+
+  const FollowUpCompletion({
+    required this.date,
+    required this.mileage,
+    required this.cost,
+    this.notes,
+    this.attachmentUrl,
+    this.attachmentUrls,
+    this.performedBy,
+  });
+
+  FollowUpCompletion copyWith({
+    DateTime? date,
+    int? mileage,
+    double? cost,
+    String? notes,
+    String? attachmentUrl,
+    List<String>? attachmentUrls,
+    String? performedBy,
+  }) {
+    return FollowUpCompletion(
+      date: date ?? this.date,
+      mileage: mileage ?? this.mileage,
+      cost: cost ?? this.cost,
+      notes: notes ?? this.notes,
+      attachmentUrl: attachmentUrl ?? this.attachmentUrl,
+      attachmentUrls: attachmentUrls ?? this.attachmentUrls,
+      performedBy: performedBy ?? this.performedBy,
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        date,
+        mileage,
+        cost,
+        notes,
+        attachmentUrl,
+        attachmentUrls,
+        performedBy,
+      ];
+}
+
 class MaintenanceRecord extends Equatable {
   final DateTime date;
   final int mileage; // in KM
@@ -86,6 +137,23 @@ class MaintenanceRecord extends Equatable {
   final String? notes;
   final int? nextServiceMileage;
   final DateTime? nextServiceDate;
+  final bool? isFollowUpRequired;
+  final String? followUpReason;
+  final bool? isFollowUpCompleted;
+  
+  // Extension fields
+  final int? extendedMileage;
+  final DateTime? extendedDate;
+  final String? extensionReason;
+  final bool? isExtended;
+
+  // New Follow-up fields
+  final int? followUpIntervalKm;
+  final int? followUpTimesCount;
+  final List<FollowUpCompletion>? followUpCompletions;
+
+  // Track who did it (login email username)
+  final String? performedBy;
 
   const MaintenanceRecord({
     required this.date,
@@ -103,6 +171,17 @@ class MaintenanceRecord extends Equatable {
     this.notes,
     this.nextServiceMileage,
     this.nextServiceDate,
+    this.isFollowUpRequired,
+    this.followUpReason,
+    this.isFollowUpCompleted,
+    this.extendedMileage,
+    this.extendedDate,
+    this.extensionReason,
+    this.isExtended,
+    this.followUpIntervalKm,
+    this.followUpTimesCount,
+    this.followUpCompletions,
+    this.performedBy,
   });
 
   MaintenanceRecord copyWith({
@@ -121,6 +200,17 @@ class MaintenanceRecord extends Equatable {
     String? notes,
     int? nextServiceMileage,
     DateTime? nextServiceDate,
+    bool? isFollowUpRequired,
+    String? followUpReason,
+    bool? isFollowUpCompleted,
+    int? extendedMileage,
+    DateTime? extendedDate,
+    String? extensionReason,
+    bool? isExtended,
+    int? followUpIntervalKm,
+    int? followUpTimesCount,
+    List<FollowUpCompletion>? followUpCompletions,
+    String? performedBy,
   }) {
     return MaintenanceRecord(
       date: date ?? this.date,
@@ -138,6 +228,17 @@ class MaintenanceRecord extends Equatable {
       notes: notes ?? this.notes,
       nextServiceMileage: nextServiceMileage ?? this.nextServiceMileage,
       nextServiceDate: nextServiceDate ?? this.nextServiceDate,
+      isFollowUpRequired: isFollowUpRequired ?? this.isFollowUpRequired,
+      followUpReason: followUpReason ?? this.followUpReason,
+      isFollowUpCompleted: isFollowUpCompleted ?? this.isFollowUpCompleted,
+      extendedMileage: extendedMileage ?? this.extendedMileage,
+      extendedDate: extendedDate ?? this.extendedDate,
+      extensionReason: extensionReason ?? this.extensionReason,
+      isExtended: isExtended ?? this.isExtended,
+      followUpIntervalKm: followUpIntervalKm ?? this.followUpIntervalKm,
+      followUpTimesCount: followUpTimesCount ?? this.followUpTimesCount,
+      followUpCompletions: followUpCompletions ?? this.followUpCompletions,
+      performedBy: performedBy ?? this.performedBy,
     );
   }
 
@@ -158,6 +259,17 @@ class MaintenanceRecord extends Equatable {
     notes,
     nextServiceMileage,
     nextServiceDate,
+    isFollowUpRequired,
+    followUpReason,
+    isFollowUpCompleted,
+    extendedMileage,
+    extendedDate,
+    extensionReason,
+    isExtended,
+    followUpIntervalKm,
+    followUpTimesCount,
+    followUpCompletions,
+    performedBy,
   ];
 }
 

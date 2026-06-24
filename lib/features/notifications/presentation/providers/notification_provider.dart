@@ -1,3 +1,7 @@
+import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.dart';
+import 'package:xloop_invoice/features/employee/domain/entities/employee_settings_entity.dart';
+import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_settings_entity.dart';
+import 'package:xloop_invoice/features/xloop_vault/domain/entities/vault_data.dart';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,6 +12,7 @@ import '../../domain/usecases/mark_all_notifications_as_read.dart';
 import '../../../employee/domain/usecases/get_employee_expiry_alerts_usecase.dart';
 import '../../../vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
 import '../../../vehicle/domain/usecases/get_vehicle_expiry_alerts_usecase.dart';
+import '../../../vehicle/domain/usecases/get_vehicle_followup_alerts_usecase.dart';
 import '../../../vehicle/domain/entities/vehicle_entity.dart';
 import '../../../vehicle/domain/entities/maintenance_type_entity.dart';
 import '../../../xloop_vault/domain/usecases/get_vault_expiry_alerts_usecase.dart';
@@ -20,6 +25,7 @@ class NotificationProvider extends ChangeNotifier {
   final GetEmployeeExpiryAlertsUseCase _getEmployeeExpiryAlerts;
   final GetVehicleMaintenanceAlertsUseCase _getVehicleMaintenanceAlerts;
   final GetVehicleExpiryAlertsUseCase _getVehicleExpiryAlerts;
+  final GetVehicleFollowUpAlertsUseCase _getVehicleFollowUpAlerts;
   final GetVaultExpiryAlertsUseCase _getVaultExpiryAlerts;
   final SharedPreferences _prefs;
 
@@ -41,6 +47,7 @@ class NotificationProvider extends ChangeNotifier {
     required GetEmployeeExpiryAlertsUseCase getEmployeeExpiryAlerts,
     required GetVehicleMaintenanceAlertsUseCase getVehicleMaintenanceAlerts,
     required GetVehicleExpiryAlertsUseCase getVehicleExpiryAlerts,
+    required GetVehicleFollowUpAlertsUseCase getVehicleFollowUpAlerts,
     required GetVaultExpiryAlertsUseCase getVaultExpiryAlerts,
     required SharedPreferences sharedPreferences,
   }) : _getNotifications = getNotifications,
@@ -50,6 +57,7 @@ class NotificationProvider extends ChangeNotifier {
        _getEmployeeExpiryAlerts = getEmployeeExpiryAlerts,
        _getVehicleMaintenanceAlerts = getVehicleMaintenanceAlerts,
        _getVehicleExpiryAlerts = getVehicleExpiryAlerts,
+       _getVehicleFollowUpAlerts = getVehicleFollowUpAlerts,
        _getVaultExpiryAlerts = getVaultExpiryAlerts,
        _prefs = sharedPreferences {
     _init();
@@ -94,12 +102,20 @@ class NotificationProvider extends ChangeNotifier {
   Future<void> refreshAlerts({
     required List<VehicleEntity> vehicles,
     required List<MaintenanceTypeEntity> maintenanceTypes,
+    List<EmployeeEntity>? employees,
+    EmployeeSettingsEntity? employeeSettings,
+    VehicleSettingsEntity? vehicleSettings,
+    VaultData? vaultData,
   }) async {
     // Clear previous computed alerts
     _computedNotifications.clear();
     await _appendComputedAlerts(
       vehicles: vehicles,
       maintenanceTypes: maintenanceTypes,
+      employees: employees,
+      employeeSettings: employeeSettings,
+      vehicleSettings: vehicleSettings,
+      vaultData: vaultData,
     );
     _combineAndSort();
   }
@@ -107,10 +123,17 @@ class NotificationProvider extends ChangeNotifier {
   Future<void> _appendComputedAlerts({
     required List<VehicleEntity> vehicles,
     required List<MaintenanceTypeEntity> maintenanceTypes,
+    List<EmployeeEntity>? employees,
+    EmployeeSettingsEntity? employeeSettings,
+    VehicleSettingsEntity? vehicleSettings,
+    VaultData? vaultData,
   }) async {
     try {
       // ── Employee expiry alerts ──────────────────────────────────────────────
-      final expiryAlerts = await _getEmployeeExpiryAlerts();
+      final expiryAlerts = await _getEmployeeExpiryAlerts(
+        localEmployees: employees,
+        localSettings: employeeSettings,
+      );
       final expiryNotifications = expiryAlerts.map((alert) {
         final id =
             'expiry_${alert.employeeId}_${alert.documentType.replaceAll(' ', '_')}';
@@ -162,8 +185,46 @@ class NotificationProvider extends ChangeNotifier {
 
       _computedNotifications.addAll(maintenanceNotifications);
 
+      // ── Vehicle follow-up alerts ───────────────────────────────────────────
+      final followupAlerts = _getVehicleFollowUpAlerts(
+        vehicles: vehicles,
+      );
+      final followupNotifications = followupAlerts.map((alert) {
+        final id = 'followup_${alert.vehicle.id}_${alert.record.date.millisecondsSinceEpoch}';
+        final targetDateStr = alert.nextServiceDate != null 
+            ? alert.nextServiceDate!.toLocal().toString().split(' ')[0]
+            : null;
+        final targetMileage = alert.nextServiceMileage;
+        
+        String dueStr = '';
+        if (targetDateStr != null && targetMileage != null) {
+          dueStr = 'due by $targetDateStr or $targetMileage km';
+        } else if (targetDateStr != null) {
+          dueStr = 'due by $targetDateStr';
+        } else if (targetMileage != null) {
+          dueStr = 'due at $targetMileage km';
+        }
+
+        return NotificationEntity(
+          id: id,
+          title: '🔧 Revisit Needed: ${alert.vehicle.plateNumber}',
+          message: '${alert.vehicle.make} ${alert.vehicle.model}: '
+              'Follow-up needed for "${alert.reason}" ($dueStr).',
+          timestamp: DateTime.now(),
+          isRead: _readVirtualIds.contains(id),
+          type: NotificationType.expiry,
+          relatedId: alert.vehicle.id,
+        );
+      }).toList();
+
+      _computedNotifications.addAll(followupNotifications);
+
       // ── Vehicle expiry alerts ──────────────────────────────────────────────
-      final vehicleExpiryAlerts = await _getVehicleExpiryAlerts();
+      final vehicleExpiryAlerts = await _getVehicleExpiryAlerts(
+        localVehicles: vehicles,
+        localSettings: vehicleSettings,
+        localEmployees: employees,
+      );
       final vehicleExpiryNotifications = vehicleExpiryAlerts.map((alert) {
         final docTypeFormatted = alert.documentType.replaceAll(' ', '_');
         final id = alert.documentId != null 
@@ -198,7 +259,9 @@ class NotificationProvider extends ChangeNotifier {
       _computedNotifications.addAll(vehicleExpiryNotifications);
 
       // ── Vault expiry alerts ────────────────────────────────────────────────
-      final vaultAlerts = await _getVaultExpiryAlerts();
+      final vaultAlerts = await _getVaultExpiryAlerts(
+        localVaultData: vaultData,
+      );
       final vaultNotifications = vaultAlerts.map((alert) {
         final id = 'vault_${alert.documentType.replaceAll(' ', '_')}';
         final isExpired = alert.daysUntilExpiry < 0;
@@ -247,7 +310,8 @@ class NotificationProvider extends ChangeNotifier {
     return id.startsWith('expiry_') ||
            id.startsWith('maintenance_') ||
            id.startsWith('v_expiry_') ||
-           id.startsWith('vault_');
+           id.startsWith('vault_') ||
+           id.startsWith('followup_');
   }
 
   Future<bool> markAsRead(String id) async {

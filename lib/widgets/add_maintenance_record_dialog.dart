@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 
 /// Special sentinel IDs for built-in extras that are not part of the
 /// Firestore-managed maintenance-type master list.
@@ -30,12 +32,22 @@ class _MaintenanceEntry {
   final TextEditingController notesController = TextEditingController();
   List<XFile> pickedFiles = [];
 
+  bool isFollowUpRequired = false;
+  final TextEditingController followUpReasonController =
+      TextEditingController();
+  DateTime? followUpDate;
+  final TextEditingController followUpDateController = TextEditingController();
+  final TextEditingController followUpKmController = TextEditingController();
+
   void dispose() {
     customTypeController.dispose();
     dateController.dispose();
     serviceKmController.dispose();
     costController.dispose();
     notesController.dispose();
+    followUpReasonController.dispose();
+    followUpDateController.dispose();
+    followUpKmController.dispose();
   }
 }
 
@@ -107,6 +119,27 @@ class _AddMaintenanceRecordDialogState
     }
   }
 
+  Future<void> _selectFollowUpDate(
+    BuildContext context,
+    _MaintenanceEntry entry,
+  ) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate:
+          entry.followUpDate ?? DateTime.now().add(const Duration(days: 30)),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        entry.followUpDate = picked;
+        entry.followUpDateController.text = DateFormat(
+          'MMM dd, yyyy',
+        ).format(picked);
+      });
+    }
+  }
+
   Future<void> _pickFiles(_MaintenanceEntry entry) async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -155,6 +188,15 @@ class _AddMaintenanceRecordDialogState
   Future<void> _saveRecords() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final user = context.read<AuthProvider>().user;
+    final email = user?.email;
+    final username =
+        (user?.displayName != null && user!.displayName!.isNotEmpty)
+        ? user.displayName
+        : (email != null && email.contains('@')
+              ? email.split('@').first
+              : (email ?? 'System'));
+
     // Validate type selection
     for (final entry in _entries) {
       if (entry.maintenanceTypeId == null) {
@@ -169,7 +211,9 @@ class _AddMaintenanceRecordDialogState
           entry.customTypeController.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please enter a name for the custom maintenance type.'),
+            content: Text(
+              'Please enter a name for the custom maintenance type.',
+            ),
           ),
         );
         return;
@@ -191,27 +235,54 @@ class _AddMaintenanceRecordDialogState
 
         // Upload picked files sequentially
         final List<String> uploadedUrls = [];
-        for (int fileIndex = 0; fileIndex < entry.pickedFiles.length; fileIndex++) {
+        for (
+          int fileIndex = 0;
+          fileIndex < entry.pickedFiles.length;
+          fileIndex++
+        ) {
           final file = entry.pickedFiles[fileIndex];
           // Construct unique docType to prevent collision/overwrite in Firebase Storage
-          final docType = 'maintenance_${DateTime.now().millisecondsSinceEpoch}_${entryIndex}_$fileIndex';
-          final url = await provider.uploadVehicleDocument(file, widget.vehicle.id, docType);
+          final docType =
+              'maintenance_${DateTime.now().millisecondsSinceEpoch}_${entryIndex}_$fileIndex';
+          final url = await provider.uploadVehicleDocument(
+            file,
+            widget.vehicle.id,
+            docType,
+          );
           uploadedUrls.add(url);
         }
 
         final primaryUrl = uploadedUrls.isNotEmpty ? uploadedUrls.first : null;
 
+        final int currentOdo =
+            int.tryParse(entry.serviceKmController.text) ?? 0;
+
         recordsToAdd.add((
           typeId: entry.maintenanceTypeId!,
           record: MaintenanceRecord(
             date: entry.date,
-            mileage: int.tryParse(entry.serviceKmController.text) ?? 0,
+            mileage: currentOdo,
             cost: double.tryParse(entry.costController.text),
             serviceProvider: '',
             notes: entry.notesController.text,
             serviceType: typeName,
             attachmentUrl: primaryUrl,
             attachmentUrls: uploadedUrls.isNotEmpty ? uploadedUrls : null,
+            isFollowUpRequired: entry.isFollowUpRequired,
+            followUpReason: entry.isFollowUpRequired
+                ? entry.followUpReasonController.text.trim()
+                : null,
+            nextServiceDate: entry.isFollowUpRequired
+                ? entry.followUpDate
+                : null,
+            nextServiceMileage: entry.isFollowUpRequired
+                ? int.tryParse(entry.followUpKmController.text)
+                : null,
+            isFollowUpCompleted: entry.isFollowUpRequired ? false : null,
+            followUpIntervalKm: null,
+            followUpTimesCount: null,
+            followUpCompletions: entry.isFollowUpRequired ? const [] : null,
+            performedBy: username,
           ),
         ));
       }
@@ -361,7 +432,7 @@ class _AddMaintenanceRecordDialogState
                             Expanded(
                               flex: 2,
                               child: DropdownButtonFormField<String>(
-                              initialValue: entry.maintenanceTypeId,
+                                initialValue: entry.maintenanceTypeId,
                                 decoration: InputDecoration(
                                   labelText: 'Maintenance Type',
                                   border: OutlineInputBorder(
@@ -457,6 +528,9 @@ class _AddMaintenanceRecordDialogState
                                   ),
                                 ),
                                 keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
                                 validator: (v) {
                                   if (v == null || v.isEmpty) return 'Required';
                                   if (int.tryParse(v) == null) return 'Invalid';
@@ -475,9 +549,15 @@ class _AddMaintenanceRecordDialogState
                                     borderRadius: BorderRadius.circular(8.r),
                                   ),
                                 ),
-                                keyboardType: const TextInputType.numberWithOptions(
-                                  decimal: true,
-                                ),
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                    RegExp(r'^\d*\.?\d*'),
+                                  ),
+                                ],
                               ),
                             ),
                             SizedBox(width: 16.w),
@@ -534,15 +614,115 @@ class _AddMaintenanceRecordDialogState
                                       borderRadius: BorderRadius.circular(8.r),
                                     ),
                                     filled: true,
-                                    fillColor:
-                                        Colors.deepPurple.withValues(alpha: 0.03),
+                                    fillColor: Colors.deepPurple.withValues(
+                                      alpha: 0.03,
+                                    ),
                                   ),
-                                  textCapitalization:
-                                      TextCapitalization.words,
+                                  textCapitalization: TextCapitalization.words,
                                   validator: (v) {
                                     if (entry.maintenanceTypeId == _kOtherId &&
                                         (v == null || v.trim().isEmpty)) {
                                       return 'Please enter a type name';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+
+                        // ── Checkbox for Follow-up / Revisit ──
+                        SizedBox(height: 12.h),
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: entry.isFollowUpRequired,
+                              onChanged: (val) {
+                                setState(() {
+                                  entry.isFollowUpRequired = val ?? false;
+                                });
+                              },
+                            ),
+                            Text(
+                              'Requires Follow-up / Revisit (Recommended by mechanic/workshop)',
+                              style: TextStyle(
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        if (entry.isFollowUpRequired) ...[
+                          SizedBox(height: 12.h),
+                          Row(
+                            children: [
+                              SizedBox(width: 8.w),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: entry.followUpReasonController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Follow-up Reason',
+                                    hintText:
+                                        'e.g. Recheck brake pads, leak inspection',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                  ),
+                                  validator: (v) {
+                                    if (entry.isFollowUpRequired &&
+                                        (v == null || v.trim().isEmpty)) {
+                                      return 'Reason is required';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12.h),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(width: 8.w),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: entry.followUpDateController,
+                                  readOnly: true,
+                                  onTap: () =>
+                                      _selectFollowUpDate(context, entry),
+                                  decoration: InputDecoration(
+                                    labelText: 'Follow-up Date (Optional)',
+                                    suffixIcon: const Icon(
+                                      Icons.calendar_today,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 16.w),
+                              Expanded(
+                                child: TextFormField(
+                                  controller: entry.followUpKmController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Follow-up Odometer (Optional)',
+                                    suffixText: 'km',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  validator: (v) {
+                                    if (entry.isFollowUpRequired &&
+                                        (v != null && v.isNotEmpty) &&
+                                        int.tryParse(v) == null) {
+                                      return 'Invalid number';
                                     }
                                     return null;
                                   },
@@ -581,7 +761,9 @@ class _AddMaintenanceRecordDialogState
                             Expanded(
                               child: entry.pickedFiles.isEmpty
                                   ? Padding(
-                                      padding: EdgeInsets.symmetric(vertical: 8.h),
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 8.h,
+                                      ),
                                       child: Text(
                                         'No documents attached',
                                         style: TextStyle(
@@ -594,29 +776,41 @@ class _AddMaintenanceRecordDialogState
                                   : Wrap(
                                       spacing: 8.w,
                                       runSpacing: 8.h,
-                                      children: entry.pickedFiles.asMap().entries.map((fileEntry) {
-                                        final fileIdx = fileEntry.key;
-                                        final file = fileEntry.value;
-                                        return InputChip(
-                                          label: Text(
-                                            file.name,
-                                            style: TextStyle(fontSize: 12.sp),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          onDeleted: () {
-                                            setState(() {
-                                              entry.pickedFiles.removeAt(fileIdx);
-                                            });
-                                          },
-                                          deleteIconColor: Colors.red[700],
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(20.r),
-                                            side: BorderSide(color: Colors.grey.shade300),
-                                          ),
-                                          backgroundColor: Colors.blue.withValues(alpha: 0.05),
-                                        );
-                                      }).toList(),
+                                      children: entry.pickedFiles
+                                          .asMap()
+                                          .entries
+                                          .map((fileEntry) {
+                                            final fileIdx = fileEntry.key;
+                                            final file = fileEntry.value;
+                                            return InputChip(
+                                              label: Text(
+                                                file.name,
+                                                style: TextStyle(
+                                                  fontSize: 12.sp,
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                              onDeleted: () {
+                                                setState(() {
+                                                  entry.pickedFiles.removeAt(
+                                                    fileIdx,
+                                                  );
+                                                });
+                                              },
+                                              deleteIconColor: Colors.red[700],
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(20.r),
+                                                side: BorderSide(
+                                                  color: Colors.grey.shade300,
+                                                ),
+                                              ),
+                                              backgroundColor: Colors.blue
+                                                  .withValues(alpha: 0.05),
+                                            );
+                                          })
+                                          .toList(),
                                     ),
                             ),
                           ],

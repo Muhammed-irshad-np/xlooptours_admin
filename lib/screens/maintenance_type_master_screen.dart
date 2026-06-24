@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
@@ -278,6 +279,7 @@ class _AddEditMaintenanceTypeDialogState
                         border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (v) {
                         if (v == null || v.isEmpty) return 'Required';
                         if (int.tryParse(v) == null) return 'Invalid number';
@@ -294,6 +296,7 @@ class _AddEditMaintenanceTypeDialogState
                         border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       validator: (v) {
                         if (v == null || v.isEmpty) return 'Required';
                         if (int.tryParse(v) == null) return 'Invalid number';

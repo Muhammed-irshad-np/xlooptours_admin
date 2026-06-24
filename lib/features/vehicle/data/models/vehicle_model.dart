@@ -162,6 +162,25 @@ class VehicleModel extends VehicleEntity {
       'notes': record.notes,
       'nextServiceMileage': record.nextServiceMileage,
       'nextServiceDate': record.nextServiceDate?.toIso8601String(),
+      'isFollowUpRequired': record.isFollowUpRequired,
+      'followUpReason': record.followUpReason,
+      'isFollowUpCompleted': record.isFollowUpCompleted,
+      'extendedMileage': record.extendedMileage,
+      'extendedDate': record.extendedDate?.toIso8601String(),
+      'extensionReason': record.extensionReason,
+      'isExtended': record.isExtended,
+      'followUpIntervalKm': record.followUpIntervalKm,
+      'followUpTimesCount': record.followUpTimesCount,
+      'followUpCompletions': record.followUpCompletions?.map((c) => {
+        'date': c.date.toIso8601String(),
+        'mileage': c.mileage,
+        'cost': c.cost,
+        'notes': c.notes,
+        'attachmentUrl': c.attachmentUrl,
+        'attachmentUrls': c.attachmentUrls,
+        'performedBy': c.performedBy,
+      }).toList(),
+      'performedBy': record.performedBy,
     };
   }
 
@@ -306,6 +325,21 @@ class VehicleModel extends VehicleEntity {
     final List<String>? attachmentUrls = urlsJson?.map((e) => e as String).toList() ??
         (json['attachmentUrl'] != null ? [json['attachmentUrl'] as String] : null);
 
+    final List<dynamic>? completionsJson = json['followUpCompletions'] as List<dynamic>?;
+    final List<FollowUpCompletion>? completions = completionsJson?.map((c) {
+      final Map<String, dynamic> cMap = c as Map<String, dynamic>;
+      final List<dynamic>? urls = cMap['attachmentUrls'] as List<dynamic>?;
+      return FollowUpCompletion(
+        date: DateTime.parse(cMap['date'] as String),
+        mileage: cMap['mileage'] as int,
+        cost: (cMap['cost'] as num).toDouble(),
+        notes: cMap['notes'] as String?,
+        attachmentUrl: cMap['attachmentUrl'] as String?,
+        attachmentUrls: urls?.map((e) => e as String).toList(),
+        performedBy: cMap['performedBy'] as String?,
+      );
+    }).toList();
+
     return MaintenanceRecord(
       date: DateTime.parse(json['date'] as String),
       mileage: json['mileage'] as int,
@@ -324,6 +358,19 @@ class VehicleModel extends VehicleEntity {
       nextServiceDate: json['nextServiceDate'] != null
           ? DateTime.parse(json['nextServiceDate'] as String)
           : null,
+      isFollowUpRequired: json['isFollowUpRequired'] as bool?,
+      followUpReason: json['followUpReason'] as String?,
+      isFollowUpCompleted: json['isFollowUpCompleted'] as bool?,
+      extendedMileage: json['extendedMileage'] as int?,
+      extendedDate: json['extendedDate'] != null
+          ? DateTime.parse(json['extendedDate'] as String)
+          : null,
+      extensionReason: json['extensionReason'] as String?,
+      isExtended: json['isExtended'] as bool?,
+      followUpIntervalKm: json['followUpIntervalKm'] as int?,
+      followUpTimesCount: json['followUpTimesCount'] as int?,
+      followUpCompletions: completions,
+      performedBy: json['performedBy'] as String?,
     );
   }
 

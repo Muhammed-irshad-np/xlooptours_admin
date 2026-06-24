@@ -4,6 +4,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:get_it/get_it.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'services/dev_database_sync_service.dart';
 
 import 'features/auth/data/datasources/auth_remote_data_source.dart';
 import 'features/auth/data/repositories/auth_repository_impl.dart';
@@ -58,6 +60,8 @@ import 'features/vehicle/domain/usecases/delete_maintenance_type_usecase.dart';
 import 'features/vehicle/domain/usecases/get_vehicle_expiry_alerts_usecase.dart';
 import 'features/vehicle/domain/usecases/get_vehicle_settings_usecase.dart';
 import 'features/vehicle/domain/usecases/update_vehicle_settings_usecase.dart';
+import 'features/vehicle/domain/usecases/get_vehicle_followup_alerts_usecase.dart';
+import 'features/vehicle/domain/usecases/extend_vehicle_maintenance_usecase.dart';
 import 'features/vehicle/presentation/providers/vehicle_provider.dart';
 
 import 'features/company/data/datasources/company_remote_data_source.dart';
@@ -162,6 +166,7 @@ Future<void> init() async {
       getEmployeeExpiryAlerts: sl(),
       getVehicleMaintenanceAlerts: sl(),
       getVehicleExpiryAlerts: sl(),
+      getVehicleFollowUpAlerts: sl(),
       getVaultExpiryAlerts: sl(),
       sharedPreferences: sl(),
     ),
@@ -297,6 +302,7 @@ Future<void> init() async {
       deleteMaintenanceTypeUseCase: sl(),
       getVehicleSettingsUseCase: sl(),
       updateVehicleSettingsUseCase: sl(),
+      extendVehicleMaintenanceUseCase: sl(),
     ),
   );
 
@@ -309,6 +315,8 @@ Future<void> init() async {
   sl.registerLazySingleton(() => UploadVehicleDocumentUseCase(sl()));
   sl.registerLazySingleton(() => GetVehiclesNeedingOdometerUpdateUseCase());
   sl.registerLazySingleton(() => GetVehicleMaintenanceAlertsUseCase());
+  sl.registerLazySingleton(() => GetVehicleFollowUpAlertsUseCase());
+  sl.registerLazySingleton(() => ExtendVehicleMaintenanceUseCase(sl()));
   sl.registerLazySingleton(() => GetVehicleExpiryAlertsUseCase(sl(), sl()));
   sl.registerLazySingleton(() => GetVehicleSettingsUseCase(sl()));
   sl.registerLazySingleton(() => UpdateVehicleSettingsUseCase(sl()));
@@ -482,4 +490,6 @@ Future<void> init() async {
   sl.registerLazySingleton(() => googleSignIn);
   sl.registerLazySingleton(() => storage);
   sl.registerLazySingleton(() => sharedPreferences);
+  sl.registerLazySingleton(() => http.Client());
+  sl.registerLazySingleton(() => DevDatabaseSyncService(client: sl()));
 }
