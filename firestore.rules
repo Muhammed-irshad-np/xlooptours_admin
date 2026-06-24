@@ -1,8 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper function to check if the user is authenticated and is an admin
+    function isAdmin() {
+      return request.auth != null && 
+             request.auth.token.email != null &&
+             exists(/databases/$(database)/documents/allowed_users/$(request.auth.token.email.lower())) &&
+             get(/databases/$(database)/documents/allowed_users/$(request.auth.token.email.lower())).data.isAdmin == true;
+    }
+
     match /{document=**} {
-      allow read, write: if true;
+      allow read, create, update: if true;
+      allow delete: if isAdmin();
     }
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:provider/provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/company/domain/entities/company_entity.dart';
 import '../features/company/presentation/providers/company_provider.dart';
 import '../widgets/responsive_layout.dart';
@@ -33,6 +34,13 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
   }
 
   Future<void> _deleteCompany(CompanyEntity company) async {
+    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    if (!isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only admins can delete companies.')),
+      );
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -115,6 +123,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Companies'),
@@ -361,19 +370,20 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
                               ],
                             ),
                           ),
-                          const PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete, color: Colors.red, size: 20),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Delete',
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                              ],
+                          if (isAdmin)
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete, color: Colors.red, size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Delete',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ],
