@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:uuid/uuid.dart';
 import 'package:provider/provider.dart';
@@ -674,6 +675,9 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
                   keyboardType: isNumber
                       ? TextInputType.number
                       : TextInputType.text,
+                  inputFormatters: isNumber
+                      ? [FilteringTextInputFormatter.digitsOnly]
+                      : null,
                   decoration: InputDecoration(
                     hintText: hint,
                     isDense: true,

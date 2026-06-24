@@ -75,3 +75,28 @@ lib/
     - Expose strictly necessary state variables.
     - Use `notifyListeners()` only when actual state changes.
     - Inject `UseCases` into the `ChangeNotifier`.
+
+## 6. Numeric Input Validation (MANDATORY)
+All `TextField` / `TextFormField` widgets that accept numeric data (costs, mileage, odometer, intervals, quantities, rates, amounts, alert days, etc.) **MUST** enforce input restrictions at the widget level:
+
+- **Integer-only fields** (e.g., odometer, mileage, interval KM, alert days, repeat times):
+  ```dart
+  keyboardType: TextInputType.number,
+  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+  ```
+- **Decimal fields** (e.g., cost, price, tax rate, discount, amounts):
+  ```dart
+  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+  inputFormatters: [
+    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+  ],
+  ```
+- **Phone number fields**:
+  ```dart
+  keyboardType: TextInputType.phone,
+  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+  ```
+
+> **Important**: Setting `keyboardType` alone is NOT sufficient — it only changes the keyboard layout but does NOT prevent non-numeric input (e.g., via paste, physical keyboards, or some soft keyboards). Always pair it with `inputFormatters`.
+>
+> Requires `import 'package:flutter/services.dart';` in the file.

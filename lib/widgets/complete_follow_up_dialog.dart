@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -282,6 +283,7 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
                   ),
                 ),
                 keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Required';
                   if (int.tryParse(v) == null) return 'Invalid odometer';
@@ -299,6 +301,9 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
                   ),
                 ),
                 keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                ],
               ),
               SizedBox(height: 16.h),
               TextFormField(

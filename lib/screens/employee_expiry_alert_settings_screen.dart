@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../features/employee/domain/entities/employee_settings_entity.dart';
@@ -293,6 +294,7 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
         TextFormField(
           controller: controller,
           keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: color),
             suffixText: 'days before',

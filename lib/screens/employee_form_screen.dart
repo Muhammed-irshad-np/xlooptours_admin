@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
@@ -1800,9 +1801,22 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     String? Function(String?)? validator,
     TextInputType? keyboardType,
   }) {
+    // Automatically derive inputFormatters from keyboardType
+    List<TextInputFormatter>? formatters;
+    if (keyboardType == TextInputType.number) {
+      formatters = [FilteringTextInputFormatter.digitsOnly];
+    } else if (keyboardType == TextInputType.phone) {
+      formatters = [FilteringTextInputFormatter.digitsOnly];
+    } else if (keyboardType != null &&
+        keyboardType.toString().contains('number')) {
+      formatters = [
+        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+      ];
+    }
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      inputFormatters: formatters,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 20),

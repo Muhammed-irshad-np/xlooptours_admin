@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../features/vehicle/domain/entities/vehicle_settings_entity.dart';
@@ -220,6 +221,7 @@ class _VehicleExpiryAlertSettingsScreenState extends State<VehicleExpiryAlertSet
         TextFormField(
           controller: controller,
           keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
           decoration: InputDecoration(
             prefixIcon: Icon(icon, color: color),
             suffixText: 'days before',

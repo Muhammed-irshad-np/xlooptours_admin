@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
@@ -414,6 +415,9 @@ class UpdateDialogHelper {
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                          ],
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
@@ -774,6 +778,7 @@ class UpdateDialogHelper {
                         border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     ),
                     const SizedBox(height: 16),
                     CustomDatePicker(
@@ -804,6 +809,9 @@ class UpdateDialogHelper {
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                      ],
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -916,6 +924,7 @@ class UpdateDialogHelper {
                             border: OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         ),
                       ] else ...[
                         TextFormField(
@@ -926,6 +935,7 @@ class UpdateDialogHelper {
                             border: OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         ),
                         const SizedBox(height: 12),
                         TextFormField(
@@ -936,6 +946,7 @@ class UpdateDialogHelper {
                             border: OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.number,
+                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         ),
                       ],
                     ],
