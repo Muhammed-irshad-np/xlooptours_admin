@@ -7,6 +7,7 @@ import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.da
 import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
+import 'package:xloop_invoice/core/utils/activity_logger.dart';
 
 class MaintenanceExtensionDialog extends StatefulWidget {
   final VehicleEntity vehicle;
@@ -80,6 +81,15 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
         performedBy: username,
         baseOdometer: widget.alert.nextServiceMileage,
       );
+
+      if (mounted) {
+        await ActivityLogger.log(
+          context,
+          title: 'Alert Extended',
+          message: 'Maintenance alert for ${widget.alert.category} on vehicle ${widget.vehicle.make} ${widget.vehicle.model} (${widget.vehicle.plateNumber}) extended by $extensionKm km.',
+          relatedId: widget.vehicle.id,
+        );
+      }
 
       if (mounted) {
         Navigator.pop(context, true);
