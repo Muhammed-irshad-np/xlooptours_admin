@@ -115,7 +115,7 @@ class _DevSyncDialogState extends State<DevSyncDialog>
         vehicleProvider.fetchAllMaintenanceTypes(),
         vehicleProvider.fetchVehicleSettings(),
         vaultProvider.loadVaultData(),
-        context.read<FeedbackProvider>().fetchLatestFeedbacks(),
+        if (isAdmin) context.read<FeedbackProvider>().fetchLatestFeedbacks(),
         if (isAdmin) context.read<CustomerProvider>().fetchAllCustomers(),
       ]);
 

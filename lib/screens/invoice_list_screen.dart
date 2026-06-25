@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/invoice/domain/entities/invoice_entity.dart';
 import '../features/invoice/presentation/providers/invoice_provider.dart';
 import '../widgets/responsive_layout.dart';
@@ -58,6 +59,13 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   }
 
   Future<void> _deleteInvoice(InvoiceEntity invoice) async {
+    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    if (!isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only admins can delete invoices.')),
+      );
+      return;
+    }
     // Show confirmation dialog
     final confirmed = await showDialog<bool>(
       context: context,
@@ -102,6 +110,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
     final currencyFormat = NumberFormat.currency(
       symbol: 'SR ',
       decimalDigits: 2,
@@ -294,6 +303,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     NumberFormat currencyFormat,
     DateFormat dateFormat,
   ) {
+    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
@@ -339,16 +349,17 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                     ],
                   ),
                 ),
-                const PopupMenuItem<String>(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, color: Colors.red, size: 20),
-                      SizedBox(width: 8),
-                      Text('Delete', style: TextStyle(color: Colors.red)),
-                    ],
+                if (isAdmin)
+                  const PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete, color: Colors.red, size: 20),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
+                    ),
                   ),
-                ),
               ],
             ),
             const Icon(Icons.arrow_forward_ios, size: 16),

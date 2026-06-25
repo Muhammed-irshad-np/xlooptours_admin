@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../features/notifications/domain/entities/notification_entity.dart';
@@ -39,6 +40,13 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   }
 
   Future<void> _deleteCustomer(CustomerEntity customer) async {
+    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    if (!isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only admins can delete customers.')),
+      );
+      return;
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -92,6 +100,13 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   }
 
   Future<void> _recordFeedback(CustomerEntity customer) async {
+    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    if (!isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only admins can record feedback.')),
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (context) => _RecordFeedbackDialog(customer: customer),
@@ -222,6 +237,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
   Widget _buildCustomerCard(CustomerEntity customer) {
     bool isActive = customer.status == 'ACTIVE';
+    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
 
     return Card(
       elevation: 0,
@@ -309,16 +325,17 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                                     }
                                   },
                                   itemBuilder: (context) => [
-                                    const PopupMenuItem(
-                                      value: 'record_feedback',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.rate_review_outlined, size: 20),
-                                          SizedBox(width: 8),
-                                          Text('Record Feedback'),
-                                        ],
+                                    if (isAdmin)
+                                      const PopupMenuItem(
+                                        value: 'record_feedback',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.rate_review_outlined, size: 20),
+                                            SizedBox(width: 8),
+                                            Text('Record Feedback'),
+                                          ],
+                                        ),
                                       ),
-                                    ),
                                     const PopupMenuItem(
                                       value: 'edit',
                                       child: Row(
@@ -329,23 +346,24 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                                         ],
                                       ),
                                     ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            Icons.delete_outline,
-                                            color: Colors.red,
-                                            size: 20,
-                                          ),
-                                          SizedBox(width: 8),
-                                          Text(
-                                            'Delete',
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                        ],
+                                    if (isAdmin)
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              Icons.delete_outline,
+                                              color: Colors.red,
+                                              size: 20,
+                                            ),
+                                            SizedBox(width: 8),
+                                            Text(
+                                              'Delete',
+                                              style: TextStyle(color: Colors.red),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                    ),
                                   ],
                                 ),
                               ),
