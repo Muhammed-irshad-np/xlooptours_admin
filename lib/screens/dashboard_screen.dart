@@ -134,7 +134,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         vehicleProvider.fetchAllMaintenanceTypes(),
         vehicleProvider.fetchVehicleSettings(),
         vaultProvider.loadVaultData(),
-        context.read<FeedbackProvider>().fetchLatestFeedbacks(),
+        if (isAdmin) context.read<FeedbackProvider>().fetchLatestFeedbacks(),
         if (isAdmin) context.read<CustomerProvider>().fetchAllCustomers(),
       ]);
 
@@ -158,6 +158,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = context.select<AuthProvider, bool>(
+      (auth) => auth.user?.isAdmin ?? false,
+    );
+
     return Scaffold(
       backgroundColor: _DT.bgPage,
       appBar: _buildAppBar(),
@@ -179,8 +183,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                     const _ExpiriesSection(),
                     SizedBox(height: 32.h),
                     _buildRecentActivitySection(),
-                    SizedBox(height: 32.h),
-                    _buildFeedbacksSection(),
+                    if (isAdmin) ...[
+                      SizedBox(height: 32.h),
+                      _buildFeedbacksSection(),
+                    ],
                     SizedBox(height: 32.h),
                     _buildOdometerSection(),
                   ],
@@ -195,8 +201,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                           const _ExpiriesSection(),
                           SizedBox(height: 32.h),
                           _buildRecentActivitySection(),
-                          SizedBox(height: 32.h),
-                          _buildFeedbacksSection(),
+                          if (isAdmin) ...[
+                            SizedBox(height: 32.h),
+                            _buildFeedbacksSection(),
+                          ],
                         ],
                       ),
                     ),

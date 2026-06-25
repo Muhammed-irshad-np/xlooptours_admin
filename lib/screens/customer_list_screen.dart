@@ -106,6 +106,13 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   }
 
   Future<void> _recordFeedback(CustomerEntity customer) async {
+    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    if (!isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only admins can record feedback.')),
+      );
+      return;
+    }
     showDialog(
       context: context,
       builder: (context) => _RecordFeedbackDialog(customer: customer),
@@ -134,7 +141,6 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
     return Consumer<CustomerProvider>(
       builder: (context, provider, child) {
         final filteredCustomers = provider.customers.where((c) {
@@ -317,16 +323,17 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                                     }
                                   },
                                   itemBuilder: (context) => [
-                                    const PopupMenuItem(
-                                      value: 'record_feedback',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.rate_review_outlined, size: 20),
-                                          SizedBox(width: 8),
-                                          Text('Record Feedback'),
-                                        ],
+                                    if (isAdmin)
+                                      const PopupMenuItem(
+                                        value: 'record_feedback',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.rate_review_outlined, size: 20),
+                                            SizedBox(width: 8),
+                                            Text('Record Feedback'),
+                                          ],
+                                        ),
                                       ),
-                                    ),
                                     const PopupMenuItem(
                                       value: 'edit',
                                       child: Row(
