@@ -5,6 +5,15 @@
 
 echo "Vercel Environment: $VERCEL_ENV"
 
+echo "Flutter SDK Version Check:"
+./flutter/bin/flutter --version
+
+echo "Cleaning previous build artifacts..."
+./flutter/bin/flutter clean
+
+echo "Fetching dependencies..."
+./flutter/bin/flutter pub get
+
 if [ "$VERCEL_ENV" == "production" ]; then
   echo "Building for Production..."
   ./flutter/bin/flutter build web --release
