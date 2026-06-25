@@ -13,6 +13,7 @@ import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/feedback/domain/entities/feedback_entity.dart';
 import '../features/feedback/presentation/providers/feedback_provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import '../widgets/responsive_layout.dart';
 
 class FeedbackHistoryScreen extends StatefulWidget {
@@ -363,6 +364,53 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    if (!isAdmin) {
+      return Scaffold(
+        backgroundColor: _bgPage,
+        appBar: AppBar(
+          title: Text(
+            'Feedback History',
+            style: GoogleFonts.inter(
+              color: _textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          backgroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.lock_outline,
+                size: 64,
+                color: _danger,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Access Denied',
+                style: GoogleFonts.inter(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.bold,
+                  color: _textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Only administrators are allowed to view this screen.',
+                style: GoogleFonts.inter(
+                  fontSize: 14.sp,
+                  color: _textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: _bgPage,
       appBar: _buildAppBar(),
