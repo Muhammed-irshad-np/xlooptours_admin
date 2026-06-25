@@ -14,6 +14,7 @@ import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/xloop_vault/presentation/providers/vault_provider.dart';
+import 'package:xloop_invoice/core/utils/activity_logger.dart';
 
 class CompleteFollowUpDialog extends StatefulWidget {
   final VehicleEntity vehicle;
@@ -217,6 +218,15 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
       );
 
       await provider.updateVehicle(updatedVehicle);
+
+      if (mounted) {
+        await ActivityLogger.log(
+          context,
+          title: 'Follow-up Completed',
+          message: 'Follow-up maintenance (${widget.record.serviceType}) completed for vehicle ${widget.vehicle.make} ${widget.vehicle.model} (${widget.vehicle.plateNumber}). Cost: SAR ${completion.cost.toStringAsFixed(2)}, Odometer: ${completion.mileage} km.',
+          relatedId: widget.vehicle.id,
+        );
+      }
 
       // Mark the corresponding virtual notification as read and refresh alerts
       final notifId = 'followup_${widget.vehicle.id}_${widget.record.date.millisecondsSinceEpoch}';
