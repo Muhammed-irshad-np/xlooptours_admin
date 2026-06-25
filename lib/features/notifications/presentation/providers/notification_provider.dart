@@ -376,8 +376,11 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   List<NotificationEntity> getNotificationsByRelatedId(String relatedId) {
-    return _dbNotifications.where((n) => n.relatedId == relatedId).toList()
-      ..addAll(_computedNotifications.where((n) => n.relatedId == relatedId));
+    return _dbNotifications
+        .where((n) => n.relatedId == relatedId && n.type == NotificationType.expiry)
+        .toList()
+      ..addAll(_computedNotifications.where((n) =>
+          n.relatedId == relatedId && n.type == NotificationType.expiry));
   }
 
   void clearError() {
