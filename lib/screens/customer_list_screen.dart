@@ -537,7 +537,8 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                               const SizedBox(height: 4),
                               Wrap(
                                 spacing: 8,
-                                children: customer.assignedCaseCodes
+                                children: (List<String>.from(customer.assignedCaseCodes)
+                                      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase())))
                                     .map(
                                       (code) => Chip(
                                         label: Text(code),

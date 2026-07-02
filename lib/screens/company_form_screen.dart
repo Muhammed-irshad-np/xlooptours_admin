@@ -31,6 +31,8 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
   final _caseCodeLabelController = TextEditingController(text: 'Case Code');
   final _newCaseCodeController = TextEditingController();
   final ValueNotifier<List<String>> _caseCodes = ValueNotifier([]);
+  final _searchCaseCodeController = TextEditingController();
+  final ValueNotifier<String> _caseCodeQuery = ValueNotifier('');
 
   final ValueNotifier<bool> _vatRegisteredInKSA = ValueNotifier(false);
 
@@ -58,7 +60,8 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
       if (company.caseCodeLabel != null) {
         _caseCodeLabelController.text = company.caseCodeLabel!;
       }
-      _caseCodes.value = List.from(company.caseCodes);
+      _caseCodes.value = List<String>.from(company.caseCodes)
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
     }
   }
 
@@ -76,6 +79,8 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
     _postalCodeController.dispose();
     _caseCodeLabelController.dispose();
     _newCaseCodeController.dispose();
+    _searchCaseCodeController.dispose();
+    _caseCodeQuery.dispose();
     _usesCaseCode.dispose();
     _vatRegisteredInKSA.dispose();
     _isSaving.dispose();
@@ -180,7 +185,8 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
     final code = _newCaseCodeController.text.trim();
     if (code.isNotEmpty) {
       if (!_caseCodes.value.contains(code)) {
-        _caseCodes.value = [..._caseCodes.value, code];
+        _caseCodes.value = [..._caseCodes.value, code]
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
         _newCaseCodeController.clear();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -369,7 +375,13 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
                     ),
                     Switch(
                       value: usesCaseCode,
-                      onChanged: (val) => _usesCaseCode.value = val,
+                      onChanged: (val) {
+                        _usesCaseCode.value = val;
+                        if (!val) {
+                          _searchCaseCodeController.clear();
+                          _caseCodeQuery.value = '';
+                        }
+                      },
                     ),
                   ],
                 ),
@@ -416,15 +428,50 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
                           ),
                         );
                       }
-                      return Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: caseCodes.map((code) {
-                          return Chip(
-                            label: Text(code),
-                            onDeleted: () => _removeCaseCode(code),
-                          );
-                        }).toList(),
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          TextFormField(
+                            controller: _searchCaseCodeController,
+                            decoration: const InputDecoration(
+                              labelText: 'Search Case Codes',
+                              hintText: 'Type to filter...',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.search),
+                            ),
+                            onChanged: (val) => _caseCodeQuery.value = val,
+                          ),
+                          const SizedBox(height: 16),
+                          ValueListenableBuilder<String>(
+                            valueListenable: _caseCodeQuery,
+                            builder: (context, query, _) {
+                              final filteredCodes = caseCodes
+                                  .where((code) => code.toLowerCase().contains(query.toLowerCase()))
+                                  .toList();
+                              
+                              if (filteredCodes.isEmpty) {
+                                return const Text(
+                                  'No matching case codes found.',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                );
+                              }
+                              
+                              return Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: filteredCodes.map((code) {
+                                  return Chip(
+                                    label: Text(code),
+                                    onDeleted: () => _removeCaseCode(code),
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
+                        ],
                       );
                     },
                   ),

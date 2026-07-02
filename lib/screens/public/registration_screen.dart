@@ -43,6 +43,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     '+966',
   ); // Default to KSA
   final ValueNotifier<List<String>> _previewCaseCodes = ValueNotifier([]);
+  final _searchCaseCodeController = TextEditingController();
+  final ValueNotifier<String> _caseCodeQuery = ValueNotifier('');
   final ValueNotifier<bool> _isArabic = ValueNotifier(false);
 
   final Map<String, Map<String, String>> _translations = {
@@ -238,8 +240,11 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     final code = _caseCodeController.text.trim();
     if (code.isNotEmpty) {
       if (!_previewCaseCodes.value.contains(code)) {
-        _previewCaseCodes.value.add(code);
+        _previewCaseCodes.value = [..._previewCaseCodes.value, code]
+          ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
         _caseCodeController.clear();
+        _searchCaseCodeController.clear();
+        _caseCodeQuery.value = '';
       } else {
         // Optionally show a message if code already exists
         _caseCodeController.clear();
@@ -248,7 +253,9 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   }
 
   void _removeCaseCode(String code) {
-    _previewCaseCodes.value.remove(code);
+    _previewCaseCodes.value = _previewCaseCodes.value.where((c) => c != code).toList();
+    _searchCaseCodeController.clear();
+    _caseCodeQuery.value = '';
   }
 
   Future<void> _fetchCompany() async {
@@ -372,6 +379,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
         _registrationSuccess,
         _countryCode,
         _previewCaseCodes,
+        _caseCodeQuery,
         _isArabic,
         _isMobileFormOpen,
       ]),
@@ -1040,6 +1048,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
     TextCapitalization textCapitalization = TextCapitalization.none,
+    ValueChanged<String>? onChanged,
   }) {
     return TextFormField(
       controller: controller,
@@ -1047,6 +1056,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       enabled: enabled,
       inputFormatters: inputFormatters,
       textCapitalization: textCapitalization,
+      onChanged: onChanged,
       style: _isArabic.value
           ? GoogleFonts.notoSansArabic(
               fontSize: 15.sp,
@@ -1744,6 +1754,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
     TextCapitalization textCapitalization = TextCapitalization.none,
+    ValueChanged<String>? onChanged,
   }) {
     return Padding(
       padding: EdgeInsets.only(
@@ -1786,6 +1797,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
             enabled: enabled,
             inputFormatters: inputFormatters,
             textCapitalization: textCapitalization,
+            onChanged: onChanged,
             style: GoogleFonts.notoSans(
               fontSize: 50.sp,
               color: enabled ? Colors.white : Colors.white60,
@@ -1846,6 +1858,8 @@ class _RegistrationScreenState extends State<RegistrationScreen>
     _registrationSuccess.dispose();
     _countryCode.dispose();
     _previewCaseCodes.dispose();
+    _searchCaseCodeController.dispose();
+    _caseCodeQuery.dispose();
     _isArabic.dispose();
     _isMobileFormOpen.dispose();
     _nameController.dispose();
@@ -1859,37 +1873,76 @@ class _RegistrationScreenState extends State<RegistrationScreen>
   }
 
   Widget _buildCaseCodeChips() {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: _previewCaseCodes.value.map((code) {
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.4)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                code,
-                style: GoogleFonts.notoSans(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
+    final query = _caseCodeQuery.value;
+    final filteredCodes = _previewCaseCodes.value
+        .where((code) => code.toLowerCase().contains(query.toLowerCase()))
+        .toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _isMobileFormOpen.value
+            ? _buildMobileInput(
+                controller: _searchCaseCodeController,
+                label: 'Search Case Codes',
+                icon: Icons.search,
+                isRequired: false,
+                onChanged: (val) => _caseCodeQuery.value = val,
+              )
+            : _buildDesktopInput(
+                controller: _searchCaseCodeController,
+                label: 'Search Case Codes',
+                icon: Icons.search,
+                isRequired: false,
+                onChanged: (val) => _caseCodeQuery.value = val,
+              ),
+        const SizedBox(height: 12),
+        if (filteredCodes.isEmpty)
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: 8.h),
+            child: Text(
+              'No matching case codes found.',
+              style: GoogleFonts.notoSans(
+                color: Colors.white70,
+                fontSize: 14.sp,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: filteredCodes.map((code) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.4)),
                 ),
-              ),
-              const SizedBox(width: 4),
-              GestureDetector(
-                onTap: () => _removeCaseCode(code),
-                child: const Icon(Icons.close, size: 14, color: Colors.white),
-              ),
-            ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      code,
+                      style: GoogleFonts.notoSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: () => _removeCaseCode(code),
+                      child: const Icon(Icons.close, size: 14, color: Colors.white),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ),
-        );
-      }).toList(),
+      ],
     );
   }
 

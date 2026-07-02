@@ -36,6 +36,8 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
   // Case Code Selection
   final ValueNotifier<List<String>> _assignedCaseCodes = ValueNotifier([]);
   final TextEditingController _newCaseCodeController = TextEditingController();
+  final TextEditingController _searchCaseCodeController = TextEditingController();
+  final ValueNotifier<String> _caseCodeQuery = ValueNotifier('');
 
   final ValueNotifier<bool> _isSaving = ValueNotifier(false);
 
@@ -129,6 +131,8 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _newCaseCodeController.dispose();
+    _searchCaseCodeController.dispose();
+    _caseCodeQuery.dispose();
     _selectedCompany.dispose();
     _availableCompanies.dispose();
     _isLoadingCompanies.dispose();
@@ -463,6 +467,8 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
                             if (newValue == null || !newValue.usesCaseCode) {
                               _assignedCaseCodes.value = [];
                             }
+                            _searchCaseCodeController.clear();
+                            _caseCodeQuery.value = '';
                           },
                         ),
 
@@ -501,20 +507,64 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
                             valueListenable: _assignedCaseCodes,
                             builder: (context, assignedCaseCodes, _) {
                               // Combine company case codes with any new ones added during this session
-                              final allCodes = Set<String>.from(selectedCompany.caseCodes)
-                                ..addAll(assignedCaseCodes);
-                                
+                              final allCodes = (Set<String>.from(selectedCompany.caseCodes)
+                                ..addAll(assignedCaseCodes)).toList()
+                                ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+                              
+                              if (allCodes.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+
                               return Column(
-                                children: allCodes.map((code) {
-                                  return CheckboxListTile(
-                                    title: Text(code),
-                                    value: assignedCaseCodes.contains(code),
-                                    onChanged: (bool? value) =>
-                                        _toggleCaseCode(code, value),
-                                    dense: true,
-                                    contentPadding: EdgeInsets.zero,
-                                  );
-                                }).toList(),
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 12),
+                                  TextFormField(
+                                    controller: _searchCaseCodeController,
+                                    decoration: const InputDecoration(
+                                      labelText: 'Search Case Codes',
+                                      hintText: 'Type to filter...',
+                                      border: OutlineInputBorder(),
+                                      prefixIcon: Icon(Icons.search),
+                                    ),
+                                    onChanged: (val) => _caseCodeQuery.value = val,
+                                  ),
+                                  const SizedBox(height: 12),
+                                  ValueListenableBuilder<String>(
+                                    valueListenable: _caseCodeQuery,
+                                    builder: (context, query, _) {
+                                      final filteredCodes = allCodes
+                                          .where((code) => code.toLowerCase().contains(query.toLowerCase()))
+                                          .toList();
+                                      
+                                      if (filteredCodes.isEmpty) {
+                                        return const Padding(
+                                          padding: EdgeInsets.symmetric(vertical: 8.0),
+                                          child: Text(
+                                            'No matching case codes found.',
+                                            style: TextStyle(
+                                              color: Colors.grey,
+                                              fontStyle: FontStyle.italic,
+                                            ),
+                                          ),
+                                        );
+                                      }
+                                      
+                                      return Column(
+                                        children: filteredCodes.map((code) {
+                                          return CheckboxListTile(
+                                            title: Text(code),
+                                            value: assignedCaseCodes.contains(code),
+                                            onChanged: (bool? value) =>
+                                                _toggleCaseCode(code, value),
+                                            dense: true,
+                                            contentPadding: EdgeInsets.zero,
+                                          );
+                                        }).toList(),
+                                      );
+                                    },
+                                  ),
+                                ],
                               );
                             },
                           ),
