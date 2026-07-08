@@ -174,10 +174,45 @@ class VehicleProvider extends ChangeNotifier {
       final List<MaintenanceRecord> updatedHistory = List.from(
         vehicle.maintenanceHistory ?? [],
       );
+      
+      VehicleMaintenance? updatedMaintenance = vehicle.maintenance;
+      bool isAuditRecord = record.serviceType?.startsWith('Extension:') ?? false;
+
+      if (isAuditRecord) {
+        String category = record.serviceType!.replaceAll('Extension:', '').trim();
+        
+        // Find the most recent actual record for this category
+        int actualIndex = updatedHistory.lastIndexWhere((r) => 
+            r.serviceType != null &&
+            _isMatchingCategory(r.serviceType!, category) &&
+            !r.serviceType!.startsWith('Extension:')
+        );
+
+        if (actualIndex != -1) {
+          var actualRecord = updatedHistory[actualIndex];
+          if (actualRecord.isExtended == true && actualRecord.extendedMileage != null) {
+            // Revert the extension
+            var revertedRecord = actualRecord.copyWith(
+               nextServiceMileage: (actualRecord.nextServiceMileage ?? 0) - actualRecord.extendedMileage!,
+               clearExtension: true,
+            );
+            updatedHistory[actualIndex] = revertedRecord;
+            
+            // Also need to update `updatedMaintenance` typed field
+            updatedMaintenance = _applyExtensionToTypedField(
+              updatedMaintenance ?? const VehicleMaintenance(),
+              category,
+              revertedRecord,
+            );
+          }
+        }
+      }
+
       updatedHistory.remove(record);
 
       final updatedVehicle = vehicle.copyWith(
         maintenanceHistory: updatedHistory,
+        maintenance: updatedMaintenance,
       );
 
       await updateVehicleUseCase(updatedVehicle);
@@ -462,6 +497,78 @@ class VehicleProvider extends ChangeNotifier {
       _setLoading(false);
       rethrow;
     }
+  }
+
+  bool _isMatchingCategory(String serviceType, String category) {
+    final s = serviceType.toLowerCase().trim();
+    final c = category.toLowerCase().trim();
+    if (s == c) return true;
+    
+    // Normalize engine oil variants
+    final engineOilKeywords = ['engine oil', 'engine oil change', 'oil filter', 'engine oil & filter', 'engine_oil'];
+    if (engineOilKeywords.contains(s) && engineOilKeywords.contains(c)) {
+      return true;
+    }
+    
+    // Normalize space vs underscore differences
+    return s.replaceAll(' ', '_') == c.replaceAll(' ', '_');
+  }
+
+  VehicleMaintenance _applyExtensionToTypedField(
+    VehicleMaintenance m,
+    String category,
+    MaintenanceRecord updatedRecord,
+  ) {
+    final norm = category.toLowerCase().trim();
+    if (norm == 'engine oil' || norm == 'engine oil change' || norm == 'engine_oil' || norm.contains('engine oil') || norm == 'engine oil & filter') {
+      return m.copyWith(engineOil: updatedRecord);
+    }
+    if (norm == 'gear oil' || norm == 'gear_oil') {
+      return m.copyWith(gearOil: updatedRecord);
+    }
+    if (norm == 'housing oil' || norm == 'housing_oil') {
+      return m.copyWith(housingOil: updatedRecord);
+    }
+    if (norm == 'tyre change' || norm == 'tyre_change') {
+      return m.copyWith(tyreChange: updatedRecord);
+    }
+    if (norm == 'battery change' || norm == 'battery_change') {
+      return m.copyWith(batteryChange: updatedRecord);
+    }
+    if (norm == 'brake pads' || norm == 'brake_pads') {
+      return m.copyWith(brakePads: updatedRecord);
+    }
+    if (norm == 'air filter' || norm == 'air_filter') {
+      return m.copyWith(airFilter: updatedRecord);
+    }
+    if (norm == 'ac service' || norm == 'ac_service') {
+      return m.copyWith(acService: updatedRecord);
+    }
+    if (norm == 'wheel alignment' || norm == 'wheel_alignment') {
+      return m.copyWith(wheelAlignment: updatedRecord);
+    }
+    if (norm == 'spark plugs' || norm == 'spark_plugs') {
+      return m.copyWith(sparkPlugs: updatedRecord);
+    }
+    if (norm == 'coolant flush' || norm == 'coolant_flush') {
+      return m.copyWith(coolantFlush: updatedRecord);
+    }
+    if (norm == 'wiper blades' || norm == 'wiper_blades') {
+      return m.copyWith(wiperBlades: updatedRecord);
+    }
+    if (norm == 'timing belt' || norm == 'timing_belt') {
+      return m.copyWith(timingBelt: updatedRecord);
+    }
+    if (norm == 'transmission fluid' || norm == 'transmission_fluid') {
+      return m.copyWith(transmissionFluid: updatedRecord);
+    }
+    if (norm == 'brake fluid' || norm == 'brake_fluid') {
+      return m.copyWith(brakeFluid: updatedRecord);
+    }
+    if (norm == 'fuel filter' || norm == 'fuel_filter') {
+      return m.copyWith(fuelFilter: updatedRecord);
+    }
+    return m;
   }
 
   void _setLoading(bool value) {

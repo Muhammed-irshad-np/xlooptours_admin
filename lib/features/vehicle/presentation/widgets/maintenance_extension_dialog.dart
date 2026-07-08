@@ -25,7 +25,7 @@ class MaintenanceExtensionDialog extends StatefulWidget {
 
 class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _extensionController = TextEditingController(text: '10000');
+  final _targetOdometerController = TextEditingController();
   final _reasonController = TextEditingController();
   bool _isLoading = false;
   int? _calculatedThreshold;
@@ -33,23 +33,23 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
   @override
   void initState() {
     super.initState();
-    _recalculateThreshold();
-    _extensionController.addListener(_recalculateThreshold);
+    _recalculateExtension();
+    _targetOdometerController.addListener(_recalculateExtension);
   }
 
   @override
   void dispose() {
-    _extensionController.removeListener(_recalculateThreshold);
-    _extensionController.dispose();
+    _targetOdometerController.removeListener(_recalculateExtension);
+    _targetOdometerController.dispose();
     _reasonController.dispose();
     super.dispose();
   }
 
-  void _recalculateThreshold() {
+  void _recalculateExtension() {
     final baseOdo = widget.alert.nextServiceMileage;
-    final extVal = int.tryParse(_extensionController.text) ?? 0;
+    final targetVal = int.tryParse(_targetOdometerController.text) ?? 0;
     setState(() {
-      _calculatedThreshold = baseOdo + extVal;
+      _calculatedThreshold = (targetVal > baseOdo) ? targetVal - baseOdo : null;
     });
   }
 
@@ -70,7 +70,9 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
 
     try {
       final provider = context.read<VehicleProvider>();
-      final extensionKm = int.parse(_extensionController.text);
+      final targetOdometer = int.parse(_targetOdometerController.text);
+      final baseOdometer = widget.alert.nextServiceMileage;
+      final extensionKm = targetOdometer - baseOdometer;
       final reason = _reasonController.text.trim();
 
       await provider.extendVehicleMaintenance(
@@ -181,14 +183,14 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
               ),
               SizedBox(height: 20.h),
 
-              // Extension Input
+              // Target Odometer Input
               TextFormField(
-                controller: _extensionController,
+                controller: _targetOdometerController,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
-                  labelText: 'Extension Mileage (KM)',
-                  hintText: 'e.g., 20000',
+                  labelText: 'Target Odometer for Alert (KM)',
+                  hintText: 'e.g., 140000',
                   suffixText: 'km',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.r),
@@ -197,7 +199,9 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) return 'Required';
                   final numVal = int.tryParse(v);
-                  if (numVal == null || numVal <= 0) return 'Enter a positive integer';
+                  if (numVal == null) return 'Enter a valid number';
+                  final baseOdo = widget.alert.nextServiceMileage;
+                  if (numVal <= baseOdo) return 'Target must be > original due ($baseOdo km)';
                   return null;
                 },
               ),
@@ -234,7 +238,7 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Projected Next Due:',
+                        'Extension Amount:',
                         style: GoogleFonts.inter(
                           fontSize: 13.sp,
                           color: const Color(0xFF4B5563),
@@ -242,7 +246,7 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
                         ),
                       ),
                       Text(
-                        '$_calculatedThreshold km',
+                        '+$_calculatedThreshold km',
                         style: GoogleFonts.inter(
                           fontSize: 15.sp,
                           color: const Color(0xFF111827),

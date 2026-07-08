@@ -45,8 +45,7 @@ class _VehicleMaintenanceHistoryScreenState
           if (_selectedFilter == 'Follow-ups') {
             return record.isFollowUpRequired == true;
           } else if (_selectedFilter == 'Extensions') {
-            return record.isExtended == true ||
-                (record.serviceType != null &&
+            return (record.serviceType != null &&
                     record.serviceType!.startsWith('Extension:'));
           }
           return true; // 'All'
