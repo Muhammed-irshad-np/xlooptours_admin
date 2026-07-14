@@ -10,6 +10,8 @@ class VehicleMaintenanceAlert {
   final int nextServiceMileage;
   final int kmOverdue;
   final bool isExtended;
+  final List<MaintenanceRecord> extensionHistory;
+  final int originalDueMileage;
 
   VehicleMaintenanceAlert({
     required this.vehicle,
@@ -19,6 +21,8 @@ class VehicleMaintenanceAlert {
     required this.nextServiceMileage,
     required this.kmOverdue,
     this.isExtended = false,
+    this.extensionHistory = const [],
+    required this.originalDueMileage,
   });
 }
 
@@ -69,11 +73,50 @@ class GetVehicleMaintenanceAlertsUseCase {
         if (entries == null || entries.isEmpty) continue;
 
         // Find the most recent service (highest mileage).
-        entries.sort((a, b) => b.mileage.compareTo(a.mileage));
-        final lastService = entries.first;
+        // Wait, we need to filter out Extension logs from `entries` when finding the last service.
+        // `_gatherHistory` gathers ALL logs, including `Extension: $category`.
+        // We should only consider actual services as the `lastService`.
+        final serviceEntries = entries.where((e) => !e.serviceType.startsWith('Extension:')).toList();
+        
+        // If there are no actual service entries, we cannot calculate the next due based on history.
+        // Wait, if it's purely an extension from purchase odometer, it might be different.
+        // But let's assume `serviceEntries` has at least one.
+        if (serviceEntries.isEmpty) continue;
 
-        int nextDue = lastService.mileage + intervalKm;
+        serviceEntries.sort((a, b) => b.mileage.compareTo(a.mileage));
+        final lastService = serviceEntries.first;
+
+        final originalDue = lastService.mileage + intervalKm;
+        int nextDue = originalDue;
         bool isExt = false;
+        
+        // Find all extension logs for this category that occurred *after* the last service.
+        // We look in the `vehicle.maintenanceHistory` directly, because they have `serviceType: 'Extension: $category'`
+        final extensionHistory = <MaintenanceRecord>[];
+        if (vehicle.maintenanceHistory != null) {
+          final extensionPrefix = 'Extension: ${type.name}';
+          final normalizedExtensionPrefix = _normalizeServiceType(extensionPrefix);
+          
+          for (final record in vehicle.maintenanceHistory!) {
+            if (record.serviceType != null) {
+              final normRecordType = _normalizeServiceType(record.serviceType!);
+              final normCat = _normalizeServiceType(type.name);
+              
+              if (record.serviceType!.startsWith('Extension:') && 
+                  normRecordType.replaceFirst('extension: ', '') == normCat) {
+                // If this extension happened after or on the last service date/mileage
+                if (record.date.isAfter(lastService.originalRecord?.date ?? DateTime(2000)) ||
+                    (record.date.isAtSameMomentAs(lastService.originalRecord?.date ?? DateTime(2000))) || 
+                    record.mileage >= lastService.mileage) {
+                  extensionHistory.add(record);
+                }
+              }
+            }
+          }
+          // Sort extensions chronologically
+          extensionHistory.sort((a, b) => a.date.compareTo(b.date));
+        }
+
         if (lastService.originalRecord != null &&
             lastService.originalRecord!.isExtended == true &&
             lastService.originalRecord!.nextServiceMileage != null) {
@@ -91,6 +134,8 @@ class GetVehicleMaintenanceAlertsUseCase {
               nextServiceMileage: nextDue,
               kmOverdue: currentMileage - nextDue,
               isExtended: isExt,
+              extensionHistory: extensionHistory,
+              originalDueMileage: originalDue,
             ),
           );
         }

@@ -1137,6 +1137,7 @@ class _ExpiryCardState extends State<_ExpiryCard> {
         lastServiceMileage: 0,
         nextServiceMileage: vehicle.currentOdometer ?? 0,
         kmOverdue: 0,
+        originalDueMileage: vehicle.currentOdometer ?? 0,
       ),
     );
 

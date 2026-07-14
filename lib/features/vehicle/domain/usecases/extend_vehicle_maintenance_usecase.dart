@@ -16,7 +16,9 @@ class ExtendVehicleMaintenanceUseCase {
     int? baseOdometer,
   }) async {
     final currentOdometer = vehicle.currentOdometer ?? 0;
-    final List<MaintenanceRecord> updatedHistory = List.from(vehicle.maintenanceHistory ?? []);
+    final List<MaintenanceRecord> updatedHistory = List.from(
+      vehicle.maintenanceHistory ?? [],
+    );
 
     // 1. Find and update the latest actual MaintenanceRecord in history for this category
     MaintenanceRecord? latestRecord;
@@ -24,7 +26,8 @@ class ExtendVehicleMaintenanceUseCase {
 
     for (int i = 0; i < updatedHistory.length; i++) {
       final record = updatedHistory[i];
-      if (record.serviceType != null && _isMatchingCategory(record.serviceType!, category)) {
+      if (record.serviceType != null &&
+          _isMatchingCategory(record.serviceType!, category)) {
         // We want to avoid matching previous extension logs (e.g., serviceType starts with "Extension:")
         if (record.serviceType!.startsWith('Extension:')) continue;
 
@@ -35,7 +38,8 @@ class ExtendVehicleMaintenanceUseCase {
       }
     }
 
-    final resolvedBaseOdometer = baseOdometer ?? (latestRecord?.nextServiceMileage ?? currentOdometer);
+    final resolvedBaseOdometer =
+        baseOdometer ?? (latestRecord?.nextServiceMileage ?? currentOdometer);
     final newAlertThreshold = resolvedBaseOdometer + extensionKm;
 
     MaintenanceRecord updatedRecord;
@@ -68,14 +72,17 @@ class ExtendVehicleMaintenanceUseCase {
       date: DateTime.now(),
       mileage: currentOdometer,
       serviceType: 'Extension: $category',
-      notes: 'Alert extended by $extensionKm km. New due mileage: $newAlertThreshold km. Reason: $reason',
+      notes: reason, // Only store the reason in notes
+      extendedMileage: extensionKm,
+      nextServiceMileage: newAlertThreshold,
       cost: 0.0,
       performedBy: performedBy,
     );
     updatedHistory.add(auditRecord);
 
     // 3. Also update the active typed field in vehicle.maintenance
-    final existingMaintenance = vehicle.maintenance ?? const VehicleMaintenance();
+    final existingMaintenance =
+        vehicle.maintenance ?? const VehicleMaintenance();
     final updatedMaintenance = _applyExtensionToTypedField(
       existingMaintenance,
       category,
@@ -95,13 +102,19 @@ class ExtendVehicleMaintenanceUseCase {
     final s = serviceType.toLowerCase().trim();
     final c = category.toLowerCase().trim();
     if (s == c) return true;
-    
+
     // Normalize engine oil variants
-    final engineOilKeywords = ['engine oil', 'engine oil change', 'oil filter', 'engine oil & filter', 'engine_oil'];
+    final engineOilKeywords = [
+      'engine oil',
+      'engine oil change',
+      'oil filter',
+      'engine oil & filter',
+      'engine_oil',
+    ];
     if (engineOilKeywords.contains(s) && engineOilKeywords.contains(c)) {
       return true;
     }
-    
+
     // Normalize space vs underscore differences
     return s.replaceAll(' ', '_') == c.replaceAll(' ', '_');
   }
@@ -112,7 +125,11 @@ class ExtendVehicleMaintenanceUseCase {
     MaintenanceRecord updatedRecord,
   ) {
     final norm = category.toLowerCase().trim();
-    if (norm == 'engine oil' || norm == 'engine oil change' || norm == 'engine_oil' || norm.contains('engine oil') || norm == 'engine oil & filter') {
+    if (norm == 'engine oil' ||
+        norm == 'engine oil change' ||
+        norm == 'engine_oil' ||
+        norm.contains('engine oil') ||
+        norm == 'engine oil & filter') {
       return m.copyWith(engineOil: updatedRecord);
     }
     if (norm == 'gear oil' || norm == 'gear_oil') {
