@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_expiry_alert.dart';
 import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicle_expiry_alerts_usecase.dart';
 import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
+import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicle_followup_alerts_usecase.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'package:xloop_invoice/injection_container.dart';
 import 'package:xloop_invoice/core/widgets/modern_app_bar.dart';
@@ -40,6 +41,7 @@ class _VehicleExpiryTrackerScreenState
   bool _isLoading = true;
   List<VehicleExpiryAlert> _allAlerts = [];
   List<VehicleMaintenanceAlert> _allMaintenanceAlerts = [];
+  List<VehicleFollowUpAlert> _allFollowUpAlerts = [];
 
   List<dynamic> _filteredAlerts = [];
   String _selectedType = 'All';
@@ -69,9 +71,14 @@ class _VehicleExpiryTrackerScreenState
         maintenanceTypes: vehicleProvider.maintenanceTypes,
         includeAll: true,
       );
+      
+      final followUpUseCase = sl<GetVehicleFollowUpAlertsUseCase>();
+      _allFollowUpAlerts = followUpUseCase(
+        vehicles: vehicleProvider.vehicles,
+      );
 
       // Extract unique document types
-      final Set<String> types = {'All', 'Maintenance'};
+      final Set<String> types = {'All', 'Maintenance', 'Extended', 'Revisit'};
       for (var alert in alerts) {
         types.add(alert.documentType);
       }
@@ -100,6 +107,7 @@ class _VehicleExpiryTrackerScreenState
     if (_selectedType == 'All') {
       _filteredAlerts.addAll(_allAlerts);
       _filteredAlerts.addAll(_allMaintenanceAlerts);
+      _filteredAlerts.addAll(_allFollowUpAlerts);
     } else if (_selectedType == 'Maintenance') {
       if (_selectedSubMaintenanceType == 'All Maintenance') {
         _filteredAlerts.addAll(_allMaintenanceAlerts);
@@ -108,6 +116,10 @@ class _VehicleExpiryTrackerScreenState
           _allMaintenanceAlerts.where((a) => a.category == _selectedSubMaintenanceType),
         );
       }
+    } else if (_selectedType == 'Extended') {
+      _filteredAlerts.addAll(_allMaintenanceAlerts.where((a) => a.isExtended));
+    } else if (_selectedType == 'Revisit') {
+      _filteredAlerts.addAll(_allFollowUpAlerts);
     } else {
       _filteredAlerts.addAll(
         _allAlerts.where((a) => a.documentType == _selectedType),
@@ -129,6 +141,12 @@ class _VehicleExpiryTrackerScreenState
     } else if (alert is VehicleMaintenanceAlert) {
       return -alert
           .kmOverdue; // Positive kmOverdue becomes negative (more urgent)
+    } else if (alert is VehicleFollowUpAlert) {
+      // Prioritize past due dates, then closer dates
+      if (alert.nextServiceDate != null) {
+        return alert.nextServiceDate!.difference(DateTime.now()).inDays;
+      }
+      return 0; // Default to urgent if no date
     }
     return 0;
   }
@@ -159,6 +177,8 @@ class _VehicleExpiryTrackerScreenState
                             final alert = _filteredAlerts[i];
                             if (alert is VehicleExpiryAlert) {
                               return _VehicleExpiryCard(alert: alert);
+                            } else if (alert is VehicleFollowUpAlert) {
+                              return _VehicleFollowUpCard(alert: alert, onRefresh: _loadAlerts);
                             } else {
                               return _VehicleMaintenanceCard(
                                 alert: alert as VehicleMaintenanceAlert,
@@ -200,9 +220,13 @@ class _VehicleExpiryTrackerScreenState
                 final isSelected = _selectedType == type;
                 int count = 0;
                 if (type == 'All') {
-                  count = _allAlerts.length + _allMaintenanceAlerts.length;
+                  count = _allAlerts.length + _allMaintenanceAlerts.length + _allFollowUpAlerts.length;
                 } else if (type == 'Maintenance') {
                   count = _allMaintenanceAlerts.length;
+                } else if (type == 'Extended') {
+                  count = _allMaintenanceAlerts.where((a) => a.isExtended).length;
+                } else if (type == 'Revisit') {
+                  count = _allFollowUpAlerts.length;
                 } else {
                   count = _allAlerts
                       .where((a) => a.documentType == type)
@@ -676,13 +700,45 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        a.vehicle.plateNumber,
-                        style: GoogleFonts.inter(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w800,
-                          color: _DT.textPrimary,
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            a.vehicle.plateNumber,
+                            style: GoogleFonts.inter(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w800,
+                              color: _DT.textPrimary,
+                            ),
+                          ),
+                          if (a.isExtended) ...[
+                            SizedBox(width: 8.w),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 6.w,
+                                vertical: 2.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _DT.brand.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4.r),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.history_rounded, size: 10.sp, color: _DT.brand),
+                                  SizedBox(width: 4.w),
+                                  Text(
+                                    'EXTENDED',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.sp,
+                                      fontWeight: FontWeight.w700,
+                                      color: _DT.brand,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       SizedBox(height: 6.h),
                       Row(
@@ -774,6 +830,230 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
                   icon: Icon(Icons.build, size: 14.sp),
                   label: Text(
                     'Mark Replaced',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _DT.brand,
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _VehicleFollowUpCard extends StatefulWidget {
+  final VehicleFollowUpAlert alert;
+  final VoidCallback? onRefresh;
+  const _VehicleFollowUpCard({required this.alert, this.onRefresh});
+
+  @override
+  State<_VehicleFollowUpCard> createState() => _VehicleFollowUpCardState();
+}
+
+class _VehicleFollowUpCardState extends State<_VehicleFollowUpCard> {
+  bool _hovered = false;
+
+  void _markAsReplaced(BuildContext context) {
+    showDialog<bool>(
+      context: context,
+      builder: (context) => AddMaintenanceRecordDialog(
+        vehicle: widget.alert.vehicle,
+      ),
+    ).then((success) {
+      if (success == true && widget.onRefresh != null) {
+        widget.onRefresh!();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final a = widget.alert;
+    
+    // Determine urgency based on date if available
+    bool isOverdue = false;
+    bool isCritical = false;
+    if (a.nextServiceDate != null) {
+      final days = a.nextServiceDate!.difference(DateTime.now()).inDays;
+      isOverdue = days < 0;
+      isCritical = days >= 0 && days <= 15;
+    } else {
+      isCritical = true; // Urgent if only mileage or no date is set
+    }
+
+    final color = isOverdue
+        ? _DT.danger
+        : (isCritical ? _DT.warning : _DT.brand);
+    final bgColor = isOverdue
+        ? _DT.dangerBg
+        : (isCritical ? _DT.warningBg : Colors.white);
+    final borderColor = isOverdue
+        ? _DT.dangerBorder
+        : (isCritical ? _DT.warningBorder : _DT.border);
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: _hovered ? bgColor : Colors.white,
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(
+            color: _hovered ? color.withOpacity(0.5) : borderColor,
+          ),
+          boxShadow: [
+            if (_hovered)
+              BoxShadow(
+                color: color.withOpacity(0.1),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+          ],
+        ),
+        padding: EdgeInsets.all(16.w),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.handyman_rounded,
+                    color: color,
+                    size: 24.sp,
+                  ),
+                ),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            a.vehicle.plateNumber,
+                            style: GoogleFonts.inter(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w800,
+                              color: _DT.textPrimary,
+                            ),
+                          ),
+                          SizedBox(width: 8.w),
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 6.w,
+                              vertical: 2.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _DT.brand.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(4.r),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.sync_rounded, size: 10.sp, color: _DT.brand),
+                                SizedBox(width: 4.w),
+                                Text(
+                                  'REVISIT',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: _DT.brand,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 6.h),
+                      Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 8.w,
+                              vertical: 2.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: _DT.border,
+                              borderRadius: BorderRadius.circular(4.r),
+                            ),
+                            child: Text(
+                              a.reason,
+                              style: GoogleFonts.inter(
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w600,
+                                color: _DT.textSecondary,
+                              ),
+                            ),
+                          ),
+                          if (a.nextServiceDate != null) ...[
+                            SizedBox(width: 8.w),
+                            Text(
+                              'Due by: ${a.nextServiceDate!.toLocal().toString().split(' ')[0]}',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.sp,
+                                color: _DT.textSecondary,
+                              ),
+                            ),
+                          ],
+                          if (a.nextServiceMileage != null) ...[
+                            SizedBox(width: 8.w),
+                            Text(
+                              'Due at: ${a.nextServiceMileage} km',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.sp,
+                                color: _DT.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 16.w),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      isOverdue ? 'Overdue' : 'Follow Up',
+                      style: GoogleFonts.inter(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w800,
+                        color: color,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            SizedBox(height: 12.h),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () => _markAsReplaced(context),
+                  icon: Icon(Icons.build, size: 14.sp),
+                  label: Text(
+                    'Complete Revisit',
                     style: GoogleFonts.inter(
                       fontSize: 12.sp,
                       fontWeight: FontWeight.w600,

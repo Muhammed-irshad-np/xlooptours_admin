@@ -9,6 +9,7 @@ class VehicleMaintenanceAlert {
   final int lastServiceMileage;
   final int nextServiceMileage;
   final int kmOverdue;
+  final bool isExtended;
 
   VehicleMaintenanceAlert({
     required this.vehicle,
@@ -17,6 +18,7 @@ class VehicleMaintenanceAlert {
     required this.lastServiceMileage,
     required this.nextServiceMileage,
     required this.kmOverdue,
+    this.isExtended = false,
   });
 }
 
@@ -71,10 +73,12 @@ class GetVehicleMaintenanceAlertsUseCase {
         final lastService = entries.first;
 
         int nextDue = lastService.mileage + intervalKm;
+        bool isExt = false;
         if (lastService.originalRecord != null &&
             lastService.originalRecord!.isExtended == true &&
             lastService.originalRecord!.nextServiceMileage != null) {
           nextDue = lastService.originalRecord!.nextServiceMileage!;
+          isExt = true;
         }
 
         if (includeAll || currentMileage >= nextDue) {
@@ -86,6 +90,7 @@ class GetVehicleMaintenanceAlertsUseCase {
               lastServiceMileage: lastService.mileage,
               nextServiceMileage: nextDue,
               kmOverdue: currentMileage - nextDue,
+              isExtended: isExt,
             ),
           );
         }
