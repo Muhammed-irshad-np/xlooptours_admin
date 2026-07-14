@@ -108,6 +108,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         _SubNavItem(
           label: 'Analytics',
           icon: Icons.analytics_outlined,
+          adminOnly: true,
           onAction: (context) {
             context.push('/analytics');
           },
@@ -115,6 +116,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         _SubNavItem(
           label: 'Activity Logs',
           icon: Icons.history_outlined,
+          adminOnly: true,
           onAction: (context) {
             Navigator.push(
               context,
@@ -285,6 +287,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         _SubNavItem(
           label: 'Alert Settings',
           icon: Icons.notifications_active_outlined,
+          adminOnly: true,
           onAction: (context) {
             Navigator.push(
               context,
@@ -297,6 +300,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         _SubNavItem(
           label: 'Evaluate Driver',
           icon: Icons.star_outline_outlined,
+          adminOnly: true,
           onAction: (context) {
             Navigator.push(
               context,
@@ -309,6 +313,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         _SubNavItem(
           label: 'Feedback History',
           icon: Icons.rate_review_outlined,
+          adminOnly: true,
           onAction: (context) {
             Navigator.push(
               context,
@@ -349,6 +354,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         _SubNavItem(
           label: 'Alert Settings',
           icon: Icons.notifications_active_outlined,
+          adminOnly: true,
           onAction: (context) {
             Navigator.push(
               context,
@@ -361,6 +367,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         _SubNavItem(
           label: 'Vehicle Makes',
           icon: Icons.directions_car_filled_outlined,
+          adminOnly: true,
           onAction: (context) {
             Navigator.push(
               context,
@@ -371,6 +378,7 @@ class _AdminLayoutState extends State<AdminLayout> {
         _SubNavItem(
           label: 'Maintenance Types',
           icon: Icons.build_outlined,
+          adminOnly: true,
           onAction: (context) {
             Navigator.push(
               context,
@@ -755,11 +763,13 @@ class _SubNavItem {
   final String label;
   final IconData icon;
   final void Function(BuildContext) onAction;
+  final bool adminOnly;
 
   const _SubNavItem({
     required this.label,
     required this.icon,
     required this.onAction,
+    this.adminOnly = false,
   });
 }
 
@@ -855,6 +865,7 @@ class _Sidebar extends StatelessWidget {
                         activeBg: activeBg,
                         inactiveText: inactiveText,
                         badgeCount: provider.unreadCount,
+                        isAdmin: isAdmin,
                         onTap: () => onItemSelected(index),
                       );
                     },
@@ -867,6 +878,7 @@ class _Sidebar extends StatelessWidget {
                   brandBlue: brandBlue,
                   activeBg: activeBg,
                   inactiveText: inactiveText,
+                  isAdmin: isAdmin,
                   onTap: () => onItemSelected(index),
                 );
               },
@@ -997,6 +1009,7 @@ class _NavTile extends StatefulWidget {
   final Color activeBg;
   final Color inactiveText;
   final int badgeCount;
+  final bool isAdmin;
   final VoidCallback onTap;
 
   const _NavTile({
@@ -1006,6 +1019,7 @@ class _NavTile extends StatefulWidget {
     required this.activeBg,
     required this.inactiveText,
     this.badgeCount = 0,
+    this.isAdmin = false,
     required this.onTap,
   });
 
@@ -1029,8 +1043,10 @@ class _NavTileState extends State<_NavTile> {
         ? widget.activeBg
         : (_hovered ? widget.activeBg.withOpacity(0.5) : Colors.transparent);
 
-    final hasSubItems =
-        widget.item.subItems != null && widget.item.subItems!.isNotEmpty;
+    final filteredSubItems = widget.item.subItems
+        ?.where((sub) => widget.isAdmin || !sub.adminOnly)
+        .toList();
+    final hasSubItems = filteredSubItems != null && filteredSubItems.isNotEmpty;
 
     return Column(
       children: [
@@ -1116,7 +1132,7 @@ class _NavTileState extends State<_NavTile> {
                     margin: EdgeInsets.only(left: 36.w, bottom: 8.h),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: widget.item.subItems!.map((sub) {
+                      children: filteredSubItems.map((sub) {
                         return _SubNavTile(
                           item: sub,
                           brandBlue: widget.brandBlue,
