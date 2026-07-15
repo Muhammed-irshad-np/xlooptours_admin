@@ -261,7 +261,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
       actions: [
-        if (const String.fromEnvironment('ENV', defaultValue: 'prod') == 'dev') ...[
+        if (const String.fromEnvironment('ENV', defaultValue: 'prod') ==
+            'dev') ...[
           Padding(
             padding: EdgeInsets.only(right: 8.w),
             child: Container(
@@ -305,7 +306,10 @@ class _DashboardScreenState extends State<DashboardScreen>
                 },
                 borderRadius: BorderRadius.circular(20.r),
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 14.w,
+                    vertical: 8.h,
+                  ),
                   decoration: BoxDecoration(
                     color: _DT.brand.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20.r),
@@ -1104,6 +1108,38 @@ class _ExpiryCard extends StatefulWidget {
 
 class _ExpiryCardState extends State<_ExpiryCard> {
   bool _hovered = false;
+  bool _isExpanded = false;
+
+  VehicleMaintenanceAlert? _getMaintenanceAlert() {
+    if (!widget.alert.id.startsWith('maintenance_')) return null;
+    final relatedId = widget.alert.relatedId;
+    if (relatedId == null) return null;
+
+    final vehicleProvider = context.read<VehicleProvider>();
+    final vehicle = vehicleProvider.vehicles.cast<VehicleEntity?>().firstWhere(
+      (v) => v?.id == relatedId,
+      orElse: () => null,
+    );
+    if (vehicle == null) return null;
+
+    final prefix = 'maintenance_${relatedId}_';
+    final categoryEncoded = widget.alert.id.substring(prefix.length);
+    final category = categoryEncoded.replaceAll('_', ' ');
+
+    final maintenanceUseCase = sl<GetVehicleMaintenanceAlertsUseCase>();
+    final alerts = maintenanceUseCase(
+      vehicles: [vehicle],
+      maintenanceTypes: vehicleProvider.maintenanceTypes,
+      includeAll: true,
+    );
+    try {
+      return alerts.firstWhere(
+        (a) => a.category.toLowerCase() == category.toLowerCase(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
 
   void _extendAlert() {
     final relatedId = widget.alert.relatedId;
@@ -1143,10 +1179,8 @@ class _ExpiryCardState extends State<_ExpiryCard> {
 
     showDialog<bool>(
       context: context,
-      builder: (context) => MaintenanceExtensionDialog(
-        vehicle: vehicle,
-        alert: alert,
-      ),
+      builder: (context) =>
+          MaintenanceExtensionDialog(vehicle: vehicle, alert: alert),
     ).then((success) {
       if (success == true) {
         if (mounted) {
@@ -1167,8 +1201,123 @@ class _ExpiryCardState extends State<_ExpiryCard> {
     });
   }
 
+  Widget _buildTimelineStep({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required bool isLast,
+  }) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 24.w,
+                height: 24.w,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 14.sp, color: color),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 2.w,
+                    margin: EdgeInsets.symmetric(vertical: 4.h),
+                    decoration: BoxDecoration(
+                      color: _DT.border,
+                      borderRadius: BorderRadius.circular(1.r),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 16.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: _DT.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: _DT.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeline(VehicleMaintenanceAlert mAlert) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 16.h),
+        Divider(color: _DT.border, height: 1),
+        SizedBox(height: 16.h),
+        Text(
+          'Extension History',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w600,
+            fontSize: 13.sp,
+            color: _DT.textPrimary,
+          ),
+        ),
+        SizedBox(height: 16.h),
+        // Step 0: Original Due
+        _buildTimelineStep(
+          title: 'Originally Due',
+          subtitle: '${mAlert.originalDueMileage} km',
+          icon: Icons.flag_outlined,
+          color: _DT.textSecondary,
+          isLast: mAlert.extensionHistory.isEmpty,
+        ),
+        // Extensions
+        ...mAlert.extensionHistory.asMap().entries.map((entry) {
+          final index = entry.key;
+          final ext = entry.value;
+          final isLast = index == mAlert.extensionHistory.length - 1;
+
+          return _buildTimelineStep(
+            title:
+                'Extended by ${ext.extendedMileage ?? 0} km to ${ext.nextServiceMileage ?? 0} km',
+            subtitle:
+                '${DateFormat('MMM dd, yyyy').format(ext.date)} • By ${ext.performedBy ?? "Unknown"}\nReason: ${ext.notes ?? "No reason provided"}',
+            icon: Icons.history,
+            color: _DT.brand,
+            isLast: isLast,
+          );
+        }),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final mAlert = _getMaintenanceAlert();
+    final hasExtensions = mAlert != null && mAlert.extensionHistory.isNotEmpty;
+
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
@@ -1190,81 +1339,141 @@ class _ExpiryCardState extends State<_ExpiryCard> {
         ),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 14.h),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: EdgeInsets.all(10.w),
-                decoration: BoxDecoration(
-                  color: _DT.danger.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.error_outline_rounded,
-                  color: _DT.danger,
-                  size: 22.sp,
-                ),
-              ),
-              SizedBox(width: 14.w),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      widget.alert.title,
-                      style: GoogleFonts.inter(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14.sp,
-                        color: _DT.danger,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(10.w),
+                    decoration: BoxDecoration(
+                      color: _DT.danger.withOpacity(0.1),
+                      shape: BoxShape.circle,
                     ),
-                    SizedBox(height: 4.h),
-                    Text(
-                      widget.alert.message,
-                      style: GoogleFonts.inter(
-                        fontSize: 13.sp,
-                        color: _DT.danger.withOpacity(0.75),
+                    child: Icon(
+                      Icons.error_outline_rounded,
+                      color: _DT.danger,
+                      size: 22.sp,
+                    ),
+                  ),
+                  SizedBox(width: 14.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.alert.title,
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14.sp,
+                            color: _DT.danger,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          widget.alert.message,
+                          style: GoogleFonts.inter(
+                            fontSize: 13.sp,
+                            color: _DT.danger.withOpacity(0.75),
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (hasExtensions) ...[
+                          SizedBox(height: 8.h),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _isExpanded = !_isExpanded;
+                              });
+                            },
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 8.w,
+                                vertical: 4.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _DT.brand.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6.r),
+                                border: Border.all(
+                                  color: _DT.brand.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.history,
+                                    size: 12.sp,
+                                    color: _DT.brand,
+                                  ),
+                                  SizedBox(width: 4.w),
+                                  Text(
+                                    'Extended ${mAlert.extensionHistory.length} time${mAlert.extensionHistory.length > 1 ? 's' : ''}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: _DT.brand,
+                                    ),
+                                  ),
+                                  SizedBox(width: 2.w),
+                                  Icon(
+                                    _isExpanded
+                                        ? Icons.keyboard_arrow_up
+                                        : Icons.keyboard_arrow_down,
+                                    size: 14.sp,
+                                    color: _DT.brand,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 12.w),
+                  if (widget.alert.id.startsWith('maintenance_')) ...[
+                    OutlinedButton(
+                      onPressed: _extendAlert,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _DT.brand,
+                        side: const BorderSide(color: _DT.brand),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12.w,
+                          vertical: 8.h,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
                       ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
+                      child: Text(
+                        'Extend Alert',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+                    _ActionButton(
+                      label: 'Mark Completed',
+                      color: _DT.danger,
+                      onPressed: widget.onUpdate,
+                    ),
+                  ] else ...[
+                    _ActionButton(
+                      label: 'Update',
+                      color: _DT.danger,
+                      onPressed: widget.onUpdate,
                     ),
                   ],
-                ),
+                ],
               ),
-              SizedBox(width: 12.w),
-              if (widget.alert.id.startsWith('maintenance_')) ...[
-                OutlinedButton(
-                  onPressed: _extendAlert,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _DT.brand,
-                    side: const BorderSide(color: _DT.brand),
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                  ),
-                  child: Text(
-                    'Extend Alert',
-                    style: GoogleFonts.inter(
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 8.w),
-                _ActionButton(
-                  label: 'Mark Completed',
-                  color: _DT.danger,
-                  onPressed: widget.onUpdate,
-                ),
-              ] else ...[
-                _ActionButton(
-                  label: 'Update',
-                  color: _DT.danger,
-                  onPressed: widget.onUpdate,
-                ),
-              ],
+              if (_isExpanded && hasExtensions) _buildTimeline(mAlert!),
             ],
           ),
         ),
@@ -1323,7 +1532,10 @@ class _ActivityTile extends StatelessWidget {
                     if (activity.userName != null) ...[
                       SizedBox(width: 8.w),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 6.w,
+                          vertical: 2.h,
+                        ),
                         decoration: BoxDecoration(
                           color: _DT.borderLight,
                           borderRadius: BorderRadius.circular(4.r),

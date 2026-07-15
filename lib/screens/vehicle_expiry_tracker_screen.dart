@@ -12,6 +12,7 @@ import 'package:xloop_invoice/core/widgets/modern_app_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:xloop_invoice/widgets/add_maintenance_record_dialog.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/widgets/maintenance_extension_dialog.dart';
+import 'package:intl/intl.dart';
 
 class _DT {
   static const bgPage = Color(0xFFF4F6FB);
@@ -606,6 +607,7 @@ class _VehicleMaintenanceCard extends StatefulWidget {
 
 class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
   bool _hovered = false;
+  bool _isExpanded = false;
 
   void _extendAlert(BuildContext context) {
     showDialog<bool>(
@@ -712,29 +714,43 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
                           ),
                           if (a.isExtended) ...[
                             SizedBox(width: 8.w),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 6.w,
-                                vertical: 2.h,
-                              ),
-                              decoration: BoxDecoration(
-                                color: _DT.brand.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(4.r),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.history_rounded, size: 10.sp, color: _DT.brand),
-                                  SizedBox(width: 4.w),
-                                  Text(
-                                    'EXTENDED',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10.sp,
-                                      fontWeight: FontWeight.w700,
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _isExpanded = !_isExpanded;
+                                });
+                              },
+                              child: Container(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 6.w,
+                                  vertical: 2.h,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _DT.brand.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4.r),
+                                  border: Border.all(color: _DT.brand.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.history_rounded, size: 10.sp, color: _DT.brand),
+                                    SizedBox(width: 4.w),
+                                    Text(
+                                      'EXTENDED (${a.extensionHistory.length})',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: _DT.brand,
+                                      ),
+                                    ),
+                                    SizedBox(width: 2.w),
+                                    Icon(
+                                      _isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                                      size: 12.sp,
                                       color: _DT.brand,
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -846,9 +862,121 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
                 ),
               ],
             ),
+            if (_isExpanded && a.extensionHistory.isNotEmpty)
+              _buildTimeline(a),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTimelineStep({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color color,
+    required bool isLast,
+  }) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 24.w,
+                height: 24.w,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 14.sp, color: color),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 2.w,
+                    margin: EdgeInsets.symmetric(vertical: 4.h),
+                    decoration: BoxDecoration(
+                      color: _DT.border,
+                      borderRadius: BorderRadius.circular(1.r),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 16.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: GoogleFonts.inter(
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w600,
+                      color: _DT.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 4.h),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: _DT.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTimeline(VehicleMaintenanceAlert mAlert) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 16.h),
+        Divider(color: _DT.border, height: 1),
+        SizedBox(height: 16.h),
+        Text(
+          'Extension History',
+          style: GoogleFonts.inter(
+            fontWeight: FontWeight.w600, 
+            fontSize: 13.sp, 
+            color: _DT.textPrimary
+          ),
+        ),
+        SizedBox(height: 16.h),
+        // Step 0: Original Due
+        _buildTimelineStep(
+          title: 'Originally Due',
+          subtitle: '${mAlert.originalDueMileage} km',
+          icon: Icons.flag_outlined,
+          color: _DT.textSecondary,
+          isLast: mAlert.extensionHistory.isEmpty,
+        ),
+        // Extensions
+        ...mAlert.extensionHistory.asMap().entries.map((entry) {
+          final index = entry.key;
+          final ext = entry.value;
+          final isLast = index == mAlert.extensionHistory.length - 1;
+          
+          return _buildTimelineStep(
+            title: 'Extended by ${ext.extendedMileage ?? 0} km to ${ext.nextServiceMileage ?? 0} km',
+            subtitle: '${DateFormat('MMM dd, yyyy').format(ext.date)} • By ${ext.performedBy ?? "Unknown"}\nReason: ${ext.notes ?? "No reason provided"}',
+            icon: Icons.history,
+            color: _DT.brand,
+            isLast: isLast,
+          );
+        }),
+      ],
     );
   }
 }
