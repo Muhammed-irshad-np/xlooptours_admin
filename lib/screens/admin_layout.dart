@@ -33,6 +33,7 @@ import '../features/notifications/presentation/providers/notification_provider.d
 import '../features/xloop_vault/presentation/pages/vault_screen.dart';
 import '../features/xloop_vault/presentation/providers/vault_provider.dart';
 import 'companies_screen.dart';
+import '../features/finance/presentation/pages/finance_dashboard_page.dart';
 
 /// The main admin scaffold with a professional, dark-themed sidebar.
 class AdminLayout extends StatefulWidget {
@@ -56,6 +57,7 @@ class _AdminLayoutState extends State<AdminLayout> {
     const HomeScreen(), // Invoices
     const FeedbackHistoryScreen(), // Feedback
     const PendingEvaluationsScreen(), // Evaluations
+    const FinanceDashboardPage(),
   ];
 
   static const Color _sidebarBg = Color(0xFF0B0F1A);
@@ -681,6 +683,47 @@ class _AdminLayoutState extends State<AdminLayout> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const VehicleFormScreen()),
+            );
+          },
+        ),
+      ],
+    ),
+    // ── Finance ────────────────────────────────────────────────
+    _NavItem(
+      label: 'Finance',
+      icon: Icons.account_balance_outlined,
+      activeIcon: Icons.account_balance_rounded,
+      subItems: [
+        _SubNavItem(
+          label: 'Overview',
+          icon: Icons.analytics_outlined,
+          onAction: (context) {
+            // Screen handles overview
+          },
+        ),
+        _SubNavItem(
+          label: 'Share Driver Link',
+          icon: Icons.share_outlined,
+          onAction: (context) {
+            showDialog(
+              context: context,
+              builder: (_) => const ShareDialog(
+                title: 'Share Driver Expense Form',
+                url: '/driver-expense',
+              ),
+            );
+          },
+        ),
+        _SubNavItem(
+          label: 'Share Closing Link',
+          icon: Icons.share_outlined,
+          onAction: (context) {
+            showDialog(
+              context: context,
+              builder: (_) => const ShareDialog(
+                title: 'Share Daily Closing Form',
+                url: '/coordinator-closing',
+              ),
             );
           },
         ),

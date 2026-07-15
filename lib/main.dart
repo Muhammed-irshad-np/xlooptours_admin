@@ -22,6 +22,12 @@ import 'features/feedback/presentation/providers/feedback_provider.dart';
 import 'features/driver_evaluation/presentation/providers/admin_evaluation_provider.dart';
 import 'features/driver_evaluation/presentation/providers/driver_form_provider.dart';
 import 'features/driver_evaluation/presentation/pages/driver_web_form_screen.dart';
+import 'features/finance/presentation/providers/finance_provider.dart';
+import 'features/finance/presentation/providers/fund_account_provider.dart';
+import 'features/finance/presentation/providers/petty_cash_provider.dart';
+import 'features/finance/presentation/pages/finance_dashboard_page.dart';
+import 'features/finance/presentation/pages/driver_expense_form_page.dart';
+import 'features/finance/presentation/pages/coordinator_closing_form_page.dart';
 
 import 'screens/invoice_form_screen.dart';
 import 'screens/pdf_preview_screen.dart';
@@ -144,13 +150,15 @@ class _MyAppState extends State<MyApp> {
         final isRegistering = state.uri.path.startsWith('/register');
         final isFeedback = state.uri.path.startsWith('/feedback');
         final isEvaluate = state.uri.path.startsWith('/evaluate');
+        final isDriverExpense = state.uri.path.startsWith('/driver-expense');
+        final isCoordinatorClosing = state.uri.path.startsWith('/coordinator-closing');
         final isRoot = state.uri.path == '/';
 
         debugPrint(
           'GoRouter Redirect: path=${state.uri.path}, isLoggedIn=$isLoggedIn, isEvaluate=$isEvaluate, isRoot=$isRoot',
         );
 
-        if (isRegistering || isFeedback || isEvaluate) {
+        if (isRegistering || isFeedback || isEvaluate || isDriverExpense || isCoordinatorClosing) {
           return null;
         }
 
@@ -278,6 +286,18 @@ class _MyAppState extends State<MyApp> {
           path: '/expiries',
           builder: (context, state) => const ExpiriesListScreen(),
         ),
+        GoRoute(
+          path: '/finance',
+          builder: (context, state) => const FinanceDashboardPage(),
+        ),
+        GoRoute(
+          path: '/driver-expense',
+          builder: (context, state) => const DriverExpenseFormPage(),
+        ),
+        GoRoute(
+          path: '/coordinator-closing',
+          builder: (context, state) => const CoordinatorClosingFormPage(),
+        ),
       ],
     );
   }
@@ -298,6 +318,9 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => di.sl<FeedbackProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<AdminEvaluationProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<DriverFormProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<FinanceProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<FundAccountProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<PettyCashProvider>()),
       ],
       child: ScreenUtilInit(
         designSize: const Size(1440, 900),

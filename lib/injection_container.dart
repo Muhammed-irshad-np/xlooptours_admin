@@ -119,6 +119,39 @@ import 'features/driver_evaluation/domain/usecases/delete_evaluation_usecase.dar
 import 'features/driver_evaluation/presentation/providers/admin_evaluation_provider.dart';
 import 'features/driver_evaluation/presentation/providers/driver_form_provider.dart';
 
+import 'features/finance/data/datasources/finance_remote_data_source.dart';
+import 'features/finance/data/repositories/finance_repository_impl.dart';
+import 'features/finance/domain/repositories/finance_repository.dart';
+import 'features/finance/domain/usecases/get_all_expenses_usecase.dart';
+import 'features/finance/domain/usecases/get_expenses_by_date_range_usecase.dart';
+import 'features/finance/domain/usecases/get_expenses_by_account_usecase.dart';
+import 'features/finance/domain/usecases/insert_expense_usecase.dart';
+import 'features/finance/domain/usecases/update_expense_usecase.dart';
+import 'features/finance/domain/usecases/delete_expense_usecase.dart';
+import 'features/finance/domain/usecases/approve_expense_usecase.dart';
+import 'features/finance/domain/usecases/reject_expense_usecase.dart';
+import 'features/finance/domain/usecases/generate_reference_number_usecase.dart';
+import 'features/finance/domain/usecases/upload_receipt_usecase.dart';
+import 'features/finance/domain/usecases/get_all_fund_accounts_usecase.dart';
+import 'features/finance/domain/usecases/insert_fund_account_usecase.dart';
+import 'features/finance/domain/usecases/update_fund_account_usecase.dart';
+import 'features/finance/domain/usecases/delete_fund_account_usecase.dart';
+import 'features/finance/domain/usecases/get_transactions_usecase.dart';
+import 'features/finance/domain/usecases/insert_transaction_usecase.dart';
+import 'features/finance/domain/usecases/get_petty_cash_sessions_usecase.dart';
+import 'features/finance/domain/usecases/get_open_session_usecase.dart';
+import 'features/finance/domain/usecases/open_petty_cash_session_usecase.dart';
+import 'features/finance/domain/usecases/close_petty_cash_session_usecase.dart';
+import 'features/finance/domain/usecases/verify_petty_cash_session_usecase.dart';
+import 'features/finance/domain/usecases/upload_closing_sheet_usecase.dart';
+import 'features/finance/domain/usecases/get_expense_categories_usecase.dart';
+import 'features/finance/domain/usecases/insert_expense_category_usecase.dart';
+import 'features/finance/domain/usecases/update_expense_category_usecase.dart';
+import 'features/finance/domain/usecases/delete_expense_category_usecase.dart';
+import 'features/finance/presentation/providers/finance_provider.dart';
+import 'features/finance/presentation/providers/fund_account_provider.dart';
+import 'features/finance/presentation/providers/petty_cash_provider.dart';
+
 final sl = GetIt.instance; // sl stands for Service Locator
 
 Future<void> init() async {
@@ -468,6 +501,91 @@ Future<void> init() async {
   // Data sources
   sl.registerLazySingleton<EvaluationRemoteDataSource>(
     () => EvaluationRemoteDataSourceImpl(firestore: sl()),
+  );
+
+  //! Features - Finance
+  // State Management (Provider)
+  sl.registerFactory(
+    () => FinanceProvider(
+      getAllExpensesUseCase: sl(),
+      getExpensesByDateRangeUseCase: sl(),
+      getExpensesByAccountUseCase: sl(),
+      insertExpenseUseCase: sl(),
+      updateExpenseUseCase: sl(),
+      deleteExpenseUseCase: sl(),
+      approveExpenseUseCase: sl(),
+      rejectExpenseUseCase: sl(),
+      generateReferenceNumberUseCase: sl(),
+      uploadReceiptUseCase: sl(),
+      getExpenseCategoriesUseCase: sl(),
+      insertExpenseCategoryUseCase: sl(),
+      updateExpenseCategoryUseCase: sl(),
+      deleteExpenseCategoryUseCase: sl(),
+    ),
+  );
+  sl.registerFactory(
+    () => FundAccountProvider(
+      getAllFundAccountsUseCase: sl(),
+      insertFundAccountUseCase: sl(),
+      updateFundAccountUseCase: sl(),
+      deleteFundAccountUseCase: sl(),
+      getTransactionsUseCase: sl(),
+      insertTransactionUseCase: sl(),
+    ),
+  );
+  sl.registerFactory(
+    () => PettyCashProvider(
+      getPettyCashSessionsUseCase: sl(),
+      getOpenSessionUseCase: sl(),
+      openPettyCashSessionUseCase: sl(),
+      closePettyCashSessionUseCase: sl(),
+      verifyPettyCashSessionUseCase: sl(),
+      uploadClosingSheetUseCase: sl(),
+    ),
+  );
+
+  // UseCases - Expenses
+  sl.registerLazySingleton(() => GetAllExpensesUseCase(sl()));
+  sl.registerLazySingleton(() => GetExpensesByDateRangeUseCase(sl()));
+  sl.registerLazySingleton(() => GetExpensesByAccountUseCase(sl()));
+  sl.registerLazySingleton(() => InsertExpenseUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateExpenseUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteExpenseUseCase(sl()));
+  sl.registerLazySingleton(() => ApproveExpenseUseCase(sl()));
+  sl.registerLazySingleton(() => RejectExpenseUseCase(sl()));
+  sl.registerLazySingleton(() => GenerateReferenceNumberUseCase(sl()));
+  sl.registerLazySingleton(() => UploadReceiptUseCase(sl()));
+
+  // UseCases - Fund Accounts
+  sl.registerLazySingleton(() => GetAllFundAccountsUseCase(sl()));
+  sl.registerLazySingleton(() => InsertFundAccountUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateFundAccountUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteFundAccountUseCase(sl()));
+  sl.registerLazySingleton(() => GetTransactionsUseCase(sl()));
+  sl.registerLazySingleton(() => InsertTransactionUseCase(sl()));
+
+  // UseCases - Petty Cash
+  sl.registerLazySingleton(() => GetPettyCashSessionsUseCase(sl()));
+  sl.registerLazySingleton(() => GetOpenSessionUseCase(sl()));
+  sl.registerLazySingleton(() => OpenPettyCashSessionUseCase(sl()));
+  sl.registerLazySingleton(() => ClosePettyCashSessionUseCase(sl()));
+  sl.registerLazySingleton(() => VerifyPettyCashSessionUseCase(sl()));
+  sl.registerLazySingleton(() => UploadClosingSheetUseCase(sl()));
+
+  // UseCases - Expense Categories
+  sl.registerLazySingleton(() => GetExpenseCategoriesUseCase(sl()));
+  sl.registerLazySingleton(() => InsertExpenseCategoryUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateExpenseCategoryUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteExpenseCategoryUseCase(sl()));
+
+  // Repositories
+  sl.registerLazySingleton<FinanceRepository>(
+    () => FinanceRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data sources
+  sl.registerLazySingleton<FinanceRemoteDataSource>(
+    () => FinanceRemoteDataSourceImpl(firestore: sl(), storage: sl()),
   );
 
   //! Core
