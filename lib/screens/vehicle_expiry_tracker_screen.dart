@@ -938,6 +938,15 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
     );
   }
 
+  String _cleanReason(String? notes) {
+    if (notes == null) return "No reason provided";
+    const reasonMarker = "Reason: ";
+    if (notes.startsWith("Alert extended by") && notes.contains(reasonMarker)) {
+      return notes.substring(notes.indexOf(reasonMarker) + reasonMarker.length);
+    }
+    return notes;
+  }
+
   Widget _buildTimeline(VehicleMaintenanceAlert mAlert) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -970,7 +979,7 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
           
           return _buildTimelineStep(
             title: 'Extended by ${ext.extendedMileage ?? 0} km to ${ext.nextServiceMileage ?? 0} km',
-            subtitle: '${DateFormat('MMM dd, yyyy').format(ext.date)} • By ${ext.performedBy ?? "Unknown"}\nReason: ${ext.notes ?? "No reason provided"}',
+            subtitle: '${DateFormat('MMM dd, yyyy').format(ext.date)} • By ${ext.performedBy ?? "Unknown"}\nReason: ${_cleanReason(ext.notes)}',
             icon: Icons.history,
             color: _DT.brand,
             isLast: isLast,

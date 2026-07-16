@@ -72,7 +72,7 @@ class ExtendVehicleMaintenanceUseCase {
       date: DateTime.now(),
       mileage: currentOdometer,
       serviceType: 'Extension: $category',
-      notes: reason, // Only store the reason in notes
+      notes: 'Alert extended by $extensionKm km. New due mileage: $newAlertThreshold km. Reason: $reason',
       extendedMileage: extensionKm,
       nextServiceMileage: newAlertThreshold,
       cost: 0.0,
