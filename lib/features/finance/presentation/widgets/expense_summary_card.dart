@@ -1,23 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 
-/// Summary metric card for the finance dashboard.
+/// A modern summary card showing a financial metric with icon, value, and label.
+///
+/// Used on the finance dashboard for total expenses, pending count, etc.
 class ExpenseSummaryCard extends StatelessWidget {
-  final String title;
+  final String label;
   final String value;
-  final String? subtitle;
   final IconData icon;
-  final Color color;
+  final Color startColor;
+  final Color endColor;
+  final String? subtitle;
   final VoidCallback? onTap;
 
   const ExpenseSummaryCard({
     super.key,
-    required this.title,
+    required this.label,
     required this.value,
-    this.subtitle,
     required this.icon,
-    required this.color,
+    required this.startColor,
+    required this.endColor,
+    this.subtitle,
     this.onTap,
   });
 
@@ -26,56 +31,64 @@ class ExpenseSummaryCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: EdgeInsets.all(18.w),
+        padding: EdgeInsets.all(20.w),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14.r),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [startColor, endColor],
+          ),
+          borderRadius: BorderRadius.circular(16.r),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
+              color: startColor.withValues(alpha: 0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  padding: EdgeInsets.all(8.w),
+                  padding: EdgeInsets.all(10.w),
                   decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10.r),
+                    color: Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12.r),
                   ),
-                  child: Icon(icon, size: 20.sp, color: color),
+                  child: Icon(icon, color: Colors.white, size: 22.sp),
                 ),
                 if (onTap != null)
                   Icon(
-                    Icons.arrow_forward_ios,
-                    size: 12.sp,
-                    color: const Color(0xFF9CA3AF),
+                    Icons.arrow_forward_rounded,
+                    color: Colors.white.withValues(alpha: 0.6),
+                    size: 18.sp,
                   ),
               ],
             ),
-            SizedBox(height: 14.h),
+            SizedBox(height: 16.h),
             Text(
               value,
               style: GoogleFonts.inter(
-                fontSize: 24.sp,
+                fontSize: 22.sp,
                 fontWeight: FontWeight.w700,
-                color: const Color(0xFF111827),
+                color: Colors.white,
+                height: 1.1,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             SizedBox(height: 4.h),
             Text(
-              title,
+              label,
               style: GoogleFonts.inter(
                 fontSize: 12.sp,
-                color: const Color(0xFF6B7280),
+                fontWeight: FontWeight.w500,
+                color: Colors.white.withValues(alpha: 0.8),
               ),
             ),
             if (subtitle != null) ...[
@@ -83,8 +96,9 @@ class ExpenseSummaryCard extends StatelessWidget {
               Text(
                 subtitle!,
                 style: GoogleFonts.inter(
-                  fontSize: 11.sp,
-                  color: const Color(0xFF9CA3AF),
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.white.withValues(alpha: 0.6),
                 ),
               ),
             ],
@@ -92,5 +106,11 @@ class ExpenseSummaryCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// Helper to format a number as currency.
+  static String formatCurrency(double amount, {String currency = 'SAR'}) {
+    final formatter = NumberFormat('#,##0.00', 'en_US');
+    return '${formatter.format(amount)} $currency';
   }
 }

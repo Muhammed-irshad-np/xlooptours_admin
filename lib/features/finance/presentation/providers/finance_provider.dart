@@ -355,10 +355,8 @@ class FinanceProvider with ChangeNotifier {
 
   /// Returns expense types for a given category name.
   List<ExpenseTypeEntity> getTypesForCategory(String categoryName) {
-    final category = _categories.firstWhere(
-      (c) => c.name == categoryName,
-      orElse: () => ExpenseCategoryEntity.empty(),
-    );
-    return category.expenseTypes.where((t) => t.isActive).toList();
+    final index = _categories.indexWhere((c) => c.name == categoryName);
+    if (index == -1) return [];
+    return _categories[index].expenseTypes.where((t) => t.isActive).toList();
   }
 }

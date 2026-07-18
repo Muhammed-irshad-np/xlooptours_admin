@@ -12,6 +12,7 @@ import 'feedback_history_screen.dart';
 import '../features/driver_evaluation/presentation/pages/pending_evaluations_screen.dart';
 import 'employee_form_screen.dart';
 import 'employee_expiry_tracker_screen.dart';
+import '../features/finance/presentation/pages/finance_dashboard_page.dart';
 import 'employee_expiry_alert_settings_screen.dart';
 import 'vehicle_form_screen.dart';
 import 'vehicle_expiry_tracker_screen.dart';
@@ -33,7 +34,6 @@ import '../features/notifications/presentation/providers/notification_provider.d
 import '../features/xloop_vault/presentation/pages/vault_screen.dart';
 import '../features/xloop_vault/presentation/providers/vault_provider.dart';
 import 'companies_screen.dart';
-import '../features/finance/presentation/pages/finance_dashboard_page.dart';
 
 /// The main admin scaffold with a professional, dark-themed sidebar.
 class AdminLayout extends StatefulWidget {
@@ -688,21 +688,20 @@ class _AdminLayoutState extends State<AdminLayout> {
         ),
       ],
     ),
-    // ── Finance ────────────────────────────────────────────────
     _NavItem(
       label: 'Finance',
-      icon: Icons.account_balance_outlined,
-      activeIcon: Icons.account_balance_rounded,
+      icon: Icons.payments_outlined,
+      activeIcon: Icons.payments,
       subItems: [
         _SubNavItem(
           label: 'Overview',
-          icon: Icons.analytics_outlined,
+          icon: Icons.dashboard_outlined,
           onAction: (context) {
-            // Screen handles overview
+            // Handled by selecting index
           },
         ),
         _SubNavItem(
-          label: 'Share Driver Link',
+          label: 'Share Expense Form',
           icon: Icons.share_outlined,
           onAction: (context) {
             showDialog(
@@ -715,13 +714,13 @@ class _AdminLayoutState extends State<AdminLayout> {
           },
         ),
         _SubNavItem(
-          label: 'Share Closing Link',
+          label: 'Share Closing Form',
           icon: Icons.share_outlined,
           onAction: (context) {
             showDialog(
               context: context,
               builder: (_) => const ShareDialog(
-                title: 'Share Daily Closing Form',
+                title: 'Share Petty Cash Closing Form',
                 url: '/coordinator-closing',
               ),
             );

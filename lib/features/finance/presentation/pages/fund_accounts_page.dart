@@ -2,18 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
-
-import 'package:xloop_invoice/features/finance/domain/entities/fund_account_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/fund_transaction_entity.dart';
-import 'package:xloop_invoice/features/finance/presentation/providers/fund_account_provider.dart';
-import 'package:xloop_invoice/features/finance/presentation/widgets/fund_account_card.dart';
-import 'package:xloop_invoice/features/finance/presentation/widgets/transaction_timeline.dart';
-import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
+import '../providers/fund_account_provider.dart';
+import '../widgets/fund_account_card.dart';
+import '../widgets/currency_display.dart';
+import '../../domain/entities/fund_account_entity.dart';
+import 'finance_dashboard_page.dart';
 
-/// Page to manage virtual fund accounts (e.g. Petty Cash, Driver Accounts, STC Pay)
-/// and their financial transaction history.
+/// Screen for managing virtual fund accounts and viewing transaction history.
 class FundAccountsPage extends StatefulWidget {
   const FundAccountsPage({super.key});
 
@@ -25,550 +24,666 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
   @override
   void initState() {
     super.initState();
-    // Load accounts initially
+    // Fetch accounts and select the first one by default if not already selected
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final fap = context.read<FundAccountProvider>();
-      fap.fetchAllAccounts().then((_) {
-        if (fap.accounts.isNotEmpty && fap.selectedAccountId == null) {
-          fap.selectAccount(fap.accounts.first.id);
+      final provider = context.read<FundAccountProvider>();
+      provider.fetchAllAccounts().then((_) {
+        if (provider.activeAccounts.isNotEmpty &&
+            provider.selectedAccountId == null) {
+          provider.selectAccount(provider.activeAccounts.first.id);
         }
       });
     });
   }
 
-  void _showAddAccountDialog(BuildContext context) {
-    final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController();
-    final codeController = TextEditingController();
-    final balanceController = TextEditingController(text: '0.0');
-    FundAccountType selectedType = FundAccountType.pettyCash;
-    String selectedCurrency = 'SAR';
-    String? selectedEmployeeId;
-    String? selectedEmployeeName;
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<FundAccountProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.accounts.isEmpty) {
+          return _buildLoading();
+        }
 
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final employeeProvider = ctx.watch<EmployeeProvider>();
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
-          title: Text('Create Fund Account', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildTextField(nameController, 'Account Name', validator: (v) => v!.isEmpty ? 'Enter name' : null),
-                  SizedBox(height: 12.h),
-                  _buildTextField(codeController, 'Code (e.g., PETTY ACC#001)', validator: (v) => v!.isEmpty ? 'Enter code' : null),
-                  SizedBox(height: 12.h),
-                  _buildDropdownField<FundAccountType>(
-                    label: 'Type',
-                    value: selectedType,
-                    items: FundAccountType.values.map((t) => DropdownMenuItem(value: t, child: Text(t.displayName))).toList(),
-                    onChanged: (v) {
-                      if (v != null) selectedType = v;
-                    },
-                  ),
-                  SizedBox(height: 12.h),
-                  Row(
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Left Column: Accounts List
+            Expanded(flex: 4, child: _buildAccountsColumn(context, provider)),
+            SizedBox(width: 24.w),
+
+            // Right Column: Details & Transaction Log
+            Expanded(flex: 5, child: _buildDetailsColumn(context, provider)),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildLoading() {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 40.h),
+      child: const Center(child: CircularProgressIndicator(color: FinDT.brand)),
+    );
+  }
+
+  Widget _buildAccountsColumn(
+    BuildContext context,
+    FundAccountProvider provider,
+  ) {
+    final active = provider.activeAccounts;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Virtual Accounts',
+              style: GoogleFonts.inter(
+                fontSize: 16.sp,
+                fontWeight: FontWeight.w700,
+                color: FinDT.textPrimary,
+              ),
+            ),
+            _buildCreateAccountButton(context, provider),
+          ],
+        ),
+        SizedBox(height: 16.h),
+        if (active.isEmpty)
+          _buildEmptyAccounts()
+        else
+          GridView.builder(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 16.w,
+              mainAxisSpacing: 16.h,
+              childAspectRatio: 1.35,
+            ),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: active.length,
+            itemBuilder: (context, index) {
+              final account = active[index];
+              final isSelected = provider.selectedAccountId == account.id;
+              return FundAccountCard(
+                account: account,
+                isSelected: isSelected,
+                onTap: () => provider.selectAccount(account.id),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyAccounts() {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(40.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: FinDT.border),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.account_balance_wallet_outlined,
+            size: 40.sp,
+            color: FinDT.textMuted,
+          ),
+          SizedBox(height: 16.h),
+          Text(
+            'No accounts created yet',
+            style: GoogleFonts.inter(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w600,
+              color: FinDT.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCreateAccountButton(
+    BuildContext context,
+    FundAccountProvider provider,
+  ) {
+    return ElevatedButton.icon(
+      onPressed: () => _showAccountFormDialog(context, provider),
+      icon: Icon(Icons.add, size: 16.sp),
+      label: Text(
+        'Add Account',
+        style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
+      ),
+      style: ElevatedButton.styleFrom(
+        foregroundColor: Colors.white,
+        backgroundColor: FinDT.brand,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10.r),
+        ),
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+      ),
+    );
+  }
+
+  Widget _buildDetailsColumn(
+    BuildContext context,
+    FundAccountProvider provider,
+  ) {
+    final selected = provider.selectedAccount;
+    if (selected == null) {
+      return Container(
+        padding: EdgeInsets.all(24.w),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: FinDT.border),
+        ),
+        child: Center(
+          child: Text(
+            'Select an account to view details & transactions',
+            style: GoogleFonts.inter(
+              fontSize: 13.sp,
+              color: FinDT.textSecondary,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: FinDT.border),
+        boxShadow: [
+          BoxShadow(
+            color: FinDT.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header of details card
+          Padding(
+            padding: EdgeInsets.all(20.w),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        flex: 2,
-                        child: _buildTextField(
-                          balanceController,
-                          'Initial Balance',
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                      Text(
+                        selected.name,
+                        style: GoogleFonts.inter(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w700,
+                          color: FinDT.textPrimary,
                         ),
                       ),
-                      SizedBox(width: 12.w),
-                      Expanded(
-                        flex: 1,
-                        child: _buildDropdownField<String>(
-                          label: 'Currency',
-                          value: selectedCurrency,
-                          items: const [
-                            DropdownMenuItem(value: 'SAR', child: Text('SAR')),
-                            DropdownMenuItem(value: 'BHD', child: Text('BHD')),
-                          ],
-                          onChanged: (v) {
-                            if (v != null) selectedCurrency = v;
-                          },
+                      SizedBox(height: 2.h),
+                      Text(
+                        '${selected.code} • ${selected.type.displayName}',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          color: FinDT.textSecondary,
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 12.h),
-                  _buildDropdownField<String>(
-                    label: 'Assign To Employee (Optional)',
-                    value: selectedEmployeeId,
-                    items: employeeProvider.employees.map((e) => DropdownMenuItem(value: e.id, child: Text(e.fullName))).toList(),
-                    onChanged: (v) {
-                      selectedEmployeeId = v;
-                      if (v != null) {
-                        selectedEmployeeName = employeeProvider.employees.firstWhere((e) => e.id == v).fullName;
-                      }
-                    },
+                ),
+                _buildDetailsActions(context, provider, selected),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: FinDT.borderLight),
+
+          // Deposit / Withdrawal buttons
+          Padding(
+            padding: EdgeInsets.all(20.w),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _buildTransactionActionBtn(
+                    context: context,
+                    provider: provider,
+                    account: selected,
+                    isDeposit: true,
                   ),
-                ],
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: _buildTransactionActionBtn(
+                    context: context,
+                    provider: provider,
+                    account: selected,
+                    isDeposit: false,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: FinDT.borderLight),
+
+          // Transaction Timeline List
+          Padding(
+            padding: EdgeInsets.all(20.w),
+            child: Text(
+              'Transaction History',
+              style: GoogleFonts.inter(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w700,
+                color: FinDT.textPrimary,
               ),
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF6B7280))),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (!formKey.currentState!.validate()) return;
-                final newAccount = FundAccountEntity(
-                  id: const Uuid().v4(),
-                  name: nameController.text.trim(),
-                  code: codeController.text.trim(),
-                  type: selectedType,
-                  currentBalance: double.tryParse(balanceController.text) ?? 0.0,
-                  currency: selectedCurrency,
-                  assignedTo: selectedEmployeeName,
-                  assignedToId: selectedEmployeeId,
-                  createdAt: DateTime.now(),
-                );
-                context.read<FundAccountProvider>().insertAccount(newAccount);
-                Navigator.pop(ctx);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-                foregroundColor: Colors.white,
+          if (provider.isTransactionsLoading)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 40.h),
+              child: const Center(
+                child: CircularProgressIndicator(color: FinDT.brand),
               ),
-              child: Text('Create', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _showTransactionDialog(BuildContext context, FundTransactionType type) {
-    final formKey = GlobalKey<FormState>();
-    final amountController = TextEditingController();
-    final descriptionController = TextEditingController();
-    String? selectedDestAccountId;
-
-    final provider = context.read<FundAccountProvider>();
-    final account = provider.selectedAccount;
-    if (account == null) return;
-
-    showDialog(
-      context: context,
-      builder: (ctx) {
-        final fap = ctx.watch<FundAccountProvider>();
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14.r)),
-          title: Text(
-            type == FundTransactionType.deposit
-                ? 'Record Deposit'
-                : type == FundTransactionType.withdrawal
-                    ? 'Record Withdrawal'
-                    : 'Record Transfer',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-          ),
-          content: Form(
-            key: formKey,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Source Account: ${account.name} (${account.currentBalance} ${account.currency})',
-                    style: GoogleFonts.inter(fontSize: 12.sp, color: const Color(0xFF6B7280)),
+            )
+          else if (provider.transactions.isEmpty)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 40.h),
+              child: Center(
+                child: Text(
+                  'No transactions recorded yet',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.sp,
+                    color: FinDT.textSecondary,
                   ),
-                  SizedBox(height: 16.h),
-                  _buildTextField(
-                    amountController,
-                    'Amount',
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                    validator: (v) {
-                      if (v!.isEmpty) return 'Enter amount';
-                      final val = double.tryParse(v);
-                      if (val == null || val <= 0) return 'Enter a positive amount';
-                      if (type != FundTransactionType.deposit && val > account.currentBalance) {
-                        return 'Insufficient balance';
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 12.h),
-                  if (type == FundTransactionType.transfer) ...[
-                    _buildDropdownField<String>(
-                      label: 'Destination Account',
-                      value: selectedDestAccountId,
-                      items: fap.activeAccounts
-                          .where((a) => a.id != account.id)
-                          .map((a) => DropdownMenuItem(value: a.id, child: Text('${a.name} (${a.currency})')))
-                          .toList(),
-                      onChanged: (v) {
-                        selectedDestAccountId = v;
-                      },
-                      validator: (v) => v == null ? 'Select destination' : null,
-                    ),
-                    SizedBox(height: 12.h),
-                  ],
-                  _buildTextField(
-                    descriptionController,
-                    'Description / Ref ID',
-                    validator: (v) => v!.isEmpty ? 'Enter description' : null,
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: GoogleFonts.inter(color: const Color(0xFF6B7280))),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-                final double amount = double.parse(amountController.text);
-                final desc = descriptionController.text.trim();
-                final now = DateTime.now();
-
-                if (type == FundTransactionType.transfer) {
-                  final destAccount = provider.getAccountById(selectedDestAccountId!);
-                  if (destAccount == null) return;
-
-                  // Record Outflow from source
-                  final txOut = FundTransactionEntity(
-                    id: const Uuid().v4(),
-                    fundAccountId: account.id,
-                    type: FundTransactionType.transfer,
-                    amount: amount,
-                    currency: account.currency,
-                    description: 'Transfer to ${destAccount.name}: $desc',
-                    transferToAccountId: destAccount.id,
-                    performedBy: 'ADMIN',
-                    date: now,
-                    createdAt: now,
-                    balanceBefore: account.currentBalance,
-                    balanceAfter: account.currentBalance - amount,
-                  );
-
-                  // Record Inflow to destination
-                  final txIn = FundTransactionEntity(
-                    id: const Uuid().v4(),
-                    fundAccountId: destAccount.id,
-                    type: FundTransactionType.transfer,
-                    amount: amount,
-                    currency: destAccount.currency,
-                    description: 'Transfer from ${account.name}: $desc',
-                    performedBy: 'ADMIN',
-                    date: now,
-                    createdAt: now,
-                    balanceBefore: destAccount.currentBalance,
-                    balanceAfter: destAccount.currentBalance + amount,
-                  );
-
-                  await provider.recordTransaction(txOut);
-                  await provider.recordTransaction(txIn);
-                } else {
-                  final double balanceAfter = type == FundTransactionType.deposit
-                      ? account.currentBalance + amount
-                      : account.currentBalance - amount;
-
-                  final tx = FundTransactionEntity(
-                    id: const Uuid().v4(),
-                    fundAccountId: account.id,
-                    type: type,
-                    amount: amount,
-                    currency: account.currency,
-                    description: desc,
-                    performedBy: 'ADMIN',
-                    date: now,
-                    createdAt: now,
-                    balanceBefore: account.currentBalance,
-                    balanceAfter: balanceAfter,
-                  );
-
-                  await provider.recordTransaction(tx);
-                }
-
-                if (context.mounted) Navigator.pop(ctx);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10B981),
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Record', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<FundAccountProvider>(
-      builder: (context, fap, _) {
-        final selectedAccount = fap.selectedAccount;
-
-        return Row(
-          children: [
-            // Left Panel (Accounts List)
-            Expanded(
-              flex: 2,
-              child: Container(
-                color: const Color(0xFFF9FAFB),
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.all(20.w),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Virtual Accounts',
-                            style: GoogleFonts.inter(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF111827),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: provider.transactions.length,
+              separatorBuilder: (_, __) =>
+                  Divider(height: 1, color: FinDT.borderLight),
+              itemBuilder: (context, index) {
+                final tx = provider.transactions[index];
+                final isDeposit = tx.type == FundTransactionType.deposit;
+                return Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 20.w,
+                    vertical: 14.h,
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(8.w),
+                        decoration: BoxDecoration(
+                          color: isDeposit
+                              ? FinDT.success.withValues(alpha: 0.08)
+                              : FinDT.danger.withValues(alpha: 0.08),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          isDeposit
+                              ? Icons.add_circle_outline
+                              : Icons.remove_circle_outline,
+                          color: isDeposit ? FinDT.success : FinDT.danger,
+                          size: 16.sp,
+                        ),
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              tx.description,
+                              style: GoogleFonts.inter(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w600,
+                                color: FinDT.textPrimary,
+                              ),
                             ),
+                            SizedBox(height: 2.h),
+                            Text(
+                              '${DateFormat('dd MMM yy, hh:mm a').format(tx.date)} • By ${tx.performedBy}',
+                              style: GoogleFonts.inter(
+                                fontSize: 10.sp,
+                                color: FinDT.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          CurrencyDisplay(
+                            amount: tx.amount,
+                            currency: tx.currency,
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w700,
+                            color: isDeposit ? FinDT.success : FinDT.danger,
                           ),
-                          ElevatedButton.icon(
-                            onPressed: () => _showAddAccountDialog(context),
-                            icon: const Icon(Icons.add, size: 16),
-                            label: Text('Create Account', style: GoogleFonts.inter(fontSize: 12.sp)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF10B981),
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                          SizedBox(height: 2.h),
+                          Text(
+                            'Bal: ${tx.balanceAfter.toStringAsFixed(2)}',
+                            style: GoogleFonts.inter(
+                              fontSize: 9.sp,
+                              color: FinDT.textMuted,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    Expanded(
-                      child: fap.isLoading
-                          ? const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)))
-                          : ListView.builder(
-                              padding: EdgeInsets.symmetric(horizontal: 20.w),
-                              itemCount: fap.accounts.length,
-                              itemBuilder: (ctx, index) {
-                                final account = fap.accounts[index];
-                                return Padding(
-                                  padding: EdgeInsets.only(bottom: 12.h),
-                                  child: FundAccountCard(
-                                    account: account,
-                                    isSelected: account.id == fap.selectedAccountId,
-                                    onTap: () => fap.selectAccount(account.id),
-                                  ),
-                                );
-                              },
-                            ),
-                    ),
-                  ],
+                    ],
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailsActions(
+    BuildContext context,
+    FundAccountProvider provider,
+    FundAccountEntity selected,
+  ) {
+    return Row(
+      children: [
+        IconButton(
+          onPressed: () =>
+              _showAccountFormDialog(context, provider, account: selected),
+          icon: Icon(
+            Icons.edit_outlined,
+            size: 18.sp,
+            color: FinDT.textSecondary,
+          ),
+          tooltip: 'Edit Account',
+        ),
+        IconButton(
+          onPressed: () => _confirmDeleteAccount(context, provider, selected),
+          icon: Icon(Icons.delete_outline, size: 18.sp, color: FinDT.danger),
+          tooltip: 'Delete Account',
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTransactionActionBtn({
+    required BuildContext context,
+    required FundAccountProvider provider,
+    required FundAccountEntity account,
+    required bool isDeposit,
+  }) {
+    final color = isDeposit ? FinDT.success : FinDT.danger;
+    return OutlinedButton.icon(
+      onPressed: () =>
+          _showTransactionDialog(context, provider, account, isDeposit),
+      icon: Icon(
+        isDeposit ? Icons.add_rounded : Icons.remove_rounded,
+        size: 14.sp,
+      ),
+      label: Text(isDeposit ? 'Deposit Cash' : 'Withdraw Cash'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: color,
+        side: BorderSide(color: color.withValues(alpha: 0.5)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10.r),
+        ),
+        padding: EdgeInsets.symmetric(vertical: 12.h),
+        textStyle: GoogleFonts.inter(
+          fontSize: 12.sp,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  // ─── Dialogs & Actions ──────────────────────────────────────
+
+  void _showAccountFormDialog(
+    BuildContext context,
+    FundAccountProvider provider, {
+    FundAccountEntity? account,
+  }) {
+    final isEditing = account != null;
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController(text: account?.name);
+    final codeCtrl = TextEditingController(text: account?.code);
+    final assignedCtrl = TextEditingController(text: account?.assignedTo);
+    FundAccountType selectedType = account?.type ?? FundAccountType.pettyCash;
+    String currency = account?.currency ?? 'SAR';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isEditing ? 'Edit Account' : 'New Fund Account'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'Account Name *'),
+                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+              ),
+              SizedBox(height: 12.h),
+              TextFormField(
+                controller: codeCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Account Code *',
+                  hintText: 'e.g., PETTY ACC#001',
+                ),
+                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+              ),
+              SizedBox(height: 12.h),
+              DropdownButtonFormField<FundAccountType>(
+                value: selectedType,
+                decoration: const InputDecoration(labelText: 'Account Type'),
+                items: FundAccountType.values
+                    .map(
+                      (t) => DropdownMenuItem(
+                        value: t,
+                        child: Text(t.displayName),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) => selectedType = v ?? FundAccountType.pettyCash,
+              ),
+              SizedBox(height: 12.h),
+              DropdownButtonFormField<String>(
+                value: currency,
+                decoration: const InputDecoration(labelText: 'Currency'),
+                items: ['SAR', 'BHD', 'AED', 'USD']
+                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                    .toList(),
+                onChanged: (v) => currency = v ?? 'SAR',
+              ),
+              SizedBox(height: 12.h),
+              TextFormField(
+                controller: assignedCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Assigned Coordinator',
+                  hintText: 'Employee name (optional)',
                 ),
               ),
-            ),
-            // Divider
-            const VerticalDivider(width: 1, color: Color(0xFFE5E7EB)),
-            // Right Panel (Transaction History & Actions)
-            Expanded(
-              flex: 3,
-              child: Container(
-                color: Colors.white,
-                child: selectedAccount == null
-                    ? Center(
-                        child: Text(
-                          'Select an account to view transactions',
-                          style: GoogleFonts.inter(color: const Color(0xFF9CA3AF), fontSize: 13.sp),
-                        ),
-                      )
-                    : SingleChildScrollView(
-                        padding: EdgeInsets.all(24.w),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      selectedAccount.name,
-                                      style: GoogleFonts.inter(fontSize: 18.sp, fontWeight: FontWeight.w700),
-                                    ),
-                                    Text(
-                                      'Code: ${selectedAccount.code}',
-                                      style: GoogleFonts.inter(fontSize: 12.sp, color: const Color(0xFF9CA3AF)),
-                                    ),
-                                  ],
-                                ),
-                                // Edit/Archive Account Actions
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit_outlined),
-                                      onPressed: () {
-                                        // Edit Account metadata if needed
-                                      },
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.archive_outlined),
-                                      onPressed: () {
-                                        fap.updateAccount(selectedAccount.copyWith(isActive: !selectedAccount.isActive));
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 24.h),
-                            // Quick Action Buttons
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _ActionBtn(
-                                    label: 'Deposit',
-                                    icon: Icons.add_circle_outline,
-                                    color: const Color(0xFF10B981),
-                                    onTap: () => _showTransactionDialog(context, FundTransactionType.deposit),
-                                  ),
-                                ),
-                                SizedBox(width: 12.w),
-                                Expanded(
-                                  child: _ActionBtn(
-                                    label: 'Withdraw',
-                                    icon: Icons.remove_circle_outline,
-                                    color: const Color(0xFFEF4444),
-                                    onTap: () => _showTransactionDialog(context, FundTransactionType.withdrawal),
-                                  ),
-                                ),
-                                SizedBox(width: 12.w),
-                                Expanded(
-                                  child: _ActionBtn(
-                                    label: 'Transfer',
-                                    icon: Icons.swap_horiz,
-                                    color: const Color(0xFF3B82F6),
-                                    onTap: () => _showTransactionDialog(context, FundTransactionType.transfer),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 32.h),
-                            Text(
-                              'Transaction History',
-                              style: GoogleFonts.inter(fontSize: 14.sp, fontWeight: FontWeight.w700),
-                            ),
-                            SizedBox(height: 16.h),
-                            fap.isTransactionsLoading
-                                ? const Center(child: CircularProgressIndicator(color: Color(0xFF10B981)))
-                                : TransactionTimeline(transactions: fap.transactions),
-                          ],
-                        ),
-                      ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              final acc = FundAccountEntity(
+                id: isEditing ? account.id : const Uuid().v4(),
+                name: nameCtrl.text,
+                code: codeCtrl.text,
+                type: selectedType,
+                currency: currency,
+                assignedTo: assignedCtrl.text.isEmpty
+                    ? null
+                    : assignedCtrl.text,
+                currentBalance: isEditing ? account.currentBalance : 0.0,
+                createdAt: isEditing ? account.createdAt : DateTime.now(),
+              );
+
+              if (isEditing) {
+                provider.updateAccount(acc);
+              } else {
+                provider.insertAccount(acc);
+              }
+              Navigator.pop(ctx);
+            },
+            style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
+            child: Text(isEditing ? 'Save' : 'Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showTransactionDialog(
+    BuildContext context,
+    FundAccountProvider provider,
+    FundAccountEntity account,
+    bool isDeposit,
+  ) {
+    final formKey = GlobalKey<FormState>();
+    final amountCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(isDeposit ? 'Deposit Cash' : 'Withdraw Cash'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Account: ${account.name} (${account.code})',
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  color: FinDT.textSecondary,
+                ),
               ),
+              SizedBox(height: 16.h),
+              TextFormField(
+                controller: amountCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                ],
+                decoration: const InputDecoration(
+                  labelText: 'Amount *',
+                  suffixText: 'SAR',
+                ),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Required';
+                  final val = double.tryParse(v);
+                  if (val == null || val <= 0) return 'Invalid amount';
+                  if (!isDeposit && val > account.currentBalance) {
+                    return 'Insufficient balance';
+                  }
+                  return null;
+                },
+              ),
+              SizedBox(height: 12.h),
+              TextFormField(
+                controller: descCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Description / Purpose *',
+                  hintText: 'e.g., Seed petty cash fund, bank withdrawal',
+                ),
+                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (!formKey.currentState!.validate()) return;
+              final amount = double.parse(amountCtrl.text);
+              final balanceBefore = account.currentBalance;
+              final balanceAfter = isDeposit
+                  ? balanceBefore + amount
+                  : balanceBefore - amount;
+
+              final tx = FundTransactionEntity(
+                id: const Uuid().v4(),
+                fundAccountId: account.id,
+                type: isDeposit
+                    ? FundTransactionType.deposit
+                    : FundTransactionType.withdrawal,
+                amount: amount,
+                currency: account.currency,
+                description: descCtrl.text,
+                performedBy: 'Admin',
+                date: DateTime.now(),
+                createdAt: DateTime.now(),
+                balanceBefore: balanceBefore,
+                balanceAfter: balanceAfter,
+              );
+
+              provider.recordTransaction(tx);
+              Navigator.pop(ctx);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: isDeposit ? FinDT.success : FinDT.danger,
             ),
-          ],
-        );
-      },
-    );
-  }
-
-  Widget _buildTextField(
-    TextEditingController controller,
-    String label, {
-    TextInputType? keyboardType,
-    List<TextInputFormatter>? inputFormatters,
-    String? Function(String?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: const Color(0xFF374151)),
-        ),
-        SizedBox(height: 6.h),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          inputFormatters: inputFormatters,
-          validator: validator,
-          style: GoogleFonts.inter(fontSize: 13.sp),
-          decoration: InputDecoration(
-            isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+            child: Text(isDeposit ? 'Deposit' : 'Withdraw'),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildDropdownField<T>({
-    required String label,
-    required T? value,
-    required List<DropdownMenuItem<T>> items,
-    required void Function(T?) onChanged,
-    String? Function(T?)? validator,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: const Color(0xFF374151)),
+  void _confirmDeleteAccount(
+    BuildContext context,
+    FundAccountProvider provider,
+    FundAccountEntity account,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Account?'),
+        content: Text(
+          'This will permanently delete ${account.name}. Historical transactions will be preserved in logs.',
         ),
-        SizedBox(height: 6.h),
-        DropdownButtonFormField<T>(
-          value: value,
-          items: items,
-          onChanged: onChanged,
-          validator: validator,
-          style: GoogleFonts.inter(fontSize: 13.sp, color: Colors.black),
-          decoration: InputDecoration(
-            isDense: true,
-            contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
           ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ActionBtn extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ActionBtn({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ElevatedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 16.sp),
-      label: Text(label, style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600)),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: color,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        padding: EdgeInsets.symmetric(vertical: 12.h),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+          FilledButton(
+            onPressed: () {
+              provider.deleteAccount(account.id);
+              Navigator.pop(ctx);
+            },
+            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
   }
