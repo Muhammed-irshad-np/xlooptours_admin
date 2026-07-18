@@ -151,6 +151,8 @@ class _MyAppState extends State<MyApp> {
         final isFeedback = state.uri.path.startsWith('/feedback');
         final isEvaluate = state.uri.path.startsWith('/evaluate');
         final isDriverExpense = state.uri.path.startsWith('/driver-expense');
+        final isCoordinatorClosing =
+            state.uri.path.startsWith('/coordinator-closing');
         final isRoot = state.uri.path == '/';
 
         debugPrint(
@@ -160,7 +162,8 @@ class _MyAppState extends State<MyApp> {
         if (isRegistering ||
             isFeedback ||
             isEvaluate ||
-            isDriverExpense) {
+            isDriverExpense ||
+            isCoordinatorClosing) {
           return null;
         }
 
