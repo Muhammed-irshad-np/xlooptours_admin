@@ -10,6 +10,8 @@ import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/expense_category_entity.dart';
+import '../../../../features/employee/presentation/providers/employee_provider.dart';
+import '../../../../features/employee/domain/entities/employee_entity.dart';
 import 'finance_dashboard_page.dart';
 
 /// Full-featured expense entry/edit form.
@@ -105,8 +107,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     return Scaffold(
       backgroundColor: FinDT.bgPage,
       appBar: _buildAppBar(),
-      body: Consumer2<FinanceProvider, FundAccountProvider>(
-        builder: (context, finProv, accProv, _) {
+      body: Consumer3<FinanceProvider, FundAccountProvider, EmployeeProvider>(
+        builder: (context, finProv, accProv, empProv, _) {
           return SingleChildScrollView(
             padding: EdgeInsets.all(28.w),
             child: Form(
@@ -126,10 +128,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                       SizedBox(height: 16.h),
                       _buildRow([
                         _buildAmountField(),
-                        _buildSubmittedByField(),
+                        _buildSubmittedByField(empProv),
                       ]),
-                      SizedBox(height: 16.h),
-                      _buildPaymentDetailsField(),
                     ],
                   ),
                   SizedBox(height: 20.h),
@@ -149,22 +149,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                   ),
                   SizedBox(height: 20.h),
 
-                  // ── Details ───────────────────────────────────
-                  _buildFormCard(
-                    title: 'Additional Details',
-                    icon: Icons.description_outlined,
-                    children: [
-                      _buildDescriptionField(),
-                      SizedBox(height: 16.h),
-                      _buildRow([
-                        _buildMileageField(),
-                        _buildTripsField(),
-                      ]),
-                      SizedBox(height: 16.h),
-                      _buildNotesField(),
-                    ],
-                  ),
-                  SizedBox(height: 20.h),
+
 
                   // ── Receipt Upload ────────────────────────────
                   _buildFormCard(
@@ -367,27 +352,242 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     );
   }
 
-  Widget _buildSubmittedByField() {
+  Widget _buildSubmittedByField(EmployeeProvider empProv) {
+    EmployeeEntity? selectedEmp;
+    if (_selectedEmployeeId != null && _selectedEmployeeId!.isNotEmpty) {
+      final matches = empProv.employees.where((e) => e.id == _selectedEmployeeId);
+      if (matches.isNotEmpty) selectedEmp = matches.first;
+    }
+
     return _FieldWrapper(
       label: 'Submitted By *',
-      child: TextFormField(
-        initialValue: _submittedBy,
-        onChanged: (v) => _submittedBy = v,
-        validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-        decoration: _inputDecoration(hint: 'e.g., NITHIN'),
-        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+      child: FormField<String>(
+        initialValue: _selectedEmployeeId,
+        validator: (v) => (_selectedEmployeeId == null || _selectedEmployeeId!.isEmpty)
+            ? 'Required'
+            : null,
+        builder: (state) {
+          final displayText = selectedEmp != null
+              ? '${selectedEmp.fullName}${selectedEmp.position.isNotEmpty ? " (${selectedEmp.position})" : ""}'
+              : (_submittedBy.isNotEmpty ? _submittedBy : '');
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InkWell(
+                onTap: () => _showEmployeeSearchDialog(context, empProv, (selected) {
+                  setState(() {
+                    _selectedEmployeeId = selected.id;
+                    _submittedBy = selected.fullName;
+                    _submittedByRole = selected.position;
+                  });
+                  state.didChange(selected.id);
+                }),
+                borderRadius: BorderRadius.circular(10.r),
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+                  decoration: BoxDecoration(
+                    color: FinDT.bgPage,
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(
+                      color: state.hasError ? FinDT.danger : FinDT.border,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.person_search_outlined,
+                        size: 16.sp,
+                        color: FinDT.brand,
+                      ),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          displayText.isNotEmpty ? displayText : 'Search & Select Employee...',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: displayText.isNotEmpty
+                                ? FinDT.textPrimary
+                                : FinDT.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_drop_down_rounded,
+                        size: 20.sp,
+                        color: FinDT.textSecondary,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (state.hasError) ...[
+                SizedBox(height: 4.h),
+                Padding(
+                  padding: EdgeInsets.only(left: 4.w),
+                  child: Text(
+                    state.errorText!,
+                    style: GoogleFonts.inter(
+                      fontSize: 10.sp,
+                      color: FinDT.danger,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildPaymentDetailsField() {
-    return _FieldWrapper(
-      label: 'Payment Details',
-      child: TextFormField(
-        controller: _paymentDetailsController,
-        decoration: _inputDecoration(hint: 'e.g., Cash, STC Pay, Bank Transfer'),
-        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-      ),
+  void _showEmployeeSearchDialog(
+    BuildContext context,
+    EmployeeProvider empProv,
+    ValueChanged<EmployeeEntity> onSelect,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        String searchQuery = '';
+        return StatefulBuilder(
+          builder: (ctx, setStateDialog) {
+            final filtered = empProv.employees.where((e) {
+              final q = searchQuery.toLowerCase();
+              return e.fullName.toLowerCase().contains(q) ||
+                  e.position.toLowerCase().contains(q);
+            }).toList();
+
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16.r),
+              ),
+              title: Text(
+                'Select Employee',
+                style: GoogleFonts.inter(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.w700,
+                  color: FinDT.textPrimary,
+                ),
+              ),
+              content: SizedBox(
+                width: 400.w,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      autofocus: true,
+                      onChanged: (v) => setStateDialog(() => searchQuery = v),
+                      decoration: InputDecoration(
+                        hintText: 'Search by name or position...',
+                        hintStyle: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          color: FinDT.textSecondary,
+                        ),
+                        prefixIcon: Icon(Icons.search, size: 18.sp, color: FinDT.brand),
+                        filled: true,
+                        fillColor: FinDT.bgPage,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10.r),
+                          borderSide: BorderSide(color: FinDT.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10.r),
+                          borderSide: BorderSide(color: FinDT.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10.r),
+                          borderSide: BorderSide(color: FinDT.brand),
+                        ),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: 300.h),
+                      child: filtered.isEmpty
+                          ? Padding(
+                              padding: EdgeInsets.all(24.w),
+                              child: Text(
+                                'No employees found',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.sp,
+                                  color: FinDT.textSecondary,
+                                ),
+                              ),
+                            )
+                          : ListView.separated(
+                              shrinkWrap: true,
+                              itemCount: filtered.length,
+                              separatorBuilder: (_, __) => Divider(
+                                height: 1,
+                                color: FinDT.borderLight,
+                              ),
+                              itemBuilder: (context, index) {
+                                final emp = filtered[index];
+                                final isSelected = emp.id == _selectedEmployeeId;
+                                return ListTile(
+                                  onTap: () {
+                                    onSelect(emp);
+                                    Navigator.pop(ctx);
+                                  },
+                                  leading: CircleAvatar(
+                                    backgroundColor: isSelected
+                                        ? FinDT.brand
+                                        : FinDT.brand.withValues(alpha: 0.1),
+                                    child: Text(
+                                      emp.fullName.isNotEmpty
+                                          ? emp.fullName[0].toUpperCase()
+                                          : 'E',
+                                      style: GoogleFonts.inter(
+                                        color: isSelected ? Colors.white : FinDT.brand,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 12.sp,
+                                      ),
+                                    ),
+                                  ),
+                                  title: Text(
+                                    emp.fullName,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: FinDT.textPrimary,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    emp.position.isNotEmpty ? emp.position : 'Employee',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.sp,
+                                      color: FinDT.textSecondary,
+                                    ),
+                                  ),
+                                  trailing: isSelected
+                                      ? Icon(Icons.check_circle, color: FinDT.brand, size: 18.sp)
+                                      : null,
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(
+                    'Cancel',
+                    style: GoogleFonts.inter(color: FinDT.textSecondary),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -456,57 +656,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     );
   }
 
-  Widget _buildDescriptionField() {
-    return _FieldWrapper(
-      label: 'Description',
-      child: TextFormField(
-        controller: _descriptionController,
-        maxLines: 3,
-        decoration: _inputDecoration(hint: 'Brief description of the expense'),
-        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-      ),
-    );
-  }
 
-  Widget _buildMileageField() {
-    return _FieldWrapper(
-      label: 'Mileage (KM)',
-      child: TextFormField(
-        controller: _mileageController,
-        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: [
-          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-        ],
-        decoration: _inputDecoration(hint: 'e.g., 150'),
-        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-      ),
-    );
-  }
-
-  Widget _buildTripsField() {
-    return _FieldWrapper(
-      label: 'Number of Trips',
-      child: TextFormField(
-        controller: _tripsController,
-        keyboardType: TextInputType.number,
-        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: _inputDecoration(hint: 'e.g., 5'),
-        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-      ),
-    );
-  }
-
-  Widget _buildNotesField() {
-    return _FieldWrapper(
-      label: 'Notes',
-      child: TextFormField(
-        controller: _notesController,
-        maxLines: 2,
-        decoration: _inputDecoration(hint: 'Internal notes (optional)'),
-        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-      ),
-    );
-  }
 
   Widget _buildReceiptSection(FinanceProvider finProv) {
     return Column(

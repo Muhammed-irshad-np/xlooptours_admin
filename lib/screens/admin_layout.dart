@@ -713,19 +713,6 @@ class _AdminLayoutState extends State<AdminLayout> {
             );
           },
         ),
-        _SubNavItem(
-          label: 'Share Closing Form',
-          icon: Icons.share_outlined,
-          onAction: (context) {
-            showDialog(
-              context: context,
-              builder: (_) => const ShareDialog(
-                title: 'Share Petty Cash Closing Form',
-                url: '/coordinator-closing',
-              ),
-            );
-          },
-        ),
       ],
     ),
   ];
