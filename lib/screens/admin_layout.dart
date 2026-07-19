@@ -12,6 +12,7 @@ import 'feedback_history_screen.dart';
 import '../features/driver_evaluation/presentation/pages/pending_evaluations_screen.dart';
 import 'employee_form_screen.dart';
 import 'employee_expiry_tracker_screen.dart';
+import '../features/finance/presentation/pages/finance_dashboard_page.dart';
 import 'employee_expiry_alert_settings_screen.dart';
 import 'vehicle_form_screen.dart';
 import 'vehicle_expiry_tracker_screen.dart';
@@ -56,6 +57,7 @@ class _AdminLayoutState extends State<AdminLayout> {
     const HomeScreen(), // Invoices
     const FeedbackHistoryScreen(), // Feedback
     const PendingEvaluationsScreen(), // Evaluations
+    const FinanceDashboardPage(),
   ];
 
   static const Color _sidebarBg = Color(0xFF0B0F1A);
@@ -681,6 +683,33 @@ class _AdminLayoutState extends State<AdminLayout> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const VehicleFormScreen()),
+            );
+          },
+        ),
+      ],
+    ),
+    _NavItem(
+      label: 'Finance',
+      icon: Icons.payments_outlined,
+      activeIcon: Icons.payments,
+      subItems: [
+        _SubNavItem(
+          label: 'Overview',
+          icon: Icons.dashboard_outlined,
+          onAction: (context) {
+            // Handled by selecting index
+          },
+        ),
+        _SubNavItem(
+          label: 'Share Expense Form',
+          icon: Icons.share_outlined,
+          onAction: (context) {
+            showDialog(
+              context: context,
+              builder: (_) => const ShareDialog(
+                title: 'Share Driver Expense Form',
+                url: '/driver-expense',
+              ),
             );
           },
         ),

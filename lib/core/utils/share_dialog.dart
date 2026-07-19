@@ -28,9 +28,33 @@ class ShareDialog extends StatelessWidget {
     }
   }
 
+  String get _resolvedUrl {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    final baseUri = Uri.base;
+    String origin;
+    if (baseUri.scheme == 'http' || baseUri.scheme == 'https') {
+      origin =
+          '${baseUri.scheme}://${baseUri.host}${baseUri.hasPort ? ":${baseUri.port}" : ""}';
+    } else {
+      origin = 'https://app.xlooptours.com';
+    }
+    final cleanPath = url.startsWith('/') ? url : '/$url';
+    return '$origin$cleanPath';
+  }
+
   void _shareToWhatsApp() {
-    String messageText = shareMessage ?? 'Check out this link: $title\n$url';
-    
+    final fullUrl = _resolvedUrl;
+    String messageText;
+    if (shareMessage != null) {
+      messageText = shareMessage!.contains(url) && url != fullUrl
+          ? shareMessage!.replaceAll(url, fullUrl)
+          : shareMessage!;
+    } else {
+      messageText = 'Check out this link: $title\n$fullUrl';
+    }
+
     String cleanPhone = '';
     if (recipientPhone != null && recipientPhone!.isNotEmpty) {
       String phone = recipientPhone!.replaceAll(RegExp(r'[^0-9]'), '');
@@ -45,20 +69,30 @@ class ShareDialog extends StatelessWidget {
       }
     }
 
-    final whatsappUrl = 'https://wa.me/$cleanPhone?text=${Uri.encodeComponent(messageText)}';
+    final whatsappUrl =
+        'https://wa.me/$cleanPhone?text=${Uri.encodeComponent(messageText)}';
     _launchUrl(whatsappUrl);
   }
 
   void _shareViaEmail() {
+    final fullUrl = _resolvedUrl;
     final subject = Uri.encodeComponent(title);
-    final body = Uri.encodeComponent(shareMessage ?? 'Hi,\n\nPlease find the link below:\n\n$title\n$url');
+    String rawBody;
+    if (shareMessage != null) {
+      rawBody = shareMessage!.contains(url) && url != fullUrl
+          ? shareMessage!.replaceAll(url, fullUrl)
+          : shareMessage!;
+    } else {
+      rawBody = 'Hi,\n\nPlease find the link below:\n\n$title\n$fullUrl';
+    }
+    final body = Uri.encodeComponent(rawBody);
     final email = recipientEmail ?? '';
     final emailUrl = 'mailto:$email?subject=$subject&body=$body';
     _launchUrl(emailUrl);
   }
 
   void _copyToClipboard(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: url));
+    Clipboard.setData(ClipboardData(text: _resolvedUrl));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Link copied to clipboard!'),
@@ -120,6 +154,43 @@ class ShareDialog extends StatelessWidget {
                 ),
               ),
             ],
+            SizedBox(height: 12.h),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SelectableText(
+                      _resolvedUrl,
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Colors.grey[800],
+                        fontFamily: 'monospace',
+                      ),
+                      maxLines: 1,
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  InkWell(
+                    onTap: () => _copyToClipboard(context),
+                    borderRadius: BorderRadius.circular(4.r),
+                    child: Padding(
+                      padding: EdgeInsets.all(4.w),
+                      child: Icon(
+                        Icons.copy_rounded,
+                        size: 18.w,
+                        color: brandColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             SizedBox(height: 24.h),
             _buildShareOption(
               context,
