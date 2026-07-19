@@ -10,6 +10,7 @@ import '../providers/petty_cash_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
+import '../../domain/entities/fund_transaction_entity.dart';
 import 'finance_dashboard_page.dart';
 
 /// Screen for managing daily petty cash open/close flows and verification.
@@ -445,60 +446,231 @@ class _PettyCashPageState extends State<PettyCashPage> {
 
   void _showOpenSessionDialog(BuildContext context, PettyCashProvider provider) {
     final formKey = GlobalKey<FormState>();
-    final openingCtrl = TextEditingController();
-
-    // Default opening balance based on the current balance of the account
     final accProv = context.read<FundAccountProvider>();
     final selectedAcc = accProv.getAccountById(_selectedAccountId ?? '');
-    if (selectedAcc != null) {
-      openingCtrl.text = selectedAcc.currentBalance.toString();
-    }
+    final currentBalance = selectedAcc?.currentBalance ?? 0.0;
+
+    final openingCtrl = TextEditingController(text: currentBalance.toStringAsFixed(2));
+    bool autoSyncBalance = true;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Open Daily Session'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: openingCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                inputFormatters: [
-                  FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                ],
-                decoration: const InputDecoration(
-                  labelText: 'Opening Balance *',
-                  suffixText: 'SAR',
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) {
+          final enteredVal = double.tryParse(openingCtrl.text) ?? 0.0;
+          final hasDiff = selectedAcc != null && (enteredVal - currentBalance).abs() > 0.01;
+          final diffAmount = enteredVal - currentBalance;
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16.r),
+            ),
+            title: Text(
+              'Open Daily Session',
+              style: GoogleFonts.inter(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w700,
+                color: FinDT.textPrimary,
+              ),
+            ),
+            content: SizedBox(
+              width: 420.w,
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (selectedAcc != null) ...[
+                      Container(
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          color: FinDT.bgPage,
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(color: FinDT.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.account_balance_wallet_outlined, size: 16.sp, color: FinDT.brand),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: Text(
+                                '${selectedAcc.name} Ledger Balance:',
+                                style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
+                              ),
+                            ),
+                            Text(
+                              '${currentBalance.toStringAsFixed(2)} SAR',
+                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w700, color: FinDT.brand),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 14.h),
+                    ],
+
+                    TextFormField(
+                      controller: openingCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                      ],
+                      onChanged: (_) => setStateDialog(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'Opening Cash Balance *',
+                        labelStyle: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
+                        hintText: 'Enter physical starting cash',
+                        suffixText: 'SAR',
+                        suffixStyle: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
+                        prefixIcon: Icon(Icons.payments_outlined, size: 18.sp, color: FinDT.brand),
+                        filled: true,
+                        fillColor: FinDT.bgPage,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10.r),
+                          borderSide: const BorderSide(color: FinDT.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10.r),
+                          borderSide: const BorderSide(color: FinDT.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10.r),
+                          borderSide: const BorderSide(color: FinDT.brand, width: 1.5),
+                        ),
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                    ),
+
+                    if (hasDiff) ...[
+                      SizedBox(height: 14.h),
+                      Container(
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          color: FinDT.warning.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(color: FinDT.warning.withValues(alpha: 0.3)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.warning_amber_rounded, size: 18.sp, color: FinDT.warning),
+                                SizedBox(width: 8.w),
+                                Text(
+                                  'Balance Mismatch Notice',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: FinDT.warning,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 6.h),
+                            Text(
+                              'The virtual account balance (${currentBalance.toStringAsFixed(2)} SAR) differs from the opened amount (${enteredVal.toStringAsFixed(2)} SAR).',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.sp,
+                                color: FinDT.textPrimary,
+                                height: 1.3,
+                              ),
+                            ),
+                            SizedBox(height: 8.h),
+                            InkWell(
+                              onTap: () => setStateDialog(() => autoSyncBalance = !autoSyncBalance),
+                              child: Row(
+                                children: [
+                                  SizedBox(
+                                    height: 20.w,
+                                    width: 20.w,
+                                    child: Checkbox(
+                                      value: autoSyncBalance,
+                                      activeColor: FinDT.brand,
+                                      onChanged: (v) => setStateDialog(() => autoSyncBalance = v ?? true),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  Expanded(
+                                    child: Text(
+                                      diffAmount > 0
+                                          ? 'Auto-deposit +${diffAmount.toStringAsFixed(2)} SAR into Virtual Account'
+                                          : 'Auto-adjust Virtual Account balance to match',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11.sp,
+                                        fontWeight: FontWeight.w600,
+                                        color: FinDT.brand,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: GoogleFonts.inter(color: FinDT.textSecondary)),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+                  final openingAmount = double.parse(openingCtrl.text);
+
+                  // Auto-sync virtual account balance if requested and different
+                  if (selectedAcc != null && hasDiff && autoSyncBalance) {
+                    final diff = openingAmount - currentBalance;
+                    final tx = FundTransactionEntity(
+                      id: const Uuid().v4(),
+                      fundAccountId: selectedAcc.id,
+                      type: diff > 0 ? FundTransactionType.deposit : FundTransactionType.withdrawal,
+                      amount: diff.abs(),
+                      currency: selectedAcc.currency,
+                      description: 'Auto-sync opening cash balance for daily session',
+                      performedBy: 'Admin',
+                      date: DateTime.now(),
+                      createdAt: DateTime.now(),
+                      balanceBefore: currentBalance,
+                      balanceAfter: openingAmount,
+                    );
+                    await accProv.recordTransaction(tx);
+                  }
+
+                  final session = PettyCashSessionEntity(
+                    id: const Uuid().v4(),
+                    fundAccountId: _selectedAccountId!,
+                    date: DateTime.now(),
+                    openedBy: 'Admin',
+                    openingBalance: openingAmount,
+                    createdAt: DateTime.now(),
+                  );
+
+                  provider.openSession(session);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                },
+                style: FilledButton.styleFrom(
+                  backgroundColor: FinDT.brand,
+                  padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                ),
+                child: Text('Open Session', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              final session = PettyCashSessionEntity(
-                id: const Uuid().v4(),
-                fundAccountId: _selectedAccountId!,
-                date: DateTime.now(),
-                openedBy: 'Admin',
-                openingBalance: double.parse(openingCtrl.text),
-                createdAt: DateTime.now(),
-              );
-
-              provider.openSession(session);
-              Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
-            child: const Text('Open Session'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
