@@ -22,7 +22,8 @@ class FinanceRepositoryImpl implements FinanceRepository {
 
   @override
   Future<List<ExpenseEntity>> getAllExpenses() async {
-    return await remoteDataSource.getAllExpenses();
+    final models = await remoteDataSource.getAllExpenses();
+    return List<ExpenseEntity>.from(models);
   }
 
   @override
@@ -30,14 +31,16 @@ class FinanceRepositoryImpl implements FinanceRepository {
     DateTime start,
     DateTime end,
   ) async {
-    return await remoteDataSource.getExpensesByDateRange(start, end);
+    final models = await remoteDataSource.getExpensesByDateRange(start, end);
+    return List<ExpenseEntity>.from(models);
   }
 
   @override
   Future<List<ExpenseEntity>> getExpensesByAccount(
     String fundAccountId,
   ) async {
-    return await remoteDataSource.getExpensesByAccount(fundAccountId);
+    final models = await remoteDataSource.getExpensesByAccount(fundAccountId);
+    return List<ExpenseEntity>.from(models);
   }
 
   @override
@@ -71,7 +74,8 @@ class FinanceRepositoryImpl implements FinanceRepository {
 
   @override
   Future<List<FundAccountEntity>> getAllFundAccounts() async {
-    return await remoteDataSource.getAllFundAccounts();
+    final models = await remoteDataSource.getAllFundAccounts();
+    return List<FundAccountEntity>.from(models);
   }
 
   @override
@@ -97,7 +101,8 @@ class FinanceRepositoryImpl implements FinanceRepository {
   Future<List<FundTransactionEntity>> getTransactionsForAccount(
     String accountId,
   ) async {
-    return await remoteDataSource.getTransactionsForAccount(accountId);
+    final models = await remoteDataSource.getTransactionsForAccount(accountId);
+    return List<FundTransactionEntity>.from(models);
   }
 
   @override
@@ -112,7 +117,8 @@ class FinanceRepositoryImpl implements FinanceRepository {
   Future<List<PettyCashSessionEntity>> getPettyCashSessions(
     String accountId,
   ) async {
-    return await remoteDataSource.getPettyCashSessions(accountId);
+    final models = await remoteDataSource.getPettyCashSessions(accountId);
+    return List<PettyCashSessionEntity>.from(models);
   }
 
   @override
@@ -149,7 +155,8 @@ class FinanceRepositoryImpl implements FinanceRepository {
 
   @override
   Future<List<ExpenseCategoryEntity>> getExpenseCategories() async {
-    return await remoteDataSource.getExpenseCategories();
+    final models = await remoteDataSource.getExpenseCategories();
+    return List<ExpenseCategoryEntity>.from(models);
   }
 
   @override

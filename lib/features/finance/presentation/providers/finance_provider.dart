@@ -98,9 +98,7 @@ class FinanceProvider with ChangeNotifier {
           .toList();
     }
     if (_accountFilter != null && _accountFilter!.isNotEmpty) {
-      result = result
-          .where((e) => e.fundAccountId == _accountFilter)
-          .toList();
+      result = result.where((e) => e.fundAccountId == _accountFilter).toList();
     }
     if (_searchQuery != null && _searchQuery!.isNotEmpty) {
       final query = _searchQuery!.toLowerCase();

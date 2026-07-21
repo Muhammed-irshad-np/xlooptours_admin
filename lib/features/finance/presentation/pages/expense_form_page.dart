@@ -10,6 +10,7 @@ import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/expense_category_entity.dart';
+import '../../domain/entities/fund_account_entity.dart';
 import '../../../../features/employee/presentation/providers/employee_provider.dart';
 import '../../../../features/employee/domain/entities/employee_entity.dart';
 import 'finance_dashboard_page.dart';
@@ -43,6 +44,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   String? _selectedCategory;
   String? _selectedType;
   String? _selectedAccountId;
+  String _paymentMethod = 'cash';
   String _selectedCurrency = 'SAR';
   String _submittedBy = '';
   String _submittedByRole = 'ADMIN';
@@ -81,6 +83,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       _selectedCategory = e.expenseCategory;
       _selectedType = e.expenseType;
       _selectedAccountId = e.fundAccountId;
+      _paymentMethod = e.paymentMethod;
       _selectedCurrency = e.currency;
       _submittedBy = e.submittedBy;
       _submittedByRole = e.submittedByRole;
@@ -638,25 +641,120 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   }
 
   Widget _buildAccountDropdown(FundAccountProvider accProv) {
-    return _FieldWrapper(
-      label: 'Fund Account *',
-      child: DropdownButtonFormField<String>(
-        value: _selectedAccountId,
-        items: accProv.activeAccounts
-            .map((a) => DropdownMenuItem(
-                  value: a.id,
-                  child: Text('${a.name} (${a.code})'),
-                ))
-            .toList(),
-        onChanged: (v) => setState(() => _selectedAccountId = v),
-        validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-        decoration: _inputDecoration(hint: 'Select account'),
-        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-      ),
+    final selectedAcc = accProv.getAccountById(_selectedAccountId ?? '');
+    final isPettyCash = selectedAcc?.type == FundAccountType.pettyCash;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _FieldWrapper(
+          label: 'Fund Account *',
+          child: DropdownButtonFormField<String>(
+            value: _selectedAccountId,
+            items: accProv.activeAccounts
+                .map((a) => DropdownMenuItem(
+                      value: a.id,
+                      child: Text('${a.name} (${a.code})'),
+                    ))
+                .toList(),
+            onChanged: (v) => setState(() => _selectedAccountId = v),
+            validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+            decoration: _inputDecoration(hint: 'Select account'),
+            style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+          ),
+        ),
+        if (isPettyCash) ...[
+          SizedBox(height: 14.h),
+          _FieldWrapper(
+            label: 'Payment Method (Petty Cash Bucket) *',
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _paymentMethod = 'cash'),
+                    borderRadius: BorderRadius.circular(10.r),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 14.w),
+                      decoration: BoxDecoration(
+                        color: _paymentMethod == 'cash'
+                            ? FinDT.brand.withValues(alpha: 0.1)
+                            : FinDT.bgPage,
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(
+                          color: _paymentMethod == 'cash' ? FinDT.brand : FinDT.border,
+                          width: _paymentMethod == 'cash' ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.payments_outlined,
+                            size: 16.sp,
+                            color: _paymentMethod == 'cash' ? FinDT.brand : FinDT.textSecondary,
+                          ),
+                          SizedBox(width: 8.w),
+                          Text(
+                            'Physical Cash',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              fontWeight: _paymentMethod == 'cash' ? FontWeight.w700 : FontWeight.w500,
+                              color: _paymentMethod == 'cash' ? FinDT.brand : FinDT.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: InkWell(
+                    onTap: () => setState(() => _paymentMethod = 'stcPay'),
+                    borderRadius: BorderRadius.circular(10.r),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 14.w),
+                      decoration: BoxDecoration(
+                        color: _paymentMethod == 'stcPay'
+                            ? const Color(0xFF6D28D9).withValues(alpha: 0.1)
+                            : FinDT.bgPage,
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(
+                          color: _paymentMethod == 'stcPay' ? const Color(0xFF6D28D9) : FinDT.border,
+                          width: _paymentMethod == 'stcPay' ? 1.5 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.phone_android_outlined,
+                            size: 16.sp,
+                            color: _paymentMethod == 'stcPay' ? const Color(0xFF6D28D9) : FinDT.textSecondary,
+                          ),
+                          SizedBox(width: 8.w),
+                          Text(
+                            'STC Pay',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              fontWeight: _paymentMethod == 'stcPay' ? FontWeight.w700 : FontWeight.w500,
+                              color: _paymentMethod == 'stcPay' ? const Color(0xFF6D28D9) : FinDT.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
-
-
 
   Widget _buildReceiptSection(FinanceProvider finProv) {
     return Column(
@@ -708,43 +806,21 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
           ),
           SizedBox(height: 12.h),
         ],
-        // Upload button
-        InkWell(
-          onTap: () => _pickAndUploadReceipt(finProv),
-          borderRadius: BorderRadius.circular(12.r),
-          child: Container(
-            width: double.infinity,
-            padding: EdgeInsets.symmetric(vertical: 24.h),
-            decoration: BoxDecoration(
-              border: Border.all(color: FinDT.border, style: BorderStyle.solid),
-              borderRadius: BorderRadius.circular(12.r),
-              color: FinDT.bgPage,
-            ),
-            child: Column(
-              children: [
-                Icon(
-                  Icons.cloud_upload_outlined,
-                  size: 28.sp,
-                  color: FinDT.brand,
-                ),
-                SizedBox(height: 8.h),
-                Text(
-                  'Click to upload receipt',
-                  style: GoogleFonts.inter(
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w500,
-                    color: FinDT.textSecondary,
-                  ),
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  'JPG, PNG, PDF up to 10MB',
-                  style: GoogleFonts.inter(
-                    fontSize: 10.sp,
-                    color: FinDT.textMuted,
-                  ),
-                ),
-              ],
+        // Upload Button
+        OutlinedButton.icon(
+          onPressed: () => _pickAndUploadReceipt(finProv),
+          icon: Icon(Icons.upload_file, size: 16.sp),
+          label: Text(
+            'Upload Receipt / Document',
+            style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
+          ),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: FinDT.brand,
+            side: const BorderSide(color: FinDT.border),
+            padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
+            minimumSize: Size(double.infinity, 44.h),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10.r),
             ),
           ),
         ),
@@ -755,11 +831,13 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   Widget _buildSubmitButton(FinanceProvider finProv) {
     return SizedBox(
       width: double.infinity,
-      height: 48.h,
-      child: FilledButton(
+      child: ElevatedButton(
         onPressed: _isSaving ? null : () => _saveExpense(finProv),
-        style: FilledButton.styleFrom(
+        style: ElevatedButton.styleFrom(
           backgroundColor: FinDT.brand,
+          foregroundColor: Colors.white,
+          padding: EdgeInsets.symmetric(vertical: 16.h),
+          elevation: 0,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12.r),
           ),
@@ -774,10 +852,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                 ),
               )
             : Text(
-                _isEditing ? 'Update Expense' : 'Save Expense',
+                _isEditing ? 'Update Expense' : 'Submit Expense',
                 style: GoogleFonts.inter(
                   fontSize: 14.sp,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
       ),
@@ -856,6 +934,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         paymentDetails: _paymentDetailsController.text.isEmpty
             ? null
             : _paymentDetailsController.text,
+        paymentMethod: _paymentMethod,
         amount: double.parse(_amountController.text),
         currency: _selectedCurrency,
         fundAccountId: _selectedAccountId!,

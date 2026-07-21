@@ -155,7 +155,11 @@ class FundAccountProvider with ChangeNotifier {
     }
   }
 
-  Future<void> recordTransaction(FundTransactionEntity transaction) async {
+  Future<void> recordTransaction(
+    FundTransactionEntity transaction, {
+    double? cashDelta,
+    double? stcPayDelta,
+  }) async {
     _error = null;
     try {
       await insertTransactionUseCase(transaction);
@@ -165,9 +169,21 @@ class FundAccountProvider with ChangeNotifier {
       final index =
           _accounts.indexWhere((a) => a.id == transaction.fundAccountId);
       if (index != -1) {
-        _accounts[index] = _accounts[index].copyWith(
+        final currentAcc = _accounts[index];
+        final newCash = (cashDelta != null)
+            ? (currentAcc.cashBalance + cashDelta)
+            : currentAcc.cashBalance;
+        final newStc = (stcPayDelta != null)
+            ? (currentAcc.stcPayBalance + stcPayDelta)
+            : currentAcc.stcPayBalance;
+
+        final updated = currentAcc.copyWith(
           currentBalance: transaction.balanceAfter,
+          cashBalance: newCash < 0 ? 0.0 : newCash,
+          stcPayBalance: newStc < 0 ? 0.0 : newStc,
         );
+        _accounts[index] = updated;
+        await updateFundAccountUseCase(updated);
       }
       notifyListeners();
     } catch (e) {

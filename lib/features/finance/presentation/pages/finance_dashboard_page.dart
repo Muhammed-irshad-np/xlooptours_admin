@@ -13,6 +13,7 @@ import 'fund_accounts_page.dart';
 import 'petty_cash_page.dart';
 import 'expense_categories_page.dart';
 import '../../domain/entities/expense_entity.dart';
+import '../../domain/entities/fund_account_entity.dart';
 
 // ── Design tokens for Finance module ─────────────────────────────────────────
 class FinDT {
@@ -357,7 +358,10 @@ class _OverviewTab extends StatelessWidget {
                       'Start by adding your first expense record',
                       Icons.receipt_long_outlined,
                     )
-                  : _RecentExpensesList(expenses: expenses.take(10).toList()),
+                  : _RecentExpensesList(
+                      expenses: expenses.take(10).toList(),
+                      accounts: accProv.accounts,
+                    ),
             ),
 
             SizedBox(height: 16.h),
@@ -558,8 +562,26 @@ class _SectionCard extends StatelessWidget {
 
 class _RecentExpensesList extends StatelessWidget {
   final List<ExpenseEntity> expenses;
+  final List<FundAccountEntity> accounts;
 
-  const _RecentExpensesList({required this.expenses});
+  const _RecentExpensesList({
+    required this.expenses,
+    required this.accounts,
+  });
+
+  String _resolveAccountName(ExpenseEntity expense) {
+    if (expense.fundAccountName != null &&
+        expense.fundAccountName!.trim().isNotEmpty) {
+      return expense.fundAccountName!;
+    }
+    try {
+      return accounts
+          .firstWhere((a) => a.id == expense.fundAccountId)
+          .name;
+    } catch (_) {
+      return expense.fundAccountId.isEmpty ? '—' : expense.fundAccountId;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -572,6 +594,7 @@ class _RecentExpensesList extends StatelessWidget {
       itemBuilder: (context, index) {
         final expense = expenses[index];
         final statusColor = _statusColor(expense.status);
+        final accountName = _resolveAccountName(expense);
 
         return Padding(
           padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
@@ -638,6 +661,39 @@ class _RecentExpensesList extends StatelessWidget {
                         color: FinDT.textMuted,
                       ),
                       overflow: TextOverflow.ellipsis,
+                    ),
+                    SizedBox(height: 4.h),
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 6.w,
+                        vertical: 2.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: FinDT.brandLight,
+                        borderRadius: BorderRadius.circular(4.r),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.account_balance_wallet_outlined,
+                            size: 10.sp,
+                            color: FinDT.brand,
+                          ),
+                          SizedBox(width: 4.w),
+                          Flexible(
+                            child: Text(
+                              accountName,
+                              style: GoogleFonts.inter(
+                                fontSize: 9.sp,
+                                fontWeight: FontWeight.w600,
+                                color: FinDT.brand,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

@@ -46,6 +46,10 @@ class ExpenseEntity extends Equatable {
 
   final String? description;
   final String? paymentDetails;
+  
+  /// Payment method used: 'cash' or 'stcPay' (or other digital method).
+  final String paymentMethod;
+
   final double amount;
   final String currency;
 
@@ -92,6 +96,7 @@ class ExpenseEntity extends Equatable {
     required this.expenseType,
     this.description,
     this.paymentDetails,
+    this.paymentMethod = 'cash',
     required this.amount,
     required this.currency,
     required this.fundAccountId,
@@ -141,6 +146,7 @@ class ExpenseEntity extends Equatable {
     String? expenseType,
     String? description,
     String? paymentDetails,
+    String? paymentMethod,
     double? amount,
     String? currency,
     String? fundAccountId,
@@ -191,6 +197,7 @@ class ExpenseEntity extends Equatable {
           clearDescription ? null : (description ?? this.description),
       paymentDetails:
           clearPaymentDetails ? null : (paymentDetails ?? this.paymentDetails),
+      paymentMethod: paymentMethod ?? this.paymentMethod,
       amount: amount ?? this.amount,
       currency: currency ?? this.currency,
       fundAccountId: fundAccountId ?? this.fundAccountId,
@@ -237,6 +244,7 @@ class ExpenseEntity extends Equatable {
         expenseType,
         description,
         paymentDetails,
+        paymentMethod,
         amount,
         currency,
         fundAccountId,

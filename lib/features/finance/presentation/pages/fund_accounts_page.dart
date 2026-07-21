@@ -118,7 +118,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
         crossAxisCount: 2,
         crossAxisSpacing: 16.w,
         mainAxisSpacing: 16.h,
-        childAspectRatio: 1.35,
+        childAspectRatio: 1.15,
       ),
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
@@ -818,6 +818,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                       onChanged: (v) => setStateDialog(() => currency = v ?? 'SAR'),
                     ),
                     SizedBox(height: 14.h),
+                    SizedBox(height: 14.h),
                     // Searchable Assigned Coordinator Field
                     InkWell(
                       onTap: () => _showEmployeeSearchDialog(context, empProv, (selected) {
@@ -871,6 +872,54 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                         ),
                       ),
                     ),
+
+                    // Account creation guard notice
+                    Builder(
+                      builder: (_) {
+                        bool hasConflict = false;
+                        if (assignedName != null && assignedName!.isNotEmpty) {
+                          if (selectedType == FundAccountType.stcPay) {
+                            hasConflict = provider.accounts.any((a) =>
+                                a.assignedTo == assignedName &&
+                                a.type == FundAccountType.pettyCash &&
+                                a.id != account?.id);
+                          } else if (selectedType == FundAccountType.pettyCash) {
+                            hasConflict = provider.accounts.any((a) =>
+                                a.assignedTo == assignedName &&
+                                a.type == FundAccountType.stcPay &&
+                                a.id != account?.id);
+                          }
+                        }
+
+                        if (!hasConflict) return const SizedBox.shrink();
+
+                        return Padding(
+                          padding: EdgeInsets.only(top: 14.h),
+                          child: Container(
+                            padding: EdgeInsets.all(12.w),
+                            decoration: BoxDecoration(
+                              color: FinDT.danger.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10.r),
+                              border: Border.all(color: FinDT.danger.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline_rounded, size: 18.sp, color: FinDT.danger),
+                                SizedBox(width: 10.w),
+                                Expanded(
+                                  child: Text(
+                                    selectedType == FundAccountType.stcPay
+                                        ? '$assignedName already has a Petty Cash account. STC Pay balances for coordinators should be managed directly inside Petty Cash.'
+                                        : '$assignedName already has a standalone STC Pay account.',
+                                    style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.danger, height: 1.3),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -887,6 +936,30 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
             FilledButton(
               onPressed: () {
                 if (!formKey.currentState!.validate()) return;
+
+                // Check conflict guard
+                bool hasConflict = false;
+                if (assignedName != null && assignedName!.isNotEmpty) {
+                  if (selectedType == FundAccountType.stcPay) {
+                    hasConflict = provider.accounts.any((a) =>
+                        a.assignedTo == assignedName &&
+                        a.type == FundAccountType.pettyCash &&
+                        a.id != account?.id);
+                  }
+                }
+                if (hasConflict) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Cannot create standalone STC Pay account for a coordinator who already has Petty Cash.',
+                        style: GoogleFonts.inter(color: Colors.white),
+                      ),
+                      backgroundColor: FinDT.danger,
+                    ),
+                  );
+                  return;
+                }
+
                 final acc = FundAccountEntity(
                   id: isEditing ? account.id : const Uuid().v4(),
                   name: nameCtrl.text,
@@ -895,6 +968,8 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                   currency: currency,
                   assignedTo: assignedName,
                   currentBalance: isEditing ? account.currentBalance : 0.0,
+                  cashBalance: isEditing ? account.cashBalance : 0.0,
+                  stcPayBalance: isEditing ? account.stcPayBalance : 0.0,
                   createdAt: isEditing ? account.createdAt : DateTime.now(),
                 );
 
@@ -930,7 +1005,11 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     bool isDeposit,
   ) {
     final formKey = GlobalKey<FormState>();
+    final isPettyCash = account.type == FundAccountType.pettyCash;
+
     final amountCtrl = TextEditingController();
+    final cashAmountCtrl = TextEditingController();
+    final stcAmountCtrl = TextEditingController();
     final descCtrl = TextEditingController();
 
     showDialog(
@@ -942,7 +1021,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
           borderRadius: BorderRadius.circular(16.r),
         ),
         title: Text(
-          isDeposit ? 'Deposit Cash' : 'Withdraw Cash',
+          isDeposit ? 'Deposit Funds' : 'Withdraw Funds',
           style: GoogleFonts.inter(
             fontSize: 18.sp,
             fontWeight: FontWeight.w700,
@@ -950,7 +1029,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
           ),
         ),
         content: SizedBox(
-          width: 400.w,
+          width: 420.w,
           child: Form(
             key: formKey,
             child: Column(
@@ -981,31 +1060,79 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                   ),
                 ),
                 SizedBox(height: 16.h),
-                TextFormField(
-                  controller: amountCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+                if (isPettyCash) ...[
+                  // Dual Bucket deposit/withdrawal for Petty Cash
+                  Text(
+                    'Specify breakdown for ${isDeposit ? "deposit" : "withdrawal"}:',
+                    style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
                   ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                  ],
-                  decoration: _dialogInputDecoration(
-                    label: 'Amount *',
-                    hint: '0.00',
-                    prefixIcon: Icons.payments_outlined,
-                    suffixText: 'SAR',
+                  SizedBox(height: 10.h),
+                  TextFormField(
+                    controller: cashAmountCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                    decoration: _dialogInputDecoration(
+                      label: 'Physical Cash Amount',
+                      hint: '0.00',
+                      prefixIcon: Icons.payments_outlined,
+                      suffixText: 'SAR',
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                    validator: (v) {
+                      final cash = double.tryParse(v ?? '') ?? 0.0;
+                      final stc = double.tryParse(stcAmountCtrl.text) ?? 0.0;
+                      if (cash == 0 && stc == 0) return 'Enter cash or STC Pay amount';
+                      if (!isDeposit && cash > account.cashBalance) {
+                        return 'Exceeds physical cash balance (${account.cashBalance.toStringAsFixed(2)})';
+                      }
+                      return null;
+                    },
                   ),
-                  style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Required';
-                    final val = double.tryParse(v);
-                    if (val == null || val <= 0) return 'Invalid amount';
-                    if (!isDeposit && val > account.currentBalance) {
-                      return 'Insufficient balance';
-                    }
-                    return null;
-                  },
-                ),
+                  SizedBox(height: 12.h),
+                  TextFormField(
+                    controller: stcAmountCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                    decoration: _dialogInputDecoration(
+                      label: 'STC Pay Transfer Amount',
+                      hint: '0.00',
+                      prefixIcon: Icons.phone_android_outlined,
+                      suffixText: 'SAR',
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                    validator: (v) {
+                      final cash = double.tryParse(cashAmountCtrl.text) ?? 0.0;
+                      final stc = double.tryParse(v ?? '') ?? 0.0;
+                      if (cash == 0 && stc == 0) return 'Enter cash or STC Pay amount';
+                      if (!isDeposit && stc > account.stcPayBalance) {
+                        return 'Exceeds STC Pay balance (${account.stcPayBalance.toStringAsFixed(2)})';
+                      }
+                      return null;
+                    },
+                  ),
+                ] else ...[
+                  TextFormField(
+                    controller: amountCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
+                    decoration: _dialogInputDecoration(
+                      label: 'Amount *',
+                      hint: '0.00',
+                      prefixIcon: Icons.payments_outlined,
+                      suffixText: 'SAR',
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Required';
+                      final val = double.tryParse(v);
+                      if (val == null || val <= 0) return 'Invalid amount';
+                      if (!isDeposit && val > account.currentBalance) {
+                        return 'Insufficient balance';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
                 SizedBox(height: 14.h),
                 TextFormField(
                   controller: descCtrl,
@@ -1032,11 +1159,14 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
           FilledButton(
             onPressed: () {
               if (!formKey.currentState!.validate()) return;
-              final amount = double.parse(amountCtrl.text);
+              final cashAmt = double.tryParse(cashAmountCtrl.text) ?? 0.0;
+              final stcAmt = double.tryParse(stcAmountCtrl.text) ?? 0.0;
+              final totalAmt = isPettyCash ? (cashAmt + stcAmt) : double.parse(amountCtrl.text);
+
               final balanceBefore = account.currentBalance;
               final balanceAfter = isDeposit
-                  ? balanceBefore + amount
-                  : balanceBefore - amount;
+                  ? balanceBefore + totalAmt
+                  : balanceBefore - totalAmt;
 
               final tx = FundTransactionEntity(
                 id: const Uuid().v4(),
@@ -1044,9 +1174,11 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                 type: isDeposit
                     ? FundTransactionType.deposit
                     : FundTransactionType.withdrawal,
-                amount: amount,
+                amount: totalAmt,
                 currency: account.currency,
-                description: descCtrl.text,
+                description: isPettyCash
+                    ? '${descCtrl.text} [Cash: $cashAmt, STC: $stcAmt]'
+                    : descCtrl.text,
                 performedBy: 'Admin',
                 date: DateTime.now(),
                 createdAt: DateTime.now(),
@@ -1054,7 +1186,11 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                 balanceAfter: balanceAfter,
               );
 
-              provider.recordTransaction(tx);
+              provider.recordTransaction(
+                tx,
+                cashDelta: isPettyCash ? (isDeposit ? cashAmt : -cashAmt) : null,
+                stcPayDelta: isPettyCash ? (isDeposit ? stcAmt : -stcAmt) : null,
+              );
               Navigator.pop(ctx);
             },
             style: FilledButton.styleFrom(

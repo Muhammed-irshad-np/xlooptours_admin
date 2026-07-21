@@ -29,13 +29,17 @@ class PettyCashSessionEntity extends Equatable {
   final DateTime date;
   final String? openedBy;
   final String? closedBy;
-  final double openingBalance;
+  final double openingCashBalance;
+  final double openingStcPayBalance;
+  final double cashDeposits;
+  final double stcPayDeposits;
+  final double cashExpenses;
+  final double stcPayExpenses;
 
-  /// Total expenses recorded against this account for the day.
-  final double totalExpenses;
-
-  /// Total deposits made into this account during the day.
-  final double deposits;
+  /// Computed totals across buckets
+  double get openingBalance => openingCashBalance + openingStcPayBalance;
+  double get deposits => cashDeposits + stcPayDeposits;
+  double get totalExpenses => cashExpenses + stcPayExpenses;
 
   /// Actual closing balance reported by the coordinator.
   final double closingBalance;
@@ -65,9 +69,12 @@ class PettyCashSessionEntity extends Equatable {
     required this.date,
     this.openedBy,
     this.closedBy,
-    this.openingBalance = 0.0,
-    this.totalExpenses = 0.0,
-    this.deposits = 0.0,
+    this.openingCashBalance = 0.0,
+    this.openingStcPayBalance = 0.0,
+    this.cashDeposits = 0.0,
+    this.stcPayDeposits = 0.0,
+    this.cashExpenses = 0.0,
+    this.stcPayExpenses = 0.0,
     this.closingBalance = 0.0,
     this.cashInHand = 0.0,
     this.stcPayBalance,
@@ -81,9 +88,12 @@ class PettyCashSessionEntity extends Equatable {
     required this.createdAt,
   });
 
-  /// Expected closing balance = opening + deposits - expenses.
-  double get expectedClosingBalance =>
-      openingBalance + deposits - totalExpenses;
+  /// Expected closing per bucket
+  double get expectedCashClosing => openingCashBalance + cashDeposits - cashExpenses;
+  double get expectedStcPayClosing => openingStcPayBalance + stcPayDeposits - stcPayExpenses;
+
+  /// Total expected closing balance = expected cash + expected STC Pay.
+  double get expectedClosingBalance => expectedCashClosing + expectedStcPayClosing;
 
   factory PettyCashSessionEntity.empty() {
     return PettyCashSessionEntity(
@@ -100,9 +110,12 @@ class PettyCashSessionEntity extends Equatable {
     DateTime? date,
     String? openedBy,
     String? closedBy,
-    double? openingBalance,
-    double? totalExpenses,
-    double? deposits,
+    double? openingCashBalance,
+    double? openingStcPayBalance,
+    double? cashDeposits,
+    double? stcPayDeposits,
+    double? cashExpenses,
+    double? stcPayExpenses,
     double? closingBalance,
     double? cashInHand,
     double? stcPayBalance,
@@ -130,9 +143,12 @@ class PettyCashSessionEntity extends Equatable {
       date: date ?? this.date,
       openedBy: clearOpenedBy ? null : (openedBy ?? this.openedBy),
       closedBy: clearClosedBy ? null : (closedBy ?? this.closedBy),
-      openingBalance: openingBalance ?? this.openingBalance,
-      totalExpenses: totalExpenses ?? this.totalExpenses,
-      deposits: deposits ?? this.deposits,
+      openingCashBalance: openingCashBalance ?? this.openingCashBalance,
+      openingStcPayBalance: openingStcPayBalance ?? this.openingStcPayBalance,
+      cashDeposits: cashDeposits ?? this.cashDeposits,
+      stcPayDeposits: stcPayDeposits ?? this.stcPayDeposits,
+      cashExpenses: cashExpenses ?? this.cashExpenses,
+      stcPayExpenses: stcPayExpenses ?? this.stcPayExpenses,
       closingBalance: closingBalance ?? this.closingBalance,
       cashInHand: cashInHand ?? this.cashInHand,
       stcPayBalance: clearStcPayBalance
@@ -163,9 +179,12 @@ class PettyCashSessionEntity extends Equatable {
         date,
         openedBy,
         closedBy,
-        openingBalance,
-        totalExpenses,
-        deposits,
+        openingCashBalance,
+        openingStcPayBalance,
+        cashDeposits,
+        stcPayDeposits,
+        cashExpenses,
+        stcPayExpenses,
         closingBalance,
         cashInHand,
         stcPayBalance,

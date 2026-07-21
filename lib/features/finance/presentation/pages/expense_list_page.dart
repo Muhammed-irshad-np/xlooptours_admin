@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/finance_provider.dart';
+import '../providers/fund_account_provider.dart';
 import '../widgets/expense_status_badge.dart';
 import '../../domain/entities/expense_entity.dart';
 import 'expense_form_page.dart';
@@ -15,17 +16,23 @@ class ExpenseListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<FinanceProvider>(
-      builder: (context, provider, _) {
+    return Consumer2<FinanceProvider, FundAccountProvider>(
+      builder: (context, provider, accountProvider, _) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Filters Bar ─────────────────────────────────
-            _FiltersBar(provider: provider),
+            _FiltersBar(
+              provider: provider,
+              accountProvider: accountProvider,
+            ),
             SizedBox(height: 16.h),
 
             // ── Expense Table ───────────────────────────────
-            _ExpenseDataTable(provider: provider),
+            _ExpenseDataTable(
+              provider: provider,
+              accountProvider: accountProvider,
+            ),
           ],
         );
       },
@@ -39,10 +46,39 @@ class ExpenseListPage extends StatelessWidget {
 
 class _FiltersBar extends StatelessWidget {
   final FinanceProvider provider;
-  const _FiltersBar({required this.provider});
+  final FundAccountProvider accountProvider;
+  const _FiltersBar({
+    required this.provider,
+    required this.accountProvider,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final accounts = accountProvider.activeAccounts;
+    // Keep dropdown value valid even if the selected account is inactive.
+    final selectedAccountId = provider.accountFilter;
+    final accountItems = accounts
+        .map((a) => DropdownMenuItem(
+              value: a.id,
+              child: Text(a.name),
+            ))
+        .toList();
+    if (selectedAccountId != null &&
+        !accounts.any((a) => a.id == selectedAccountId)) {
+      final inactive = accountProvider.accounts
+          .where((a) => a.id == selectedAccountId)
+          .toList();
+      if (inactive.isNotEmpty) {
+        accountItems.insert(
+          0,
+          DropdownMenuItem(
+            value: inactive.first.id,
+            child: Text(inactive.first.name),
+          ),
+        );
+      }
+    }
+
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -89,11 +125,21 @@ class _FiltersBar extends StatelessWidget {
             ),
             SizedBox(width: 12.w),
 
+            // Fund account filter
+            _FilterDropdown<String>(
+              hint: 'Account',
+              value: selectedAccountId,
+              items: accountItems,
+              onChanged: (id) => provider.setAccountFilter(id),
+            ),
+            SizedBox(width: 12.w),
+
             // Date range
             _DateRangeButton(provider: provider),
 
             if (provider.statusFilter != null ||
                 provider.categoryFilter != null ||
+                provider.accountFilter != null ||
                 provider.searchQuery != null ||
                 provider.dateFrom != null) ...[
               SizedBox(width: 12.w),
@@ -287,7 +333,25 @@ class _ClearFilterButton extends StatelessWidget {
 
 class _ExpenseDataTable extends StatelessWidget {
   final FinanceProvider provider;
-  const _ExpenseDataTable({required this.provider});
+  final FundAccountProvider accountProvider;
+  const _ExpenseDataTable({
+    required this.provider,
+    required this.accountProvider,
+  });
+
+  String _resolveAccountName(ExpenseEntity expense) {
+    if (expense.fundAccountName != null &&
+        expense.fundAccountName!.trim().isNotEmpty) {
+      return expense.fundAccountName!;
+    }
+    try {
+      return accountProvider.accounts
+          .firstWhere((a) => a.id == expense.fundAccountId)
+          .name;
+    } catch (_) {
+      return expense.fundAccountId.isEmpty ? '—' : expense.fundAccountId;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -458,12 +522,14 @@ class _ExpenseDataTable extends StatelessWidget {
             DataColumn(label: Text('DATE')),
             DataColumn(label: Text('TYPE')),
             DataColumn(label: Text('CATEGORY')),
+            DataColumn(label: Text('ACCOUNT')),
             DataColumn(label: Text('SUBMITTED BY')),
             DataColumn(label: Text('AMOUNT'), numeric: true),
             DataColumn(label: Text('STATUS')),
             DataColumn(label: Text('ACTIONS')),
           ],
           rows: expenses.map((expense) {
+            final accountName = _resolveAccountName(expense);
             return DataRow(
               cells: [
                 DataCell(
@@ -504,6 +570,24 @@ class _ExpenseDataTable extends StatelessWidget {
                         fontSize: 10.sp,
                         fontWeight: FontWeight.w600,
                         color: FinDT.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+                DataCell(
+                  Container(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                    decoration: BoxDecoration(
+                      color: FinDT.brandLight,
+                      borderRadius: BorderRadius.circular(6.r),
+                    ),
+                    child: Text(
+                      accountName,
+                      style: GoogleFonts.inter(
+                        fontSize: 10.sp,
+                        fontWeight: FontWeight.w600,
+                        color: FinDT.brand,
                       ),
                     ),
                   ),
