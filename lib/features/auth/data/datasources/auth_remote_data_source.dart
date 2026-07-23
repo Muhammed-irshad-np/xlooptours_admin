@@ -24,23 +24,43 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required this.firestore,
   });
 
+  Future<UserModel> _userFromFirebase(User user) async {
+    if (user.email == null) {
+      return UserModel.fromFirebaseUser(user);
+    }
+    try {
+      final userDoc = await firestore
+          .collection('allowed_users')
+          .doc(user.email!.toLowerCase())
+          .get();
+      if (!userDoc.exists) {
+        return UserModel.fromFirebaseUser(user);
+      }
+      final data = userDoc.data();
+      final model = UserModel.fromFirebaseUserAndWhitelist(user, data);
+      if (!model.isActive) {
+        throw AuthenticationException(
+          'This account has been deactivated. Contact an administrator.',
+        );
+      }
+      return model;
+    } on AuthenticationException {
+      rethrow;
+    } catch (_) {
+      return UserModel.fromFirebaseUser(user);
+    }
+  }
+
   @override
   Stream<UserModel?> get authStateChanges {
     return auth.authStateChanges().asyncMap((user) async {
       if (user != null) {
-        bool isAdmin = false;
-        if (user.email != null) {
-          try {
-            final userDoc = await firestore
-                .collection('allowed_users')
-                .doc(user.email!.toLowerCase())
-                .get();
-            if (userDoc.exists) {
-              isAdmin = userDoc.data()?['isAdmin'] ?? false;
-            }
-          } catch (_) {}
+        try {
+          return await _userFromFirebase(user);
+        } on AuthenticationException {
+          await signOut();
+          return null;
         }
-        return UserModel.fromFirebaseUser(user, isAdmin: isAdmin);
       }
       return null;
     });
@@ -50,8 +70,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   UserModel? get currentUser {
     final user = auth.currentUser;
     if (user != null) {
-      // Synchronous getter won't have the real isAdmin value, 
-      // but authStateChanges will update it shortly.
+      // Sync path has no role yet; authStateChanges fills it in.
       return UserModel.fromFirebaseUser(user);
     }
     return null;
@@ -68,21 +87,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         password: password,
       );
       if (credential.user != null) {
-        bool isAdmin = false;
-        try {
-          final userDoc = await firestore
-              .collection('allowed_users')
-              .doc(credential.user!.email!.toLowerCase())
-              .get();
-          if (userDoc.exists) {
-            isAdmin = userDoc.data()?['isAdmin'] ?? false;
-          }
-        } catch (_) {}
-        return UserModel.fromFirebaseUser(credential.user!, isAdmin: isAdmin);
+        return await _userFromFirebase(credential.user!);
       }
       throw AuthenticationException('Login failed');
     } on FirebaseAuthException catch (e) {
       throw AuthenticationException(e.message ?? 'Authentication error');
+    } on AuthenticationException {
+      rethrow;
     } catch (e) {
       throw ServerException('Unexpected error');
     }
@@ -92,7 +103,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<UserModel> signInWithGoogle() async {
     try {
       User? user;
-      
+
       if (kIsWeb) {
         final googleProvider = GoogleAuthProvider();
         final userCredential = await auth.signInWithPopup(googleProvider);
@@ -113,8 +124,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         user = userCredential.user;
       }
 
-      bool isAdmin = false;
-
       if (user != null && user.email != null) {
         try {
           final userDoc = await firestore
@@ -128,8 +137,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
               'This email is not authorized to access the application.',
             );
           }
-          
-          isAdmin = userDoc.data()?['isAdmin'] ?? false;
+
+          final data = userDoc.data();
+          final isActive = data?['isActive'] as bool? ?? true;
+          if (!isActive) {
+            await signOut();
+            throw AuthenticationException(
+              'This account has been deactivated. Contact an administrator.',
+            );
+          }
+
+          return UserModel.fromFirebaseUserAndWhitelist(user, data);
         } catch (e) {
           if (e is AuthenticationException) rethrow;
           await signOut();
@@ -140,7 +158,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
 
       if (user != null) {
-        return UserModel.fromFirebaseUser(user, isAdmin: isAdmin);
+        return UserModel.fromFirebaseUser(user);
       }
       throw AuthenticationException('Login failed');
     } on FirebaseAuthException catch (e) {

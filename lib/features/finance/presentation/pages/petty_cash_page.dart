@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/petty_cash_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
@@ -222,32 +223,75 @@ class _PettyCashPageState extends State<PettyCashPage> {
           ),
           SizedBox(height: 20.h),
           if (session != null) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildSessionStat(
-                  'Opening Total',
-                  '${formatter.format(session.openingBalance)} SAR',
-                  subtext: 'Cash: ${formatter.format(session.openingCashBalance)} | STC: ${formatter.format(session.openingStcPayBalance)}',
-                ),
-                _buildSessionStat(
-                  'Total Expenses Today',
-                  '${formatter.format(session.totalExpenses)} SAR',
-                  subtext: 'Cash: ${formatter.format(session.cashExpenses)} | STC: ${formatter.format(session.stcPayExpenses)}',
-                ),
-                _buildSessionStat(
-                  'Total Deposits Today',
-                  '${formatter.format(session.deposits)} SAR',
-                  subtext: 'Cash: ${formatter.format(session.cashDeposits)} | STC: ${formatter.format(session.stcPayDeposits)}',
-                ),
-                _buildSessionStat(
-                  'Expected Closing',
-                  '${formatter.format(session.expectedClosingBalance)} SAR',
-                  highlight: true,
-                  subtext: 'Cash: ${formatter.format(session.expectedCashClosing)} | STC: ${formatter.format(session.expectedStcPayClosing)}',
-                ),
-              ],
-            ),
+            Builder(builder: (_) {
+              final live = provider.previewTotals;
+              final cashExp = live?.cashExpenses ?? session.cashExpenses;
+              final stcExp = live?.stcPayExpenses ?? session.stcPayExpenses;
+              final cashDep = live?.cashDeposits ?? session.cashDeposits;
+              final stcDep = live?.stcPayDeposits ?? session.stcPayDeposits;
+              final expTotal = cashExp + stcExp;
+              final depTotal = cashDep + stcDep;
+              final expectedCash =
+                  session.openingCashBalance + cashDep - cashExp;
+              final expectedStc =
+                  session.openingStcPayBalance + stcDep - stcExp;
+              final expected = expectedCash + expectedStc;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (live != null)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: 8.h),
+                      child: Text(
+                        'Live from ledger (not typed) — refresh when money moves',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          color: FinDT.brand,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildSessionStat(
+                        'Opening Total',
+                        '${formatter.format(session.openingBalance)} SAR',
+                        subtext:
+                            'Cash: ${formatter.format(session.openingCashBalance)} | STC: ${formatter.format(session.openingStcPayBalance)}',
+                      ),
+                      _buildSessionStat(
+                        'Total Expenses Today',
+                        '${formatter.format(expTotal)} SAR',
+                        subtext:
+                            'Cash: ${formatter.format(cashExp)} | STC: ${formatter.format(stcExp)}',
+                      ),
+                      _buildSessionStat(
+                        'Total Deposits Today',
+                        '${formatter.format(depTotal)} SAR',
+                        subtext:
+                            'Cash: ${formatter.format(cashDep)} | STC: ${formatter.format(stcDep)}',
+                      ),
+                      _buildSessionStat(
+                        'Expected Closing',
+                        '${formatter.format(expected)} SAR',
+                        highlight: true,
+                        subtext:
+                            'Cash: ${formatter.format(expectedCash)} | STC: ${formatter.format(expectedStc)}',
+                      ),
+                    ],
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => provider.refreshDayTotals(),
+                      icon: Icon(Icons.refresh, size: 16.sp),
+                      label: const Text('Refresh ledger totals'),
+                    ),
+                  ),
+                ],
+              );
+            }),
             SizedBox(height: 24.h),
             Row(
               children: [
@@ -649,7 +693,9 @@ class _PettyCashPageState extends State<PettyCashPage> {
                     id: const Uuid().v4(),
                     fundAccountId: _selectedAccountId!,
                     date: DateTime.now(),
-                    openedBy: 'Admin',
+                    openedBy:
+                        context.read<AuthProvider>().user?.actorLabel ??
+                            'Unknown',
                     openingCashBalance: openCash,
                     openingStcPayBalance: openStc,
                     createdAt: DateTime.now(),
@@ -813,16 +859,39 @@ class _PettyCashPageState extends State<PettyCashPage> {
                 final digital = double.parse(digitalCtrl.text);
                 final closing = cash + digital;
 
+                final user = context.read<AuthProvider>().user;
                 final closed = session.copyWith(
                   closingBalance: closing,
                   cashInHand: cash,
                   stcPayBalance: digital,
                   closingSheetUrl: closingSheetUrl,
-                  closedBy: 'Admin',
+                  closedBy: user?.actorLabel ?? 'Unknown',
                 );
 
-                provider.closeSession(closed);
                 Navigator.pop(ctx);
+                provider
+                    .closeSession(
+                  session: closed,
+                  closedBy: user?.actorLabel ?? 'Unknown',
+                  closedByUserId: user?.id,
+                )
+                    .then((_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Session closed using ledger totals for the day',
+                        ),
+                      ),
+                    );
+                  }
+                }).catchError((e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
+                    );
+                  }
+                });
               },
               style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
               child: const Text('Close Session'),
@@ -833,30 +902,56 @@ class _PettyCashPageState extends State<PettyCashPage> {
     );
   }
 
-  void _confirmVerifySession(
+  Future<void> _confirmVerifySession(
     BuildContext context,
     PettyCashProvider provider,
     PettyCashSessionEntity session,
-  ) {
-    showDialog(
+  ) async {
+    final user = context.read<AuthProvider>().user;
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Verify Daily Closing?'),
+        title: const Text('Verify & lock day?'),
         content: Text(
-          'Confirm that the declared closing balance of ${session.closingBalance.toStringAsFixed(2)} SAR matches the daily receipts and cash in hand.',
+          'Confirm closing ${session.closingBalance.toStringAsFixed(2)} SAR '
+          '(discrepancy: ${session.discrepancy?.toStringAsFixed(2) ?? "0"}).\n\n'
+          'This LOCKS the day — no further deposits, withdrawals, or expense '
+          'payments can be posted to this fund for that calendar day.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            onPressed: () {
-              provider.verifySession(session.id, 'Admin');
-              Navigator.pop(ctx);
-            },
+            onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: FinDT.success),
-            child: const Text('Verify'),
+            child: const Text('Verify & lock'),
           ),
         ],
       ),
     );
+    if (ok != true || !context.mounted) return;
+    try {
+      await provider.verifySession(
+        sessionId: session.id,
+        verifiedBy: user?.actorLabel ?? 'Unknown',
+        verifiedByUserId: user?.id,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Day verified and locked'),
+            backgroundColor: FinDT.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
+        );
+      }
+    }
   }
 }

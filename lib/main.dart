@@ -27,6 +27,7 @@ import 'features/finance/presentation/pages/driver_expense_form_page.dart';
 import 'features/finance/presentation/providers/finance_provider.dart';
 import 'features/finance/presentation/providers/fund_account_provider.dart';
 import 'features/finance/presentation/providers/petty_cash_provider.dart';
+import 'features/finance/presentation/providers/cash_advance_provider.dart';
 
 import 'screens/invoice_form_screen.dart';
 import 'screens/pdf_preview_screen.dart';
@@ -315,6 +316,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => di.sl<FinanceProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<FundAccountProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<PettyCashProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<CashAdvanceProvider>()),
       ],
       child: ScreenUtilInit(
         designSize: const Size(1440, 900),

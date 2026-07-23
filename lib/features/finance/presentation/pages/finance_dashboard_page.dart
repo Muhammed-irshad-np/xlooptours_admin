@@ -11,6 +11,7 @@ import '../widgets/finance_nav_tabs.dart';
 import 'expense_list_page.dart';
 import 'fund_accounts_page.dart';
 import 'petty_cash_page.dart';
+import 'cash_advances_page.dart';
 import 'expense_categories_page.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
@@ -253,6 +254,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
       case 3:
         return const PettyCashPage(key: ValueKey('petty'));
       case 4:
+        return const CashAdvancesPage(key: ValueKey('advances'));
+      case 5:
         return const ExpenseCategoriesPage(key: ValueKey('categories'));
       default:
         return const SizedBox.shrink();
@@ -716,12 +719,18 @@ class _RecentExpensesList extends StatelessWidget {
 
   Color _statusColor(ExpenseStatus status) {
     switch (status) {
+      case ExpenseStatus.draft:
+        return FinDT.textSecondary;
       case ExpenseStatus.pending:
         return FinDT.warning;
       case ExpenseStatus.approved:
+        return const Color(0xFF059669);
+      case ExpenseStatus.paid:
         return FinDT.success;
       case ExpenseStatus.rejected:
         return FinDT.danger;
+      case ExpenseStatus.voided:
+        return const Color(0xFF7C3AED);
       case ExpenseStatus.closed:
         return FinDT.textSecondary;
     }

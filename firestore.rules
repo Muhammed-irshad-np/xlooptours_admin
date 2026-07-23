@@ -1,16 +1,128 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if the user is authenticated and is an admin
-    function isAdmin() {
-      return request.auth != null && 
-             request.auth.token.email != null &&
-             exists(/databases/$(database)/documents/allowed_users/$(request.auth.token.email.lower())) &&
-             get(/databases/$(database)/documents/allowed_users/$(request.auth.token.email.lower())).data.isAdmin == true;
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
     }
 
+    function userEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function allowedUserDoc() {
+      return get(/databases/$(database)/documents/allowed_users/$(userEmail()));
+    }
+
+    function isAllowedUser() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/allowed_users/$(userEmail()))
+        && allowedUserDoc().data.get('isActive', true) == true;
+    }
+
+    function userRole() {
+      return allowedUserDoc().data.get('role',
+        allowedUserDoc().data.get('isAdmin', false) == true ? 'admin' : 'viewer'
+      );
+    }
+
+    function isAdmin() {
+      return isAllowedUser() && (
+        userRole() == 'admin' ||
+        allowedUserDoc().data.get('isAdmin', false) == true
+      );
+    }
+
+    function isFinance() {
+      return isAllowedUser() && (
+        userRole() in ['finance', 'admin'] ||
+        allowedUserDoc().data.get('isAdmin', false) == true
+      );
+    }
+
+    function isManagerOrAbove() {
+      return isAllowedUser() && (
+        userRole() in ['manager', 'finance', 'admin'] ||
+        allowedUserDoc().data.get('isAdmin', false) == true
+      );
+    }
+
+    function isCoordinatorOrAbove() {
+      return isAllowedUser() && (
+        userRole() in ['coordinator', 'manager', 'finance', 'admin'] ||
+        allowedUserDoc().data.get('isAdmin', false) == true
+      );
+    }
+
+    // Whitelist: users can read own doc; only admin manages list
+    match /allowed_users/{email} {
+      allow read: if isAllowedUser() && (email == userEmail() || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // Finance collections — authenticated staff only
+    match /expenses/{id} {
+      allow read: if isAllowedUser();
+      allow create: if isAllowedUser();
+      allow update: if isManagerOrAbove() || isCoordinatorOrAbove();
+      allow delete: if isFinance();
+    }
+
+    match /fund_accounts/{id} {
+      allow read: if isAllowedUser();
+      allow create, update: if isFinance() || isCoordinatorOrAbove();
+      allow delete: if isFinance();
+    }
+
+    match /fund_transactions/{id} {
+      allow read: if isAllowedUser();
+      // Client may create via app transactions; prefer finance roles
+      allow create: if isCoordinatorOrAbove();
+      allow update: if isFinance();
+      allow delete: if false; // append-only ledger
+    }
+
+    match /petty_cash_sessions/{id} {
+      allow read: if isAllowedUser();
+      allow create, update: if isCoordinatorOrAbove();
+      allow delete: if isFinance();
+    }
+
+    match /expense_categories/{id} {
+      allow read: if isAllowedUser();
+      allow write: if isFinance();
+    }
+
+    match /counters/{id} {
+      allow read, write: if isAllowedUser();
+    }
+
+    match /finance_audit_log/{id} {
+      allow read: if isManagerOrAbove();
+      allow create: if isAllowedUser();
+      allow update, delete: if false;
+    }
+
+    match /finance_day_locks/{id} {
+      allow read: if isAllowedUser();
+      allow create: if isManagerOrAbove();
+      allow update, delete: if isFinance();
+    }
+
+    match /cash_advances/{id} {
+      allow read: if isAllowedUser();
+      allow create, update: if isCoordinatorOrAbove();
+      allow delete: if isFinance();
+    }
+
+    match /finance_settings/{id} {
+      allow read: if isAllowedUser();
+      allow write: if isFinance();
+    }
+
+    // Default: existing app collections — require allowed user
+    // (tightened from open public access)
     match /{document=**} {
-      allow read, create, update: if true;
+      allow read, create, update: if isAllowedUser();
       allow delete: if isAdmin();
     }
   }

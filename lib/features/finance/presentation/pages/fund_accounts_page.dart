@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/fund_transaction_entity.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../widgets/fund_account_card.dart';
 import '../widgets/currency_display.dart';
@@ -212,21 +213,305 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     BuildContext context,
     FundAccountProvider provider,
   ) {
-    return ElevatedButton.icon(
-      onPressed: () => _showAccountFormDialog(context, provider),
-      icon: Icon(Icons.add_rounded, size: 16.sp),
-      label: Text(
-        'Add Account',
-        style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
-      ),
-      style: ElevatedButton.styleFrom(
-        foregroundColor: Colors.white,
-        backgroundColor: FinDT.brand,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10.r),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        OutlinedButton.icon(
+          onPressed: () => _showTransferDialog(context, provider),
+          icon: Icon(Icons.swap_horiz_rounded, size: 16.sp),
+          label: Text(
+            'Transfer',
+            style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
+          ),
         ),
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 11.h),
+        SizedBox(width: 8.w),
+        ElevatedButton.icon(
+          onPressed: () => _showAccountFormDialog(context, provider),
+          icon: Icon(Icons.add_rounded, size: 16.sp),
+          label: Text(
+            'Add Account',
+            style:
+                GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
+          ),
+          style: ElevatedButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: FinDT.brand,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10.r),
+            ),
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 11.h),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showAdjustmentDialog(
+    BuildContext context,
+    FundAccountProvider provider,
+    FundAccountEntity account,
+  ) {
+    final formKey = GlobalKey<FormState>();
+    final amountCtrl = TextEditingController();
+    final reasonCtrl = TextEditingController();
+    var increase = true;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Balance adjustment'),
+          content: SizedBox(
+            width: 420.w,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Use only when counted cash/bank does not match the app. '
+                    'Always explain why. Current balance: '
+                    '${account.currentBalance.toStringAsFixed(2)} ${account.currency}',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: FinDT.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                  SizedBox(height: 14.h),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Increase (+)'),
+                          selected: increase,
+                          onSelected: (_) => setLocal(() => increase = true),
+                          selectedColor: FinDT.success.withValues(alpha: 0.2),
+                        ),
+                      ),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: ChoiceChip(
+                          label: const Text('Decrease (−)'),
+                          selected: !increase,
+                          onSelected: (_) => setLocal(() => increase = false),
+                          selectedColor: FinDT.danger.withValues(alpha: 0.15),
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 12.h),
+                  TextFormField(
+                    controller: amountCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Amount *',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) {
+                      final n = double.tryParse(v ?? '');
+                      if (n == null || n <= 0) return 'Enter a positive amount';
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 12.h),
+                  TextFormField(
+                    controller: reasonCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      labelText: 'Reason * (required)',
+                      hintText: 'e.g. Cash count shortfall after day close',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (v) =>
+                        (v == null || v.trim().isEmpty) ? 'Reason required' : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final user = context.read<AuthProvider>().user;
+                final amount = double.parse(amountCtrl.text);
+                final reason = reasonCtrl.text.trim();
+                final isIncrease = increase;
+                Navigator.pop(ctx);
+                try {
+                  await provider.recordMovement(
+                    fundAccountId: account.id,
+                    type: FundTransactionType.adjustment,
+                    amountMajor: amount,
+                    currency: account.currency,
+                    description:
+                        'ADJUSTMENT (${isIncrease ? '+' : '−'}): $reason',
+                    performedBy: user?.actorLabel ?? 'Unknown',
+                    performedByUserId: user?.id ?? '',
+                    bucket: FundBucket.total,
+                    credit: isIncrease,
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isIncrease
+                              ? 'Balance increased by $amount'
+                              : 'Balance decreased by $amount',
+                        ),
+                        backgroundColor: FinDT.success,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('$e'),
+                        backgroundColor: FinDT.danger,
+                      ),
+                    );
+                  }
+                }
+              },
+              style: FilledButton.styleFrom(backgroundColor: FinDT.warning),
+              child: const Text('Post adjustment'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showTransferDialog(
+    BuildContext context,
+    FundAccountProvider provider,
+  ) {
+    final formKey = GlobalKey<FormState>();
+    final amountCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    String? fromId = provider.selectedAccountId;
+    String? toId;
+    final accounts = provider.activeAccounts;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          title: const Text('Transfer between accounts'),
+          content: SizedBox(
+            width: 420.w,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: fromId,
+                    decoration: const InputDecoration(labelText: 'From'),
+                    items: accounts
+                        .map(
+                          (a) => DropdownMenuItem(
+                            value: a.id,
+                            child: Text(a.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setLocal(() => fromId = v),
+                    validator: (v) => v == null ? 'Required' : null,
+                  ),
+                  SizedBox(height: 12.h),
+                  DropdownButtonFormField<String>(
+                    value: toId,
+                    decoration: const InputDecoration(labelText: 'To'),
+                    items: accounts
+                        .where((a) => a.id != fromId)
+                        .map(
+                          (a) => DropdownMenuItem(
+                            value: a.id,
+                            child: Text(a.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setLocal(() => toId = v),
+                    validator: (v) => v == null ? 'Required' : null,
+                  ),
+                  SizedBox(height: 12.h),
+                  TextFormField(
+                    controller: amountCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Amount'),
+                    validator: (v) {
+                      final n = double.tryParse(v ?? '');
+                      if (n == null || n <= 0) return 'Invalid amount';
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 12.h),
+                  TextFormField(
+                    controller: descCtrl,
+                    decoration: const InputDecoration(labelText: 'Purpose *'),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Required' : null,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final user = context.read<AuthProvider>().user;
+                final from = accounts.firstWhere((a) => a.id == fromId);
+                final amount = double.parse(amountCtrl.text);
+                Navigator.pop(ctx);
+                try {
+                  await provider.transfer(
+                    fromAccountId: fromId!,
+                    toAccountId: toId!,
+                    amountMajor: amount,
+                    currency: from.currency,
+                    description: descCtrl.text.trim(),
+                    performedBy: user?.actorLabel ?? 'Unknown',
+                    performedByUserId: user?.id ?? '',
+                  );
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Transfer completed (both sides posted)'),
+                        backgroundColor: FinDT.success,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('$e'),
+                        backgroundColor: FinDT.danger,
+                      ),
+                    );
+                  }
+                }
+              },
+              child: const Text('Transfer'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -341,26 +626,57 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
           ),
           Divider(height: 1, color: FinDT.borderLight),
 
-          // Deposit / Withdrawal buttons
+          // Deposit / Withdrawal / Adjust
           Padding(
             padding: EdgeInsets.all(20.w),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: _buildTransactionActionBtn(
-                    context: context,
-                    provider: provider,
-                    account: selected,
-                    isDeposit: true,
-                  ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildTransactionActionBtn(
+                        context: context,
+                        provider: provider,
+                        account: selected,
+                        isDeposit: true,
+                      ),
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: _buildTransactionActionBtn(
+                        context: context,
+                        provider: provider,
+                        account: selected,
+                        isDeposit: false,
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: _buildTransactionActionBtn(
-                    context: context,
-                    provider: provider,
-                    account: selected,
-                    isDeposit: false,
+                SizedBox(height: 10.h),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showAdjustmentDialog(
+                      context,
+                      provider,
+                      selected,
+                    ),
+                    icon: Icon(Icons.tune_rounded, size: 16.sp),
+                    label: Text(
+                      'Adjustment (fix balance with reason)',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: FinDT.warning,
+                      side: BorderSide(color: FinDT.warning.withValues(alpha: 0.5)),
+                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -409,7 +725,12 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                   Divider(height: 1, color: FinDT.borderLight),
               itemBuilder: (context, index) {
                 final tx = provider.transactions[index];
-                final isDeposit = tx.type == FundTransactionType.deposit;
+                final isIn = tx.balanceAfter >= tx.balanceBefore;
+                final isAdjust =
+                    tx.type == FundTransactionType.adjustment;
+                final color = isAdjust
+                    ? FinDT.warning
+                    : (isIn ? FinDT.success : FinDT.danger);
                 return Padding(
                   padding: EdgeInsets.symmetric(
                     horizontal: 20.w,
@@ -420,16 +741,16 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                       Container(
                         padding: EdgeInsets.all(8.w),
                         decoration: BoxDecoration(
-                          color: isDeposit
-                              ? FinDT.success.withValues(alpha: 0.08)
-                              : FinDT.danger.withValues(alpha: 0.08),
+                          color: color.withValues(alpha: 0.08),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          isDeposit
-                              ? Icons.add_circle_outline
-                              : Icons.remove_circle_outline,
-                          color: isDeposit ? FinDT.success : FinDT.danger,
+                          isAdjust
+                              ? Icons.tune_rounded
+                              : (isIn
+                                  ? Icons.add_circle_outline
+                                  : Icons.remove_circle_outline),
+                          color: color,
                           size: 16.sp,
                         ),
                       ),
@@ -465,7 +786,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                             currency: tx.currency,
                             fontSize: 13.sp,
                             fontWeight: FontWeight.w700,
-                            color: isDeposit ? FinDT.success : FinDT.danger,
+                            color: color,
                           ),
                           SizedBox(height: 2.h),
                           Text(
@@ -1163,35 +1484,29 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
               final stcAmt = double.tryParse(stcAmountCtrl.text) ?? 0.0;
               final totalAmt = isPettyCash ? (cashAmt + stcAmt) : double.parse(amountCtrl.text);
 
-              final balanceBefore = account.currentBalance;
-              final balanceAfter = isDeposit
-                  ? balanceBefore + totalAmt
-                  : balanceBefore - totalAmt;
+              final auth = context.read<AuthProvider>().user;
+              final actorName = auth?.actorLabel ?? 'Unknown';
+              final actorId = auth?.id ?? '';
 
-              final tx = FundTransactionEntity(
-                id: const Uuid().v4(),
+              Navigator.pop(ctx);
+              provider.recordMovement(
                 fundAccountId: account.id,
                 type: isDeposit
                     ? FundTransactionType.deposit
                     : FundTransactionType.withdrawal,
-                amount: totalAmt,
+                amountMajor: totalAmt,
                 currency: account.currency,
                 description: isPettyCash
                     ? '${descCtrl.text} [Cash: $cashAmt, STC: $stcAmt]'
                     : descCtrl.text,
-                performedBy: 'Admin',
-                date: DateTime.now(),
-                createdAt: DateTime.now(),
-                balanceBefore: balanceBefore,
-                balanceAfter: balanceAfter,
+                performedBy: actorName,
+                performedByUserId: actorId,
+                bucket: isPettyCash ? FundBucket.total : FundBucket.total,
+                cashDelta:
+                    isPettyCash ? (isDeposit ? cashAmt : -cashAmt) : null,
+                stcPayDelta:
+                    isPettyCash ? (isDeposit ? stcAmt : -stcAmt) : null,
               );
-
-              provider.recordTransaction(
-                tx,
-                cashDelta: isPettyCash ? (isDeposit ? cashAmt : -cashAmt) : null,
-                stcPayDelta: isPettyCash ? (isDeposit ? stcAmt : -stcAmt) : null,
-              );
-              Navigator.pop(ctx);
             },
             style: FilledButton.styleFrom(
               backgroundColor: isDeposit ? FinDT.success : FinDT.danger,

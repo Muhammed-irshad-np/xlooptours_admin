@@ -10,6 +10,7 @@ import '../../domain/usecases/update_expense_usecase.dart';
 import '../../domain/usecases/delete_expense_usecase.dart';
 import '../../domain/usecases/approve_expense_usecase.dart';
 import '../../domain/usecases/reject_expense_usecase.dart';
+import '../../domain/usecases/void_expense_usecase.dart';
 import '../../domain/usecases/generate_reference_number_usecase.dart';
 import '../../domain/usecases/upload_receipt_usecase.dart';
 import '../../domain/usecases/get_expense_categories_usecase.dart';
@@ -17,10 +18,7 @@ import '../../domain/usecases/insert_expense_category_usecase.dart';
 import '../../domain/usecases/update_expense_category_usecase.dart';
 import '../../domain/usecases/delete_expense_category_usecase.dart';
 
-/// Provider managing expense records and expense categories.
-///
-/// Handles CRUD operations, approval workflow, filtering,
-/// and expense category configuration.
+/// Provider managing expenses and categories.
 class FinanceProvider with ChangeNotifier {
   final GetAllExpensesUseCase getAllExpensesUseCase;
   final GetExpensesByDateRangeUseCase getExpensesByDateRangeUseCase;
@@ -30,6 +28,7 @@ class FinanceProvider with ChangeNotifier {
   final DeleteExpenseUseCase deleteExpenseUseCase;
   final ApproveExpenseUseCase approveExpenseUseCase;
   final RejectExpenseUseCase rejectExpenseUseCase;
+  final VoidExpenseUseCase voidExpenseUseCase;
   final GenerateReferenceNumberUseCase generateReferenceNumberUseCase;
   final UploadReceiptUseCase uploadReceiptUseCase;
   final GetExpenseCategoriesUseCase getExpenseCategoriesUseCase;
@@ -46,6 +45,7 @@ class FinanceProvider with ChangeNotifier {
     required this.deleteExpenseUseCase,
     required this.approveExpenseUseCase,
     required this.rejectExpenseUseCase,
+    required this.voidExpenseUseCase,
     required this.generateReferenceNumberUseCase,
     required this.uploadReceiptUseCase,
     required this.getExpenseCategoriesUseCase,
@@ -54,15 +54,11 @@ class FinanceProvider with ChangeNotifier {
     required this.deleteExpenseCategoryUseCase,
   });
 
-  // ─── State ──────────────────────────────────────────────────
-
   List<ExpenseEntity> _expenses = [];
   List<ExpenseCategoryEntity> _categories = [];
   bool _isLoading = false;
   bool _isCategoriesLoading = false;
   String? _error;
-
-  // ─── Filters ────────────────────────────────────────────────
 
   ExpenseStatus? _statusFilter;
   String? _categoryFilter;
@@ -70,8 +66,6 @@ class FinanceProvider with ChangeNotifier {
   String? _searchQuery;
   DateTime? _dateFrom;
   DateTime? _dateTo;
-
-  // ─── Getters ────────────────────────────────────────────────
 
   List<ExpenseEntity> get expenses => _expenses;
   List<ExpenseCategoryEntity> get categories => _categories;
@@ -85,7 +79,6 @@ class FinanceProvider with ChangeNotifier {
   DateTime? get dateFrom => _dateFrom;
   DateTime? get dateTo => _dateTo;
 
-  /// Filtered expenses based on current filter state.
   List<ExpenseEntity> get filteredExpenses {
     var result = List<ExpenseEntity>.from(_expenses);
 
@@ -93,12 +86,12 @@ class FinanceProvider with ChangeNotifier {
       result = result.where((e) => e.status == _statusFilter).toList();
     }
     if (_categoryFilter != null && _categoryFilter!.isNotEmpty) {
-      result = result
-          .where((e) => e.expenseCategory == _categoryFilter)
-          .toList();
+      result =
+          result.where((e) => e.expenseCategory == _categoryFilter).toList();
     }
     if (_accountFilter != null && _accountFilter!.isNotEmpty) {
-      result = result.where((e) => e.fundAccountId == _accountFilter).toList();
+      result =
+          result.where((e) => e.fundAccountId == _accountFilter).toList();
     }
     if (_searchQuery != null && _searchQuery!.isNotEmpty) {
       final query = _searchQuery!.toLowerCase();
@@ -116,15 +109,11 @@ class FinanceProvider with ChangeNotifier {
     return result;
   }
 
-  /// Count of expenses pending approval.
   int get pendingCount =>
       _expenses.where((e) => e.status == ExpenseStatus.pending).length;
 
-  /// Total amount of all filtered expenses.
   double get totalFilteredAmount =>
       filteredExpenses.fold(0.0, (sum, e) => sum + e.amount);
-
-  // ─── Expense Operations ─────────────────────────────────────
 
   Future<void> fetchAllExpenses() async {
     _isLoading = true;
@@ -161,93 +150,185 @@ class FinanceProvider with ChangeNotifier {
   }
 
   Future<void> insertExpense(ExpenseEntity expense) async {
-    _isLoading = true;
     _error = null;
+    final withMinor = expense.copyWith(
+      amountMinor: expense.amountMinor ?? (expense.amount * 100).round(),
+    );
+    _expenses = [withMinor, ..._expenses];
     notifyListeners();
 
     try {
-      await insertExpenseUseCase(expense);
-      _expenses.insert(0, expense);
+      await insertExpenseUseCase(withMinor);
     } catch (e) {
+      _expenses = _expenses.where((e) => e.id != withMinor.id).toList();
       _error = e.toString();
       debugPrint('Error inserting expense: $e');
-    } finally {
-      _isLoading = false;
       notifyListeners();
+      rethrow;
     }
   }
 
   Future<void> updateExpense(ExpenseEntity expense) async {
     _error = null;
+    final index = _expenses.indexWhere((e) => e.id == expense.id);
+    ExpenseEntity? oldExpense;
+
+    if (index != -1) {
+      oldExpense = _expenses[index];
+      _expenses[index] = expense;
+      notifyListeners();
+    }
+
     try {
       await updateExpenseUseCase(expense);
-      final index = _expenses.indexWhere((e) => e.id == expense.id);
-      if (index != -1) {
-        _expenses[index] = expense;
-        notifyListeners();
-      }
     } catch (e) {
+      if (index != -1 && oldExpense != null) {
+        _expenses[index] = oldExpense;
+      }
       _error = e.toString();
       debugPrint('Error updating expense: $e');
       notifyListeners();
+      rethrow;
     }
   }
 
+  /// Only drafts/pending. Posted expenses must be voided.
   Future<void> deleteExpense(String id) async {
     _error = null;
+    final index = _expenses.indexWhere((e) => e.id == id);
+    ExpenseEntity? oldExpense;
+
+    if (index != -1) {
+      oldExpense = _expenses[index];
+      if (!oldExpense.status.canHardDelete) {
+        _error =
+            'Cannot delete posted expense. Void it to reverse the payment.';
+        notifyListeners();
+        throw StateError(_error!);
+      }
+      _expenses.removeAt(index);
+      notifyListeners();
+    }
+
     try {
       await deleteExpenseUseCase(id);
-      _expenses.removeWhere((e) => e.id == id);
-      notifyListeners();
     } catch (e) {
+      if (index != -1 && oldExpense != null) {
+        _expenses.insert(index, oldExpense);
+      }
       _error = e.toString();
       debugPrint('Error deleting expense: $e');
       notifyListeners();
+      rethrow;
     }
   }
 
-  Future<void> approveExpense(ExpenseEntity expense, String approvedBy) async {
+  /// Approve + post to wallet (or approve only if non-wallet).
+  Future<void> approveExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String actorRole,
+    bool allowSelfApprove = false,
+  }) async {
     _error = null;
     try {
-      await approveExpenseUseCase(expense, approvedBy);
-      final index = _expenses.indexWhere((e) => e.id == expense.id);
+      final updated = await approveExpenseUseCase(
+        expenseId: expenseId,
+        actorName: actorName,
+        actorUserId: actorUserId,
+        actorRole: actorRole,
+        allowSelfApprove: allowSelfApprove,
+      );
+      final index = _expenses.indexWhere((e) => e.id == expenseId);
       if (index != -1) {
-        _expenses[index] = expense.copyWith(
-          status: ExpenseStatus.approved,
-          approvedBy: approvedBy,
-          approvedAt: DateTime.now(),
-        );
-        notifyListeners();
+        _expenses[index] = updated;
+      } else {
+        _expenses = [updated, ..._expenses];
       }
-    } catch (e) {
-      _error = e.toString();
-      debugPrint('Error approving expense: $e');
       notifyListeners();
+    } catch (e, st) {
+      _error = _readableError(e);
+      debugPrint('Error approving expense: $_error');
+      debugPrint('Approve raw: $e');
+      debugPrint('Approve stack: $st');
+      notifyListeners();
+      throw StateError(_error!);
     }
   }
 
-  Future<void> rejectExpense(
-    ExpenseEntity expense,
-    String rejectedBy,
-    String reason,
-  ) async {
+  String _readableError(Object e) {
+    final s = e.toString();
+    if (s.contains('Dart exception thrown from converted Future')) {
+      try {
+        // ignore: avoid_dynamic_calls
+        final dynamic d = e;
+        final inner = d.error ?? d.message;
+        if (inner != null && '$inner'.isNotEmpty) {
+          return '$inner';
+        }
+      } catch (_) {}
+      return 'Approve failed (web hid the real error). Common causes: '
+          'insufficient fund/cash balance, day locked, approval limit, '
+          'or Firestore permission-denied. Check fund balance and your role.';
+    }
+    return s
+        .replaceFirst('StateError: ', '')
+        .replaceFirst('Bad state: ', '')
+        .replaceFirst('Exception: ', '');
+  }
+
+  Future<void> rejectExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String reason,
+  }) async {
     _error = null;
     try {
-      await rejectExpenseUseCase(expense, rejectedBy, reason);
-      final index = _expenses.indexWhere((e) => e.id == expense.id);
+      final updated = await rejectExpenseUseCase(
+        expenseId: expenseId,
+        actorName: actorName,
+        actorUserId: actorUserId,
+        reason: reason,
+      );
+      final index = _expenses.indexWhere((e) => e.id == expenseId);
       if (index != -1) {
-        _expenses[index] = expense.copyWith(
-          status: ExpenseStatus.rejected,
-          approvedBy: rejectedBy,
-          approvedAt: DateTime.now(),
-          rejectionReason: reason,
-        );
-        notifyListeners();
+        _expenses[index] = updated;
       }
+      notifyListeners();
     } catch (e) {
       _error = e.toString();
       debugPrint('Error rejecting expense: $e');
       notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> voidExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String reason,
+  }) async {
+    _error = null;
+    try {
+      final updated = await voidExpenseUseCase(
+        expenseId: expenseId,
+        actorName: actorName,
+        actorUserId: actorUserId,
+        reason: reason,
+      );
+      final index = _expenses.indexWhere((e) => e.id == expenseId);
+      if (index != -1) {
+        _expenses[index] = updated;
+      }
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('Error voiding expense: $e');
+      notifyListeners();
+      rethrow;
     }
   }
 
@@ -258,8 +339,6 @@ class FinanceProvider with ChangeNotifier {
   Future<String> uploadReceipt(XFile file, String expenseId) async {
     return await uploadReceiptUseCase(file, expenseId);
   }
-
-  // ─── Filter Operations ─────────────────────────────────────
 
   void setStatusFilter(ExpenseStatus? status) {
     _statusFilter = status;
@@ -291,8 +370,6 @@ class FinanceProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Category Operations ────────────────────────────────────
-
   Future<void> fetchCategories() async {
     _isCategoriesLoading = true;
     _error = null;
@@ -311,11 +388,13 @@ class FinanceProvider with ChangeNotifier {
 
   Future<void> insertCategory(ExpenseCategoryEntity category) async {
     _error = null;
+    _categories = [category, ..._categories];
+    notifyListeners();
+
     try {
       await insertExpenseCategoryUseCase(category);
-      _categories.add(category);
-      notifyListeners();
     } catch (e) {
+      _categories = _categories.where((c) => c.id != category.id).toList();
       _error = e.toString();
       debugPrint('Error inserting category: $e');
       notifyListeners();
@@ -324,14 +403,21 @@ class FinanceProvider with ChangeNotifier {
 
   Future<void> updateCategory(ExpenseCategoryEntity category) async {
     _error = null;
+    final index = _categories.indexWhere((c) => c.id == category.id);
+    ExpenseCategoryEntity? oldCategory;
+
+    if (index != -1) {
+      oldCategory = _categories[index];
+      _categories[index] = category;
+      notifyListeners();
+    }
+
     try {
       await updateExpenseCategoryUseCase(category);
-      final index = _categories.indexWhere((c) => c.id == category.id);
-      if (index != -1) {
-        _categories[index] = category;
-        notifyListeners();
-      }
     } catch (e) {
+      if (index != -1 && oldCategory != null) {
+        _categories[index] = oldCategory;
+      }
       _error = e.toString();
       debugPrint('Error updating category: $e');
       notifyListeners();
@@ -340,18 +426,27 @@ class FinanceProvider with ChangeNotifier {
 
   Future<void> deleteCategory(String id) async {
     _error = null;
+    final index = _categories.indexWhere((c) => c.id == id);
+    ExpenseCategoryEntity? oldCategory;
+
+    if (index != -1) {
+      oldCategory = _categories[index];
+      _categories.removeAt(index);
+      notifyListeners();
+    }
+
     try {
       await deleteExpenseCategoryUseCase(id);
-      _categories.removeWhere((c) => c.id == id);
-      notifyListeners();
     } catch (e) {
+      if (index != -1 && oldCategory != null) {
+        _categories.insert(index, oldCategory);
+      }
       _error = e.toString();
       debugPrint('Error deleting category: $e');
       notifyListeners();
     }
   }
 
-  /// Returns expense types for a given category name.
   List<ExpenseTypeEntity> getTypesForCategory(String categoryName) {
     final index = _categories.indexWhere((c) => c.name == categoryName);
     if (index == -1) return [];

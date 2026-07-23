@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../../domain/entities/expense_entity.dart';
@@ -13,6 +14,8 @@ import '../../domain/entities/expense_category_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../../../../features/employee/presentation/providers/employee_provider.dart';
 import '../../../../features/employee/domain/entities/employee_entity.dart';
+import '../../../../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../../../../features/vehicle/domain/entities/vehicle_entity.dart';
 import 'finance_dashboard_page.dart';
 
 /// Full-featured expense entry/edit form.
@@ -50,13 +53,26 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   String _submittedByRole = 'ADMIN';
   String? _selectedEmployeeId;
   String? _selectedVehicleId;
+  String? _selectedVehicleName;
   List<String> _receiptUrls = [];
+
+  bool get _isFuelType {
+    final t = (_selectedType ?? '').toUpperCase();
+    return t.contains('FUEL') || t.contains('PETROL') || t.contains('DIESEL');
+  }
 
   @override
   void initState() {
     super.initState();
     _isEditing = widget.expense != null;
     final e = widget.expense;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final veh = context.read<VehicleProvider>();
+      if (veh.vehicles.isEmpty) {
+        veh.fetchAllVehicles();
+      }
+    });
 
     _amountController = TextEditingController(
       text: e != null ? e.amount.toString() : '',
@@ -89,6 +105,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       _submittedByRole = e.submittedByRole;
       _selectedEmployeeId = e.employeeId;
       _selectedVehicleId = e.vehicleId;
+      _selectedVehicleName = e.vehicleName;
       _receiptUrls = List.from(e.receiptUrls);
     }
   }
@@ -110,8 +127,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     return Scaffold(
       backgroundColor: FinDT.bgPage,
       appBar: _buildAppBar(),
-      body: Consumer3<FinanceProvider, FundAccountProvider, EmployeeProvider>(
-        builder: (context, finProv, accProv, empProv, _) {
+      body: Consumer4<FinanceProvider, FundAccountProvider, EmployeeProvider,
+          VehicleProvider>(
+        builder: (context, finProv, accProv, empProv, vehProv, _) {
           return SingleChildScrollView(
             padding: EdgeInsets.all(28.w),
             child: Form(
@@ -152,7 +170,21 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                   ),
                   SizedBox(height: 20.h),
 
-
+                  // ── Vehicle (required for fuel) ───────────────
+                  _buildFormCard(
+                    title: _isFuelType
+                        ? 'Vehicle * (required for fuel)'
+                        : 'Vehicle (optional)',
+                    icon: Icons.directions_car_outlined,
+                    children: [
+                      _buildVehicleField(vehProv),
+                      if (_isFuelType) ...[
+                        SizedBox(height: 16.h),
+                        _buildMileageField(),
+                      ],
+                    ],
+                  ),
+                  SizedBox(height: 20.h),
 
                   // ── Receipt Upload ────────────────────────────
                   _buildFormCard(
@@ -756,6 +788,209 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     );
   }
 
+  Widget _buildVehicleField(VehicleProvider vehProv) {
+    VehicleEntity? selected;
+    if (_selectedVehicleId != null && _selectedVehicleId!.isNotEmpty) {
+      final matches =
+          vehProv.vehicles.where((v) => v.id == _selectedVehicleId);
+      if (matches.isNotEmpty) selected = matches.first;
+    }
+    final display = selected != null
+        ? '${selected.plateNumber} · ${selected.make} ${selected.model}'
+        : (_selectedVehicleName ?? '');
+
+    return FormField<String>(
+      initialValue: _selectedVehicleId,
+      validator: (v) {
+        if (_isFuelType &&
+            (_selectedVehicleId == null || _selectedVehicleId!.isEmpty)) {
+          return 'Vehicle is required for fuel expenses';
+        }
+        return null;
+      },
+      builder: (state) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            InkWell(
+              onTap: () => _showVehicleSearchDialog(context, vehProv, (v) {
+                setState(() {
+                  _selectedVehicleId = v.id;
+                  _selectedVehicleName =
+                      '${v.plateNumber} · ${v.make} ${v.model}';
+                });
+                state.didChange(v.id);
+              }),
+              borderRadius: BorderRadius.circular(10.r),
+              child: Container(
+                padding:
+                    EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+                decoration: BoxDecoration(
+                  color: FinDT.bgPage,
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(
+                    color: state.hasError ? FinDT.danger : FinDT.border,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.directions_car_outlined,
+                      size: 16.sp,
+                      color: FinDT.brand,
+                    ),
+                    SizedBox(width: 8.w),
+                    Expanded(
+                      child: Text(
+                        display.isNotEmpty
+                            ? display
+                            : (_isFuelType
+                                ? 'Select vehicle (required for fuel)...'
+                                : 'Search & select vehicle (optional)...'),
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          color: display.isNotEmpty
+                              ? FinDT.textPrimary
+                              : FinDT.textSecondary,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (_selectedVehicleId != null)
+                      InkWell(
+                        onTap: () {
+                          setState(() {
+                            _selectedVehicleId = null;
+                            _selectedVehicleName = null;
+                          });
+                          state.didChange(null);
+                        },
+                        child: Icon(Icons.close, size: 16.sp, color: FinDT.textSecondary),
+                      )
+                    else
+                      Icon(Icons.search, size: 16.sp, color: FinDT.textSecondary),
+                  ],
+                ),
+              ),
+            ),
+            if (state.hasError)
+              Padding(
+                padding: EdgeInsets.only(top: 6.h, left: 4.w),
+                child: Text(
+                  state.errorText!,
+                  style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.danger),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildMileageField() {
+    return _FieldWrapper(
+      label: 'Odometer / Mileage (km)',
+      child: TextFormField(
+        controller: _mileageController,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+        ],
+        decoration: _inputDecoration(hint: 'Optional km reading'),
+        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+      ),
+    );
+  }
+
+  void _showVehicleSearchDialog(
+    BuildContext context,
+    VehicleProvider vehProv,
+    ValueChanged<VehicleEntity> onSelect,
+  ) {
+    final searchCtrl = TextEditingController();
+    var query = '';
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          final vehicles = vehProv.vehicles.where((v) {
+            if (!v.isActive) return false;
+            if (query.isEmpty) return true;
+            final q = query.toLowerCase();
+            return v.plateNumber.toLowerCase().contains(q) ||
+                v.make.toLowerCase().contains(q) ||
+                v.model.toLowerCase().contains(q);
+          }).toList();
+
+          return AlertDialog(
+            title: const Text('Select vehicle'),
+            content: SizedBox(
+              width: 480.w,
+              height: 420.h,
+              child: Column(
+                children: [
+                  TextField(
+                    controller: searchCtrl,
+                    decoration: const InputDecoration(
+                      hintText: 'Search plate, make, model...',
+                      prefixIcon: Icon(Icons.search),
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (v) => setLocal(() => query = v),
+                  ),
+                  SizedBox(height: 12.h),
+                  if (vehProv.vehicles.isEmpty)
+                    const Expanded(
+                      child: Center(child: Text('No vehicles loaded')),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: vehicles.length,
+                        itemBuilder: (_, i) {
+                          final v = vehicles[i];
+                          return ListTile(
+                            leading: Icon(
+                              Icons.directions_car,
+                              color: FinDT.brand,
+                              size: 20.sp,
+                            ),
+                            title: Text(
+                              v.plateNumber,
+                              style: GoogleFonts.inter(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13.sp,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${v.make} ${v.model} · ${v.year}',
+                              style: GoogleFonts.inter(fontSize: 11.sp),
+                            ),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              onSelect(v);
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Widget _buildReceiptSection(FinanceProvider finProv) {
     return Column(
       children: [
@@ -909,11 +1144,25 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   Future<void> _saveExpense(FinanceProvider finProv) async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (_isFuelType &&
+        (_selectedVehicleId == null || _selectedVehicleId!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Select a vehicle for fuel expenses'),
+          backgroundColor: FinDT.danger,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
       final accProv = context.read<FundAccountProvider>();
       final account = accProv.getAccountById(_selectedAccountId ?? '');
+
+      final authUser = context.read<AuthProvider>().user;
+      final amount = double.parse(_amountController.text);
 
       final expense = ExpenseEntity(
         id: _isEditing ? widget.expense!.id : const Uuid().v4(),
@@ -924,8 +1173,14 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         createdAt:
             _isEditing ? widget.expense!.createdAt : DateTime.now(),
         updatedAt: _isEditing ? DateTime.now() : null,
-        submittedBy: _submittedBy,
-        submittedByRole: _submittedByRole,
+        submittedBy: _submittedBy.isNotEmpty
+            ? _submittedBy
+            : (authUser?.actorLabel ?? ''),
+        submittedByRole: _submittedByRole.isNotEmpty
+            ? _submittedByRole
+            : (authUser?.role.name.toUpperCase() ?? 'USER'),
+        submittedByUserId:
+            widget.expense?.submittedByUserId ?? authUser?.id,
         expenseCategory: _selectedCategory!,
         expenseType: _selectedType!,
         description: _descriptionController.text.isEmpty
@@ -935,15 +1190,18 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
             ? null
             : _paymentDetailsController.text,
         paymentMethod: _paymentMethod,
-        amount: double.parse(_amountController.text),
+        amount: amount,
+        amountMinor: (amount * 100).round(),
         currency: _selectedCurrency,
         fundAccountId: _selectedAccountId!,
         fundAccountName: account?.name,
+        isNonWallet: false,
         status: _isEditing
             ? widget.expense!.status
             : ExpenseStatus.pending,
         employeeId: _selectedEmployeeId,
         vehicleId: _selectedVehicleId,
+        vehicleName: _selectedVehicleName,
         mileageKm: _mileageController.text.isNotEmpty
             ? double.tryParse(_mileageController.text)
             : null,

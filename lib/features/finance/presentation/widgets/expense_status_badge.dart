@@ -51,6 +51,13 @@ class ExpenseStatusBadge extends StatelessWidget {
 
   _StatusConfig _statusConfig(ExpenseStatus status) {
     switch (status) {
+      case ExpenseStatus.draft:
+        return _StatusConfig(
+          bg: const Color(0xFFF8FAFC),
+          border: const Color(0xFFE2E8F0),
+          dot: const Color(0xFF94A3B8),
+          text: const Color(0xFF475569),
+        );
       case ExpenseStatus.pending:
         return _StatusConfig(
           bg: const Color(0xFFFFFBEB),
@@ -59,6 +66,13 @@ class ExpenseStatusBadge extends StatelessWidget {
           text: const Color(0xFF92400E),
         );
       case ExpenseStatus.approved:
+        return _StatusConfig(
+          bg: const Color(0xFFECFDF5),
+          border: const Color(0xFFA7F3D0),
+          dot: const Color(0xFF059669),
+          text: const Color(0xFF065F46),
+        );
+      case ExpenseStatus.paid:
         return _StatusConfig(
           bg: const Color(0xFFF0FDF4),
           border: const Color(0xFFBBF7D0),
@@ -71,6 +85,13 @@ class ExpenseStatusBadge extends StatelessWidget {
           border: const Color(0xFFFFCDD2),
           dot: const Color(0xFFDC2626),
           text: const Color(0xFF991B1B),
+        );
+      case ExpenseStatus.voided:
+        return _StatusConfig(
+          bg: const Color(0xFFF5F3FF),
+          border: const Color(0xFFDDD6FE),
+          dot: const Color(0xFF7C3AED),
+          text: const Color(0xFF5B21B6),
         );
       case ExpenseStatus.closed:
         return _StatusConfig(
