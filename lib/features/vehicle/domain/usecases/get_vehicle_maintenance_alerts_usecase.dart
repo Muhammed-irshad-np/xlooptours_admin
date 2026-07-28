@@ -20,6 +20,9 @@ class VehicleMaintenanceAlert {
   final int? daysOverdue;
   final int? daysRemaining;
 
+  // Shop / Provider field
+  final String? shopName;
+
   VehicleMaintenanceAlert({
     required this.vehicle,
     required this.category,
@@ -35,6 +38,7 @@ class VehicleMaintenanceAlert {
     this.nextServiceDate,
     this.daysOverdue,
     this.daysRemaining,
+    this.shopName,
   });
 
   bool get isDateTrigger => triggerType == 'date';
@@ -150,6 +154,7 @@ class GetVehicleMaintenanceAlertsUseCase {
                 nextServiceDate: targetDueDate,
                 daysOverdue: diffDays > 0 ? diffDays : 0,
                 daysRemaining: diffDays < 0 ? -diffDays : 0,
+                shopName: lastService.originalRecord?.serviceProvider,
               ),
             );
           }
@@ -212,6 +217,7 @@ class GetVehicleMaintenanceAlertsUseCase {
                 originalDueMileage: originalDue,
                 triggerType: 'odometer',
                 lastServiceDate: lastService.originalRecord?.date,
+                shopName: lastService.originalRecord?.serviceProvider,
               ),
             );
           }
