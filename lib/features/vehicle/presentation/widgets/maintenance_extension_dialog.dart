@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.dart';
 import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
@@ -27,21 +28,34 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
   final _formKey = GlobalKey<FormState>();
   final _extensionController = TextEditingController(text: '10000');
   final _reasonController = TextEditingController();
+  final _dateController = TextEditingController();
+  
   bool _isLoading = false;
   int? _calculatedThreshold;
+  DateTime? _selectedTargetDate;
 
   @override
   void initState() {
     super.initState();
-    _recalculateThreshold();
-    _extensionController.addListener(_recalculateThreshold);
+    if (widget.alert.isDateTrigger) {
+      _selectedTargetDate = widget.alert.nextServiceDate ??
+          DateTime.now().add(const Duration(days: 30));
+      _dateController.text =
+          DateFormat('MMM dd, yyyy').format(_selectedTargetDate!);
+    } else {
+      _recalculateThreshold();
+      _extensionController.addListener(_recalculateThreshold);
+    }
   }
 
   @override
   void dispose() {
-    _extensionController.removeListener(_recalculateThreshold);
+    if (!widget.alert.isDateTrigger) {
+      _extensionController.removeListener(_recalculateThreshold);
+    }
     _extensionController.dispose();
     _reasonController.dispose();
+    _dateController.dispose();
     super.dispose();
   }
 
@@ -51,6 +65,24 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
     setState(() {
       _calculatedThreshold = baseOdo + extVal;
     });
+  }
+
+  Future<void> _selectTargetDate() async {
+    final initial = _selectedTargetDate ??
+        widget.alert.nextServiceDate ??
+        DateTime.now().add(const Duration(days: 30));
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial.isBefore(DateTime.now()) ? DateTime.now().add(const Duration(days: 1)) : initial,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedTargetDate = picked;
+        _dateController.text = DateFormat('MMM dd, yyyy').format(picked);
+      });
+    }
   }
 
   Future<void> _submitExtension() async {
@@ -70,23 +102,29 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
 
     try {
       final provider = context.read<VehicleProvider>();
-      final extensionKm = int.parse(_extensionController.text);
+      final isDate = widget.alert.isDateTrigger;
+      final extensionKm = isDate ? 0 : (int.tryParse(_extensionController.text) ?? 0);
       final reason = _reasonController.text.trim();
 
       await provider.extendVehicleMaintenance(
         vehicle: widget.vehicle,
         category: widget.alert.category,
         extensionKm: extensionKm,
+        extensionDate: isDate ? _selectedTargetDate : null,
         reason: reason,
         performedBy: username,
         baseOdometer: widget.alert.nextServiceMileage,
       );
 
+      final extMessage = isDate
+          ? 'extended to ${DateFormat('MMM dd, yyyy').format(_selectedTargetDate!)}'
+          : 'extended by $extensionKm km';
+
       if (mounted) {
         await ActivityLogger.log(
           context,
           title: 'Alert Extended',
-          message: 'Maintenance alert for ${widget.alert.category} on vehicle ${widget.vehicle.make} ${widget.vehicle.model} (${widget.vehicle.plateNumber}) extended by $extensionKm km.',
+          message: 'Maintenance alert for ${widget.alert.category} on vehicle ${widget.vehicle.make} ${widget.vehicle.model} (${widget.vehicle.plateNumber}) $extMessage.',
           relatedId: widget.vehicle.id,
         );
       }
@@ -96,7 +134,7 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Successfully extended ${widget.alert.category} alert by $extensionKm km.',
+              'Successfully extended ${widget.alert.category} alert ($extMessage).',
             ),
             backgroundColor: Colors.green,
           ),
@@ -123,6 +161,11 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
   @override
   Widget build(BuildContext context) {
     final currentOdo = widget.vehicle.currentOdometer ?? 0;
+    final isDate = widget.alert.isDateTrigger;
+
+    final summaryText = isDate
+        ? 'Part: ${widget.alert.category}\nTrigger: Date\nCurrent Due Date: ${widget.alert.nextServiceDate != null ? DateFormat('MMM dd, yyyy').format(widget.alert.nextServiceDate!) : 'Not set'}'
+        : 'Part: ${widget.alert.category}\nCurrent Odometer: $currentOdo km\nOriginal Due: ${widget.alert.nextServiceMileage} km';
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
@@ -167,7 +210,7 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
                     SizedBox(width: 8.w),
                     Expanded(
                       child: Text(
-                        'Part: ${widget.alert.category}\nCurrent Odometer: $currentOdo km\nOriginal Due: ${widget.alert.nextServiceMileage} km',
+                        summaryText,
                         style: GoogleFonts.inter(
                           fontSize: 13.sp,
                           height: 1.5,
@@ -182,25 +225,44 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
               SizedBox(height: 20.h),
 
               // Extension Input
-              TextFormField(
-                controller: _extensionController,
-                keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
-                  labelText: 'Extension Mileage (KM)',
-                  hintText: 'e.g., 20000',
-                  suffixText: 'km',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8.r),
+              if (isDate)
+                TextFormField(
+                  controller: _dateController,
+                  readOnly: true,
+                  onTap: _selectTargetDate,
+                  decoration: InputDecoration(
+                    labelText: 'New Extension Target Date',
+                    hintText: 'Select Date',
+                    suffixIcon: const Icon(Icons.calendar_today),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
                   ),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Target Date is required';
+                    return null;
+                  },
+                )
+              else
+                TextFormField(
+                  controller: _extensionController,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'Extension Mileage (KM)',
+                    hintText: 'e.g., 20000',
+                    suffixText: 'km',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.r),
+                    ),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.trim().isEmpty) return 'Required';
+                    final numVal = int.tryParse(v);
+                    if (numVal == null || numVal <= 0) return 'Enter a positive integer';
+                    return null;
+                  },
                 ),
-                validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'Required';
-                  final numVal = int.tryParse(v);
-                  if (numVal == null || numVal <= 0) return 'Enter a positive integer';
-                  return null;
-                },
-              ),
               SizedBox(height: 16.h),
 
               // Reason Input
@@ -209,7 +271,7 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
                 maxLines: 2,
                 decoration: InputDecoration(
                   labelText: 'Inspection Notes / Reason',
-                  hintText: 'e.g., Brake pad has 5mm remaining, safe for extended use.',
+                  hintText: 'e.g., Component checked and verified safe for extended use.',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.r),
                   ),
@@ -222,7 +284,37 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
               SizedBox(height: 20.h),
 
               // Projection Result
-              if (_calculatedThreshold != null)
+              if (isDate && _selectedTargetDate != null)
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF3F4F6),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Projected Next Due Date:',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.sp,
+                          color: const Color(0xFF4B5563),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        DateFormat('MMM dd, yyyy').format(_selectedTargetDate!),
+                        style: GoogleFonts.inter(
+                          fontSize: 15.sp,
+                          color: const Color(0xFF111827),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else if (!isDate && _calculatedThreshold != null)
                 Container(
                   width: double.infinity,
                   padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),

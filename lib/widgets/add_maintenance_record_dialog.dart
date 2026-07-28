@@ -40,6 +40,10 @@ class _MaintenanceEntry {
   final TextEditingController followUpDateController = TextEditingController();
   final TextEditingController followUpKmController = TextEditingController();
 
+  DateTime? targetDueDate;
+  final TextEditingController targetDueDateController =
+      TextEditingController();
+
   void dispose() {
     customTypeController.dispose();
     dateController.dispose();
@@ -49,6 +53,7 @@ class _MaintenanceEntry {
     followUpReasonController.dispose();
     followUpDateController.dispose();
     followUpKmController.dispose();
+    targetDueDateController.dispose();
   }
 }
 
@@ -135,6 +140,27 @@ class _AddMaintenanceRecordDialogState
       setState(() {
         entry.followUpDate = picked;
         entry.followUpDateController.text = DateFormat(
+          'MMM dd, yyyy',
+        ).format(picked);
+      });
+    }
+  }
+
+  Future<void> _selectTargetDueDate(
+    BuildContext context,
+    _MaintenanceEntry entry,
+  ) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate:
+          entry.targetDueDate ?? DateTime.now().add(const Duration(days: 30)),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        entry.targetDueDate = picked;
+        entry.targetDueDateController.text = DateFormat(
           'MMM dd, yyyy',
         ).format(picked);
       });
@@ -258,6 +284,21 @@ class _AddMaintenanceRecordDialogState
         final int currentOdo =
             int.tryParse(entry.serviceKmController.text) ?? 0;
 
+        DateTime? computedNextDate =
+            entry.isFollowUpRequired ? entry.followUpDate : null;
+
+        if (computedNextDate == null &&
+            entry.maintenanceTypeId != _kCarWashId &&
+            entry.maintenanceTypeId != _kOtherId) {
+          final matchType = provider.maintenanceTypes.firstWhere(
+            (t) => t.id == entry.maintenanceTypeId,
+            orElse: () => throw StateError('Type not found'),
+          );
+          if (matchType.isDateTrigger) {
+            computedNextDate = entry.targetDueDate;
+          }
+        }
+
         recordsToAdd.add((
           typeId: entry.maintenanceTypeId!,
           record: MaintenanceRecord(
@@ -273,9 +314,7 @@ class _AddMaintenanceRecordDialogState
             followUpReason: entry.isFollowUpRequired
                 ? entry.followUpReasonController.text.trim()
                 : null,
-            nextServiceDate: entry.isFollowUpRequired
-                ? entry.followUpDate
-                : null,
+            nextServiceDate: computedNextDate,
             nextServiceMileage: entry.isFollowUpRequired
                 ? int.tryParse(entry.followUpKmController.text)
                 : null,
@@ -432,6 +471,17 @@ class _AddMaintenanceRecordDialogState
                   itemBuilder: (context, index) {
                     final entry = _entries[index];
                     final isOther = entry.maintenanceTypeId == _kOtherId;
+                    final isDateTriggered = () {
+                      if (entry.maintenanceTypeId == null ||
+                          entry.maintenanceTypeId == _kCarWashId ||
+                          entry.maintenanceTypeId == _kOtherId) {
+                        return false;
+                      }
+                      return types.any(
+                        (t) =>
+                            t.id == entry.maintenanceTypeId && t.isDateTrigger,
+                      );
+                    }();
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -634,6 +684,51 @@ class _AddMaintenanceRecordDialogState
                                     if (entry.maintenanceTypeId == _kOtherId &&
                                         (v == null || v.trim().isEmpty)) {
                                       return 'Please enter a type name';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+
+                        // ── Date Trigger Next Due Date selection ──
+                        if (isDateTriggered) ...[
+                          SizedBox(height: 12.h),
+                          Row(
+                            children: [
+                              SizedBox(width: 8.w),
+                              Icon(
+                                Icons.event_outlined,
+                                size: 20.sp,
+                                color: Colors.blue[600],
+                              ),
+                              SizedBox(width: 8.w),
+                              SizedBox(
+                                width: 320.w,
+                                child: TextFormField(
+                                  controller: entry.targetDueDateController,
+                                  readOnly: true,
+                                  onTap: () =>
+                                      _selectTargetDueDate(context, entry),
+                                  decoration: InputDecoration(
+                                    labelText: 'Next Service / Target Due Date *',
+                                    hintText:
+                                        'Select date when next service is due',
+                                    suffixIcon: const Icon(Icons.calendar_today),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.blue.withValues(
+                                      alpha: 0.03,
+                                    ),
+                                  ),
+                                  validator: (v) {
+                                    if (isDateTriggered &&
+                                        (v == null || v.isEmpty)) {
+                                      return 'Please select a Target Due Date';
                                     }
                                     return null;
                                   },

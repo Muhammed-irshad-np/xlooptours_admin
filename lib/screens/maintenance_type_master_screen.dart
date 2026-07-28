@@ -37,7 +37,7 @@ class _MaintenanceTypeMasterScreenState
         _isLoading.value = false;
       }
     } catch (e) {
-      debugPrint('Error loading maintenance types: \$e');
+      debugPrint('Error loading maintenance types: $e');
       if (mounted) {
         _isLoading.value = false;
       }
@@ -54,7 +54,7 @@ class _MaintenanceTypeMasterScreenState
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error deleting type: \$e')));
+        ).showSnackBar(SnackBar(content: Text('Error deleting type: $e')));
       }
     }
   }
@@ -127,7 +127,9 @@ class _MaintenanceTypeMasterScreenState
                     ),
                   ),
                   subtitle: Text(
-                    'SUV: ${type.suvIntervalKm} KM  |  Sedan: ${type.sedanIntervalKm} KM',
+                    type.isDateTrigger
+                        ? 'Trigger: Date (Target date selected per vehicle record)'
+                        : 'Trigger: Odometer  |  SUV: ${type.suvIntervalKm} KM  |  Sedan: ${type.sedanIntervalKm} KM',
                     style: TextStyle(color: Colors.grey[600], fontSize: 14.sp),
                   ),
                   trailing: Row(
@@ -146,7 +148,7 @@ class _MaintenanceTypeMasterScreenState
                             builder: (c) => AlertDialog(
                               title: const Text('Delete Maintenance Type'),
                               content: Text(
-                                'Are you sure you want to delete \${type.name}?',
+                                'Are you sure you want to delete ${type.name}?',
                               ),
                               actions: [
                                 TextButton(
@@ -203,15 +205,18 @@ class _AddEditMaintenanceTypeDialogState
   late TextEditingController _suvIntervalController;
   late TextEditingController _sedanIntervalController;
 
+  late String _triggerType;
+
   @override
   void initState() {
     super.initState();
+    _triggerType = widget.type?.triggerType ?? 'odometer';
     _nameController = TextEditingController(text: widget.type?.name ?? '');
     _suvIntervalController = TextEditingController(
-      text: widget.type?.suvIntervalKm.toString() ?? '',
+      text: widget.type?.suvIntervalKm.toString() ?? '5000',
     );
     _sedanIntervalController = TextEditingController(
-      text: widget.type?.sedanIntervalKm.toString() ?? '',
+      text: widget.type?.sedanIntervalKm.toString() ?? '5000',
     );
   }
 
@@ -226,11 +231,18 @@ class _AddEditMaintenanceTypeDialogState
   void _save() {
     if (!_formKey.currentState!.validate()) return;
 
+    final isDate = _triggerType == 'date';
+
     final newType = MaintenanceTypeEntity(
       id: widget.type?.id ?? const Uuid().v4(),
       name: _nameController.text.trim(),
-      suvIntervalKm: int.tryParse(_suvIntervalController.text.trim()) ?? 0,
-      sedanIntervalKm: int.tryParse(_sedanIntervalController.text.trim()) ?? 0,
+      triggerType: _triggerType,
+      suvIntervalKm: isDate
+          ? 0
+          : (int.tryParse(_suvIntervalController.text.trim()) ?? 0),
+      sedanIntervalKm: isDate
+          ? 0
+          : (int.tryParse(_sedanIntervalController.text.trim()) ?? 0),
     );
 
     widget.onSave(newType);
@@ -239,10 +251,12 @@ class _AddEditMaintenanceTypeDialogState
 
   @override
   Widget build(BuildContext context) {
+    final isDateTrigger = _triggerType == 'date';
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
-        width: 400,
+        width: 440,
         padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
@@ -259,53 +273,127 @@ class _AddEditMaintenanceTypeDialogState
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
                   labelText: 'Maintenance Name (e.g. Engine Oil Change)',
                   border: OutlineInputBorder(),
                 ),
-                validator: (v) => v!.isEmpty ? 'Required' : null,
+                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 20),
+              // --- Trigger Type Selection ---
+              const Text(
+                'Trigger Type',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+              ),
+              const SizedBox(height: 8),
               Row(
                 children: [
                   Expanded(
-                    child: TextFormField(
-                      controller: _suvIntervalController,
-                      decoration: const InputDecoration(
-                        labelText: 'SUV Interval (KM)',
-                        border: OutlineInputBorder(),
+                    child: ChoiceChip(
+                      label: const Center(
+                        child: Text('Odometer (KM)'),
                       ),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Required';
-                        if (int.tryParse(v) == null) return 'Invalid number';
-                        return null;
+                      selected: _triggerType == 'odometer',
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _triggerType = 'odometer';
+                          });
+                        }
                       },
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: TextFormField(
-                      controller: _sedanIntervalController,
-                      decoration: const InputDecoration(
-                        labelText: 'Sedan Interval (KM)',
-                        border: OutlineInputBorder(),
+                    child: ChoiceChip(
+                      label: const Center(
+                        child: Text('Date'),
                       ),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Required';
-                        if (int.tryParse(v) == null) return 'Invalid number';
-                        return null;
+                      selected: _triggerType == 'date',
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _triggerType = 'date';
+                          });
+                        }
                       },
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 20),
+
+              if (!isDateTrigger) ...[
+                // --- ODOMETER INPUTS ---
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _suvIntervalController,
+                        decoration: const InputDecoration(
+                          labelText: 'SUV Interval (KM)',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        validator: (v) {
+                          if (_triggerType == 'odometer') {
+                            if (v == null || v.isEmpty) return 'Required';
+                            if (int.tryParse(v) == null) return 'Invalid number';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _sedanIntervalController,
+                        decoration: const InputDecoration(
+                          labelText: 'Sedan Interval (KM)',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                        validator: (v) {
+                          if (_triggerType == 'odometer') {
+                            if (v == null || v.isEmpty) return 'Required';
+                            if (int.tryParse(v) == null) return 'Invalid number';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ] else ...[
+                // --- DATE TRIGGER INFO ---
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.blue.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.blue, size: 20),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'Target due date for date-triggered maintenance is selected when adding maintenance records for a vehicle.',
+                          style: TextStyle(fontSize: 13, color: Colors.blue),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
