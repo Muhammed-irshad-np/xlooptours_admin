@@ -605,6 +605,24 @@ class VehicleDetailScreen extends StatelessWidget {
                 color: Colors.grey[600],
               ),
             ),
+            if (record.serviceProvider != null &&
+                record.serviceProvider!.isNotEmpty) ...[
+              SizedBox(height: 2.h),
+              Row(
+                children: [
+                  Icon(Icons.storefront, size: 13.sp, color: Colors.blue.shade700),
+                  SizedBox(width: 4.w),
+                  Text(
+                    record.serviceProvider!,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: Colors.blue.shade800,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (record.isFollowUpRequired == true) ...[
               SizedBox(height: 4.h),
               Row(

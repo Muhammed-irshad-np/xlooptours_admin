@@ -6,8 +6,10 @@ import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
+import '../features/vehicle/domain/entities/shop_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../core/utils/activity_logger.dart';
@@ -19,6 +21,7 @@ const String _kOtherId = '__other__';
 
 class _MaintenanceEntry {
   String? maintenanceTypeId;
+  String? selectedShopName;
 
   /// When [maintenanceTypeId] == [_kOtherId], the user must fill in a custom
   /// name via this controller.
@@ -84,6 +87,112 @@ class _AddMaintenanceRecordDialogState
     _entries = [
       _MaintenanceEntry()..maintenanceTypeId = widget.initialMaintenanceTypeId,
     ];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<VehicleProvider>().fetchAllShops();
+      }
+    });
+  }
+
+  Future<void> _showQuickAddShopDialog(_MaintenanceEntry entry) async {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final createdShop = await showDialog<ShopEntity>(
+      context: context,
+      builder: (context) {
+        bool isSaving = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Quick Add Shop'),
+              content: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: nameController,
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Shop / Workshop Name *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.storefront),
+                      ),
+                      textCapitalization: TextCapitalization.words,
+                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                    ),
+                    SizedBox(height: 12.h),
+                    TextFormField(
+                      controller: phoneController,
+                      decoration: const InputDecoration(
+                        labelText: 'Phone Number (Optional)',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.phone),
+                      ),
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          setDialogState(() => isSaving = true);
+                          try {
+                            final newShop = ShopEntity(
+                              id: const Uuid().v4(),
+                              name: nameController.text.trim(),
+                              phone: phoneController.text.trim().isEmpty
+                                  ? null
+                                  : phoneController.text.trim(),
+                              createdAt: DateTime.now(),
+                            );
+                            await context.read<VehicleProvider>().addShop(newShop);
+                            if (context.mounted) {
+                              Navigator.pop(context, newShop);
+                            }
+                          } catch (e) {
+                            setDialogState(() => isSaving = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed to add shop: $e')),
+                              );
+                            }
+                          }
+                        },
+                  child: isSaving
+                      ? SizedBox(
+                          width: 16.w,
+                          height: 16.w,
+                          child: const CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Add & Select'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    phoneController.dispose();
+
+    if (createdShop != null) {
+      setState(() {
+        entry.selectedShopName = createdShop.name;
+      });
+    }
   }
 
   @override
@@ -305,7 +414,7 @@ class _AddMaintenanceRecordDialogState
             date: entry.date,
             mileage: currentOdo,
             cost: double.tryParse(entry.costController.text),
-            serviceProvider: '',
+            serviceProvider: entry.selectedShopName ?? '',
             notes: entry.notesController.text,
             serviceType: typeName,
             attachmentUrl: primaryUrl,
@@ -560,6 +669,71 @@ class _AddMaintenanceRecordDialogState
                                   });
                                 },
                                 validator: (v) => v == null ? 'Required' : null,
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            // ---------- Shop / Workshop dropdown with Quick Add ----------
+                            Expanded(
+                              flex: 2,
+                              child: Consumer<VehicleProvider>(
+                                builder: (context, provider, _) {
+                                  final shops = provider.shops;
+                                  final currentShopName = entry.selectedShopName;
+                                  final bool valueInShops = shops.any((s) => s.name == currentShopName);
+
+                                  return DropdownButtonFormField<String>(
+                                    value: valueInShops ? currentShopName : null,
+                                    decoration: InputDecoration(
+                                      labelText: 'Shop / Workshop (Optional)',
+                                      prefixIcon: Icon(Icons.storefront_outlined, size: 18.sp),
+                                      suffixIcon: IconButton(
+                                        icon: Icon(Icons.add_circle_outline, color: Colors.blue, size: 20.sp),
+                                        tooltip: 'Quick Add Shop',
+                                        onPressed: () => _showQuickAddShopDialog(entry),
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8.r),
+                                      ),
+                                    ),
+                                    isExpanded: true,
+                                    items: [
+                                      ...shops.map((s) {
+                                        return DropdownMenuItem(
+                                          value: s.name,
+                                          child: Text(s.name, overflow: TextOverflow.ellipsis),
+                                        );
+                                      }),
+                                      if (shops.isNotEmpty)
+                                        DropdownMenuItem<String>(
+                                          enabled: false,
+                                          value: null,
+                                          child: Divider(height: 1, color: Colors.grey[300]),
+                                        ),
+                                      DropdownMenuItem<String>(
+                                        value: '_quick_add_new_shop_',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.add, size: 18.sp, color: Colors.blue),
+                                            SizedBox(width: 6.w),
+                                            const Text(
+                                              '+ Quick Add Shop',
+                                              style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: (value) {
+                                      if (value == '_quick_add_new_shop_') {
+                                        _showQuickAddShopDialog(entry);
+                                      } else {
+                                        setState(() {
+                                          entry.selectedShopName = value;
+                                        });
+                                      }
+                                    },
+                                  );
+                                },
                               ),
                             ),
                             SizedBox(width: 16.w),
