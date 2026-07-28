@@ -794,6 +794,23 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
                           ),
                         ],
                       ),
+                      if (a.shopName != null && a.shopName!.isNotEmpty) ...[
+                        SizedBox(height: 4.h),
+                        Row(
+                          children: [
+                            Icon(Icons.storefront_outlined, size: 13.sp, color: _DT.brand),
+                            SizedBox(width: 4.w),
+                            Text(
+                              'Shop: ${a.shopName}',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w600,
+                                color: _DT.brand,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
