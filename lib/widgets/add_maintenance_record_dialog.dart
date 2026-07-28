@@ -586,10 +586,15 @@ class _AddMaintenanceRecordDialogState
     final provider = context.watch<VehicleProvider>();
     final types = provider.maintenanceTypes;
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final dialogWidth = screenWidth > 1200
+        ? 1000.w
+        : (screenWidth > 800 ? 880.w : screenWidth * 0.92);
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
       child: Container(
-        width: 800.w, // Match screen size constraint or constraints
+        width: dialogWidth,
         padding: EdgeInsets.all(24.w),
         child: Form(
           key: _formKey,
@@ -630,6 +635,7 @@ class _AddMaintenanceRecordDialogState
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // ── Row 1: Type, Shop, Date ──
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -639,7 +645,7 @@ class _AddMaintenanceRecordDialogState
                               child: DropdownButtonFormField<String>(
                                 initialValue: entry.maintenanceTypeId,
                                 decoration: InputDecoration(
-                                  labelText: 'Maintenance Type',
+                                  labelText: 'Maintenance Type *',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8.r),
                                   ),
@@ -773,6 +779,7 @@ class _AddMaintenanceRecordDialogState
                             ),
                             SizedBox(width: 16.w),
                             Expanded(
+                              flex: 1,
                               child: TextFormField(
                                 controller: entry.dateController,
                                 readOnly: true,
@@ -786,12 +793,19 @@ class _AddMaintenanceRecordDialogState
                                 ),
                               ),
                             ),
-                            SizedBox(width: 16.w),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                        // ── Row 2: Odometer, Cost, Notes, Delete ──
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Expanded(
+                              flex: 1,
                               child: TextFormField(
                                 controller: entry.serviceKmController,
                                 decoration: InputDecoration(
-                                  labelText: 'Current Odometer',
+                                  labelText: 'Current Odometer *',
                                   suffixText: 'km',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8.r),
@@ -810,6 +824,7 @@ class _AddMaintenanceRecordDialogState
                             ),
                             SizedBox(width: 16.w),
                             Expanded(
+                              flex: 1,
                               child: TextFormField(
                                 controller: entry.costController,
                                 decoration: InputDecoration(
@@ -832,10 +847,11 @@ class _AddMaintenanceRecordDialogState
                             ),
                             SizedBox(width: 16.w),
                             Expanded(
+                              flex: 2,
                               child: TextFormField(
                                 controller: entry.notesController,
                                 decoration: InputDecoration(
-                                  labelText: 'Notes',
+                                  labelText: 'Notes / Remarks (Optional)',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8.r),
                                   ),
@@ -844,13 +860,14 @@ class _AddMaintenanceRecordDialogState
                             ),
                             if (_entries.length > 1)
                               Padding(
-                                padding: EdgeInsets.only(left: 8.w, top: 4.h),
+                                padding: EdgeInsets.only(left: 12.w, top: 8.h),
                                 child: IconButton(
                                   icon: const Icon(
                                     Icons.delete_outline,
                                     color: Colors.red,
                                   ),
                                   onPressed: () => _removeEntry(index),
+                                  tooltip: 'Remove Entry',
                                 ),
                               ),
                           ],
