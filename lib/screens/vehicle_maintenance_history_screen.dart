@@ -23,6 +23,7 @@ class VehicleMaintenanceHistoryScreen extends StatefulWidget {
 class _VehicleMaintenanceHistoryScreenState
     extends State<VehicleMaintenanceHistoryScreen> {
   String _selectedFilter = 'All'; // 'All', 'Follow-ups', 'Extensions'
+  String _selectedShopFilter = 'All Shops';
 
   @override
   Widget build(BuildContext context) {
@@ -41,16 +42,38 @@ class _VehicleMaintenanceHistoryScreenState
         );
         history.sort((a, b) => b.date.compareTo(a.date));
 
-        final filteredHistory = history.where((record) {
-          if (_selectedFilter == 'Follow-ups') {
-            return record.isFollowUpRequired == true;
-          } else if (_selectedFilter == 'Extensions') {
-            return record.isExtended == true ||
-                (record.serviceType != null &&
-                    record.serviceType!.startsWith('Extension:'));
+        // Extract available shop names from history
+        final Set<String> availableShops = {'All Shops'};
+        for (var record in history) {
+          if (record.serviceProvider != null && record.serviceProvider!.isNotEmpty) {
+            availableShops.add(record.serviceProvider!);
           }
-          return true; // 'All'
+        }
+
+        final filteredHistory = history.where((record) {
+          final matchesCategory = () {
+            if (_selectedFilter == 'Follow-ups') {
+              return record.isFollowUpRequired == true;
+            } else if (_selectedFilter == 'Extensions') {
+              return record.isExtended == true ||
+                  (record.serviceType != null &&
+                      record.serviceType!.startsWith('Extension:'));
+            }
+            return true; // 'All'
+          }();
+
+          final matchesShop = () {
+            if (_selectedShopFilter == 'All Shops') return true;
+            return record.serviceProvider == _selectedShopFilter;
+          }();
+
+          return matchesCategory && matchesShop;
         }).toList();
+
+        final double totalCost = filteredHistory.fold(
+          0.0,
+          (sum, r) => sum + (r.cost ?? 0.0),
+        );
 
         return Scaffold(
           appBar: ModernAppBar(
@@ -58,12 +81,13 @@ class _VehicleMaintenanceHistoryScreenState
           ),
           body: Column(
             children: [
-              _buildFilterBar(),
+              _buildFilterBar(availableShops.toList()),
+              _buildCostSummaryCard(totalCost, filteredHistory.length),
               Expanded(
                 child: filteredHistory.isEmpty
                     ? Center(
                         child: Text(
-                          'No ${_selectedFilter.toLowerCase()} available.',
+                          'No maintenance history available for selected filters.',
                           style: const TextStyle(fontSize: 16, color: Colors.grey),
                         ),
                       )
@@ -90,47 +114,160 @@ class _VehicleMaintenanceHistoryScreenState
     );
   }
 
-  Widget _buildFilterBar() {
-    final filters = ['All', 'Follow-ups', 'Extensions'];
+  Widget _buildCostSummaryCard(double totalCost, int recordCount) {
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
-      color: Colors.white,
+      margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.blue.shade800, Colors.indigo.shade900],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12.r),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blue.withValues(alpha: 0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Row(
-        children: filters.map((filter) {
-          final isSelected = _selectedFilter == filter;
-          return Padding(
-            padding: EdgeInsets.only(right: 8.w),
-            child: ChoiceChip(
-              label: Text(
-                filter,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.grey[700],
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                  fontSize: 13.sp,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: EdgeInsets.all(8.w),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
                 ),
+                child: Icon(Icons.account_balance_wallet, color: Colors.white, size: 20.sp),
               ),
-              selected: isSelected,
-              onSelected: (val) {
-                if (val) {
-                  setState(() {
-                    _selectedFilter = filter;
-                  });
-                }
-              },
-              selectedColor: Colors.blue[700],
-              backgroundColor: Colors.grey[100],
-              checkmarkColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20.r),
-                side: BorderSide(
-                  color: isSelected
-                      ? Colors.blue.shade700
-                      : Colors.grey.shade300,
-                ),
+              SizedBox(width: 12.w),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _selectedShopFilter == 'All Shops'
+                        ? 'Total Maintenance Cost'
+                        : 'Cost at $_selectedShopFilter',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    '\$${totalCost.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Text(
+              '$recordCount Records',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12.sp,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          );
-        }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterBar(List<String> availableShops) {
+    final filters = ['All', 'Follow-ups', 'Extensions'];
+    return Container(
+      padding: EdgeInsets.symmetric(vertical: 8.h, horizontal: 16.w),
+      color: Colors.white,
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: filters.map((filter) {
+                      final isSelected = _selectedFilter == filter;
+                      return Padding(
+                        padding: EdgeInsets.only(right: 8.w),
+                        child: ChoiceChip(
+                          label: Text(
+                            filter,
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : Colors.grey[700],
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 12.sp,
+                            ),
+                          ),
+                          selected: isSelected,
+                          onSelected: (val) {
+                            if (val) {
+                              setState(() {
+                                _selectedFilter = filter;
+                              });
+                            }
+                          },
+                          selectedColor: Colors.blue[700],
+                          backgroundColor: Colors.grey[100],
+                          checkmarkColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20.r),
+                            side: BorderSide(
+                              color: isSelected
+                                  ? Colors.blue.shade700
+                                  : Colors.grey.shade300,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+              if (availableShops.length > 1) ...[
+                SizedBox(width: 8.w),
+                DropdownButton<String>(
+                  value: _selectedShopFilter,
+                  icon: const Icon(Icons.filter_list),
+                  underline: const SizedBox(),
+                  style: TextStyle(fontSize: 12.sp, color: Colors.blue.shade800, fontWeight: FontWeight.bold),
+                  items: availableShops.map((shop) {
+                    return DropdownMenuItem(
+                      value: shop,
+                      child: Text(shop),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedShopFilter = val;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ],
+          ),
+        ],
       ),
     );
   }
