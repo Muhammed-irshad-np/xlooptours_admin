@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import '../entities/vehicle_entity.dart';
 import '../entities/vehicle_documents.dart';
 import '../repositories/vehicle_repository.dart';
@@ -10,7 +11,8 @@ class ExtendVehicleMaintenanceUseCase {
   Future<void> call({
     required VehicleEntity vehicle,
     required String category,
-    required int extensionKm,
+    int extensionKm = 0,
+    DateTime? extensionDate,
     required String reason,
     String? performedBy,
     int? baseOdometer,
@@ -31,50 +33,66 @@ class ExtendVehicleMaintenanceUseCase {
         // We want to avoid matching previous extension logs (e.g., serviceType starts with "Extension:")
         if (record.serviceType!.startsWith('Extension:')) continue;
 
-        if (latestRecord == null || record.mileage > latestRecord.mileage) {
+        if (latestRecord == null ||
+            (record.date.isAfter(latestRecord.date)) ||
+            (record.date.isAtSameMomentAs(latestRecord.date) &&
+                record.mileage >= latestRecord.mileage)) {
           latestRecord = record;
           latestIndex = i;
         }
       }
     }
 
+    final isDateExt = extensionDate != null;
     final resolvedBaseOdometer =
         baseOdometer ?? (latestRecord?.nextServiceMileage ?? currentOdometer);
-    final newAlertThreshold = resolvedBaseOdometer + extensionKm;
+    final newAlertThreshold = isDateExt ? 0 : (resolvedBaseOdometer + extensionKm);
 
     MaintenanceRecord updatedRecord;
     if (latestRecord != null) {
       updatedRecord = latestRecord.copyWith(
         isExtended: true,
-        extendedMileage: extensionKm,
+        extendedMileage: isDateExt ? null : extensionKm,
+        extendedDate: isDateExt ? extensionDate : null,
         extensionReason: reason,
-        nextServiceMileage: newAlertThreshold,
+        nextServiceMileage: isDateExt ? latestRecord.nextServiceMileage : newAlertThreshold,
+        nextServiceDate: isDateExt ? extensionDate : latestRecord.nextServiceDate,
         performedBy: performedBy,
       );
       updatedHistory[latestIndex] = updatedRecord;
     } else {
-      // Fallback: If no history record exists, create one starting from 0 or purchase odometer
+      // Fallback: If no history record exists, create one
       updatedRecord = MaintenanceRecord(
         date: DateTime.now(),
-        mileage: vehicle.purchaseOdometer ?? 0,
+        mileage: vehicle.purchaseOdometer ?? currentOdometer,
         serviceType: category,
         isExtended: true,
-        extendedMileage: extensionKm,
+        extendedMileage: isDateExt ? null : extensionKm,
+        extendedDate: isDateExt ? extensionDate : null,
         extensionReason: reason,
-        nextServiceMileage: newAlertThreshold,
+        nextServiceMileage: isDateExt ? null : newAlertThreshold,
+        nextServiceDate: isDateExt ? extensionDate : null,
         performedBy: performedBy,
       );
       updatedHistory.add(updatedRecord);
     }
+
+    final formattedDateStr =
+        extensionDate != null ? DateFormat('MMM dd, yyyy').format(extensionDate) : '';
+    final auditNote = isDateExt
+        ? 'Alert extended to target date: $formattedDateStr. Reason: $reason'
+        : 'Alert extended by $extensionKm km. New due mileage: $newAlertThreshold km. Reason: $reason';
 
     // 2. Add an audit log entry to the history list
     final auditRecord = MaintenanceRecord(
       date: DateTime.now(),
       mileage: currentOdometer,
       serviceType: 'Extension: $category',
-      notes: 'Alert extended by $extensionKm km. New due mileage: $newAlertThreshold km. Reason: $reason',
-      extendedMileage: extensionKm,
-      nextServiceMileage: newAlertThreshold,
+      notes: auditNote,
+      extendedMileage: isDateExt ? null : extensionKm,
+      extendedDate: isDateExt ? extensionDate : null,
+      nextServiceMileage: isDateExt ? null : newAlertThreshold,
+      nextServiceDate: isDateExt ? extensionDate : null,
       cost: 0.0,
       performedBy: performedBy,
     );

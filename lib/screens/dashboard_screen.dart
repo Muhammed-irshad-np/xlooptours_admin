@@ -1297,7 +1297,11 @@ class _ExpiryCardState extends State<_ExpiryCard> {
         // Step 0: Original Due
         _buildTimelineStep(
           title: 'Originally Due',
-          subtitle: '${mAlert.originalDueMileage} km',
+          subtitle: mAlert.isDateTrigger
+              ? (mAlert.lastServiceDate != null
+                  ? DateFormat('MMM dd, yyyy').format(mAlert.lastServiceDate!)
+                  : 'Scheduled Date')
+              : '${mAlert.originalDueMileage} km',
           icon: Icons.flag_outlined,
           color: _DT.textSecondary,
           isLast: mAlert.extensionHistory.isEmpty,
@@ -1308,9 +1312,14 @@ class _ExpiryCardState extends State<_ExpiryCard> {
           final ext = entry.value;
           final isLast = index == mAlert.extensionHistory.length - 1;
 
+          final titleText = (mAlert.isDateTrigger || ext.nextServiceDate != null)
+              ? (ext.nextServiceDate != null
+                  ? 'Extended to target date ${DateFormat('MMM dd, yyyy').format(ext.nextServiceDate!)}'
+                  : 'Extended target date')
+              : 'Extended by ${ext.extendedMileage ?? 0} km to ${ext.nextServiceMileage ?? 0} km';
+
           return _buildTimelineStep(
-            title:
-                'Extended by ${ext.extendedMileage ?? 0} km to ${ext.nextServiceMileage ?? 0} km',
+            title: titleText,
             subtitle:
                 '${DateFormat('MMM dd, yyyy').format(ext.date)} • By ${ext.performedBy ?? "Unknown"}\nReason: ${_cleanReason(ext.notes)}',
             icon: Icons.history,

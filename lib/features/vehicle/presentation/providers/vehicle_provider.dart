@@ -475,7 +475,8 @@ class VehicleProvider extends ChangeNotifier {
   Future<void> extendVehicleMaintenance({
     required VehicleEntity vehicle,
     required String category,
-    required int extensionKm,
+    int extensionKm = 0,
+    DateTime? extensionDate,
     required String reason,
     String? performedBy,
     int? baseOdometer,
@@ -486,6 +487,7 @@ class VehicleProvider extends ChangeNotifier {
         vehicle: vehicle,
         category: category,
         extensionKm: extensionKm,
+        extensionDate: extensionDate,
         reason: reason,
         performedBy: performedBy,
         baseOdometer: baseOdometer,

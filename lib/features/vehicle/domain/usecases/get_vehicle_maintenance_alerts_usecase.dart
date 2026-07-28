@@ -13,6 +13,13 @@ class VehicleMaintenanceAlert {
   final List<MaintenanceRecord> extensionHistory;
   final int originalDueMileage;
 
+  // Date trigger fields
+  final String triggerType;
+  final DateTime? lastServiceDate;
+  final DateTime? nextServiceDate;
+  final int? daysOverdue;
+  final int? daysRemaining;
+
   VehicleMaintenanceAlert({
     required this.vehicle,
     required this.category,
@@ -23,16 +30,20 @@ class VehicleMaintenanceAlert {
     this.isExtended = false,
     this.extensionHistory = const [],
     required this.originalDueMileage,
+    this.triggerType = 'odometer',
+    this.lastServiceDate,
+    this.nextServiceDate,
+    this.daysOverdue,
+    this.daysRemaining,
   });
+
+  bool get isDateTrigger => triggerType == 'date';
 }
 
 /// Checks every vehicle's maintenance history against the configured intervals.
-/// For each [MaintenanceTypeEntity] that has records in history, it finds the
-/// most recent service (highest mileage) and flags it when:
-///   currentOdometer >= lastServiceMileage + intervalKm
-///
-/// This logic is purely history-driven — it does NOT rely on `vehicle.maintenance`
-/// typed fields, so old records logged before the typed-field fix still work.
+/// For each [MaintenanceTypeEntity] that has records in history, it flags overdue services:
+/// - Odometer trigger: currentOdometer >= lastServiceMileage + intervalKm
+/// - Date trigger: DateTime.now() >= lastServiceDate + interval (months/weeks/days)
 class GetVehicleMaintenanceAlertsUseCase {
   List<VehicleMaintenanceAlert> call({
     required List<VehicleEntity> vehicles,
@@ -44,8 +55,7 @@ class GetVehicleMaintenanceAlertsUseCase {
     final alerts = <VehicleMaintenanceAlert>[];
 
     for (final vehicle in vehicles) {
-      final currentMileage = vehicle.currentOdometer;
-      if (currentMileage == null || currentMileage == 0) continue;
+      final currentMileage = vehicle.currentOdometer ?? 0;
 
       // Collect ALL history entries (flat list + typed fields fallback).
       final allHistory = _gatherHistory(vehicle);
@@ -60,84 +70,151 @@ class GetVehicleMaintenanceAlertsUseCase {
 
       // For each maintenance type configured, check if service is overdue.
       for (final type in maintenanceTypes) {
-        // Determine the applicable interval for this vehicle type
-        final String vType = vehicle.type.toLowerCase();
-        final int intervalKm = vType.contains('sedan') 
-            ? type.sedanIntervalKm 
-            : type.suvIntervalKm;
-
-        if (intervalKm <= 0) continue;
-
         final key = _normalizeServiceType(type.name);
         final entries = byType[key];
         if (entries == null || entries.isEmpty) continue;
 
-        // Find the most recent service (highest mileage).
-        // Wait, we need to filter out Extension logs from `entries` when finding the last service.
-        // `_gatherHistory` gathers ALL logs, including `Extension: $category`.
-        // We should only consider actual services as the `lastService`.
-        final serviceEntries = entries.where((e) => !e.serviceType.startsWith('Extension:')).toList();
-        
-        // If there are no actual service entries, we cannot calculate the next due based on history.
-        // Wait, if it's purely an extension from purchase odometer, it might be different.
-        // But let's assume `serviceEntries` has at least one.
+        final serviceEntries = entries
+            .where((e) => !e.serviceType.startsWith('Extension:'))
+            .toList();
+
         if (serviceEntries.isEmpty) continue;
 
-        serviceEntries.sort((a, b) => b.mileage.compareTo(a.mileage));
-        final lastService = serviceEntries.first;
+        if (type.isDateTrigger) {
+          // --- DATE-BASED TRIGGER ---
+          // Sort entries by date descending to find the most recent service
+          serviceEntries.sort((a, b) {
+            final dateA = a.originalRecord?.date ?? DateTime(2000);
+            final dateB = b.originalRecord?.date ?? DateTime(2000);
+            return dateB.compareTo(dateA);
+          });
+          final lastService = serviceEntries.first;
+          final lastDate = lastService.originalRecord?.date;
 
-        final originalDue = lastService.mileage + intervalKm;
-        int nextDue = originalDue;
-        bool isExt = false;
-        
-        // Find all extension logs for this category that occurred *after* the last service.
-        // We look in the `vehicle.maintenanceHistory` directly, because they have `serviceType: 'Extension: $category'`
-        final extensionHistory = <MaintenanceRecord>[];
-        if (vehicle.maintenanceHistory != null) {
-          final extensionPrefix = 'Extension: ${type.name}';
-          final normalizedExtensionPrefix = _normalizeServiceType(extensionPrefix);
-          
-          for (final record in vehicle.maintenanceHistory!) {
-            if (record.serviceType != null) {
-              final normRecordType = _normalizeServiceType(record.serviceType!);
-              final normCat = _normalizeServiceType(type.name);
-              
-              if (record.serviceType!.startsWith('Extension:') && 
-                  normRecordType.replaceFirst('extension: ', '') == normCat) {
-                // If this extension happened after or on the last service date/mileage
-                if (record.date.isAfter(lastService.originalRecord?.date ?? DateTime(2000)) ||
-                    (record.date.isAtSameMomentAs(lastService.originalRecord?.date ?? DateTime(2000))) || 
-                    record.mileage >= lastService.mileage) {
-                  extensionHistory.add(record);
+          DateTime? targetDueDate =
+              lastService.originalRecord?.nextServiceDate;
+
+          final extensionHistory = <MaintenanceRecord>[];
+          if (vehicle.maintenanceHistory != null) {
+            for (final record in vehicle.maintenanceHistory!) {
+              if (record.serviceType != null) {
+                final normRecordType = _normalizeServiceType(record.serviceType!);
+                final normCat = _normalizeServiceType(type.name);
+
+                if (record.serviceType!.startsWith('Extension:') &&
+                    normRecordType.replaceFirst('extension: ', '') == normCat) {
+                  if (record.date.isAfter(lastService.originalRecord?.date ?? DateTime(2000)) ||
+                      (record.date.isAtSameMomentAs(lastService.originalRecord?.date ?? DateTime(2000)))) {
+                    extensionHistory.add(record);
+                  }
                 }
               }
             }
+            extensionHistory.sort((a, b) => a.date.compareTo(b.date));
           }
-          // Sort extensions chronologically
-          extensionHistory.sort((a, b) => a.date.compareTo(b.date));
-        }
 
-        if (lastService.originalRecord != null &&
-            lastService.originalRecord!.isExtended == true &&
-            lastService.originalRecord!.nextServiceMileage != null) {
-          nextDue = lastService.originalRecord!.nextServiceMileage!;
-          isExt = true;
-        }
+          bool isExt = false;
+          if (lastService.originalRecord != null &&
+              lastService.originalRecord!.isExtended == true &&
+              lastService.originalRecord!.nextServiceDate != null) {
+            targetDueDate = lastService.originalRecord!.nextServiceDate!;
+            isExt = true;
+          }
 
-        if (includeAll || currentMileage >= nextDue) {
-          alerts.add(
-            VehicleMaintenanceAlert(
-              vehicle: vehicle,
-              category: type.name,
-              currentMileage: currentMileage,
-              lastServiceMileage: lastService.mileage,
-              nextServiceMileage: nextDue,
-              kmOverdue: currentMileage - nextDue,
-              isExtended: isExt,
-              extensionHistory: extensionHistory,
-              originalDueMileage: originalDue,
-            ),
+          if (targetDueDate == null) continue;
+
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          final dueDay = DateTime(
+            targetDueDate.year,
+            targetDueDate.month,
+            targetDueDate.day,
           );
+
+          final diffDays = today.difference(dueDay).inDays;
+
+          if (includeAll || diffDays >= 0) {
+            alerts.add(
+              VehicleMaintenanceAlert(
+                vehicle: vehicle,
+                category: type.name,
+                currentMileage: currentMileage,
+                lastServiceMileage: lastService.mileage,
+                nextServiceMileage: 0,
+                kmOverdue: 0,
+                isExtended: isExt,
+                extensionHistory: extensionHistory,
+                originalDueMileage: 0,
+                triggerType: 'date',
+                lastServiceDate: lastDate,
+                nextServiceDate: targetDueDate,
+                daysOverdue: diffDays > 0 ? diffDays : 0,
+                daysRemaining: diffDays < 0 ? -diffDays : 0,
+              ),
+            );
+          }
+        } else {
+          // --- ODOMETER-BASED TRIGGER ---
+          if (currentMileage == 0) continue;
+
+          final String vType = vehicle.type.toLowerCase();
+          final int intervalKm = vType.contains('sedan')
+              ? type.sedanIntervalKm
+              : type.suvIntervalKm;
+
+          if (intervalKm <= 0) continue;
+
+          serviceEntries.sort((a, b) => b.mileage.compareTo(a.mileage));
+          final lastService = serviceEntries.first;
+
+          final originalDue = lastService.mileage + intervalKm;
+          int nextDue = originalDue;
+          bool isExt = false;
+
+          final extensionHistory = <MaintenanceRecord>[];
+          if (vehicle.maintenanceHistory != null) {
+            for (final record in vehicle.maintenanceHistory!) {
+              if (record.serviceType != null) {
+                final normRecordType = _normalizeServiceType(record.serviceType!);
+                final normCat = _normalizeServiceType(type.name);
+
+                if (record.serviceType!.startsWith('Extension:') &&
+                    normRecordType.replaceFirst('extension: ', '') == normCat) {
+                  if (record.date.isAfter(lastService.originalRecord?.date ?? DateTime(2000)) ||
+                      (record.date.isAtSameMomentAs(lastService.originalRecord?.date ?? DateTime(2000))) ||
+                      record.mileage >= lastService.mileage) {
+                    extensionHistory.add(record);
+                  }
+                }
+              }
+            }
+            extensionHistory.sort((a, b) => a.date.compareTo(b.date));
+          }
+
+          if (lastService.originalRecord != null &&
+              lastService.originalRecord!.isExtended == true &&
+              lastService.originalRecord!.nextServiceMileage != null) {
+            nextDue = lastService.originalRecord!.nextServiceMileage!;
+            isExt = true;
+          }
+
+          if (includeAll || currentMileage >= nextDue) {
+            alerts.add(
+              VehicleMaintenanceAlert(
+                vehicle: vehicle,
+                category: type.name,
+                currentMileage: currentMileage,
+                lastServiceMileage: lastService.mileage,
+                nextServiceMileage: nextDue,
+                kmOverdue: currentMileage - nextDue,
+                isExtended: isExt,
+                extensionHistory: extensionHistory,
+                originalDueMileage: originalDue,
+                triggerType: 'odometer',
+                lastServiceDate: lastService.originalRecord?.date,
+              ),
+            );
+          }
         }
       }
     }
