@@ -97,6 +97,8 @@ class _AddMaintenanceRecordDialogState
   Future<void> _showQuickAddShopDialog(_MaintenanceEntry entry) async {
     final nameController = TextEditingController();
     final phoneController = TextEditingController();
+    final addressController = TextEditingController();
+    final notesController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
     final createdShop = await showDialog<ShopEntity>(
@@ -107,34 +109,59 @@ class _AddMaintenanceRecordDialogState
           builder: (context, setDialogState) {
             return AlertDialog(
               title: const Text('Quick Add Shop'),
-              content: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextFormField(
-                      controller: nameController,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Shop / Workshop Name *',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.storefront),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: nameController,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Shop / Workshop Name *',
+                          hintText: 'e.g. Al-Amana Auto Repair',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.storefront),
+                        ),
+                        textCapitalization: TextCapitalization.words,
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                       ),
-                      textCapitalization: TextCapitalization.words,
-                      validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
-                    ),
-                    SizedBox(height: 12.h),
-                    TextFormField(
-                      controller: phoneController,
-                      decoration: const InputDecoration(
-                        labelText: 'Phone Number (Optional)',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.phone),
+                      SizedBox(height: 12.h),
+                      TextFormField(
+                        controller: phoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Phone Number (Optional)',
+                          hintText: 'e.g. 0501234567',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.phone),
+                        ),
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       ),
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    ),
-                  ],
+                      SizedBox(height: 12.h),
+                      TextFormField(
+                        controller: addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Address / Location (Optional)',
+                          hintText: 'e.g. Industrial Area 2, Riyadh',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.location_on),
+                        ),
+                        textCapitalization: TextCapitalization.sentences,
+                      ),
+                      SizedBox(height: 12.h),
+                      TextFormField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes / Contact Person (Optional)',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.note),
+                        ),
+                        maxLines: 2,
+                      ),
+                    ],
+                  ),
                 ),
               ),
               actions: [
@@ -155,6 +182,12 @@ class _AddMaintenanceRecordDialogState
                               phone: phoneController.text.trim().isEmpty
                                   ? null
                                   : phoneController.text.trim(),
+                              address: addressController.text.trim().isEmpty
+                                  ? null
+                                  : addressController.text.trim(),
+                              notes: notesController.text.trim().isEmpty
+                                  ? null
+                                  : notesController.text.trim(),
                               createdAt: DateTime.now(),
                             );
                             await context.read<VehicleProvider>().addShop(newShop);
@@ -187,6 +220,8 @@ class _AddMaintenanceRecordDialogState
 
     nameController.dispose();
     phoneController.dispose();
+    addressController.dispose();
+    notesController.dispose();
 
     if (createdShop != null) {
       setState(() {
