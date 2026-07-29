@@ -30,7 +30,7 @@ Widget buildPdfWebView(String url) {
 
 /// Web implementation: renders office documents (doc, docx, xlsx, etc.)
 /// using Google Docs Viewer inside an iframe.
-Widget buildDocWebView(String url) {
+Widget buildOfficeDocWebView(String url) {
   final viewId = 'doc-viewer-${url.hashCode}';
 
   // ignore: undefined_prefixed_name
