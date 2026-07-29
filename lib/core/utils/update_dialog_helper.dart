@@ -25,6 +25,7 @@ import '../../features/vehicle/domain/entities/shop_entity.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../injection_container.dart';
 import '../utils/activity_logger.dart';
+import '../utils/change_diff_helper.dart';
 
 class UpdateDialogHelper {
   static void showUpdateDialog(
@@ -692,8 +693,11 @@ class UpdateDialogHelper {
                               await ActivityLogger.log(
                                 ctx,
                                 title: 'Employee Document Updated',
-                                message:
-                                    '${employee.fullName}\'s $documentType has been updated.',
+                                message: ChangeDiffHelper.describeEmployeeDocumentUpdate(
+                                  employeeName: employee.fullName,
+                                  documentType: documentType,
+                                  newExpiryDate: selectedDate,
+                                ),
                                 relatedId: employee.id,
                               );
 
@@ -1182,8 +1186,11 @@ class UpdateDialogHelper {
                       await ActivityLogger.log(
                         context,
                         title: 'Maintenance Updated',
-                        message:
-                            'Maintenance record for $category updated on vehicle ${vehicle.plateNumber}.',
+                        message: ChangeDiffHelper.describeMaintenanceUpdate(
+                          category: category,
+                          plateNumber: vehicle.plateNumber,
+                          newRecord: newRecord,
+                        ),
                         relatedId: vehicle.id,
                       );
 

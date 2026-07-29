@@ -52,9 +52,9 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting shop: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error deleting shop: $e')));
       }
     }
   }
@@ -137,9 +137,14 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
 
                 final filteredList = _shops.value.where((shop) {
                   if (_searchQuery.isEmpty) return true;
-                  final nameMatch = shop.name.toLowerCase().contains(_searchQuery);
-                  final phoneMatch = shop.phone?.toLowerCase().contains(_searchQuery) ?? false;
-                  final addressMatch = shop.address?.toLowerCase().contains(_searchQuery) ?? false;
+                  final nameMatch = shop.name.toLowerCase().contains(
+                    _searchQuery,
+                  );
+                  final phoneMatch =
+                      shop.phone?.toLowerCase().contains(_searchQuery) ?? false;
+                  final addressMatch =
+                      shop.address?.toLowerCase().contains(_searchQuery) ??
+                      false;
                   return nameMatch || phoneMatch || addressMatch;
                 }).toList();
 
@@ -149,10 +154,16 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.storefront_outlined, size: 64.sp, color: Colors.grey),
+                        Icon(
+                          Icons.storefront_outlined,
+                          size: 64.sp,
+                          color: Colors.grey,
+                        ),
                         SizedBox(height: 16.h),
                         Text(
-                          _searchQuery.isEmpty ? 'No maintenance shops found' : 'No shops matching search',
+                          _searchQuery.isEmpty
+                              ? 'No maintenance shops found'
+                              : 'No shops matching search',
                           style: TextStyle(color: Colors.grey, fontSize: 16.sp),
                         ),
                       ],
@@ -177,7 +188,11 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
                         ),
                         leading: CircleAvatar(
                           backgroundColor: Colors.blue.withValues(alpha: 0.1),
-                          child: Icon(Icons.storefront, color: Colors.blue, size: 24.sp),
+                          child: Icon(
+                            Icons.storefront,
+                            color: Colors.blue,
+                            size: 24.sp,
+                          ),
                         ),
                         title: Text(
                           shop.name,
@@ -189,29 +204,45 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (shop.phone != null && shop.phone!.isNotEmpty) ...[
+                            if (shop.phone != null &&
+                                shop.phone!.isNotEmpty) ...[
                               SizedBox(height: 4.h),
                               Row(
                                 children: [
-                                  Icon(Icons.phone_outlined, size: 14.sp, color: Colors.grey[600]),
+                                  Icon(
+                                    Icons.phone_outlined,
+                                    size: 14.sp,
+                                    color: Colors.grey[600],
+                                  ),
                                   SizedBox(width: 4.w),
                                   Text(
                                     shop.phone!,
-                                    style: TextStyle(color: Colors.grey[700], fontSize: 13.sp),
+                                    style: TextStyle(
+                                      color: Colors.grey[700],
+                                      fontSize: 13.sp,
+                                    ),
                                   ),
                                 ],
                               ),
                             ],
-                            if (shop.address != null && shop.address!.isNotEmpty) ...[
+                            if (shop.address != null &&
+                                shop.address!.isNotEmpty) ...[
                               SizedBox(height: 2.h),
                               Row(
                                 children: [
-                                  Icon(Icons.location_on_outlined, size: 14.sp, color: Colors.grey[600]),
+                                  Icon(
+                                    Icons.location_on_outlined,
+                                    size: 14.sp,
+                                    color: Colors.grey[600],
+                                  ),
                                   SizedBox(width: 4.w),
                                   Expanded(
                                     child: Text(
                                       shop.address!,
-                                      style: TextStyle(color: Colors.grey[700], fontSize: 13.sp),
+                                      style: TextStyle(
+                                        color: Colors.grey[700],
+                                        fontSize: 13.sp,
+                                      ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -219,11 +250,16 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
                                 ],
                               ),
                             ],
-                            if (shop.notes != null && shop.notes!.isNotEmpty) ...[
+                            if (shop.notes != null &&
+                                shop.notes!.isNotEmpty) ...[
                               SizedBox(height: 2.h),
                               Text(
                                 shop.notes!,
-                                style: TextStyle(color: Colors.grey[500], fontSize: 12.sp, fontStyle: FontStyle.italic),
+                                style: TextStyle(
+                                  color: Colors.grey[500],
+                                  fontSize: 12.sp,
+                                  fontStyle: FontStyle.italic,
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -234,7 +270,10 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.edit, color: Colors.orange),
+                              icon: const Icon(
+                                Icons.edit,
+                                color: Colors.orange,
+                              ),
                               onPressed: () => _showAddEditDialog(shop: shop),
                               tooltip: 'Edit',
                             ),
@@ -250,7 +289,8 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
                                     ),
                                     actions: [
                                       TextButton(
-                                        onPressed: () => Navigator.pop(c, false),
+                                        onPressed: () =>
+                                            Navigator.pop(c, false),
                                         child: const Text('Cancel'),
                                       ),
                                       ElevatedButton(
@@ -307,7 +347,9 @@ class _AddEditShopDialogState extends State<_AddEditShopDialog> {
     super.initState();
     _nameController = TextEditingController(text: widget.shop?.name ?? '');
     _phoneController = TextEditingController(text: widget.shop?.phone ?? '');
-    _addressController = TextEditingController(text: widget.shop?.address ?? '');
+    _addressController = TextEditingController(
+      text: widget.shop?.address ?? '',
+    );
     _notesController = TextEditingController(text: widget.shop?.notes ?? '');
   }
 
@@ -331,9 +373,15 @@ class _AddEditShopDialogState extends State<_AddEditShopDialog> {
       final shop = ShopEntity(
         id: widget.shop?.id ?? const Uuid().v4(),
         name: _nameController.text.trim(),
-        phone: _phoneController.text.trim().isEmpty ? null : _phoneController.text.trim(),
-        address: _addressController.text.trim().isEmpty ? null : _addressController.text.trim(),
-        notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
+        phone: _phoneController.text.trim().isEmpty
+            ? null
+            : _phoneController.text.trim(),
+        address: _addressController.text.trim().isEmpty
+            ? null
+            : _addressController.text.trim(),
+        notes: _notesController.text.trim().isEmpty
+            ? null
+            : _notesController.text.trim(),
         createdAt: widget.shop?.createdAt ?? DateTime.now(),
       );
 
@@ -343,9 +391,9 @@ class _AddEditShopDialogState extends State<_AddEditShopDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving shop: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error saving shop: $e')));
         setState(() {
           _isSaving = false;
         });
@@ -372,7 +420,8 @@ class _AddEditShopDialogState extends State<_AddEditShopDialog> {
                   prefixIcon: Icon(Icons.storefront),
                 ),
                 textCapitalization: TextCapitalization.words,
-                validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                validator: (v) =>
+                    v == null || v.trim().isEmpty ? 'Required' : null,
               ),
               SizedBox(height: 16.h),
               TextFormField(
