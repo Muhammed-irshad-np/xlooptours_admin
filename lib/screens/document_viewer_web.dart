@@ -27,3 +27,26 @@ Widget buildPdfWebView(String url) {
 
   return HtmlElementView(viewType: viewId);
 }
+
+/// Web implementation: renders office documents (doc, docx, xlsx, etc.)
+/// using Google Docs Viewer inside an iframe.
+Widget buildDocWebView(String url) {
+  final viewId = 'doc-viewer-${url.hashCode}';
+
+  // ignore: undefined_prefixed_name
+  ui_web.platformViewRegistry.registerViewFactory(viewId, (int id) {
+    final encodedUrl = Uri.encodeComponent(url);
+    final viewerUrl =
+        'https://docs.google.com/gview?embedded=true&url=$encodedUrl';
+
+    final iframe = html.IFrameElement()
+      ..src = viewerUrl
+      ..style.border = 'none'
+      ..style.width = '100%'
+      ..style.height = '100%'
+      ..setAttribute('allowfullscreen', 'true');
+    return iframe;
+  });
+
+  return HtmlElementView(viewType: viewId);
+}

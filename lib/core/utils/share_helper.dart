@@ -27,18 +27,8 @@ class ShareHelper {
         );
       }
 
-      // Extract filename from URL or use a default one
-      String filename = 'document.pdf';
-      try {
-        final uri = Uri.parse(url);
-        final pathSegments = uri.pathSegments;
-        if (pathSegments.isNotEmpty) {
-          final lastSegment = pathSegments.last.split('?').first;
-          if (lastSegment.contains('.')) {
-            filename = Uri.decodeComponent(lastSegment);
-          }
-        }
-      } catch (_) {}
+      // Extract filename from URL or derive a sensible default
+      String filename = _extractFilename(url, title);
 
       final mimeType = _getMimeType(filename);
 
@@ -78,12 +68,74 @@ class ShareHelper {
     }
   }
 
+  /// Extracts a filename from a Firebase Storage URL.
+  ///
+  /// Firebase encodes the original filename in the URL path segment.
+  /// This method URL-decodes the path and extracts the last segment that
+  /// contains a file extension. Falls back to a title-based name.
+  static String _extractFilename(String url, String title) {
+    try {
+      final uri = Uri.parse(url);
+      final pathSegments = uri.pathSegments;
+      if (pathSegments.isNotEmpty) {
+        // URL-decode the last path segment to get the original filename
+        final lastSegment = Uri.decodeComponent(pathSegments.last);
+        // Remove any query string residue
+        final cleanSegment = lastSegment.split('?').first;
+        if (cleanSegment.contains('.')) {
+          return cleanSegment;
+        }
+      }
+    } catch (_) {}
+
+    // Fallback: derive from title with a generic extension
+    // Sanitize the title for use as a filename
+    final sanitized = title.replaceAll(RegExp(r'[^\w\s\-.]'), '').trim();
+    return sanitized.isNotEmpty ? sanitized : 'document';
+  }
+
+  /// Returns the MIME type for a given filename based on its extension.
+  ///
+  /// Supports common document, image, and spreadsheet formats.
   static String? _getMimeType(String filename) {
     final lowerCaseName = filename.toLowerCase();
-    if (lowerCaseName.endsWith('.pdf')) return 'application/pdf';
-    if (lowerCaseName.endsWith('.jpg') || lowerCaseName.endsWith('.jpeg'))
+
+    // Images
+    if (lowerCaseName.endsWith('.jpg') || lowerCaseName.endsWith('.jpeg')) {
       return 'image/jpeg';
+    }
     if (lowerCaseName.endsWith('.png')) return 'image/png';
-    return null;
+    if (lowerCaseName.endsWith('.gif')) return 'image/gif';
+    if (lowerCaseName.endsWith('.webp')) return 'image/webp';
+    if (lowerCaseName.endsWith('.bmp')) return 'image/bmp';
+
+    // Documents
+    if (lowerCaseName.endsWith('.pdf')) return 'application/pdf';
+    if (lowerCaseName.endsWith('.doc')) return 'application/msword';
+    if (lowerCaseName.endsWith('.docx')) {
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+
+    // Spreadsheets
+    if (lowerCaseName.endsWith('.xls')) return 'application/vnd.ms-excel';
+    if (lowerCaseName.endsWith('.xlsx')) {
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    }
+    if (lowerCaseName.endsWith('.csv')) return 'text/csv';
+
+    // Presentations
+    if (lowerCaseName.endsWith('.ppt')) {
+      return 'application/vnd.ms-powerpoint';
+    }
+    if (lowerCaseName.endsWith('.pptx')) {
+      return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    }
+
+    // Text
+    if (lowerCaseName.endsWith('.txt')) return 'text/plain';
+    if (lowerCaseName.endsWith('.rtf')) return 'application/rtf';
+
+    // Fallback — application/octet-stream is a safe generic binary type
+    return 'application/octet-stream';
   }
 }
