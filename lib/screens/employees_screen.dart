@@ -18,7 +18,7 @@ import '../core/widgets/modern_tab_bar.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../core/widgets/action_items_dialog.dart';
 import '../core/utils/activity_logger.dart';
-
+import '../core/widgets/skeleton_loader.dart';
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({super.key});
 
@@ -309,7 +309,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                     valueListenable: _isLoading,
                     builder: (context, isLoading, _) {
                       if (isLoading) {
-                        return const Center(child: CircularProgressIndicator());
+                        return const SkeletonListView(itemCount: 6);
                       }
                       return ValueListenableBuilder<List<EmployeeEntity>>(
                         valueListenable: _filteredEmployees,

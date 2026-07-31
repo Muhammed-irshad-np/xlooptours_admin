@@ -29,14 +29,28 @@ class CustomerProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  // ── Cache timestamp ───────────────────────────────────────────────────────
+  DateTime? _customersLastFetch;
+  static const _cacheDuration = Duration(minutes: 5);
+
+  /// Invalidates cached data, forcing a fresh fetch on next access.
+  void invalidateCache() {
+    _customersLastFetch = null;
+  }
+
   List<CustomerEntity> get customers => _customers;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  Future<void> fetchAllCustomers() async {
+  Future<void> fetchAllCustomers({bool forceRefresh = false}) async {
+    if (!forceRefresh && _customersLastFetch != null && _customers.isNotEmpty &&
+        DateTime.now().difference(_customersLastFetch!) < _cacheDuration) {
+      return;
+    }
     _setLoading(true);
     try {
       _customers = await _getAllCustomersUseCase();
+      _customersLastFetch = DateTime.now();
       _error = null;
     } catch (e) {
       _error = e.toString();

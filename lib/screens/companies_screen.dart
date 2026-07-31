@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/company/domain/entities/company_entity.dart';
 import '../features/company/presentation/providers/company_provider.dart';
+import '../core/utils/activity_logger.dart';
+import '../core/widgets/skeleton_loader.dart';
 import '../widgets/responsive_layout.dart';
 
 class CompaniesScreen extends StatefulWidget {
@@ -157,7 +159,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
       body: Consumer<CompanyProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading && provider.companies.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const SkeletonListView(itemCount: 6);
           }
 
           if (provider.errorMessage != null && provider.companies.isEmpty) {

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/invoice/domain/entities/invoice_entity.dart';
 import '../features/invoice/presentation/providers/invoice_provider.dart';
+import '../core/widgets/skeleton_loader.dart';
 import '../widgets/responsive_layout.dart';
 
 class InvoiceListScreen extends StatefulWidget {
@@ -156,7 +157,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       body: Consumer<InvoiceProvider>(
         builder: (context, provider, child) {
           if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const SkeletonListView(itemCount: 6);
           }
 
           if (provider.error != null) {

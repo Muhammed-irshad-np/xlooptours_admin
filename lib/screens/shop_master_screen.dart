@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../features/vehicle/domain/entities/shop_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
+import '../core/widgets/skeleton_loader.dart';
 
 class ShopMasterScreen extends StatefulWidget {
   const ShopMasterScreen({super.key});
@@ -132,7 +133,7 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
               animation: Listenable.merge([_isLoading, _shops]),
               builder: (context, _) {
                 if (_isLoading.value) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const SkeletonListView(itemCount: 5);
                 }
 
                 final filteredList = _shops.value.where((shop) {

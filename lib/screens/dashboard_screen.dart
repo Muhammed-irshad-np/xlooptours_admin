@@ -126,20 +126,25 @@ class _DashboardScreenState extends State<DashboardScreen>
       final authProvider = context.read<AuthProvider>();
       final isAdmin = authProvider.user?.isAdmin ?? false;
 
-      // Fetch all required data in parallel on startup so it is cached in providers,
-      // avoiding multiple subsequent database reads.
+      // ── Phase 1: Load critical data first (stat cards render immediately) ──
       await Future.wait<dynamic>(<Future<dynamic>>[
         employeeProvider.fetchAllEmployees(),
-        employeeProvider.fetchEmployeeSettings(),
         vehicleProvider.fetchAllVehicles(),
-        vehicleProvider.fetchAllMaintenanceTypes(),
-        vehicleProvider.fetchVehicleSettings(),
-        vaultProvider.loadVaultData(),
-        if (isAdmin) context.read<FeedbackProvider>().fetchLatestFeedbacks(),
-        if (isAdmin) context.read<CustomerProvider>().fetchAllCustomers(),
       ]);
 
       if (!mounted) return;
+
+      // ── Phase 2: Load secondary data (alerts & maintenance sections) ──
+      await Future.wait<dynamic>(<Future<dynamic>>[
+        employeeProvider.fetchEmployeeSettings(),
+        vehicleProvider.fetchAllMaintenanceTypes(),
+        vehicleProvider.fetchVehicleSettings(),
+        vaultProvider.loadVaultData(),
+      ]);
+
+      if (!mounted) return;
+
+      // ── Phase 3: Refresh alerts now that all settings are loaded ──
       await context.read<NotificationProvider>().refreshAlerts(
         vehicles: vehicleProvider.vehicles,
         maintenanceTypes: vehicleProvider.maintenanceTypes,
@@ -148,6 +153,15 @@ class _DashboardScreenState extends State<DashboardScreen>
         vehicleSettings: vehicleProvider.settings,
         vaultData: vaultProvider.vaultData,
       );
+
+      if (!mounted) return;
+
+      // ── Phase 4: Load non-critical admin data last ──
+      if (isAdmin) {
+        // Fire and forget — these sections can render independently
+        context.read<FeedbackProvider>().fetchLatestFeedbacks();
+        context.read<CustomerProvider>().fetchAllCustomers();
+      }
     });
   }
 

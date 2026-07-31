@@ -27,6 +27,15 @@ class FeedbackProvider extends ChangeNotifier {
   bool _isLoadingFeedbacks = false;
   bool get isLoadingFeedbacks => _isLoadingFeedbacks;
 
+  // ── Cache timestamp ───────────────────────────────────────────────────────
+  DateTime? _feedbacksLastFetch;
+  static const _cacheDuration = Duration(minutes: 5);
+
+  /// Invalidates cached data, forcing a fresh fetch on next access.
+  void invalidateCache() {
+    _feedbacksLastFetch = null;
+  }
+
   Future<void> submitFeedback(FeedbackEntity feedback) async {
     _isLoading = true;
     _errorMessage = null;
@@ -44,12 +53,17 @@ class FeedbackProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> fetchLatestFeedbacks({int limit = 5}) async {
+  Future<void> fetchLatestFeedbacks({int limit = 5, bool forceRefresh = false}) async {
+    if (!forceRefresh && _feedbacksLastFetch != null && _latestFeedbacks.isNotEmpty &&
+        DateTime.now().difference(_feedbacksLastFetch!) < _cacheDuration) {
+      return;
+    }
     _isLoadingFeedbacks = true;
     notifyListeners();
 
     try {
       _latestFeedbacks = await getLatestFeedbacksUseCase(limit: limit);
+      _feedbacksLastFetch = DateTime.now();
     } catch (e) {
       _errorMessage = e.toString();
     } finally {

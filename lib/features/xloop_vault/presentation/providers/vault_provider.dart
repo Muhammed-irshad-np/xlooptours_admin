@@ -36,10 +36,26 @@ class VaultProvider extends ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
-  Future<void> loadVaultData() async {
+  // ── Cache timestamps ───────────────────────────────────────────────────────
+  DateTime? _vaultDataLastFetch;
+  DateTime? _vatFilingsLastFetch;
+  static const _cacheDuration = Duration(minutes: 5);
+
+  /// Invalidates all cached data, forcing fresh fetches on next access.
+  void invalidateCache() {
+    _vaultDataLastFetch = null;
+    _vatFilingsLastFetch = null;
+  }
+
+  Future<void> loadVaultData({bool forceRefresh = false}) async {
+    if (!forceRefresh && _vaultDataLastFetch != null && _vaultData != null &&
+        DateTime.now().difference(_vaultDataLastFetch!) < _cacheDuration) {
+      return;
+    }
     _setLoading(true);
     try {
       _vaultData = await getVaultDataUseCase();
+      _vaultDataLastFetch = DateTime.now();
       _errorMessage = null;
     } catch (e) {
       _errorMessage = e.toString();
@@ -47,10 +63,15 @@ class VaultProvider extends ChangeNotifier {
     _setLoading(false);
   }
 
-  Future<void> loadVatFilings() async {
+  Future<void> loadVatFilings({bool forceRefresh = false}) async {
+    if (!forceRefresh && _vatFilingsLastFetch != null && _vatFilings.isNotEmpty &&
+        DateTime.now().difference(_vatFilingsLastFetch!) < _cacheDuration) {
+      return;
+    }
     _setLoading(true);
     try {
       _vatFilings = await getVatFilingsUseCase();
+      _vatFilingsLastFetch = DateTime.now();
       _errorMessage = null;
     } catch (e) {
       _errorMessage = e.toString();
@@ -77,8 +98,9 @@ class VaultProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await addVatFilingUseCase(filing);
-      // Refresh list
-      await loadVatFilings();
+      // Optimistic local update instead of re-fetching
+      _vatFilings.add(filing);
+      _errorMessage = null;
       _setLoading(false);
       return true;
     } catch (e) {
@@ -92,8 +114,12 @@ class VaultProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await updateVatFilingUseCase(filing);
-      // Refresh list
-      await loadVatFilings();
+      // Optimistic local update instead of re-fetching
+      final index = _vatFilings.indexWhere((f) => f.id == filing.id);
+      if (index != -1) {
+        _vatFilings[index] = filing;
+      }
+      _errorMessage = null;
       _setLoading(false);
       return true;
     } catch (e) {
@@ -107,8 +133,9 @@ class VaultProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await deleteVatFilingUseCase(id);
-      // Refresh list
-      await loadVatFilings();
+      // Optimistic local update instead of re-fetching
+      _vatFilings.removeWhere((f) => f.id == id);
+      _errorMessage = null;
       _setLoading(false);
       return true;
     } catch (e) {

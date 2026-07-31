@@ -17,7 +17,7 @@ import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
 import '../core/widgets/action_items_dialog.dart';
 import '../core/utils/activity_logger.dart';
-
+import '../core/widgets/skeleton_loader.dart';
 class VehiclesScreen extends StatefulWidget {
   const VehiclesScreen({super.key});
 
@@ -224,7 +224,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
           children: [
             // Tab 1: Fleet List (Existing UI)
             isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const SkeletonListView(itemCount: 6)
                 : filteredVehicles.isEmpty
                 ? Center(
                     child: Column(

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../features/vehicle/domain/entities/maintenance_type_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
+import '../core/widgets/skeleton_loader.dart';
 
 class MaintenanceTypeMasterScreen extends StatefulWidget {
   const MaintenanceTypeMasterScreen({super.key});
@@ -93,7 +94,7 @@ class _MaintenanceTypeMasterScreenState
         animation: Listenable.merge([_isLoading, _types]),
         builder: (context, _) {
           if (_isLoading.value) {
-            return const Center(child: CircularProgressIndicator());
+            return const SkeletonListView(itemCount: 5);
           }
           if (_types.value.isEmpty) {
             return Center(

@@ -46,18 +46,23 @@ class AdminLayout extends StatefulWidget {
 class _AdminLayoutState extends State<AdminLayout> {
   final ValueNotifier<int> _selectedIndex = ValueNotifier<int>(0);
 
-  final List<Widget> _screens = [
-    const DashboardScreen(),
-    const TripCreationScreen(),
-    const NotificationsScreen(),
-    const EmployeesScreen(),
-    const VehiclesScreen(),
-    const CompaniesScreen(),
-    const CustomerListScreen(),
-    const HomeScreen(), // Invoices
-    const FeedbackHistoryScreen(), // Feedback
-    const PendingEvaluationsScreen(), // Evaluations
-  ];
+  /// Lazily builds only the screen that is currently selected,
+  /// instead of pre-creating all screens at once.
+  Widget _buildScreen(int index) {
+    switch (index) {
+      case 0: return const DashboardScreen();
+      case 1: return const TripCreationScreen();
+      case 2: return const NotificationsScreen();
+      case 3: return const EmployeesScreen();
+      case 4: return const VehiclesScreen();
+      case 5: return const CompaniesScreen();
+      case 6: return const CustomerListScreen();
+      case 7: return const HomeScreen(); // Invoices
+      case 8: return const FeedbackHistoryScreen(); // Feedback
+      case 9: return const PendingEvaluationsScreen(); // Evaluations
+      default: return const DashboardScreen();
+    }
+  }
 
   static const Color _sidebarBg = Color(0xFF0B0F1A);
   static const Color _brandBlue = Color(0xFF13B1F2);
@@ -717,13 +722,13 @@ class _AdminLayoutState extends State<AdminLayout> {
   Widget build(BuildContext context) {
     final isAdmin = _isAdmin(context);
 
-    final List<Widget> allowedScreens = [];
+    final List<int> allowedScreenIndices = [];
     final List<_NavItem> allowedNavItems = [];
 
     for (int i = 0; i < _navItems.length; i++) {
       // 0: Dashboard, 3: Employees, 4: Vehicles
       if (isAdmin || [0, 3, 4].contains(i)) {
-        allowedScreens.add(_screens[i]);
+        allowedScreenIndices.add(i);
         allowedNavItems.add(_navItems[i]);
       }
     }
@@ -754,16 +759,17 @@ class _AdminLayoutState extends State<AdminLayout> {
               );
             },
           ),
-          // Main content
+          // Main content — lazily builds only the selected screen
           Expanded(
             child: ValueListenableBuilder<int>(
               valueListenable: _selectedIndex,
               builder: (context, selectedIndex, _) {
                 // Failsafe in case index is out of bounds due to role changes
-                final index = selectedIndex < allowedScreens.length
+                final navIndex = selectedIndex < allowedScreenIndices.length
                     ? selectedIndex
                     : 0;
-                return allowedScreens[index];
+                final screenIndex = allowedScreenIndices[navIndex];
+                return _buildScreen(screenIndex);
               },
             ),
           ),
@@ -772,6 +778,7 @@ class _AdminLayoutState extends State<AdminLayout> {
     );
   }
 }
+
 
 class _SubNavItem {
   final String label;

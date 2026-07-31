@@ -64,6 +64,34 @@ class VehicleProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
 
+  // ── Cache timestamps ────────────────────────────────────────────────────────
+  DateTime? _vehiclesLastFetch;
+  DateTime? _vehicleMakesLastFetch;
+  DateTime? _maintenanceTypesLastFetch;
+  DateTime? _shopsLastFetch;
+  DateTime? _settingsLastFetch;
+
+  /// Cache duration for frequently-changing data (vehicles).
+  static const _shortCacheDuration = Duration(minutes: 5);
+
+  /// Cache duration for rarely-changing master data (makes, types, shops, settings).
+  static const _longCacheDuration = Duration(minutes: 30);
+
+  /// Returns true if the cache for the given [lastFetch] time is still valid.
+  bool _isCacheValid(DateTime? lastFetch, Duration cacheDuration, List data) {
+    if (lastFetch == null || data.isEmpty) return false;
+    return DateTime.now().difference(lastFetch) < cacheDuration;
+  }
+
+  /// Invalidates all cached data, forcing fresh fetches on next access.
+  void invalidateCache() {
+    _vehiclesLastFetch = null;
+    _vehicleMakesLastFetch = null;
+    _maintenanceTypesLastFetch = null;
+    _shopsLastFetch = null;
+    _settingsLastFetch = null;
+  }
+
   VehicleProvider({
     required this.getAllVehiclesUseCase,
     required this.insertVehicleUseCase,
@@ -101,10 +129,14 @@ class VehicleProvider extends ChangeNotifier {
   // Vehicle Methods
   // ======================
 
-  Future<void> fetchAllVehicles() async {
+  Future<void> fetchAllVehicles({bool forceRefresh = false}) async {
+    if (!forceRefresh && _isCacheValid(_vehiclesLastFetch, _shortCacheDuration, _vehicles)) {
+      return;
+    }
     _setLoading(true);
     try {
       _vehicles = await getAllVehiclesUseCase();
+      _vehiclesLastFetch = DateTime.now();
       _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to fetch vehicles: \$e';
@@ -346,10 +378,14 @@ class VehicleProvider extends ChangeNotifier {
   // Vehicle Make Methods
   // ======================
 
-  Future<void> fetchAllVehicleMakes() async {
+  Future<void> fetchAllVehicleMakes({bool forceRefresh = false}) async {
+    if (!forceRefresh && _isCacheValid(_vehicleMakesLastFetch, _longCacheDuration, _vehicleMakes)) {
+      return;
+    }
     _setLoading(true);
     try {
       _vehicleMakes = await getAllVehicleMakesUseCase();
+      _vehicleMakesLastFetch = DateTime.now();
       _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to fetch vehicle makes: \$e';
@@ -363,12 +399,17 @@ class VehicleProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await insertVehicleMakeUseCase(make);
-      await fetchAllVehicleMakes();
+      // Optimistic local update instead of re-fetching
+      _vehicleMakes.add(make);
+      _vehicleMakes.sort((a, b) => a.name.compareTo(b.name));
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to add vehicle make: \$e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -376,12 +417,20 @@ class VehicleProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await updateVehicleMakeUseCase(make);
-      await fetchAllVehicleMakes();
+      // Optimistic local update instead of re-fetching
+      final index = _vehicleMakes.indexWhere((m) => m.id == make.id);
+      if (index != -1) {
+        _vehicleMakes[index] = make;
+        _vehicleMakes.sort((a, b) => a.name.compareTo(b.name));
+      }
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to update vehicle make: \$e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -389,12 +438,16 @@ class VehicleProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await deleteVehicleMakeUseCase(id);
-      await fetchAllVehicleMakes();
+      // Optimistic local update instead of re-fetching
+      _vehicleMakes.removeWhere((m) => m.id == id);
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to delete vehicle make: \$e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -402,10 +455,14 @@ class VehicleProvider extends ChangeNotifier {
   // Maintenance Type Methods
   // ======================
 
-  Future<void> fetchAllMaintenanceTypes() async {
+  Future<void> fetchAllMaintenanceTypes({bool forceRefresh = false}) async {
+    if (!forceRefresh && _isCacheValid(_maintenanceTypesLastFetch, _longCacheDuration, _maintenanceTypes)) {
+      return;
+    }
     _setLoading(true);
     try {
       _maintenanceTypes = await getAllMaintenanceTypesUseCase();
+      _maintenanceTypesLastFetch = DateTime.now();
       _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to fetch maintenance types: \$e';
@@ -419,12 +476,17 @@ class VehicleProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await insertMaintenanceTypeUseCase(type);
-      await fetchAllMaintenanceTypes();
+      // Optimistic local update instead of re-fetching
+      _maintenanceTypes.add(type);
+      _maintenanceTypes.sort((a, b) => a.name.compareTo(b.name));
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to add maintenance type: \$e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -432,12 +494,20 @@ class VehicleProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await updateMaintenanceTypeUseCase(type);
-      await fetchAllMaintenanceTypes();
+      // Optimistic local update instead of re-fetching
+      final index = _maintenanceTypes.indexWhere((m) => m.id == type.id);
+      if (index != -1) {
+        _maintenanceTypes[index] = type;
+        _maintenanceTypes.sort((a, b) => a.name.compareTo(b.name));
+      }
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to update maintenance type: \$e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -445,14 +515,16 @@ class VehicleProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await deleteMaintenanceTypeUseCase(id);
-      await fetchAllMaintenanceTypes();
+      // Optimistic local update instead of re-fetching
+      _maintenanceTypes.removeWhere((m) => m.id == id);
+      _errorMessage = null;
     } catch (e) {
-      _errorMessage = 'Failed to delete maintenance type: \$e';
-      debugPrint(_errorMessage);
       _errorMessage = 'Failed to delete maintenance type: $e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -460,10 +532,14 @@ class VehicleProvider extends ChangeNotifier {
   // Shop Methods
   // ======================
 
-  Future<void> fetchAllShops() async {
+  Future<void> fetchAllShops({bool forceRefresh = false}) async {
+    if (!forceRefresh && _isCacheValid(_shopsLastFetch, _longCacheDuration, _shops)) {
+      return;
+    }
     _setLoading(true);
     try {
       _shops = await getAllShopsUseCase();
+      _shopsLastFetch = DateTime.now();
       _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to fetch shops: $e';
@@ -477,12 +553,17 @@ class VehicleProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await insertShopUseCase(shop);
-      await fetchAllShops();
+      // Optimistic local update instead of re-fetching
+      _shops.add(shop);
+      _shops.sort((a, b) => a.name.compareTo(b.name));
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to add shop: $e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -490,12 +571,20 @@ class VehicleProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await updateShopUseCase(shop);
-      await fetchAllShops();
+      // Optimistic local update instead of re-fetching
+      final index = _shops.indexWhere((s) => s.id == shop.id);
+      if (index != -1) {
+        _shops[index] = shop;
+        _shops.sort((a, b) => a.name.compareTo(b.name));
+      }
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to update shop: $e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -503,12 +592,16 @@ class VehicleProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await deleteShopUseCase(id);
-      await fetchAllShops();
+      // Optimistic local update instead of re-fetching
+      _shops.removeWhere((s) => s.id == id);
+      _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to delete shop: $e';
       debugPrint(_errorMessage);
       _setLoading(false);
       rethrow;
+    } finally {
+      _setLoading(false);
     }
   }
 
@@ -517,10 +610,15 @@ class VehicleProvider extends ChangeNotifier {
   // ======================
 
 
-  Future<void> fetchVehicleSettings() async {
+  Future<void> fetchVehicleSettings({bool forceRefresh = false}) async {
+    if (!forceRefresh && _settingsLastFetch != null && _settings != null &&
+        DateTime.now().difference(_settingsLastFetch!) < _longCacheDuration) {
+      return;
+    }
     _setLoading(true);
     try {
       _settings = await getVehicleSettingsUseCase();
+      _settingsLastFetch = DateTime.now();
       _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to fetch settings: $e';

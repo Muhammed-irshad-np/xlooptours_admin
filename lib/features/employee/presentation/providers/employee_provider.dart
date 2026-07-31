@@ -37,12 +37,28 @@ class EmployeeProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  // ── Cache timestamps ──────────────────────────────────────────────────────
+  DateTime? _employeesLastFetch;
+  DateTime? _settingsLastFetch;
+  static const _shortCacheDuration = Duration(minutes: 5);
+  static const _longCacheDuration = Duration(minutes: 30);
+
+  /// Invalidates all cached data, forcing fresh fetches on next access.
+  void invalidateCache() {
+    _employeesLastFetch = null;
+    _settingsLastFetch = null;
+  }
+
   List<EmployeeEntity> get employees => _employees;
   EmployeeSettingsEntity? get settings => _settings;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
-  Future<void> fetchAllEmployees() async {
+  Future<void> fetchAllEmployees({bool forceRefresh = false}) async {
+    if (!forceRefresh && _employeesLastFetch != null && _employees.isNotEmpty &&
+        DateTime.now().difference(_employeesLastFetch!) < _shortCacheDuration) {
+      return;
+    }
     _isLoading = true;
     _error = null;
     notifyListeners();
@@ -50,6 +66,7 @@ class EmployeeProvider with ChangeNotifier {
     try {
       final fetchedEmployees = await getAllEmployeesUseCase();
       _employees = List<EmployeeEntity>.from(fetchedEmployees);
+      _employeesLastFetch = DateTime.now();
     } catch (e) {
       _error = e.toString();
       debugPrint('Error fetching employees: $e');
@@ -145,11 +162,16 @@ class EmployeeProvider with ChangeNotifier {
   // Settings Methods
   // ======================
 
-  Future<void> fetchEmployeeSettings() async {
+  Future<void> fetchEmployeeSettings({bool forceRefresh = false}) async {
+    if (!forceRefresh && _settingsLastFetch != null && _settings != null &&
+        DateTime.now().difference(_settingsLastFetch!) < _longCacheDuration) {
+      return;
+    }
     _isLoading = true;
     notifyListeners();
     try {
       _settings = await getEmployeeSettingsUseCase();
+      _settingsLastFetch = DateTime.now();
       _error = null;
     } catch (e) {
       _error = 'Failed to fetch settings: $e';

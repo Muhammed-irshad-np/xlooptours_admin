@@ -30,7 +30,20 @@ class CompanyProvider with ChangeNotifier {
   String? _errorMessage;
   String? get errorMessage => _errorMessage;
 
-  Future<void> loadCompanies() async {
+  // ── Cache timestamp ───────────────────────────────────────────────────────
+  DateTime? _companiesLastFetch;
+  static const _cacheDuration = Duration(minutes: 5);
+
+  /// Invalidates cached data, forcing a fresh fetch on next access.
+  void invalidateCache() {
+    _companiesLastFetch = null;
+  }
+
+  Future<void> loadCompanies({bool forceRefresh = false}) async {
+    if (!forceRefresh && _companiesLastFetch != null && _companies.isNotEmpty &&
+        DateTime.now().difference(_companiesLastFetch!) < _cacheDuration) {
+      return;
+    }
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -44,6 +57,7 @@ class CompanyProvider with ChangeNotifier {
       },
       (companiesList) {
         _companies = companiesList;
+        _companiesLastFetch = DateTime.now();
         _errorMessage = null;
       },
     );

@@ -13,7 +13,7 @@ import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../widgets/responsive_layout.dart';
 import '../core/utils/activity_logger.dart';
-
+import '../core/widgets/skeleton_loader.dart';
 class CustomerListScreen extends StatefulWidget {
   final Function(CustomerEntity)? onCustomerSelected;
   final bool isSelectionMode;
@@ -181,7 +181,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
             ],
           ),
           body: provider.isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? const SkeletonListView(itemCount: 6)
               : filteredCustomers.isEmpty
               ? Center(
                   child: Column(
