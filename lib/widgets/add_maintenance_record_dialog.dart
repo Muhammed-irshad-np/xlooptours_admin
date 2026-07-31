@@ -13,6 +13,7 @@ import '../features/vehicle/domain/entities/shop_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../core/utils/activity_logger.dart';
+import '../core/utils/change_diff_helper.dart';
 
 /// Special sentinel IDs for built-in extras that are not part of the
 /// Firestore-managed maintenance-type master list.
@@ -46,6 +47,8 @@ class _MaintenanceEntry {
   DateTime? targetDueDate;
   final TextEditingController targetDueDateController =
       TextEditingController();
+  final TextEditingController notificationDaysController =
+      TextEditingController(text: '7');
 
   void dispose() {
     customTypeController.dispose();
@@ -57,6 +60,7 @@ class _MaintenanceEntry {
     followUpDateController.dispose();
     followUpKmController.dispose();
     targetDueDateController.dispose();
+    notificationDaysController.dispose();
   }
 }
 
@@ -431,6 +435,7 @@ class _AddMaintenanceRecordDialogState
         DateTime? computedNextDate =
             entry.isFollowUpRequired ? entry.followUpDate : null;
 
+        int? notificationDays;
         if (computedNextDate == null &&
             entry.maintenanceTypeId != _kCarWashId &&
             entry.maintenanceTypeId != _kOtherId) {
@@ -440,6 +445,10 @@ class _AddMaintenanceRecordDialogState
           );
           if (matchType.isDateTrigger) {
             computedNextDate = entry.targetDueDate;
+            notificationDays =
+                int.tryParse(entry.notificationDaysController.text.trim()) ??
+                    matchType.notificationDays ??
+                    7;
           }
         }
 
@@ -462,6 +471,7 @@ class _AddMaintenanceRecordDialogState
             nextServiceMileage: entry.isFollowUpRequired
                 ? int.tryParse(entry.followUpKmController.text)
                 : null,
+            notificationDays: notificationDays,
             isFollowUpCompleted: entry.isFollowUpRequired ? false : null,
             followUpIntervalKm: null,
             followUpTimesCount: null,
@@ -502,8 +512,7 @@ class _AddMaintenanceRecordDialogState
         await ActivityLogger.log(
           context,
           title: 'Maintenance Added',
-          message:
-              '${recordsToAdd.length} maintenance record(s) added for ${widget.vehicle.make} ${widget.vehicle.model} (${widget.vehicle.plateNumber}).',
+          message: ChangeDiffHelper.describeMaintenanceRecords(recordsToAdd, widget.vehicle),
           relatedId: widget.vehicle.id,
         );
       }
@@ -923,6 +932,7 @@ class _AddMaintenanceRecordDialogState
                         if (isDateTriggered) ...[
                           SizedBox(height: 12.h),
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               SizedBox(width: 8.w),
                               Icon(
@@ -955,6 +965,40 @@ class _AddMaintenanceRecordDialogState
                                     if (isDateTriggered &&
                                         (v == null || v.isEmpty)) {
                                       return 'Please select a Target Due Date';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              SizedBox(width: 16.w),
+                              SizedBox(
+                                width: 220.w,
+                                child: TextFormField(
+                                  controller: entry.notificationDaysController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Alert Days Before Due Date',
+                                    hintText: 'e.g. 7',
+                                    suffixText: 'days',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.blue.withValues(
+                                      alpha: 0.03,
+                                    ),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  validator: (v) {
+                                    if (isDateTriggered) {
+                                      if (v == null || v.trim().isEmpty) {
+                                        return 'Required';
+                                      }
+                                      if (int.tryParse(v.trim()) == null) {
+                                        return 'Invalid number';
+                                      }
                                     }
                                     return null;
                                   },

@@ -8,6 +8,7 @@ import '../features/customer/domain/entities/customer_entity.dart';
 import '../features/customer/presentation/providers/customer_provider.dart';
 import '../widgets/responsive_layout.dart';
 import '../core/utils/activity_logger.dart';
+import '../core/utils/change_diff_helper.dart';
 
 class CustomerFormScreen extends StatefulWidget {
   final CustomerEntity? customer;
@@ -191,10 +192,17 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
           if (widget.customer != null) {
             await context.read<CustomerProvider>().updateCustomer(customer);
             if (mounted) {
+              final changeSummary = ChangeDiffHelper.describeCustomerChanges(
+                widget.customer!,
+                customer,
+              );
+              
               await ActivityLogger.log(
                 context,
                 title: 'Customer Updated',
-                message: 'Customer ${customer.name} has been updated.',
+                message: changeSummary != null
+                    ? 'Customer ${customer.name} updated: $changeSummary.'
+                    : 'Customer ${customer.name} has been updated.',
                 relatedId: customer.id,
               );
             }

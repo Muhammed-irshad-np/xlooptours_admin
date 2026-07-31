@@ -128,7 +128,7 @@ class _MaintenanceTypeMasterScreenState
                   ),
                   subtitle: Text(
                     type.isDateTrigger
-                        ? 'Trigger: Date (Target date selected per vehicle record)'
+                        ? 'Trigger: Date  |  Alert: ${type.notificationDays ?? 7} days before due date'
                         : 'Trigger: Odometer  |  SUV: ${type.suvIntervalKm} KM  |  Sedan: ${type.sedanIntervalKm} KM',
                     style: TextStyle(color: Colors.grey[600], fontSize: 14.sp),
                   ),
@@ -204,6 +204,7 @@ class _AddEditMaintenanceTypeDialogState
   late TextEditingController _nameController;
   late TextEditingController _suvIntervalController;
   late TextEditingController _sedanIntervalController;
+  late TextEditingController _notificationDaysController;
 
   late String _triggerType;
 
@@ -218,6 +219,9 @@ class _AddEditMaintenanceTypeDialogState
     _sedanIntervalController = TextEditingController(
       text: widget.type?.sedanIntervalKm.toString() ?? '5000',
     );
+    _notificationDaysController = TextEditingController(
+      text: (widget.type?.notificationDays ?? 7).toString(),
+    );
   }
 
   @override
@@ -225,6 +229,7 @@ class _AddEditMaintenanceTypeDialogState
     _nameController.dispose();
     _suvIntervalController.dispose();
     _sedanIntervalController.dispose();
+    _notificationDaysController.dispose();
     super.dispose();
   }
 
@@ -243,6 +248,9 @@ class _AddEditMaintenanceTypeDialogState
       sedanIntervalKm: isDate
           ? 0
           : (int.tryParse(_sedanIntervalController.text.trim()) ?? 0),
+      notificationDays: isDate
+          ? (int.tryParse(_notificationDaysController.text.trim()) ?? 7)
+          : null,
     );
 
     widget.onSave(newType);
@@ -370,7 +378,26 @@ class _AddEditMaintenanceTypeDialogState
                   ],
                 ),
               ] else ...[
-                // --- DATE TRIGGER INFO ---
+                // --- DATE TRIGGER INPUTS ---
+                TextFormField(
+                  controller: _notificationDaysController,
+                  decoration: const InputDecoration(
+                    labelText: 'Alert Interval (Days Before Due Date)',
+                    hintText: 'e.g. 7',
+                    suffixText: 'days',
+                    border: OutlineInputBorder(),
+                  ),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  validator: (v) {
+                    if (_triggerType == 'date') {
+                      if (v == null || v.trim().isEmpty) return 'Required';
+                      if (int.tryParse(v.trim()) == null) return 'Invalid number';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -386,7 +413,7 @@ class _AddEditMaintenanceTypeDialogState
                       SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Target due date for date-triggered maintenance is selected when adding maintenance records for a vehicle.',
+                          'Alerts will be triggered automatically N days before the due date set on the maintenance record.',
                           style: TextStyle(fontSize: 13, color: Colors.blue),
                         ),
                       ),

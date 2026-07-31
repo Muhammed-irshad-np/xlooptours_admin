@@ -4,6 +4,7 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xloop_invoice/core/utils/share_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 // Conditional imports for web platform view
 import 'document_viewer_stub.dart'
@@ -25,23 +26,52 @@ class DocumentViewerScreen extends StatefulWidget {
 }
 
 class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
+  /// Office document file extensions supported by Google Docs Viewer.
+  static const _officeExtensions = {
+    '.doc',
+    '.docx',
+    '.xls',
+    '.xlsx',
+    '.ppt',
+    '.pptx',
+    '.rtf',
+    '.csv',
+    '.txt',
+  };
+
+  /// Extracts the file extension from a Firebase Storage URL.
+  ///
+  /// Firebase encodes filenames in the path segment, so we URL-decode before
+  /// extracting the extension to handle names like `Insurance%20Policy.docx`.
+  String _getExtension(String url) {
+    try {
+      final uri = Uri.parse(url);
+      // Decode the path to handle URL-encoded filenames
+      final decodedPath = Uri.decodeFull(uri.path);
+      // Remove query parameters and get the extension
+      final cleanPath = decodedPath.split('?').first;
+      final dotIndex = cleanPath.lastIndexOf('.');
+      if (dotIndex != -1) {
+        return cleanPath.substring(dotIndex).toLowerCase();
+      }
+    } catch (_) {}
+    return '';
+  }
+
   bool _isPdfUrl(String url) {
-    final cleanUrl = url.split('?').first.toLowerCase();
-    return cleanUrl.endsWith('.pdf') || url.toLowerCase().contains('.pdf?');
+    final ext = _getExtension(url);
+    return ext == '.pdf';
   }
 
   bool _isImageUrl(String url) {
-    final cleanUrl = url.split('?').first.toLowerCase();
-    return cleanUrl.endsWith('.jpg') ||
-        cleanUrl.endsWith('.jpeg') ||
-        cleanUrl.endsWith('.png') ||
-        cleanUrl.endsWith('.gif') ||
-        cleanUrl.endsWith('.webp') ||
-        url.toLowerCase().contains('.jpg?') ||
-        url.toLowerCase().contains('.jpeg?') ||
-        url.toLowerCase().contains('.png?') ||
-        url.toLowerCase().contains('.gif?') ||
-        url.toLowerCase().contains('.webp?');
+    const imageExtensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'};
+    final ext = _getExtension(url);
+    return imageExtensions.contains(ext);
+  }
+
+  bool _isOfficeDoc(String url) {
+    final ext = _getExtension(url);
+    return _officeExtensions.contains(ext);
   }
 
   Future<void> _openInBrowser() async {
@@ -147,10 +177,44 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     );
   }
 
+  /// Builds a viewer for office documents (Word, Excel, PowerPoint, etc.)
+  /// using Google Docs Viewer.
+  ///
+  /// On web, uses an iframe. On native, uses a WebView widget.
+  Widget _buildOfficeDocViewer() {
+    if (kIsWeb) {
+      return platform_viewer.buildOfficeDocWebView(widget.attachmentUrl);
+    }
+
+    // On native platforms, use WebViewWidget with Google Docs Viewer
+    final encodedUrl = Uri.encodeComponent(widget.attachmentUrl);
+    final viewerUrl =
+        'https://docs.google.com/gview?embedded=true&url=$encodedUrl';
+
+    final controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) {
+            debugPrint('Office doc viewer: page started loading');
+          },
+          onWebResourceError: (error) {
+            debugPrint(
+              'Office doc viewer error: ${error.description} (${error.errorCode})',
+            );
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(viewerUrl));
+
+    return WebViewWidget(controller: controller);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isPdf = _isPdfUrl(widget.attachmentUrl);
     final isImage = _isImageUrl(widget.attachmentUrl);
+    final isOfficeDoc = _isOfficeDoc(widget.attachmentUrl);
 
     return Scaffold(
       appBar: AppBar(
@@ -182,11 +246,14 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         child: Center(
           child: isPdf
               ? _buildPdfViewer()
-              : (isImage
-                    ? _buildImageViewer()
-                    : _buildFallbackView(
-                        'This document format cannot be previewed inline.',
-                      )),
+              : isImage
+                  ? _buildImageViewer()
+                  : isOfficeDoc
+                      ? _buildOfficeDocViewer()
+                      : _buildFallbackView(
+                          'This document format is not recognized. '
+                          'You can download or open it in an external app.',
+                        ),
         ),
       ),
     );

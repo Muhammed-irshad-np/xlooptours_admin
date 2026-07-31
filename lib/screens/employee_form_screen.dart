@@ -18,6 +18,7 @@ import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/utils/activity_logger.dart';
+import '../core/utils/change_diff_helper.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
   // ... (rest of class)
@@ -577,10 +578,17 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         } else {
           await provider.updateEmployee(newEmployee);
           if (mounted) {
+            final changeSummary = ChangeDiffHelper.describeEmployeeChanges(
+              widget.employee!,
+              newEmployee,
+            );
+            
             await ActivityLogger.log(
               context,
               title: 'Employee Updated',
-              message: 'Employee ${newEmployee.fullName} has been updated.',
+              message: changeSummary != null 
+                  ? 'Employee ${newEmployee.fullName} updated: $changeSummary.'
+                  : 'Employee ${newEmployee.fullName} has been updated.',
               relatedId: newEmployee.id,
             );
           }
