@@ -127,6 +127,11 @@ class GetVehicleMaintenanceAlertsUseCase {
 
           if (targetDueDate == null) continue;
 
+          final alertDays =
+              lastService.originalRecord?.notificationDays ??
+              type.notificationDays ??
+              7;
+
           final now = DateTime.now();
           final today = DateTime(now.year, now.month, now.day);
           final dueDay = DateTime(
@@ -137,7 +142,7 @@ class GetVehicleMaintenanceAlertsUseCase {
 
           final diffDays = today.difference(dueDay).inDays;
 
-          if (includeAll || diffDays >= 0) {
+          if (includeAll || diffDays >= -alertDays) {
             alerts.add(
               VehicleMaintenanceAlert(
                 vehicle: vehicle,

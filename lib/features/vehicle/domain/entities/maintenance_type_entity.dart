@@ -9,12 +9,16 @@ class MaintenanceTypeEntity extends Equatable {
   /// Trigger type: 'odometer' (default) or 'date'
   final String triggerType;
 
+  /// For 'date' trigger type: how many days before due date to alert (default 7)
+  final int? notificationDays;
+
   const MaintenanceTypeEntity({
     required this.id,
     required this.name,
     required this.suvIntervalKm,
     required this.sedanIntervalKm,
     this.triggerType = 'odometer',
+    this.notificationDays = 7,
   });
 
   bool get isDateTrigger => triggerType == 'date';
@@ -29,5 +33,6 @@ class MaintenanceTypeEntity extends Equatable {
         suvIntervalKm,
         sedanIntervalKm,
         triggerType,
+        notificationDays,
       ];
 }
