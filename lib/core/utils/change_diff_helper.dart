@@ -154,7 +154,7 @@ class ChangeDiffHelper {
         sb.write(', Shop: ${r.serviceProvider}');
       }
       if (r.mileage > 0) {
-        sb.write(', Odometer: ${_formatNumber(r.mileage)} km');
+        sb.write(', Service Odometer: ${_formatNumber(r.mileage)} km');
       }
       parts.add(sb.toString());
     }
@@ -179,7 +179,7 @@ class ChangeDiffHelper {
       sb.write(', Shop: ${newRecord.serviceProvider}');
     }
     if (newRecord.mileage > 0) {
-      sb.write(', Odometer: ${_formatNumber(newRecord.mileage)} km');
+      sb.write(', Service Odometer: ${_formatNumber(newRecord.mileage)} km');
     }
     sb.write('.');
     return sb.toString();
