@@ -21,6 +21,7 @@ import 'features/xloop_vault/presentation/providers/vault_provider.dart';
 import 'features/feedback/presentation/providers/feedback_provider.dart';
 import 'features/driver_evaluation/presentation/providers/admin_evaluation_provider.dart';
 import 'features/driver_evaluation/presentation/providers/driver_form_provider.dart';
+import 'features/user_management/presentation/providers/user_management_provider.dart';
 import 'features/driver_evaluation/presentation/pages/driver_web_form_screen.dart';
 import 'features/finance/presentation/pages/finance_dashboard_page.dart';
 import 'features/finance/presentation/pages/driver_expense_form_page.dart';
@@ -315,6 +316,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => di.sl<FinanceProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<FundAccountProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<PettyCashProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<UserManagementProvider>()),
       ],
       child: ScreenUtilInit(
         designSize: const Size(1440, 900),

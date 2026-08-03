@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../../core/rbac/rbac_manager.dart';
 import '../../domain/entities/user_entity.dart';
 
 class UserModel extends UserEntity {
@@ -6,15 +7,21 @@ class UserModel extends UserEntity {
     required super.id,
     super.email,
     super.displayName,
-    super.isAdmin = false,
+    super.roleId = 'office_staff',
+    super.permissions = const [],
   });
 
-  factory UserModel.fromFirebaseUser(User user, {bool isAdmin = false}) {
+  factory UserModel.fromFirebaseUser(
+    User user, {
+    String roleId = 'office_staff',
+    List<String> permissions = const [],
+  }) {
     return UserModel(
       id: user.uid,
       email: user.email,
       displayName: user.displayName,
-      isAdmin: isAdmin,
+      roleId: RbacManager.normalizeRoleId(roleId),
+      permissions: permissions,
     );
   }
 }
