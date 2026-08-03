@@ -429,27 +429,34 @@ class _AddMaintenanceRecordDialogState
 
         final primaryUrl = uploadedUrls.isNotEmpty ? uploadedUrls.first : null;
 
-        final int currentOdo =
-            int.tryParse(entry.serviceKmController.text) ?? 0;
+        bool isDateTrigger = false;
+        int? typeNotificationDays;
+        if (entry.maintenanceTypeId != null &&
+            entry.maintenanceTypeId != _kCarWashId &&
+            entry.maintenanceTypeId != _kOtherId) {
+          try {
+            final matchType = provider.maintenanceTypes.firstWhere(
+              (t) => t.id == entry.maintenanceTypeId,
+            );
+            isDateTrigger = matchType.isDateTrigger;
+            typeNotificationDays = matchType.notificationDays;
+          } catch (_) {}
+        }
+
+        final int currentOdo = isDateTrigger
+            ? (widget.vehicle.currentOdometer ?? 0)
+            : (int.tryParse(entry.serviceKmController.text) ?? 0);
 
         DateTime? computedNextDate =
             entry.isFollowUpRequired ? entry.followUpDate : null;
 
         int? notificationDays;
-        if (computedNextDate == null &&
-            entry.maintenanceTypeId != _kCarWashId &&
-            entry.maintenanceTypeId != _kOtherId) {
-          final matchType = provider.maintenanceTypes.firstWhere(
-            (t) => t.id == entry.maintenanceTypeId,
-            orElse: () => throw StateError('Type not found'),
-          );
-          if (matchType.isDateTrigger) {
-            computedNextDate = entry.targetDueDate;
-            notificationDays =
-                int.tryParse(entry.notificationDaysController.text.trim()) ??
-                    matchType.notificationDays ??
-                    7;
-          }
+        if (isDateTrigger) {
+          computedNextDate ??= entry.targetDueDate;
+          notificationDays =
+              int.tryParse(entry.notificationDaysController.text.trim()) ??
+                  typeNotificationDays ??
+                  7;
         }
 
         recordsToAdd.add((
@@ -809,29 +816,31 @@ class _AddMaintenanceRecordDialogState
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              flex: 1,
-                              child: TextFormField(
-                                controller: entry.serviceKmController,
-                                decoration: InputDecoration(
-                                  labelText: 'Current Odometer *',
-                                  suffixText: 'km',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8.r),
+                            if (!isDateTriggered) ...[
+                              Expanded(
+                                flex: 1,
+                                child: TextFormField(
+                                  controller: entry.serviceKmController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Current Odometer *',
+                                    suffixText: 'km',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
                                   ),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return 'Required';
+                                    if (int.tryParse(v) == null) return 'Invalid';
+                                    return null;
+                                  },
                                 ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                validator: (v) {
-                                  if (v == null || v.isEmpty) return 'Required';
-                                  if (int.tryParse(v) == null) return 'Invalid';
-                                  return null;
-                                },
                               ),
-                            ),
-                            SizedBox(width: 16.w),
+                              SizedBox(width: 16.w),
+                            ],
                             Expanded(
                               flex: 1,
                               child: TextFormField(
