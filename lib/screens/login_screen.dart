@@ -22,7 +22,22 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    _emailController.addListener(_clearErrorOnTyping);
+    _passwordController.addListener(_clearErrorOnTyping);
+  }
+
+  void _clearErrorOnTyping() {
+    if (_errorMessage.value != null) {
+      _errorMessage.value = null;
+    }
+  }
+
+  @override
   void dispose() {
+    _emailController.removeListener(_clearErrorOnTyping);
+    _passwordController.removeListener(_clearErrorOnTyping);
     _emailController.dispose();
     _passwordController.dispose();
     _isLoading.dispose();
@@ -123,11 +138,11 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 // Decorative Ambient Glows
                 Positioned(
-                  top: -100.h,
-                  left: -100.w,
+                  top: -100,
+                  left: -100,
                   child: Container(
-                    width: 350.w,
-                    height: 350.h,
+                    width: 350,
+                    height: 350,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: const Color(0xFF13B1F2).withValues(alpha: 0.15),
@@ -136,11 +151,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 Positioned(
-                  bottom: -80.h,
-                  right: -80.w,
+                  bottom: -80,
+                  right: -80,
                   child: Container(
-                    width: 300.w,
-                    height: 300.h,
+                    width: 300,
+                    height: 300,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.purple.withValues(alpha: 0.12),
@@ -151,9 +166,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 // Content Overlay
                 Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 48.w,
-                    vertical: 48.h,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 48,
+                    vertical: 48,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,12 +177,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       Row(
                         children: [
                           Container(
-                            padding: EdgeInsets.all(10.w),
+                            padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
                               gradient: const LinearGradient(
                                 colors: [Color(0xFF13B1F2), Color(0xFF0284C7)],
                               ),
-                              borderRadius: BorderRadius.circular(14.r),
+                              borderRadius: BorderRadius.circular(14),
                               boxShadow: [
                                 BoxShadow(
                                   color: const Color(
@@ -178,17 +193,17 @@ class _LoginScreenState extends State<LoginScreen> {
                                 ),
                               ],
                             ),
-                            child: Icon(
+                            child: const Icon(
                               Icons.directions_bus_rounded,
                               color: Colors.white,
-                              size: 26.sp,
+                              size: 26,
                             ),
                           ),
-                          SizedBox(width: 14.w),
+                          const SizedBox(width: 14),
                           Text(
                             'XLOOP TOURS',
                             style: GoogleFonts.notoSans(
-                              fontSize: 18.sp,
+                              fontSize: 18,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 2,
                               color: Colors.white,
@@ -203,28 +218,28 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         'Manage Invoices,\nVehicles & Staff\nIn One Platform.',
                         style: GoogleFonts.merriweather(
-                          fontSize: 34.sp,
+                          fontSize: 34,
                           fontWeight: FontWeight.bold,
                           height: 1.3,
                           color: Colors.white,
                         ),
                       ),
-                      SizedBox(height: 16.h),
+                      const SizedBox(height: 16),
                       Text(
                         'Enterprise administration suite designed for Xloop Tours. Streamline fleet operations, automated billing, and user management.',
                         style: GoogleFonts.notoSans(
-                          fontSize: 14.sp,
+                          fontSize: 14,
                           height: 1.6,
                           color: const Color(0xFF94A3B8),
                         ),
                       ),
 
-                      SizedBox(height: 32.h),
+                      const SizedBox(height: 32),
 
                       // Feature Pills
                       Wrap(
-                        spacing: 12.w,
-                        runSpacing: 12.h,
+                        spacing: 12,
+                        runSpacing: 12,
                         children: [
                           _buildFeaturePill(
                             Icons.shield_outlined,
@@ -251,7 +266,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         '© ${DateTime.now().year} Xloop Tours & Travels. All rights reserved.',
                         style: GoogleFonts.notoSans(
-                          fontSize: 12.sp,
+                          fontSize: 12,
                           color: const Color(0xFF64748B),
                         ),
                       ),
@@ -268,9 +283,9 @@ class _LoginScreenState extends State<LoginScreen> {
           flex: 6,
           child: Center(
             child: SingleChildScrollView(
-              padding: EdgeInsets.all(36.w),
+              padding: const EdgeInsets.all(36),
               child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 440.w),
+                constraints: const BoxConstraints(maxWidth: 440),
                 child: _buildLoginFormCard(),
               ),
             ),
@@ -331,21 +346,21 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildFeaturePill(IconData icon, String label) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(20.r),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14.sp, color: const Color(0xFF13B1F2)),
-          SizedBox(width: 8.w),
+          Icon(icon, size: 14, color: const Color(0xFF13B1F2)),
+          const SizedBox(width: 8),
           Text(
             label,
             style: GoogleFonts.notoSans(
-              fontSize: 12.sp,
+              fontSize: 12,
               fontWeight: FontWeight.w500,
               color: const Color(0xFFE2E8F0),
             ),
@@ -452,6 +467,8 @@ class _LoginScreenState extends State<LoginScreen> {
             TextFormField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.next,
+              autofillHints: const [AutofillHints.email],
               style: GoogleFonts.notoSans(
                 fontSize: 14.sp,
                 color: const Color(0xFF0F172A),
@@ -489,8 +506,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               validator: (val) {
-                if (val == null || val.trim().isEmpty)
+                if (val == null || val.trim().isEmpty) {
                   return 'Email is required';
+                }
                 if (!val.contains('@')) return 'Enter a valid email address';
                 return null;
               },
@@ -510,6 +528,9 @@ class _LoginScreenState extends State<LoginScreen> {
             TextFormField(
               controller: _passwordController,
               obscureText: _obscurePassword,
+              textInputAction: TextInputAction.done,
+              autofillHints: const [AutofillHints.password],
+              onFieldSubmitted: (_) => _loginWithEmail(),
               style: GoogleFonts.notoSans(
                 fontSize: 14.sp,
                 color: const Color(0xFF0F172A),
@@ -558,8 +579,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               validator: (val) {
-                if (val == null || val.trim().isEmpty)
+                if (val == null || val.trim().isEmpty) {
                   return 'Password is required';
+                }
                 return null;
               },
             ),
@@ -641,7 +663,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             SizedBox(height: 24.h),
 
-            // Google Sign-In Button
+            // Google Sign-In Button (Pure Flutter UI rendering - no SVG or CORS errors)
             ValueListenableBuilder<bool>(
               valueListenable: _isLoading,
               builder: (context, isLoading, _) {
@@ -658,21 +680,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Container(
-                        width: 20.w,
-                        height: 20.h,
-                        decoration: const BoxDecoration(shape: BoxShape.circle),
-                        child: Image.network(
-                          'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg',
-                          width: 20.w,
-                          height: 20.h,
-                          errorBuilder: (_, __, ___) => Icon(
-                            Icons.g_mobiledata,
-                            size: 24.sp,
-                            color: const Color(0xFF4285F4),
-                          ),
-                        ),
-                      ),
+                      _buildGoogleLogoBadge(),
                       SizedBox(width: 12.w),
                       Text(
                         'Sign in with Google',
@@ -688,6 +696,27 @@ class _LoginScreenState extends State<LoginScreen> {
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// Pure Flutter Google 'G' Logo render (eliminates SVG parsing & CORS errors)
+  Widget _buildGoogleLogoBadge() {
+    return Container(
+      width: 20.w,
+      height: 20.h,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: const Color(0xFF4285F4),
+        borderRadius: BorderRadius.circular(4.r),
+      ),
+      child: Text(
+        'G',
+        style: GoogleFonts.notoSans(
+          fontSize: 13.sp,
+          fontWeight: FontWeight.w900,
+          color: Colors.white,
         ),
       ),
     );
