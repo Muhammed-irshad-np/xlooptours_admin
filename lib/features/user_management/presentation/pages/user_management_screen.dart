@@ -9,6 +9,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/managed_user_entity.dart';
 import '../../domain/entities/role_entity.dart';
 import '../providers/user_management_provider.dart';
+import '../widgets/change_login_email_dialog.dart';
 import '../widgets/change_password_dialog.dart';
 import '../widgets/role_form_dialog.dart';
 import '../widgets/user_form_dialog.dart';
@@ -347,8 +348,29 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           ),
           SizedBox(width: 10.w),
 
-          // Admin / Super Admin: change password
-          if (context.read<AuthProvider>().user?.isAdmin == true)
+          // Admin / Super Admin: change login email + password
+          if (context.read<AuthProvider>().user?.isAdmin == true) ...[
+            IconButton(
+              tooltip: 'Change login email',
+              icon: const Icon(Icons.alternate_email, color: Color(0xFF64748B)),
+              onPressed: () {
+                if (user.uid.contains('@')) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'This user has no Auth account id. Cannot change login email.',
+                      ),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+                showDialog(
+                  context: context,
+                  builder: (_) => ChangeLoginEmailDialog(user: user),
+                );
+              },
+            ),
             IconButton(
               tooltip: 'Change password',
               icon: const Icon(Icons.lock_reset_outlined, color: Color(0xFF64748B)),
@@ -370,6 +392,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                 );
               },
             ),
+          ],
 
           // Edit user profile
           if (RbacManager.canManageUsers(context.read<AuthProvider>().user))

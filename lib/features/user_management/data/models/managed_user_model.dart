@@ -81,11 +81,12 @@ class ManagedUserModel extends ManagedUserEntity {
     };
   }
 
-  Map<String, dynamic> toFirestoreUpdate() {
+  /// Profile/role fields only. Login email is handled separately and must not
+  /// be overwritten when linking an employee.
+  Map<String, dynamic> toFirestoreUpdate({bool includeEmail = false}) {
     final normalizedRole = RbacManager.normalizeRoleId(roleId);
-    return {
+    final map = <String, dynamic>{
       'uid': uid,
-      'email': email.toLowerCase(),
       'displayName': displayName,
       'roleId': normalizedRole,
       'isAdmin': RbacManager.roleIsAdmin(normalizedRole),
@@ -93,5 +94,10 @@ class ManagedUserModel extends ManagedUserEntity {
       'employeeId': employeeId,
       'employeeName': employeeName,
     };
+    if (includeEmail) {
+      map['email'] = email.toLowerCase();
+    }
+    return map;
   }
 }
+

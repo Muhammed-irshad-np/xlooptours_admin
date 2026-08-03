@@ -143,6 +143,42 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
   }
 
   @override
+  Future<Either<Failure, void>> changeUserLoginEmail({
+    required String uid,
+    required String newEmail,
+  }) async {
+    try {
+      await remoteDataSource.changeUserLoginEmail(
+        uid: uid,
+        newEmail: newEmail,
+      );
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, void>> correctLoginEmail({
+    required String uid,
+    required String loginEmail,
+  }) async {
+    try {
+      await remoteDataSource.correctLoginEmail(
+        uid: uid,
+        loginEmail: loginEmail,
+      );
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<RoleEntity>>> getAllRoles() async {
     try {
       final models = await remoteDataSource.getAllRoles();

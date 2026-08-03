@@ -19,6 +19,15 @@ abstract class UserManagementRepository {
     required String uid,
     required String newPassword,
   });
+  /// Changes Firebase Auth login email + profile (Admin / Super Admin).
+  Future<Either<Failure, void>> changeUserLoginEmail({
+    required String uid,
+    required String newEmail,
+  });
+  Future<Either<Failure, void>> correctLoginEmail({
+    required String uid,
+    required String loginEmail,
+  });
 
   Future<Either<Failure, List<RoleEntity>>> getAllRoles();
   Future<Either<Failure, RoleEntity>> createRole(RoleEntity role);
