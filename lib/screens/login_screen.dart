@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -116,6 +118,27 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  Future<void> _launchPhone(String phoneNumber) async {
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri);
+    }
+  }
+
+  Future<void> _launchEmail(String email) async {
+    final Uri launchUri = Uri(scheme: 'mailto', path: email);
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri);
+    }
+  }
+
+  Future<void> _launchWhatsApp() async {
+    final Uri launchUri = Uri.parse("https://wa.me/966504836105");
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri, mode: LaunchMode.externalApplication);
+    }
+  }
+
   Widget _buildWideLayout() {
     return Row(
       children: [
@@ -128,8 +151,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
+                  Color(0xFF080D1A),
                   Color(0xFF0F172A),
-                  Color(0xFF0B0F1A),
                   Color(0xFF1E293B),
                 ],
               ),
@@ -138,139 +161,277 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 // Decorative Ambient Glows
                 Positioned(
-                  top: -100,
-                  left: -100,
+                  top: -80,
+                  left: -80,
                   child: Container(
-                    width: 350,
-                    height: 350,
+                    width: 380,
+                    height: 380,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF13B1F2).withValues(alpha: 0.15),
-                      blurRadius: 100,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF13B1F2,
+                          ).withValues(alpha: 0.18),
+                          blurRadius: 120,
+                        ),
+                      ],
                     ),
                   ),
                 ),
                 Positioned(
-                  bottom: -80,
-                  right: -80,
+                  bottom: -60,
+                  right: -60,
                   child: Container(
-                    width: 300,
-                    height: 300,
+                    width: 320,
+                    height: 320,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.purple.withValues(alpha: 0.12),
-                      blurRadius: 90,
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(
+                            0xFF8B5CF6,
+                          ).withValues(alpha: 0.15),
+                          blurRadius: 100,
+                        ),
+                      ],
                     ),
                   ),
                 ),
 
                 // Content Overlay
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 48,
-                    vertical: 48,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Header Logo & Badge
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF13B1F2), Color(0xFF0284C7)],
+                SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 48,
+                      vertical: 40,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Header Logo & Company Brand
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 8,
                               ),
-                              borderRadius: BorderRadius.circular(14),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(
-                                    0xFF13B1F2,
-                                  ).withValues(alpha: 0.4),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.15),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Image.asset(
+                                'assets/logo/xloop_logo_new.png',
+                                height: 40,
+                                fit: BoxFit.contain,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    Image.asset(
+                                      'assets/logo/xloop_logo.png',
+                                      height: 40,
+                                      fit: BoxFit.contain,
+                                    ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'XLOOP TOURS W.L.L',
+                                  style: GoogleFonts.notoSans(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 2,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'ENTERPRISE OPERATIONS PORTAL',
+                                  style: GoogleFonts.notoSans(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 1.5,
+                                    color: const Color(0xFF38BDF8),
+                                  ),
                                 ),
                               ],
                             ),
-                            child: const Icon(
-                              Icons.directions_bus_rounded,
-                              color: Colors.white,
-                              size: 26,
+                          ],
+                        ),
+
+                        const Spacer(),
+
+                        // Security Pill
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(
+                              0xFF13B1F2,
+                            ).withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: const Color(
+                                0xFF13B1F2,
+                              ).withValues(alpha: 0.3),
                             ),
                           ),
-                          const SizedBox(width: 14),
-                          Text(
-                            'XLOOP TOURS',
-                            style: GoogleFonts.notoSans(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 2,
-                              color: Colors.white,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF10B981),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'SECURE  •  INTEGRATED  •  REAL-TIME',
+                                style: GoogleFonts.notoSans(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.5,
+                                  color: const Color(0xFF7DD3FC),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Internal Portal Headline
+                        Text(
+                          'Empowering Xloop Fleet\n& Operations Staff',
+                          style: GoogleFonts.merriweather(
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            height: 1.25,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Subtitle
+                        Text(
+                          'Central administrative workspace for managing automated invoicing, vehicle maintenance compliance, employee roles, and driver evaluation reports.',
+                          style: GoogleFonts.notoSans(
+                            fontSize: 14,
+                            height: 1.6,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        ),
+
+                        const Spacer(),
+
+                        // Internal Support / Helpdesk Footer Section
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.25),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.08),
                             ),
                           ),
-                        ],
-                      ),
-
-                      const Spacer(),
-
-                      // Center Hero Text
-                      Text(
-                        'Manage Invoices,\nVehicles & Staff\nIn One Platform.',
-                        style: GoogleFonts.merriweather(
-                          fontSize: 34,
-                          fontWeight: FontWeight.bold,
-                          height: 1.3,
-                          color: Colors.white,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    'INTERNAL IT & ADMIN HELPDESK',
+                                    style: GoogleFonts.notoSans(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 1.2,
+                                      color: const Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.withValues(
+                                        alpha: 0.15,
+                                      ),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      'INTERNAL USE ONLY',
+                                      style: GoogleFonts.notoSans(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.amberAccent,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Wrap(
+                                spacing: 10,
+                                runSpacing: 8,
+                                children: [
+                                  _buildContactChip(
+                                    icon: Icons.support_agent_rounded,
+                                    label: 'Admin Desk',
+                                    value: '+966 50 269 1607',
+                                    accentColor: Colors.orangeAccent,
+                                    onTap: () => _launchPhone('+966502691607'),
+                                  ),
+                                  _buildContactChip(
+                                    icon: Icons.email_outlined,
+                                    label: 'IT Support',
+                                    value: 'enquiries@xlooptours.com',
+                                    accentColor: const Color(0xFF38BDF8),
+                                    onTap: () => _launchEmail(
+                                      'enquiries@xlooptours.com',
+                                    ),
+                                  ),
+                                  _buildContactChip(
+                                    icon: FontAwesomeIcons.whatsapp.data,
+                                    label: 'Ops Chat',
+                                    value: '+966 50 483 6105',
+                                    accentColor: const Color(0xFF25D366),
+                                    onTap: _launchWhatsApp,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Enterprise administration suite designed for Xloop Tours. Streamline fleet operations, automated billing, and user management.',
-                        style: GoogleFonts.notoSans(
-                          fontSize: 14,
-                          height: 1.6,
-                          color: const Color(0xFF94A3B8),
+
+                        const SizedBox(height: 16),
+
+                        // Copyright Notice
+                        Text(
+                          '© ${DateTime.now().year} Xloop Tours W.L.L. Restricted Internal System.',
+                          style: GoogleFonts.notoSans(
+                            fontSize: 11,
+                            color: const Color(0xFF64748B),
+                          ),
                         ),
-                      ),
-
-                      const SizedBox(height: 32),
-
-                      // Feature Pills
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: [
-                          _buildFeaturePill(
-                            Icons.shield_outlined,
-                            'Role-Based Access',
-                          ),
-                          _buildFeaturePill(
-                            Icons.receipt_long_outlined,
-                            'Smart Invoicing',
-                          ),
-                          _buildFeaturePill(
-                            Icons.directions_car_outlined,
-                            'Fleet Tracking',
-                          ),
-                          _buildFeaturePill(
-                            Icons.history_toggle_off,
-                            'Activity Logs',
-                          ),
-                        ],
-                      ),
-
-                      const Spacer(),
-
-                      // Footer Copyright
-                      Text(
-                        '© ${DateTime.now().year} Xloop Tours & Travels. All rights reserved.',
-                        style: GoogleFonts.notoSans(
-                          fontSize: 12,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -308,17 +469,30 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Container(
-                    padding: EdgeInsets.all(10.w),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF13B1F2), Color(0xFF0284C7)],
-                      ),
-                      borderRadius: BorderRadius.circular(12.r),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 10.w,
+                      vertical: 6.h,
                     ),
-                    child: Icon(
-                      Icons.directions_bus_rounded,
+                    decoration: BoxDecoration(
                       color: Colors.white,
-                      size: 24.sp,
+                      borderRadius: BorderRadius.circular(12.r),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Image.asset(
+                      'assets/logo/xloop_logo_new.png',
+                      height: 38.h,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Image.asset(
+                        'assets/logo/xloop_logo.png',
+                        height: 38.h,
+                        fit: BoxFit.contain,
+                      ),
                     ),
                   ),
                   SizedBox(width: 12.w),
@@ -344,28 +518,55 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildFeaturePill(IconData icon, String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: const Color(0xFF13B1F2)),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: GoogleFonts.notoSans(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: const Color(0xFFE2E8F0),
-            ),
+  Widget _buildContactChip({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color accentColor,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: accentColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: accentColor.withValues(alpha: 0.25)),
           ),
-        ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: accentColor),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.notoSans(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF94A3B8),
+                    ),
+                  ),
+                  Text(
+                    value,
+                    style: GoogleFonts.notoSans(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
