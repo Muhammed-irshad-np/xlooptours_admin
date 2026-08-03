@@ -71,8 +71,40 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   /// Resolves authorized role for a Firebase user.
   /// Throws [AuthenticationException] if not in allow-list or inactive.
-  Future<({String roleId, List<String> permissions, String? displayName})>
-  _resolveAuthorizedUser(User user) async {
+  Future<String?> _roleNameFor(String roleId) async {
+    try {
+      final doc = await firestore.collection('roles').doc(roleId).get();
+      if (doc.exists) {
+        return doc.data()?['name'] as String?;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<String?> _employeePhotoUrl(String? employeeId) async {
+    if (employeeId == null || employeeId.trim().isEmpty) return null;
+    try {
+      final doc =
+          await firestore.collection('employees').doc(employeeId.trim()).get();
+      if (!doc.exists) return null;
+      final url = doc.data()?['imageUrl'] as String?;
+      if (url == null || url.trim().isEmpty) return null;
+      return url.trim();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<
+      ({
+        String roleId,
+        List<String> permissions,
+        String? displayName,
+        String? roleName,
+        String? employeeId,
+        String? employeeName,
+        String? photoUrl,
+      })> _resolveAuthorizedUser(User user) async {
     final email = user.email?.toLowerCase().trim();
     if (email == null || email.isEmpty) {
       throw AuthenticationException(
@@ -111,11 +143,17 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
         final roleId = _roleIdFromUserData(data);
         final permissions = await _permissionsForRole(roleId);
-        final displayName = data['displayName'] as String?;
+        final roleName = await _roleNameFor(roleId);
+        final employeeId = data['employeeId'] as String?;
+        final photoUrl = await _employeePhotoUrl(employeeId);
         return (
           roleId: roleId,
           permissions: permissions,
-          displayName: displayName,
+          displayName: data['displayName'] as String?,
+          roleName: roleName ?? data['roleName'] as String?,
+          employeeId: employeeId,
+          employeeName: data['employeeName'] as String?,
+          photoUrl: photoUrl,
         );
       }
 
@@ -135,11 +173,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         // Legacy: isAdmin true → admin; also honor roleId if present
         final roleId = _roleIdFromUserData(data);
         final permissions = await _permissionsForRole(roleId);
-        final displayName = data['displayName'] as String?;
+        final roleName = await _roleNameFor(roleId);
         return (
           roleId: roleId,
           permissions: permissions,
-          displayName: displayName,
+          displayName: data['displayName'] as String?,
+          roleName: roleName,
+          employeeId: null,
+          employeeName: null,
+          photoUrl: null,
         );
       }
     } on AuthenticationException {
@@ -171,6 +213,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         roleId: RbacManager.roleSuperAdmin,
         permissions: permissions,
         displayName: 'Super Admin',
+        roleName: 'Super Admin',
+        employeeId: null,
+        employeeName: null,
+        photoUrl: null,
       );
     }
 
@@ -184,8 +230,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final model = UserModel.fromFirebaseUser(
       user,
       roleId: resolved.roleId,
+      roleName: resolved.roleName,
       permissions: resolved.permissions,
       displayName: resolved.displayName,
+      employeeId: resolved.employeeId,
+      employeeName: resolved.employeeName,
+      photoUrl: resolved.photoUrl,
     );
     _cachedUser = model;
     return model;

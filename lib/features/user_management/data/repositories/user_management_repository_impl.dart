@@ -28,6 +28,9 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
               isActive: m.isActive,
               createdAt: m.createdAt,
               createdBy: m.createdBy,
+              employeeId: m.employeeId,
+              employeeName: m.employeeName,
+              photoUrl: m.photoUrl,
             ),
           )
           .toList();
@@ -45,6 +48,8 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
     required String password,
     required String displayName,
     required String roleId,
+    String? employeeId,
+    String? employeeName,
   }) async {
     try {
       final m = await remoteDataSource.createUser(
@@ -52,6 +57,8 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
         password: password,
         displayName: displayName,
         roleId: roleId,
+        employeeId: employeeId,
+        employeeName: employeeName,
       );
       return Right(
         ManagedUserEntity(
@@ -63,6 +70,9 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
           isActive: m.isActive,
           createdAt: m.createdAt,
           createdBy: m.createdBy,
+          employeeId: m.employeeId,
+          employeeName: m.employeeName,
+          photoUrl: m.photoUrl,
         ),
       );
     } on AuthenticationException catch (e) {
@@ -86,6 +96,9 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
         isActive: user.isActive,
         createdAt: user.createdAt,
         createdBy: user.createdBy,
+        employeeId: user.employeeId,
+        employeeName: user.employeeName,
+        photoUrl: user.photoUrl,
       );
       await remoteDataSource.updateUser(model);
       return const Right(null);

@@ -932,9 +932,81 @@ class _Sidebar extends StatelessWidget {
             color: dividerColor,
             margin: EdgeInsets.symmetric(horizontal: 16.w),
           ),
+          // Logged-in user profile
+          _buildProfileSection(context),
           // Logout
           _buildLogoutButton(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProfileSection(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
+    if (user == null) return const SizedBox.shrink();
+
+    final initial = user.displayLabel.isNotEmpty
+        ? user.displayLabel[0].toUpperCase()
+        : 'U';
+    final photoUrl = user.photoUrl?.trim();
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12.w, 12.h, 12.w, 0),
+      child: Container(
+        padding: EdgeInsets.all(12.w),
+        decoration: BoxDecoration(
+          color: activeBg,
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: dividerColor),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20.r,
+              backgroundColor: brandBlue.withValues(alpha: 0.2),
+              backgroundImage: hasPhoto ? NetworkImage(photoUrl) : null,
+              onBackgroundImageError: hasPhoto ? (_, __) {} : null,
+              child: hasPhoto
+                  ? null
+                  : Text(
+                      initial,
+                      style: GoogleFonts.notoSans(
+                        color: brandBlue,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14.sp,
+                      ),
+                    ),
+            ),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.displayLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.notoSans(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.sp,
+                    ),
+                  ),
+                  Text(
+                    user.email ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.notoSans(
+                      color: inactiveText,
+                      fontSize: 10.sp,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

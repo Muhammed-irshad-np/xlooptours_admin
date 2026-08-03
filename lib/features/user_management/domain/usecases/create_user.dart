@@ -10,16 +10,21 @@ class CreateUserParams extends Equatable {
   final String password;
   final String displayName;
   final String roleId;
+  final String? employeeId;
+  final String? employeeName;
 
   const CreateUserParams({
     required this.email,
     required this.password,
     required this.displayName,
     required this.roleId,
+    this.employeeId,
+    this.employeeName,
   });
 
   @override
-  List<Object?> get props => [email, password, displayName, roleId];
+  List<Object?> get props =>
+      [email, password, displayName, roleId, employeeId, employeeName];
 }
 
 class CreateUser implements UseCase<ManagedUserEntity, CreateUserParams> {
@@ -34,6 +39,8 @@ class CreateUser implements UseCase<ManagedUserEntity, CreateUserParams> {
       password: params.password,
       displayName: params.displayName,
       roleId: params.roleId,
+      employeeId: params.employeeId,
+      employeeName: params.employeeName,
     );
   }
 }

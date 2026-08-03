@@ -9,6 +9,12 @@ class ManagedUserEntity extends Equatable {
   final bool isActive;
   final DateTime? createdAt;
   final String? createdBy;
+  /// Linked employee record id from `employees` collection.
+  final String? employeeId;
+  /// Cached employee display name for lists.
+  final String? employeeName;
+  /// Profile photo from linked employee (`employees.imageUrl`).
+  final String? photoUrl;
 
   const ManagedUserEntity({
     required this.uid,
@@ -19,7 +25,13 @@ class ManagedUserEntity extends Equatable {
     this.isActive = true,
     this.createdAt,
     this.createdBy,
+    this.employeeId,
+    this.employeeName,
+    this.photoUrl,
   });
+
+  bool get hasEmployeeLink =>
+      employeeId != null && employeeId!.trim().isNotEmpty;
 
   @override
   List<Object?> get props => [
@@ -31,5 +43,8 @@ class ManagedUserEntity extends Equatable {
         isActive,
         createdAt,
         createdBy,
+        employeeId,
+        employeeName,
+        photoUrl,
       ];
 }
