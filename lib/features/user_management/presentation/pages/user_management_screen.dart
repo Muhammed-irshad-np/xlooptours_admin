@@ -21,18 +21,16 @@ class UserManagementScreen extends StatefulWidget {
   State<UserManagementScreen> createState() => _UserManagementScreenState();
 }
 
-class _UserManagementScreenState extends State<UserManagementScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _UserManagementScreenState extends State<UserManagementScreen> {
+  int _selectedTabIndex = 0; // 0 = Users, 1 = Roles & Permissions
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  String _roleFilter = 'ALL';
+  String _statusFilter = 'ALL';
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() => setState(() {}));
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<UserManagementProvider>().loadInitialData();
     });
@@ -40,7 +38,6 @@ class _UserManagementScreenState extends State<UserManagementScreen>
 
   @override
   void dispose() {
-    _tabController.dispose();
     _searchController.dispose();
     super.dispose();
   }
@@ -57,62 +54,96 @@ class _UserManagementScreenState extends State<UserManagementScreen>
         backgroundColor: const Color(0xFFF8FAFC),
         appBar: const ModernAppBar(title: 'User & Role Management'),
         body: Center(
-          child: Text(
-            'You do not have permission to manage users or roles.',
-            style: GoogleFonts.notoSans(fontSize: 14.sp, color: Colors.grey),
+          child: Container(
+            padding: EdgeInsets.all(24.w),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16.r),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.lock_person_outlined,
+                  size: 48.sp,
+                  color: Colors.amber.shade700,
+                ),
+                SizedBox(height: 12.h),
+                Text(
+                  'Access Restricted',
+                  style: GoogleFonts.merriweather(
+                    fontSize: 18.sp,
+                    fontWeight: FontWeight.bold,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+                SizedBox(height: 6.h),
+                Text(
+                  'You do not have permission to manage users or security roles.',
+                  style: GoogleFonts.notoSans(
+                    fontSize: 13.sp,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
     }
 
+    // Stats calculations
+    final totalUsers = provider.users.length;
+    final activeUsers = provider.users.where((u) => u.isActive).length;
+    final totalRoles = provider.roles.length;
+    final adminCount = provider.users
+        .where((u) => u.roleId == 'super_admin' || u.roleId == 'admin')
+        .length;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      appBar: const ModernAppBar(
-        title: 'User & Role Management',
-      ),
-      body: Padding(
+      appBar: const ModernAppBar(title: 'User & Role Management'),
+      body: SingleChildScrollView(
         padding: EdgeInsets.all(24.w),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top Bar: Tab Switcher + Action Button
+            // Header Description & Action Button Row
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Custom Tab Bar
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10.r),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: TabBar(
-                    controller: _tabController,
-                    isScrollable: true,
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    indicator: BoxDecoration(
-                      color: const Color(0xFF13B1F2),
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                    labelColor: Colors.white,
-                    unselectedLabelColor: const Color(0xFF64748B),
-                    labelStyle: GoogleFonts.notoSans(
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    tabs: const [
-                      Tab(text: '  Users  '),
-                      Tab(text: '  Roles & Permissions  '),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Access Control & Security Directory',
+                        style: GoogleFonts.merriweather(
+                          fontSize: 20.sp,
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF0F172A),
+                        ),
+                      ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        'Manage administrative accounts, role assignments, authentication credentials, and permission rules.',
+                        style: GoogleFonts.notoSans(
+                          fontSize: 13.sp,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const Spacer(),
+                SizedBox(width: 16.w),
 
-                // Action Button
-                if ((_tabController.index == 0 && canManageUsers) ||
-                    (_tabController.index == 1 && canManageRoles))
+                // Primary Action Button
+                if ((_selectedTabIndex == 0 && canManageUsers) ||
+                    (_selectedTabIndex == 1 && canManageRoles))
                   ElevatedButton.icon(
                     onPressed: () {
-                      if (_tabController.index == 0) {
+                      if (_selectedTabIndex == 0) {
                         showDialog(
                           context: context,
                           builder: (_) => const UserFormDialog(),
@@ -126,7 +157,13 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     },
                     icon: const Icon(Icons.add, size: 18),
                     label: Text(
-                      _tabController.index == 0 ? 'Add User' : 'Add Role',
+                      _selectedTabIndex == 0
+                          ? 'Create New User'
+                          : 'Create Custom Role',
+                      style: GoogleFonts.notoSans(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF13B1F2),
@@ -136,7 +173,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                         vertical: 14.h,
                       ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10.r),
+                        borderRadius: BorderRadius.circular(12.r),
                       ),
                       elevation: 0,
                     ),
@@ -145,17 +182,207 @@ class _UserManagementScreenState extends State<UserManagementScreen>
             ),
             SizedBox(height: 20.h),
 
+            // KPI Summary Row
+            Row(
+              children: [
+                Expanded(
+                  child: _buildKpiCard(
+                    title: 'Total Users',
+                    value: totalUsers.toString(),
+                    icon: Icons.people_alt_outlined,
+                    color: const Color(0xFF13B1F2),
+                  ),
+                ),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: _buildKpiCard(
+                    title: 'Active Accounts',
+                    value: activeUsers.toString(),
+                    icon: Icons.check_circle_outline,
+                    color: const Color(0xFF10B981),
+                  ),
+                ),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: _buildKpiCard(
+                    title: 'Configured Roles',
+                    value: totalRoles.toString(),
+                    icon: Icons.shield_outlined,
+                    color: const Color(0xFF8B5CF6),
+                  ),
+                ),
+                SizedBox(width: 16.w),
+                Expanded(
+                  child: _buildKpiCard(
+                    title: 'Administrators',
+                    value: adminCount.toString(),
+                    icon: Icons.admin_panel_settings_outlined,
+                    color: const Color(0xFFF59E0B),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 24.h),
+
+            // Custom Pill Tab Switcher (Completely filled active tab indicator)
+            Container(
+              padding: EdgeInsets.all(4.w),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildTabItem(
+                    index: 0,
+                    label: 'User Accounts',
+                    icon: Icons.person_search_outlined,
+                    count: provider.users.length,
+                  ),
+                  SizedBox(width: 4.w),
+                  _buildTabItem(
+                    index: 1,
+                    label: 'Roles & Permissions',
+                    icon: Icons.security_outlined,
+                    count: provider.roles.length,
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 20.h),
+
             // Tab Content
-            Expanded(
-              child: provider.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildUsersTab(provider),
-                        _buildRolesTab(provider),
-                      ],
-                    ),
+            provider.isLoading
+                ? Padding(
+                    padding: EdgeInsets.symmetric(vertical: 60.h),
+                    child: const Center(child: CircularProgressIndicator()),
+                  )
+                : _selectedTabIndex == 0
+                ? _buildUsersTab(provider)
+                : _buildRolesTab(provider),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildKpiCard({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(12.w),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Icon(icon, color: color, size: 22.sp),
+          ),
+          SizedBox(width: 14.w),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                value,
+                style: GoogleFonts.notoSans(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+              Text(
+                title,
+                style: GoogleFonts.notoSans(
+                  fontSize: 11.sp,
+                  color: const Color(0xFF64748B),
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabItem({
+    required int index,
+    required String label,
+    required IconData icon,
+    required int count,
+  }) {
+    final isSelected = _selectedTabIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedTabIndex = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 10.h),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF13B1F2) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10.r),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF13B1F2).withValues(alpha: 0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16.sp,
+              color: isSelected ? Colors.white : const Color(0xFF64748B),
+            ),
+            SizedBox(width: 8.w),
+            Text(
+              label,
+              style: GoogleFonts.notoSans(
+                fontSize: 13.sp,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                color: isSelected ? Colors.white : const Color(0xFF64748B),
+              ),
+            ),
+            SizedBox(width: 8.w),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.25)
+                    : const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(12.r),
+              ),
+              child: Text(
+                count.toString(),
+                style: GoogleFonts.notoSans(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? Colors.white : const Color(0xFF334155),
+                ),
+              ),
             ),
           ],
         ),
@@ -166,58 +393,192 @@ class _UserManagementScreenState extends State<UserManagementScreen>
   Widget _buildUsersTab(UserManagementProvider provider) {
     final filteredUsers = provider.users.where((user) {
       final query = _searchQuery.toLowerCase();
-      return user.displayName.toLowerCase().contains(query) ||
+      final matchesQuery =
+          user.displayName.toLowerCase().contains(query) ||
           user.email.toLowerCase().contains(query) ||
           user.roleName.toLowerCase().contains(query);
+
+      final matchesRole = _roleFilter == 'ALL' || user.roleId == _roleFilter;
+      final matchesStatus =
+          _statusFilter == 'ALL' ||
+          (_statusFilter == 'ACTIVE' && user.isActive) ||
+          (_statusFilter == 'INACTIVE' && !user.isActive);
+
+      return matchesQuery && matchesRole && matchesStatus;
     }).toList();
 
     return Column(
       children: [
-        // Search Bar
+        // Search & Filter Toolbar
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 16.w),
+          padding: EdgeInsets.all(14.w),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(10.r),
-            border: Border.all(color: Colors.grey.shade200),
+            borderRadius: BorderRadius.circular(14.r),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
           ),
-          child: TextField(
-            controller: _searchController,
-            onChanged: (val) => setState(() => _searchQuery = val),
-            decoration: const InputDecoration(
-              icon: Icon(Icons.search, color: Color(0xFF94A3B8)),
-              hintText: 'Search users by name, email, or role...',
-              border: InputBorder.none,
-            ),
+          child: Row(
+            children: [
+              // Search Field
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (val) => setState(() => _searchQuery = val),
+                  style: GoogleFonts.notoSans(
+                    fontSize: 13.sp,
+                    color: const Color(0xFF0F172A),
+                  ),
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(
+                      Icons.search,
+                      color: Color(0xFF94A3B8),
+                    ),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear, size: 18),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() => _searchQuery = '');
+                            },
+                          )
+                        : null,
+                    hintText: 'Search by name, email, or role...',
+                    hintStyle: GoogleFonts.notoSans(
+                      fontSize: 13.sp,
+                      color: const Color(0xFF94A3B8),
+                    ),
+                    isDense: true,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 14.w,
+                      vertical: 10.h,
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10.r),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10.r),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(width: 12.w),
+
+              // Role Filter Dropdown
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _roleFilter,
+                    icon: const Icon(
+                      Icons.filter_list,
+                      color: Color(0xFF64748B),
+                      size: 18,
+                    ),
+                    style: GoogleFonts.notoSans(
+                      fontSize: 12.sp,
+                      color: const Color(0xFF334155),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: 'ALL',
+                        child: Text('All Roles'),
+                      ),
+                      ...provider.roles.map(
+                        (r) =>
+                            DropdownMenuItem(value: r.id, child: Text(r.name)),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setState(() => _roleFilter = val);
+                    },
+                  ),
+                ),
+              ),
+              SizedBox(width: 10.w),
+
+              // Status Filter Dropdown
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _statusFilter,
+                    icon: const Icon(
+                      Icons.tune,
+                      color: Color(0xFF64748B),
+                      size: 18,
+                    ),
+                    style: GoogleFonts.notoSans(
+                      fontSize: 12.sp,
+                      color: const Color(0xFF334155),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'ALL', child: Text('All Status')),
+                      DropdownMenuItem(
+                        value: 'ACTIVE',
+                        child: Text('Active Only'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'INACTIVE',
+                        child: Text('Inactive Only'),
+                      ),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setState(() => _statusFilter = val);
+                    },
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
         SizedBox(height: 16.h),
 
-        // Users List
-        Expanded(
-          child: filteredUsers.isEmpty
-              ? _buildEmptyState('No users found')
-              : ListView.separated(
-                  itemCount: filteredUsers.length,
-                  separatorBuilder: (_, __) => SizedBox(height: 10.h),
-                  itemBuilder: (context, index) {
-                    final user = filteredUsers[index];
-                    return _buildUserCard(context, user, provider);
-                  },
-                ),
-        ),
+        // Users List Cards
+        filteredUsers.isEmpty
+            ? _buildEmptyState('No users found matching your filters')
+            : ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: filteredUsers.length,
+                separatorBuilder: (_, __) => SizedBox(height: 12.h),
+                itemBuilder: (context, index) {
+                  final user = filteredUsers[index];
+                  return _buildUserCard(context, user, provider);
+                },
+              ),
       ],
     );
   }
 
   Widget _buildUserCard(
-      BuildContext context, ManagedUserEntity user, UserManagementProvider provider) {
+    BuildContext context,
+    ManagedUserEntity user,
+    UserManagementProvider provider,
+  ) {
+    final roleColor = _getRoleBadgeColor(user.roleId);
+
     return Container(
-      padding: EdgeInsets.all(16.w),
+      padding: EdgeInsets.all(18.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(14.r),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -228,7 +589,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       ),
       child: Row(
         children: [
-          // Avatar: employee photo when linked, else initial
+          // Avatar
           Builder(
             builder: (_) {
               final photo = user.photoUrl?.trim();
@@ -237,8 +598,8 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                   ? user.displayName[0].toUpperCase()
                   : 'U';
               return CircleAvatar(
-                radius: 20.r,
-                backgroundColor: const Color(0xFF13B1F2).withValues(alpha: 0.1),
+                radius: 22.r,
+                backgroundColor: roleColor.withValues(alpha: 0.12),
                 backgroundImage: hasPhoto ? NetworkImage(photo) : null,
                 onBackgroundImageError: hasPhoto ? (_, __) {} : null,
                 child: hasPhoto
@@ -247,28 +608,55 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                         initial,
                         style: GoogleFonts.notoSans(
                           fontWeight: FontWeight.bold,
-                          color: const Color(0xFF13B1F2),
+                          fontSize: 16.sp,
+                          color: roleColor,
                         ),
                       ),
               );
             },
           ),
-          SizedBox(width: 14.w),
+          SizedBox(width: 16.w),
 
-          // Name & Email
+          // User Info
           Expanded(
             flex: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  user.displayName,
-                  style: GoogleFonts.notoSans(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14.sp,
-                    color: const Color(0xFF0F172A),
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      user.displayName,
+                      style: GoogleFonts.notoSans(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14.sp,
+                        color: const Color(0xFF0F172A),
+                      ),
+                    ),
+                    if (!user.isActive) ...[
+                      SizedBox(width: 8.w),
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 6.w,
+                          vertical: 2.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF2F2),
+                          borderRadius: BorderRadius.circular(4.r),
+                        ),
+                        child: Text(
+                          'DEACTIVATED',
+                          style: GoogleFonts.notoSans(
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFFDC2626),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+                SizedBox(height: 2.h),
                 Text(
                   user.email,
                   style: GoogleFonts.notoSans(
@@ -282,19 +670,16 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     children: [
                       Icon(
                         Icons.badge_outlined,
-                        size: 12.sp,
+                        size: 13.sp,
                         color: const Color(0xFF13B1F2),
                       ),
                       SizedBox(width: 4.w),
-                      Flexible(
-                        child: Text(
-                          user.employeeName ?? 'Linked employee',
-                          style: GoogleFonts.notoSans(
-                            fontSize: 11.sp,
-                            color: const Color(0xFF13B1F2),
-                            fontWeight: FontWeight.w600,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                      Text(
+                        user.employeeName ?? 'Linked employee',
+                        style: GoogleFonts.notoSans(
+                          fontSize: 11.sp,
+                          color: const Color(0xFF13B1F2),
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ],
@@ -308,37 +693,43 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           Container(
             padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
             decoration: BoxDecoration(
-              color: _getRoleBadgeColor(user.roleId).withValues(alpha: 0.1),
+              color: roleColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20.r),
+              border: Border.all(color: roleColor.withValues(alpha: 0.2)),
             ),
             child: Text(
               user.roleName.toUpperCase(),
               style: GoogleFonts.notoSans(
                 fontSize: 10.sp,
                 fontWeight: FontWeight.bold,
-                color: _getRoleBadgeColor(user.roleId),
+                letterSpacing: 0.5,
+                color: roleColor,
               ),
             ),
           ),
           SizedBox(width: 20.w),
 
-          // Status Switch
+          // Status Switch & Label
           Row(
             children: [
               Text(
                 user.isActive ? 'Active' : 'Inactive',
-                style: TextStyle(
+                style: GoogleFonts.notoSans(
                   fontSize: 12.sp,
-                  color: user.isActive ? Colors.green : Colors.red,
+                  color: user.isActive
+                      ? const Color(0xFF10B981)
+                      : const Color(0xFFEF4444),
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              SizedBox(width: 4.w),
               Switch(
                 value: user.isActive,
                 activeThumbColor: const Color(0xFF13B1F2),
-                onChanged: RbacManager.canManageUsers(
-                  context.read<AuthProvider>().user,
-                )
+                onChanged:
+                    RbacManager.canManageUsers(
+                      context.read<AuthProvider>().user,
+                    )
                     ? (val) {
                         provider.toggleStatus(user.uid, val);
                       }
@@ -346,65 +737,83 @@ class _UserManagementScreenState extends State<UserManagementScreen>
               ),
             ],
           ),
-          SizedBox(width: 10.w),
+          SizedBox(width: 12.w),
 
-          // Admin / Super Admin: change login email + password
+          // Admin / Super Admin Quick Actions
           if (context.read<AuthProvider>().user?.isAdmin == true) ...[
-            IconButton(
-              tooltip: 'Change login email',
-              icon: const Icon(Icons.alternate_email, color: Color(0xFF64748B)),
-              onPressed: () {
-                if (user.uid.contains('@')) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'This user has no Auth account id. Cannot change login email.',
+            Tooltip(
+              message: 'Change login email',
+              child: IconButton(
+                icon: Icon(
+                  Icons.alternate_email,
+                  size: 18.sp,
+                  color: const Color(0xFF64748B),
+                ),
+                onPressed: () {
+                  if (user.uid.contains('@')) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'This user has no Auth account id. Cannot change login email.',
+                        ),
+                        backgroundColor: Colors.orange,
                       ),
-                      backgroundColor: Colors.orange,
-                    ),
+                    );
+                    return;
+                  }
+                  showDialog(
+                    context: context,
+                    builder: (_) => ChangeLoginEmailDialog(user: user),
                   );
-                  return;
-                }
-                showDialog(
-                  context: context,
-                  builder: (_) => ChangeLoginEmailDialog(user: user),
-                );
-              },
+                },
+              ),
             ),
-            IconButton(
-              tooltip: 'Change password',
-              icon: const Icon(Icons.lock_reset_outlined, color: Color(0xFF64748B)),
-              onPressed: () {
-                if (user.uid.contains('@')) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'This user has no Auth account id. Recreate the user to set a password.',
+            Tooltip(
+              message: 'Change password',
+              child: IconButton(
+                icon: Icon(
+                  Icons.lock_reset_outlined,
+                  size: 18.sp,
+                  color: const Color(0xFF64748B),
+                ),
+                onPressed: () {
+                  if (user.uid.contains('@')) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'This user has no Auth account id. Recreate user to set a password.',
+                        ),
+                        backgroundColor: Colors.orange,
                       ),
-                      backgroundColor: Colors.orange,
-                    ),
+                    );
+                    return;
+                  }
+                  showDialog(
+                    context: context,
+                    builder: (_) => ChangePasswordDialog(user: user),
                   );
-                  return;
-                }
-                showDialog(
-                  context: context,
-                  builder: (_) => ChangePasswordDialog(user: user),
-                );
-              },
+                },
+              ),
             ),
           ],
 
-          // Edit user profile
+          // Edit User Button
           if (RbacManager.canManageUsers(context.read<AuthProvider>().user))
-            IconButton(
-              tooltip: 'Edit user',
-              icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B)),
-              onPressed: () {
-                showDialog(
-                  context: context,
-                  builder: (_) => UserFormDialog(userToEdit: user),
-                );
-              },
+            Tooltip(
+              message: 'Edit user profile',
+              child: IconButton(
+                icon: Icon(
+                  Icons.edit_outlined,
+                  size: 18.sp,
+                  color: const Color(0xFF64748B),
+                ),
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (_) => UserFormDialog(userToEdit: user),
+                  );
+                },
+              ),
             ),
         ],
       ),
@@ -413,8 +822,10 @@ class _UserManagementScreenState extends State<UserManagementScreen>
 
   Widget _buildRolesTab(UserManagementProvider provider) {
     return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
       itemCount: provider.roles.length,
-      separatorBuilder: (_, __) => SizedBox(height: 12.h),
+      separatorBuilder: (_, __) => SizedBox(height: 14.h),
       itemBuilder: (context, index) {
         final role = provider.roles[index];
         return _buildRoleCard(context, role, provider);
@@ -423,25 +834,45 @@ class _UserManagementScreenState extends State<UserManagementScreen>
   }
 
   Widget _buildRoleCard(
-      BuildContext context, RoleEntity role, UserManagementProvider provider) {
+    BuildContext context,
+    RoleEntity role,
+    UserManagementProvider provider,
+  ) {
+    final roleColor = _getRoleBadgeColor(role.id);
+
     return Container(
-      padding: EdgeInsets.all(18.w),
+      padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: Colors.grey.shade200),
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              // Icon
-              Icon(
-                role.isSystem ? Icons.verified_user : Icons.shield_outlined,
-                color: role.isSystem ? const Color(0xFF13B1F2) : Colors.grey.shade700,
+              // Icon Badge
+              Container(
+                padding: EdgeInsets.all(10.w),
+                decoration: BoxDecoration(
+                  color: roleColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
+                child: Icon(
+                  role.isSystem ? Icons.verified_user : Icons.shield_outlined,
+                  color: roleColor,
+                  size: 20.sp,
+                ),
               ),
-              SizedBox(width: 10.w),
+              SizedBox(width: 14.w),
 
               // Title
               Text(
@@ -452,35 +883,41 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                   color: const Color(0xFF0F172A),
                 ),
               ),
-              SizedBox(width: 8.w),
+              SizedBox(width: 10.w),
 
               // System Badge
               if (role.isSystem)
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(4.r),
-                    border: Border.all(color: Colors.blue.shade200),
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(6.r),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
                   ),
                   child: Text(
                     'SYSTEM ROLE',
-                    style: TextStyle(
+                    style: GoogleFonts.notoSans(
                       fontSize: 9.sp,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade700,
+                      color: const Color(0xFF1D4ED8),
                     ),
                   ),
                 ),
               const Spacer(),
 
               // Edit / view role
-              if (RbacManager.canManageRoles(context.read<AuthProvider>().user) ||
+              if (RbacManager.canManageRoles(
+                    context.read<AuthProvider>().user,
+                  ) ||
                   role.isSystem)
                 IconButton(
+                  tooltip: role.isSystem ? 'View permissions' : 'Edit role',
                   icon: Icon(
-                    role.isSystem ? Icons.visibility_outlined : Icons.edit_outlined,
+                    role.isSystem
+                        ? Icons.visibility_outlined
+                        : Icons.edit_outlined,
                     color: const Color(0xFF64748B),
+                    size: 18.sp,
                   ),
                   onPressed: () {
                     showDialog(
@@ -490,11 +927,16 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                   },
                 ),
 
-              // Delete Button (only non-system roles + manage_roles)
+              // Delete Button
               if (!role.isSystem &&
                   RbacManager.canManageRoles(context.read<AuthProvider>().user))
                 IconButton(
-                  icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+                  tooltip: 'Delete role',
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: Colors.redAccent,
+                    size: 18.sp,
+                  ),
                   onPressed: () async {
                     final confirm = await showDialog<bool>(
                       context: context,
@@ -536,34 +978,36 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                 ),
             ],
           ),
-          SizedBox(height: 10.h),
+          SizedBox(height: 14.h),
 
           // Permissions summary
           Text(
-            'Permissions (${role.permissions.length}):',
-            style: TextStyle(
+            'Granted Permissions (${role.permissions.length}):',
+            style: GoogleFonts.notoSans(
               fontSize: 11.sp,
               fontWeight: FontWeight.w600,
               color: const Color(0xFF64748B),
             ),
           ),
-          SizedBox(height: 6.h),
+          SizedBox(height: 8.h),
 
           Wrap(
             spacing: 6.w,
-            runSpacing: 4.h,
+            runSpacing: 6.h,
             children: role.permissions.map((p) {
               return Container(
-                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                 decoration: BoxDecoration(
                   color: const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(6.r),
+                  border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: Text(
                   p.label,
-                  style: TextStyle(
-                    fontSize: 10.sp,
+                  style: GoogleFonts.notoSans(
+                    fontSize: 11.sp,
                     color: const Color(0xFF334155),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               );
@@ -576,16 +1020,26 @@ class _UserManagementScreenState extends State<UserManagementScreen>
 
   Widget _buildEmptyState(String message) {
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.inbox_outlined, size: 48.r, color: Colors.grey.shade400),
-          SizedBox(height: 8.h),
-          Text(
-            message,
-            style: TextStyle(fontSize: 14.sp, color: Colors.grey.shade600),
-          ),
-        ],
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: 40.h),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off_outlined,
+              size: 48.sp,
+              color: Colors.grey.shade400,
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              message,
+              style: GoogleFonts.notoSans(
+                fontSize: 14.sp,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -603,7 +1057,7 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       case 'office_staff':
         return Colors.indigo;
       default:
-        return Colors.grey.shade700;
+        return Colors.blueGrey;
     }
   }
 }
