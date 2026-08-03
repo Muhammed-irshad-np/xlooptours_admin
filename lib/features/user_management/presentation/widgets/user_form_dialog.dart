@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '../../../../core/rbac/rbac_manager.dart';
 import '../../domain/entities/managed_user_entity.dart';
-import '../../domain/entities/role_entity.dart';
 import '../providers/user_management_provider.dart';
 
 class UserFormDialog extends StatefulWidget {
@@ -61,11 +61,12 @@ class _UserFormDialogState extends State<UserFormDialog> {
         }
       }
 
+      final roleId = RbacManager.normalizeRoleId(_selectedRoleId);
       final updatedUser = ManagedUserEntity(
         uid: widget.userToEdit!.uid,
         email: _emailController.text.trim(),
         displayName: _nameController.text.trim(),
-        roleId: _selectedRoleId!,
+        roleId: roleId,
         roleName: roleName,
         isActive: _isActive,
         createdAt: widget.userToEdit!.createdAt,
@@ -77,7 +78,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
         displayName: _nameController.text.trim(),
-        roleId: _selectedRoleId!,
+        roleId: RbacManager.normalizeRoleId(_selectedRoleId),
       );
     }
 

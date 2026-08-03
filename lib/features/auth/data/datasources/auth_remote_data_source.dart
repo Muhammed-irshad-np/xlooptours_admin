@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/rbac/permission.dart';
+import '../../../../core/rbac/rbac_manager.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -33,23 +34,38 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   });
 
   Future<List<String>> _permissionsForRole(String roleId) async {
-    if (roleId == 'super_admin') {
+    final id = RbacManager.normalizeRoleId(roleId);
+    if (id == RbacManager.roleSuperAdmin) {
       return AppPermission.values.map((p) => p.toPermissionString()).toList();
     }
-    if (roleId == 'admin') {
+    if (id == RbacManager.roleAdmin) {
       return AppPermission.values
           .where((p) => p != AppPermission.manageRoles)
           .map((p) => p.toPermissionString())
           .toList();
     }
     try {
-      final roleDoc = await firestore.collection('roles').doc(roleId).get();
+      final roleDoc = await firestore.collection('roles').doc(id).get();
       if (!roleDoc.exists) return const [];
       final raw = roleDoc.data()?['permissions'] as List<dynamic>? ?? [];
       return raw.map((e) => e.toString()).toList();
     } catch (_) {
       return const [];
     }
+  }
+
+  /// Maps a `users` doc (or equivalent map) to a normalized roleId.
+  /// Prefer [roleId]; fall back to legacy [isAdmin] boolean on the same doc.
+  String _roleIdFromUserData(Map<String, dynamic> data) {
+    final rawRole = data['roleId'] as String?;
+    if (rawRole != null && rawRole.trim().isNotEmpty) {
+      return RbacManager.normalizeRoleId(rawRole);
+    }
+    // Legacy field on users / allowed_users docs
+    if (data['isAdmin'] == true) {
+      return RbacManager.roleAdmin;
+    }
+    return 'office_staff';
   }
 
   /// Resolves authorized role for a Firebase user.
@@ -93,9 +109,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             'Your account has been deactivated. Contact an administrator.',
           );
         }
-        final roleId = (data['roleId'] as String?)?.trim().isNotEmpty == true
-            ? data['roleId'] as String
-            : 'office_staff';
+        final roleId = _roleIdFromUserData(data);
         final permissions = await _permissionsForRole(roleId);
         return (roleId: roleId, permissions: permissions);
       }
@@ -111,8 +125,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             'Your account is not active. Contact an administrator.',
           );
         }
-        final isAdmin = data['isAdmin'] ?? false;
-        final roleId = isAdmin ? 'admin' : 'office_staff';
+        // Legacy: isAdmin true → admin; also honor roleId if present
+        final roleId = _roleIdFromUserData(data);
         final permissions = await _permissionsForRole(roleId);
         return (roleId: roleId, permissions: permissions);
       }
@@ -130,7 +144,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'uid': user.uid,
         'email': email,
         'displayName': user.displayName ?? 'Super Admin',
-        'roleId': 'super_admin',
+        'roleId': RbacManager.roleSuperAdmin,
+        'isAdmin': true,
         'isActive': true,
         'createdAt': FieldValue.serverTimestamp(),
         'createdBy': 'system_bootstrap',
@@ -139,8 +154,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'active': true,
         'isAdmin': true,
       }, SetOptions(merge: true));
-      final permissions = await _permissionsForRole('super_admin');
-      return (roleId: 'super_admin', permissions: permissions);
+      final permissions =
+          await _permissionsForRole(RbacManager.roleSuperAdmin);
+      return (roleId: RbacManager.roleSuperAdmin, permissions: permissions);
     }
 
     throw AuthenticationException(

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/rbac/permission.dart';
+import '../../../../core/rbac/rbac_manager.dart';
 import '../models/managed_user_model.dart';
 import '../models/role_model.dart';
 
@@ -51,9 +52,11 @@ class UserManagementRemoteDataSourceImpl
     required String roleId,
   }) async {
     if (email.isEmpty) return;
+    final normalized = RbacManager.normalizeRoleId(roleId);
     await firestore.collection('allowed_users').doc(email.toLowerCase()).set({
       'active': isActive,
-      'isAdmin': roleId == 'super_admin' || roleId == 'admin',
+      'isAdmin': RbacManager.roleIsAdmin(normalized),
+      'roleId': normalized,
     }, SetOptions(merge: true));
   }
 
@@ -174,12 +177,13 @@ class UserManagementRemoteDataSourceImpl
       final roleMap = await _roleNameMap();
       final roleName = roleMap[roleId] ?? roleId;
 
+      final normalizedRoleId = RbacManager.normalizeRoleId(roleId);
       final userModel = ManagedUserModel(
         uid: newUser.uid,
         email: normalizedEmail,
         displayName: displayName,
-        roleId: roleId,
-        roleName: roleName,
+        roleId: normalizedRoleId,
+        roleName: roleMap[normalizedRoleId] ?? roleName,
         isActive: true,
         createdAt: DateTime.now(),
         createdBy: currentUserUid,

@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../../core/rbac/rbac_manager.dart';
 import '../../domain/entities/user_entity.dart';
 
 class UserModel extends UserEntity {
@@ -19,7 +20,7 @@ class UserModel extends UserEntity {
       id: user.uid,
       email: user.email,
       displayName: user.displayName,
-      roleId: roleId,
+      roleId: RbacManager.normalizeRoleId(roleId),
       permissions: permissions,
     );
   }
