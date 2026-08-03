@@ -16,8 +16,22 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
   @override
   Future<Either<Failure, List<ManagedUserEntity>>> getAllUsers() async {
     try {
-      final users = await remoteDataSource.getAllUsers();
-      return Right(users);
+      final models = await remoteDataSource.getAllUsers();
+      final entities = models
+          .map(
+            (m) => ManagedUserEntity(
+              uid: m.uid,
+              email: m.email,
+              displayName: m.displayName,
+              roleId: m.roleId,
+              roleName: m.roleName,
+              isActive: m.isActive,
+              createdAt: m.createdAt,
+              createdBy: m.createdBy,
+            ),
+          )
+          .toList();
+      return Right(entities);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -33,13 +47,24 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
     required String roleId,
   }) async {
     try {
-      final user = await remoteDataSource.createUser(
+      final m = await remoteDataSource.createUser(
         email: email,
         password: password,
         displayName: displayName,
         roleId: roleId,
       );
-      return Right(user);
+      return Right(
+        ManagedUserEntity(
+          uid: m.uid,
+          email: m.email,
+          displayName: m.displayName,
+          roleId: m.roleId,
+          roleName: m.roleName,
+          isActive: m.isActive,
+          createdAt: m.createdAt,
+          createdBy: m.createdBy,
+        ),
+      );
     } on AuthenticationException catch (e) {
       return Left(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
@@ -72,7 +97,10 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
   }
 
   @override
-  Future<Either<Failure, void>> toggleUserStatus(String uid, bool isActive) async {
+  Future<Either<Failure, void>> toggleUserStatus(
+    String uid,
+    bool isActive,
+  ) async {
     try {
       await remoteDataSource.toggleUserStatus(uid, isActive);
       return const Right(null);
@@ -84,10 +112,39 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
   }
 
   @override
+  Future<Either<Failure, void>> changeUserPassword({
+    required String uid,
+    required String newPassword,
+  }) async {
+    try {
+      await remoteDataSource.changeUserPassword(
+        uid: uid,
+        newPassword: newPassword,
+      );
+      return const Right(null);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(e.message));
+    } catch (e) {
+      return Left(ServerFailure(e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<RoleEntity>>> getAllRoles() async {
     try {
-      final roles = await remoteDataSource.getAllRoles();
-      return Right(roles);
+      final models = await remoteDataSource.getAllRoles();
+      final entities = models
+          .map(
+            (m) => RoleEntity(
+              id: m.id,
+              name: m.name,
+              isSystem: m.isSystem,
+              permissions: m.permissions,
+              createdAt: m.createdAt,
+            ),
+          )
+          .toList();
+      return Right(entities);
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {
@@ -106,7 +163,15 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
         createdAt: role.createdAt,
       );
       final created = await remoteDataSource.createRole(model);
-      return Right(created);
+      return Right(
+        RoleEntity(
+          id: created.id,
+          name: created.name,
+          isSystem: created.isSystem,
+          permissions: created.permissions,
+          createdAt: created.createdAt,
+        ),
+      );
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     } catch (e) {

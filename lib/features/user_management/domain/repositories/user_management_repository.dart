@@ -13,6 +13,10 @@ abstract class UserManagementRepository {
   });
   Future<Either<Failure, void>> updateUser(ManagedUserEntity user);
   Future<Either<Failure, void>> toggleUserStatus(String uid, bool isActive);
+  Future<Either<Failure, void>> changeUserPassword({
+    required String uid,
+    required String newPassword,
+  });
 
   Future<Either<Failure, List<RoleEntity>>> getAllRoles();
   Future<Either<Failure, RoleEntity>> createRole(RoleEntity role);
