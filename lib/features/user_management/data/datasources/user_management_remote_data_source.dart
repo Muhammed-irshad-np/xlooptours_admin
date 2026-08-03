@@ -15,6 +15,8 @@ abstract class UserManagementRemoteDataSource {
     required String password,
     required String displayName,
     required String roleId,
+    String? employeeId,
+    String? employeeName,
   });
   Future<void> updateUser(ManagedUserModel user);
   Future<void> toggleUserStatus(String uid, bool isActive);
@@ -77,6 +79,35 @@ class UserManagementRemoteDataSourceImpl
     }
   }
 
+  /// Link / unlink login account on the employee document.
+  Future<void> _syncEmployeeLink({
+    required String uid,
+    required String email,
+    String? employeeId,
+    String? previousEmployeeId,
+  }) async {
+    // Clear previous employee link if changed
+    if (previousEmployeeId != null &&
+        previousEmployeeId.isNotEmpty &&
+        previousEmployeeId != employeeId) {
+      try {
+        await firestore.collection('employees').doc(previousEmployeeId).set({
+          'linkedUserUid': FieldValue.delete(),
+          'linkedUserEmail': FieldValue.delete(),
+        }, SetOptions(merge: true));
+      } catch (_) {}
+    }
+
+    if (employeeId == null || employeeId.isEmpty) {
+      return;
+    }
+
+    await firestore.collection('employees').doc(employeeId).set({
+      'linkedUserUid': uid,
+      'linkedUserEmail': email.toLowerCase(),
+    }, SetOptions(merge: true));
+  }
+
   @override
   Future<List<ManagedUserModel>> getAllUsers() async {
     try {
@@ -106,14 +137,43 @@ class UserManagementRemoteDataSourceImpl
       }
 
       // Include legacy email-only users that have no uid counterpart.
-      final existingEmails = byUid.values.map((u) => u.email.toLowerCase()).toSet();
+      final existingEmails =
+          byUid.values.map((u) => u.email.toLowerCase()).toSet();
       for (final entry in emailOnlyFallback.entries) {
         if (!existingEmails.contains(entry.key)) {
           byUid['legacy_${entry.key}'] = entry.value;
         }
       }
 
-      final list = byUid.values.toList()
+      // Resolve employee profile photos for linked users
+      final employeeIds = byUid.values
+          .map((u) => u.employeeId)
+          .whereType<String>()
+          .where((id) => id.trim().isNotEmpty)
+          .toSet()
+          .toList();
+
+      final photoByEmployeeId = <String, String>{};
+      // Firestore getAll in chunks of 10 via Future.wait individual gets (simple & reliable)
+      await Future.wait(
+        employeeIds.map((id) async {
+          try {
+            final snap = await firestore.collection('employees').doc(id).get();
+            final url = snap.data()?['imageUrl'] as String?;
+            if (url != null && url.trim().isNotEmpty) {
+              photoByEmployeeId[id] = url.trim();
+            }
+          } catch (_) {}
+        }),
+      );
+
+      final list = byUid.values.map((u) {
+        final empId = u.employeeId;
+        if (empId == null || empId.isEmpty) return u;
+        final photo = photoByEmployeeId[empId];
+        if (photo == null) return u;
+        return u.copyWithPhoto(photo);
+      }).toList()
         ..sort((a, b) {
           final aTime = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
           final bTime = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
@@ -131,6 +191,8 @@ class UserManagementRemoteDataSourceImpl
     required String password,
     required String displayName,
     required String roleId,
+    String? employeeId,
+    String? employeeName,
   }) async {
     try {
       final normalizedEmail = email.trim().toLowerCase();
@@ -148,6 +210,20 @@ class UserManagementRemoteDataSourceImpl
           await firestore.collection('users').doc(normalizedEmail).get();
       if (legacyEmailDoc.exists) {
         throw ServerException('A user with this email already exists.');
+      }
+
+      // Prevent two logins linked to the same employee
+      if (employeeId != null && employeeId.isNotEmpty) {
+        final linked = await firestore
+            .collection('users')
+            .where('employeeId', isEqualTo: employeeId)
+            .limit(1)
+            .get();
+        if (linked.docs.isNotEmpty) {
+          throw ServerException(
+            'This employee is already linked to another login account.',
+          );
+        }
       }
 
       // Secondary Firebase App so admin session is preserved
@@ -192,6 +268,8 @@ class UserManagementRemoteDataSourceImpl
         isActive: true,
         createdAt: DateTime.now(),
         createdBy: currentUserUid,
+        employeeId: employeeId,
+        employeeName: employeeName,
       );
 
       // Single canonical document: users/{uid}
@@ -199,6 +277,12 @@ class UserManagementRemoteDataSourceImpl
           .collection('users')
           .doc(newUser.uid)
           .set(userModel.toFirestore());
+
+      await _syncEmployeeLink(
+        uid: newUser.uid,
+        email: normalizedEmail,
+        employeeId: employeeId,
+      );
 
       await _syncLegacyAllowedUser(
         email: normalizedEmail,
@@ -227,6 +311,26 @@ class UserManagementRemoteDataSourceImpl
       final email = user.email.toLowerCase();
       final payload = user.toFirestoreUpdate();
 
+      final existing =
+          await firestore.collection('users').doc(user.uid).get();
+      final previousEmployeeId =
+          existing.data()?['employeeId'] as String?;
+
+      // Another login already linked to this employee?
+      if (user.employeeId != null && user.employeeId!.isNotEmpty) {
+        final linked = await firestore
+            .collection('users')
+            .where('employeeId', isEqualTo: user.employeeId)
+            .limit(2)
+            .get();
+        final conflict = linked.docs.any((d) => d.id != user.uid);
+        if (conflict) {
+          throw ServerException(
+            'This employee is already linked to another login account.',
+          );
+        }
+      }
+
       await firestore.collection('users').doc(user.uid).set({
         ...payload,
         'createdAt': user.createdAt != null
@@ -234,6 +338,13 @@ class UserManagementRemoteDataSourceImpl
             : FieldValue.serverTimestamp(),
         'createdBy': user.createdBy,
       }, SetOptions(merge: true));
+
+      await _syncEmployeeLink(
+        uid: user.uid,
+        email: email,
+        employeeId: user.employeeId,
+        previousEmployeeId: previousEmployeeId,
+      );
 
       // Sync / remove legacy email doc
       await _deleteLegacyEmailDoc(email, user.uid);
@@ -244,6 +355,7 @@ class UserManagementRemoteDataSourceImpl
         roleId: user.roleId,
       );
     } catch (e) {
+      if (e is ServerException) rethrow;
       throw ServerException('Failed to update user: $e');
     }
   }

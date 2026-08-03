@@ -227,17 +227,30 @@ class _UserManagementScreenState extends State<UserManagementScreen>
       ),
       child: Row(
         children: [
-          // User Avatar
-          CircleAvatar(
-            radius: 20.r,
-            backgroundColor: const Color(0xFF13B1F2).withValues(alpha: 0.1),
-            child: Text(
-              user.displayName.isNotEmpty ? user.displayName[0].toUpperCase() : 'U',
-              style: GoogleFonts.notoSans(
-                fontWeight: FontWeight.bold,
-                color: const Color(0xFF13B1F2),
-              ),
-            ),
+          // Avatar: employee photo when linked, else initial
+          Builder(
+            builder: (_) {
+              final photo = user.photoUrl?.trim();
+              final hasPhoto = photo != null && photo.isNotEmpty;
+              final initial = user.displayName.isNotEmpty
+                  ? user.displayName[0].toUpperCase()
+                  : 'U';
+              return CircleAvatar(
+                radius: 20.r,
+                backgroundColor: const Color(0xFF13B1F2).withValues(alpha: 0.1),
+                backgroundImage: hasPhoto ? NetworkImage(photo) : null,
+                onBackgroundImageError: hasPhoto ? (_, __) {} : null,
+                child: hasPhoto
+                    ? null
+                    : Text(
+                        initial,
+                        style: GoogleFonts.notoSans(
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF13B1F2),
+                        ),
+                      ),
+              );
+            },
           ),
           SizedBox(width: 14.w),
 
@@ -262,6 +275,30 @@ class _UserManagementScreenState extends State<UserManagementScreen>
                     color: const Color(0xFF64748B),
                   ),
                 ),
+                if (user.hasEmployeeLink) ...[
+                  SizedBox(height: 4.h),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.badge_outlined,
+                        size: 12.sp,
+                        color: const Color(0xFF13B1F2),
+                      ),
+                      SizedBox(width: 4.w),
+                      Flexible(
+                        child: Text(
+                          user.employeeName ?? 'Linked employee',
+                          style: GoogleFonts.notoSans(
+                            fontSize: 11.sp,
+                            color: const Color(0xFF13B1F2),
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
