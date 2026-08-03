@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../../domain/entities/managed_user_entity.dart';
 import '../../domain/entities/role_entity.dart';
+import '../../domain/usecases/change_user_login_email.dart';
 import '../../domain/usecases/change_user_password.dart';
 import '../../domain/usecases/create_role.dart';
 import '../../domain/usecases/create_user.dart';
@@ -19,6 +20,7 @@ class UserManagementProvider extends ChangeNotifier {
   final UpdateUser _updateUser;
   final ToggleUserStatus _toggleUserStatus;
   final ChangeUserPassword _changeUserPassword;
+  final ChangeUserLoginEmail _changeUserLoginEmail;
   final GetAllRoles _getAllRoles;
   final CreateRole _createRole;
   final UpdateRole _updateRole;
@@ -31,6 +33,7 @@ class UserManagementProvider extends ChangeNotifier {
     required UpdateUser updateUser,
     required ToggleUserStatus toggleUserStatus,
     required ChangeUserPassword changeUserPassword,
+    required ChangeUserLoginEmail changeUserLoginEmail,
     required GetAllRoles getAllRoles,
     required CreateRole createRole,
     required UpdateRole updateRole,
@@ -41,6 +44,7 @@ class UserManagementProvider extends ChangeNotifier {
         _updateUser = updateUser,
         _toggleUserStatus = toggleUserStatus,
         _changeUserPassword = changeUserPassword,
+        _changeUserLoginEmail = changeUserLoginEmail,
         _getAllRoles = getAllRoles,
         _createRole = createRole,
         _updateRole = updateRole,
@@ -182,6 +186,47 @@ class UserManagementProvider extends ChangeNotifier {
         return false;
       },
       (_) => true,
+    );
+  }
+
+  /// Changes login email in Firebase Auth + User Management (Admin / Super Admin).
+  Future<bool> changeLoginEmail({
+    required String uid,
+    required String newEmail,
+  }) async {
+    _errorMessage = null;
+    final email = newEmail.trim().toLowerCase();
+    final result = await _changeUserLoginEmail(
+      ChangeUserLoginEmailParams(uid: uid, newEmail: email),
+    );
+
+    return result.fold(
+      (failure) {
+        _errorMessage = failure.message;
+        notifyListeners();
+        return false;
+      },
+      (_) {
+        final index = _users.indexWhere((u) => u.uid == uid);
+        if (index != -1) {
+          final old = _users[index];
+          _users[index] = ManagedUserEntity(
+            uid: old.uid,
+            email: email,
+            displayName: old.displayName,
+            roleId: old.roleId,
+            roleName: old.roleName,
+            isActive: old.isActive,
+            createdAt: old.createdAt,
+            createdBy: old.createdBy,
+            employeeId: old.employeeId,
+            employeeName: old.employeeName,
+            photoUrl: old.photoUrl,
+          );
+          notifyListeners();
+        }
+        return true;
+      },
     );
   }
 

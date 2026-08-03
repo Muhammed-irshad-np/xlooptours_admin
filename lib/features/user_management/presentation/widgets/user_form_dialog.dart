@@ -55,9 +55,15 @@ class _UserFormDialogState extends State<UserFormDialog> {
     super.dispose();
   }
 
+  /// Employee link only attaches HR identity (photo, name).
+  /// Login email is separate: it is the Firebase Auth username.
+  /// We prefill name/email from employee as a convenience when creating —
+  /// admin can still change the login email before saving.
   void _onEmployeeSelected(String? employeeId, List<EmployeeEntity> employees) {
     setState(() => _selectedEmployeeId = employeeId);
     if (employeeId == null) return;
+    if (widget.userToEdit != null) return; // editing: don't overwrite login email
+
     EmployeeEntity? match;
     for (final e in employees) {
       if (e.id == employeeId) {
@@ -67,9 +73,21 @@ class _UserFormDialogState extends State<UserFormDialog> {
     }
     if (match == null) return;
     _nameController.text = match.fullName;
-    if (match.email.trim().isNotEmpty) {
-      _emailController.text = match.email.trim();
+    // Suggest employee email as login username only if field empty
+    if (_emailController.text.trim().isEmpty && match.email.trim().isNotEmpty) {
+      _emailController.text = match.email.trim().toLowerCase();
     }
+  }
+
+  String? _selectedEmployeeContactEmail(List<EmployeeEntity> employees) {
+    if (_selectedEmployeeId == null) return null;
+    for (final e in employees) {
+      if (e.id == _selectedEmployeeId) {
+        final mail = e.email.trim();
+        return mail.isEmpty ? null : mail;
+      }
+    }
+    return null;
   }
 
   String? _employeeName(List<EmployeeEntity> employees) {
@@ -109,9 +127,10 @@ class _UserFormDialogState extends State<UserFormDialog> {
       }
       if (_selectedEmployeeId == null) photoUrl = null;
 
+      // Login email is immutable here — never take it from the employee link.
       final updatedUser = ManagedUserEntity(
         uid: widget.userToEdit!.uid,
-        email: _emailController.text.trim(),
+        email: widget.userToEdit!.email,
         displayName: _nameController.text.trim(),
         roleId: roleId,
         roleName: roleName,
@@ -237,7 +256,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                       borderRadius: BorderRadius.circular(8.r),
                     ),
                     helperText:
-                        'Connect this login to an employee from HR records',
+                        'Photo & name come from the employee. Login email is separate.',
                   ),
                   items: [
                     const DropdownMenuItem<String?>(
@@ -265,12 +284,29 @@ class _UserFormDialogState extends State<UserFormDialog> {
                     padding: EdgeInsets.only(top: 8.h),
                     child: const LinearProgressIndicator(minHeight: 2),
                   ),
+                Builder(
+                  builder: (_) {
+                    final contact =
+                        _selectedEmployeeContactEmail(selectableEmployees);
+                    if (contact == null) return const SizedBox.shrink();
+                    return Padding(
+                      padding: EdgeInsets.only(top: 6.h),
+                      child: Text(
+                        'Employee contact email: $contact',
+                        style: GoogleFonts.notoSans(
+                          fontSize: 11.sp,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 SizedBox(height: 16.h),
 
                 TextFormField(
                   controller: _nameController,
                   decoration: InputDecoration(
-                    labelText: 'Full Name',
+                    labelText: 'Display name',
                     prefixIcon: const Icon(Icons.person_outline),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8.r),
@@ -283,25 +319,34 @@ class _UserFormDialogState extends State<UserFormDialog> {
                 ),
                 SizedBox(height: 16.h),
 
-                TextFormField(
-                  controller: _emailController,
-                  enabled: !isEditing,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: 'Email Address',
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.r),
+                if (!isEditing)
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: InputDecoration(
+                      labelText: 'Login email (username)',
+                      prefixIcon: const Icon(Icons.email_outlined),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8.r),
+                      ),
+                      helperText:
+                          'What they type at login. Linking an employee only fills this if empty — it is not the employee contact email.',
                     ),
+                    validator: (val) {
+                      if (val == null || val.trim().isEmpty) {
+                        return 'Login email is required';
+                      }
+                      if (!val.contains('@')) {
+                        return 'Enter a valid email address';
+                      }
+                      return null;
+                    },
+                  )
+                else
+                  _LoginEmailFixSection(
+                    uid: widget.userToEdit!.uid,
+                    currentEmail: widget.userToEdit!.email,
                   ),
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
-                      return 'Email is required';
-                    }
-                    if (!val.contains('@')) return 'Enter a valid email address';
-                    return null;
-                  },
-                ),
                 SizedBox(height: 16.h),
 
                 if (!isEditing) ...[
@@ -412,6 +457,155 @@ class _UserFormDialogState extends State<UserFormDialog> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Shows stored login email and lets admin fix it if it was wrongly
+/// overwritten when linking an employee (Auth password login is unchanged).
+class _LoginEmailFixSection extends StatefulWidget {
+  final String uid;
+  final String currentEmail;
+
+  const _LoginEmailFixSection({
+    required this.uid,
+    required this.currentEmail,
+  });
+
+  @override
+  State<_LoginEmailFixSection> createState() => _LoginEmailFixSectionState();
+}
+
+class _LoginEmailFixSectionState extends State<_LoginEmailFixSection> {
+  late final TextEditingController _controller;
+  bool _expanded = false;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.currentEmail);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final email = _controller.text.trim().toLowerCase();
+    if (email.isEmpty || !email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a valid login email'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    setState(() => _saving = true);
+    final ok = await context.read<UserManagementProvider>().changeLoginEmail(
+          uid: widget.uid,
+          newEmail: email,
+        );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    final provider = context.read<UserManagementProvider>();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          ok
+              ? 'Login email updated in User Management'
+              : (provider.errorMessage ?? 'Failed to update'),
+        ),
+        backgroundColor: ok ? Colors.green : Colors.red,
+      ),
+    );
+    if (ok) setState(() => _expanded = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Login email (username)',
+            style: GoogleFonts.notoSans(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF64748B),
+            ),
+          ),
+          SizedBox(height: 4.h),
+          Text(
+            widget.currentEmail,
+            style: GoogleFonts.notoSans(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w600,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            'This is their sign-in username. Use @ on the user list (or expand below) to change it in Firebase Auth.',
+            style: GoogleFonts.notoSans(
+              fontSize: 11.sp,
+              color: const Color(0xFF94A3B8),
+            ),
+          ),
+          TextButton(
+            onPressed: () => setState(() => _expanded = !_expanded),
+            child: Text(
+              _expanded ? 'Cancel' : 'Change login email',
+              style: const TextStyle(fontSize: 12),
+            ),
+          ),
+          if (_expanded) ...[
+            TextFormField(
+              controller: _controller,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'New login email',
+                hintText: 'They will use this email to sign in',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+              ),
+            ),
+            SizedBox(height: 8.h),
+            Align(
+              alignment: Alignment.centerRight,
+              child: ElevatedButton(
+                onPressed: _saving ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF13B1F2),
+                  foregroundColor: Colors.white,
+                ),
+                child: _saving
+                    ? SizedBox(
+                        width: 18.w,
+                        height: 18.h,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Text('Update login email'),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

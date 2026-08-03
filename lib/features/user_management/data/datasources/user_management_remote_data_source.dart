@@ -24,6 +24,16 @@ abstract class UserManagementRemoteDataSource {
     required String uid,
     required String newPassword,
   });
+  /// Changes Firebase Auth login email + users profile (Admin / Super Admin).
+  Future<void> changeUserLoginEmail({
+    required String uid,
+    required String newEmail,
+  });
+  /// Fixes `users.email` display/profile only (must match Auth login email).
+  Future<void> correctLoginEmail({
+    required String uid,
+    required String loginEmail,
+  });
 
   Future<List<RoleModel>> getAllRoles();
   Future<RoleModel> createRole(RoleModel role);
@@ -308,13 +318,17 @@ class UserManagementRemoteDataSourceImpl
   @override
   Future<void> updateUser(ManagedUserModel user) async {
     try {
-      final email = user.email.toLowerCase();
-      final payload = user.toFirestoreUpdate();
-
       final existing =
           await firestore.collection('users').doc(user.uid).get();
       final previousEmployeeId =
           existing.data()?['employeeId'] as String?;
+
+      // Login email is the Auth username. Never replace it from employee data.
+      // Keep the existing Firestore login email unless it was empty.
+      final existingEmail =
+          (existing.data()?['email'] as String?)?.trim().toLowerCase() ?? '';
+      final loginEmail =
+          existingEmail.isNotEmpty ? existingEmail : user.email.toLowerCase();
 
       // Another login already linked to this employee?
       if (user.employeeId != null && user.employeeId!.isNotEmpty) {
@@ -331,8 +345,12 @@ class UserManagementRemoteDataSourceImpl
         }
       }
 
+      // Do not write email from form — preserves original login identity
+      final payload = user.toFirestoreUpdate(includeEmail: false);
+
       await firestore.collection('users').doc(user.uid).set({
         ...payload,
+        'email': loginEmail,
         'createdAt': user.createdAt != null
             ? Timestamp.fromDate(user.createdAt!)
             : FieldValue.serverTimestamp(),
@@ -341,22 +359,75 @@ class UserManagementRemoteDataSourceImpl
 
       await _syncEmployeeLink(
         uid: user.uid,
-        email: email,
+        email: loginEmail,
         employeeId: user.employeeId,
         previousEmployeeId: previousEmployeeId,
       );
 
-      // Sync / remove legacy email doc
-      await _deleteLegacyEmailDoc(email, user.uid);
+      await _deleteLegacyEmailDoc(loginEmail, user.uid);
 
       await _syncLegacyAllowedUser(
-        email: email,
+        email: loginEmail,
         isActive: user.isActive,
         roleId: user.roleId,
       );
     } catch (e) {
       if (e is ServerException) rethrow;
       throw ServerException('Failed to update user: $e');
+    }
+  }
+
+  /// Fix wrong login email stored on users/{uid} (must match Firebase Auth email).
+  /// Does not change Firebase Auth — only the profile used in User Management.
+  @override
+  Future<void> correctLoginEmail({
+    required String uid,
+    required String loginEmail,
+  }) async {
+    try {
+      final email = loginEmail.trim().toLowerCase();
+      if (email.isEmpty || !email.contains('@')) {
+        throw ServerException('Enter a valid login email.');
+      }
+
+      final existing = await firestore.collection('users').doc(uid).get();
+      if (!existing.exists) {
+        throw ServerException('User not found.');
+      }
+
+      final oldEmail =
+          (existing.data()?['email'] as String?)?.trim().toLowerCase() ?? '';
+      final roleId = existing.data()?['roleId'] as String? ?? 'office_staff';
+      final isActive = existing.data()?['isActive'] as bool? ?? true;
+
+      await firestore.collection('users').doc(uid).set({
+        'email': email,
+      }, SetOptions(merge: true));
+
+      if (oldEmail.isNotEmpty && oldEmail != email) {
+        // Drop wrong legacy doc if it was keyed by the bad email
+        final wrongDoc = firestore.collection('users').doc(oldEmail);
+        final wrongSnap = await wrongDoc.get();
+        if (wrongSnap.exists) {
+          final wrongUid = wrongSnap.data()?['uid'] as String?;
+          if (wrongUid == uid || wrongUid == null) {
+            await wrongDoc.delete();
+          }
+        }
+        // Keep allow-list in sync for both emails
+        await firestore.collection('allowed_users').doc(oldEmail).set({
+          'active': false,
+        }, SetOptions(merge: true));
+      }
+
+      await _syncLegacyAllowedUser(
+        email: email,
+        isActive: isActive,
+        roleId: roleId,
+      );
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException('Failed to correct login email: $e');
     }
   }
 
@@ -434,6 +505,35 @@ class UserManagementRemoteDataSourceImpl
     } catch (e) {
       throw ServerException(
         'Failed to change password. Ensure the changeUserPassword Cloud Function is deployed. ($e)',
+      );
+    }
+  }
+
+  @override
+  Future<void> changeUserLoginEmail({
+    required String uid,
+    required String newEmail,
+  }) async {
+    if (uid.isEmpty) {
+      throw ServerException('User id is required.');
+    }
+    final email = newEmail.trim().toLowerCase();
+    if (email.isEmpty || !email.contains('@')) {
+      throw ServerException('Enter a valid login email.');
+    }
+
+    try {
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('changeUserEmail');
+      await callable.call<Map<String, dynamic>>({
+        'uid': uid,
+        'newEmail': email,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? 'Failed to change login email.');
+    } catch (e) {
+      throw ServerException(
+        'Failed to change login email. Ensure the changeUserEmail Cloud Function is deployed. ($e)',
       );
     }
   }
