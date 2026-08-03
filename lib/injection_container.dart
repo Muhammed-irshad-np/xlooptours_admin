@@ -159,6 +159,7 @@ import 'features/finance/presentation/providers/petty_cash_provider.dart';
 import 'features/user_management/data/datasources/user_management_remote_data_source.dart';
 import 'features/user_management/data/repositories/user_management_repository_impl.dart';
 import 'features/user_management/domain/repositories/user_management_repository.dart';
+import 'features/user_management/domain/usecases/change_user_password.dart';
 import 'features/user_management/domain/usecases/create_role.dart';
 import 'features/user_management/domain/usecases/create_user.dart';
 import 'features/user_management/domain/usecases/delete_role.dart';
@@ -623,6 +624,7 @@ Future<void> init() async {
       createUser: sl(),
       updateUser: sl(),
       toggleUserStatus: sl(),
+      changeUserPassword: sl(),
       getAllRoles: sl(),
       createRole: sl(),
       updateRole: sl(),
@@ -636,6 +638,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => CreateUser(sl()));
   sl.registerLazySingleton(() => UpdateUser(sl()));
   sl.registerLazySingleton(() => ToggleUserStatus(sl()));
+  sl.registerLazySingleton(() => ChangeUserPassword(sl()));
   sl.registerLazySingleton(() => GetAllRoles(sl()));
   sl.registerLazySingleton(() => CreateRole(sl()));
   sl.registerLazySingleton(() => UpdateRole(sl()));

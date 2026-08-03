@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../../../../core/error/exceptions.dart';
@@ -17,6 +18,10 @@ abstract class UserManagementRemoteDataSource {
   });
   Future<void> updateUser(ManagedUserModel user);
   Future<void> toggleUserStatus(String uid, bool isActive);
+  Future<void> changeUserPassword({
+    required String uid,
+    required String newPassword,
+  });
 
   Future<List<RoleModel>> getAllRoles();
   Future<RoleModel> createRole(RoleModel role);
@@ -290,6 +295,34 @@ class UserManagementRemoteDataSourceImpl
     } catch (e) {
       if (e is ServerException) rethrow;
       throw ServerException('Failed to update user status: $e');
+    }
+  }
+
+  @override
+  Future<void> changeUserPassword({
+    required String uid,
+    required String newPassword,
+  }) async {
+    if (uid.isEmpty) {
+      throw ServerException('User id is required.');
+    }
+    if (newPassword.length < 6) {
+      throw ServerException('Password must be at least 6 characters.');
+    }
+
+    try {
+      final callable =
+          FirebaseFunctions.instance.httpsCallable('changeUserPassword');
+      await callable.call<Map<String, dynamic>>({
+        'uid': uid,
+        'newPassword': newPassword,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw ServerException(e.message ?? 'Failed to change password.');
+    } catch (e) {
+      throw ServerException(
+        'Failed to change password. Ensure the changeUserPassword Cloud Function is deployed. ($e)',
+      );
     }
   }
 

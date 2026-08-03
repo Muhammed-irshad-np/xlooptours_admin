@@ -15,11 +15,12 @@ class UserModel extends UserEntity {
     User user, {
     String roleId = 'office_staff',
     List<String> permissions = const [],
+    String? displayName,
   }) {
     return UserModel(
       id: user.uid,
       email: user.email,
-      displayName: user.displayName,
+      displayName: displayName ?? user.displayName,
       roleId: RbacManager.normalizeRoleId(roleId),
       permissions: permissions,
     );

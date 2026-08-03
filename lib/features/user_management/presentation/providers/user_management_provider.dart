@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../core/usecases/usecase.dart';
 import '../../domain/entities/managed_user_entity.dart';
 import '../../domain/entities/role_entity.dart';
+import '../../domain/usecases/change_user_password.dart';
 import '../../domain/usecases/create_role.dart';
 import '../../domain/usecases/create_user.dart';
 import '../../domain/usecases/delete_role.dart';
@@ -17,6 +18,7 @@ class UserManagementProvider extends ChangeNotifier {
   final CreateUser _createUser;
   final UpdateUser _updateUser;
   final ToggleUserStatus _toggleUserStatus;
+  final ChangeUserPassword _changeUserPassword;
   final GetAllRoles _getAllRoles;
   final CreateRole _createRole;
   final UpdateRole _updateRole;
@@ -28,6 +30,7 @@ class UserManagementProvider extends ChangeNotifier {
     required CreateUser createUser,
     required UpdateUser updateUser,
     required ToggleUserStatus toggleUserStatus,
+    required ChangeUserPassword changeUserPassword,
     required GetAllRoles getAllRoles,
     required CreateRole createRole,
     required UpdateRole updateRole,
@@ -37,6 +40,7 @@ class UserManagementProvider extends ChangeNotifier {
         _createUser = createUser,
         _updateUser = updateUser,
         _toggleUserStatus = toggleUserStatus,
+        _changeUserPassword = changeUserPassword,
         _getAllRoles = getAllRoles,
         _createRole = createRole,
         _updateRole = updateRole,
@@ -152,6 +156,25 @@ class UserManagementProvider extends ChangeNotifier {
         }
         return true;
       },
+    );
+  }
+
+  Future<bool> changePassword({
+    required String uid,
+    required String newPassword,
+  }) async {
+    _errorMessage = null;
+    final result = await _changeUserPassword(
+      ChangeUserPasswordParams(uid: uid, newPassword: newPassword),
+    );
+
+    return result.fold(
+      (failure) {
+        _errorMessage = failure.message;
+        notifyListeners();
+        return false;
+      },
+      (_) => true,
     );
   }
 

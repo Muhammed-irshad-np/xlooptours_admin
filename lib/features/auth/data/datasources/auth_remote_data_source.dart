@@ -22,7 +22,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   /// Initial Super Admin — bootstrapped into `users` on first successful Auth login
   /// if no profile document exists yet.
-  static const String _bootstrapSuperAdminEmail = 'muhammed.saleh@xlooptours.com';
+  static const String _bootstrapSuperAdminEmail =
+      'muhammed.saleh@xlooptours.com';
 
   /// Cache role info so [currentUser] is not empty on cold start.
   UserModel? _cachedUser;
@@ -70,9 +71,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   /// Resolves authorized role for a Firebase user.
   /// Throws [AuthenticationException] if not in allow-list or inactive.
-  Future<({String roleId, List<String> permissions})> _resolveAuthorizedUser(
-    User user,
-  ) async {
+  Future<({String roleId, List<String> permissions, String? displayName})>
+  _resolveAuthorizedUser(User user) async {
     final email = user.email?.toLowerCase().trim();
     if (email == null || email.isEmpty) {
       throw AuthenticationException(
@@ -111,12 +111,19 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         }
         final roleId = _roleIdFromUserData(data);
         final permissions = await _permissionsForRole(roleId);
-        return (roleId: roleId, permissions: permissions);
+        final displayName = data['displayName'] as String?;
+        return (
+          roleId: roleId,
+          permissions: permissions,
+          displayName: displayName,
+        );
       }
 
       // 4. Legacy allowed_users collection
-      final allowedDoc =
-          await firestore.collection('allowed_users').doc(email).get();
+      final allowedDoc = await firestore
+          .collection('allowed_users')
+          .doc(email)
+          .get();
       if (allowedDoc.exists) {
         final data = allowedDoc.data() ?? {};
         final isActive = data['active'] ?? true;
@@ -128,7 +135,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         // Legacy: isAdmin true → admin; also honor roleId if present
         final roleId = _roleIdFromUserData(data);
         final permissions = await _permissionsForRole(roleId);
-        return (roleId: roleId, permissions: permissions);
+        final displayName = data['displayName'] as String?;
+        return (
+          roleId: roleId,
+          permissions: permissions,
+          displayName: displayName,
+        );
       }
     } on AuthenticationException {
       rethrow;
@@ -154,9 +166,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'active': true,
         'isAdmin': true,
       }, SetOptions(merge: true));
-      final permissions =
-          await _permissionsForRole(RbacManager.roleSuperAdmin);
-      return (roleId: RbacManager.roleSuperAdmin, permissions: permissions);
+      final permissions = await _permissionsForRole(RbacManager.roleSuperAdmin);
+      return (
+        roleId: RbacManager.roleSuperAdmin,
+        permissions: permissions,
+        displayName: 'Super Admin',
+      );
     }
 
     throw AuthenticationException(
@@ -170,6 +185,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       user,
       roleId: resolved.roleId,
       permissions: resolved.permissions,
+      displayName: resolved.displayName,
     );
     _cachedUser = model;
     return model;

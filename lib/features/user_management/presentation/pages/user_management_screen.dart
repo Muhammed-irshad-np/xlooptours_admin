@@ -9,6 +9,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../domain/entities/managed_user_entity.dart';
 import '../../domain/entities/role_entity.dart';
 import '../providers/user_management_provider.dart';
+import '../widgets/change_password_dialog.dart';
 import '../widgets/role_form_dialog.dart';
 import '../widgets/user_form_dialog.dart';
 
@@ -309,9 +310,34 @@ class _UserManagementScreenState extends State<UserManagementScreen>
           ),
           SizedBox(width: 10.w),
 
-          // Edit Button
+          // Admin / Super Admin: change password
+          if (context.read<AuthProvider>().user?.isAdmin == true)
+            IconButton(
+              tooltip: 'Change password',
+              icon: const Icon(Icons.lock_reset_outlined, color: Color(0xFF64748B)),
+              onPressed: () {
+                if (user.uid.contains('@')) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'This user has no Auth account id. Recreate the user to set a password.',
+                      ),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+                showDialog(
+                  context: context,
+                  builder: (_) => ChangePasswordDialog(user: user),
+                );
+              },
+            ),
+
+          // Edit user profile
           if (RbacManager.canManageUsers(context.read<AuthProvider>().user))
             IconButton(
+              tooltip: 'Edit user',
               icon: const Icon(Icons.edit_outlined, color: Color(0xFF64748B)),
               onPressed: () {
                 showDialog(
