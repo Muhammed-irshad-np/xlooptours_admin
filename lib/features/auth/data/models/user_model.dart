@@ -6,15 +6,21 @@ class UserModel extends UserEntity {
     required super.id,
     super.email,
     super.displayName,
-    super.isAdmin = false,
+    super.roleId = 'office_staff',
+    super.permissions = const [],
   });
 
-  factory UserModel.fromFirebaseUser(User user, {bool isAdmin = false}) {
+  factory UserModel.fromFirebaseUser(
+    User user, {
+    String roleId = 'office_staff',
+    List<String> permissions = const [],
+  }) {
     return UserModel(
       id: user.uid,
       email: user.email,
       displayName: user.displayName,
-      isAdmin: isAdmin,
+      roleId: roleId,
+      permissions: permissions,
     );
   }
 }

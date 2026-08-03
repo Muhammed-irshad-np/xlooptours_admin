@@ -3,6 +3,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/rbac/permission.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -18,43 +19,184 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final GoogleSignIn googleSignIn;
   final FirebaseFirestore firestore;
 
+  /// Initial Super Admin — bootstrapped into `users` on first successful Auth login
+  /// if no profile document exists yet.
+  static const String _bootstrapSuperAdminEmail = 'muhammed.saleh@xlooptours.com';
+
+  /// Cache role info so [currentUser] is not empty on cold start.
+  UserModel? _cachedUser;
+
   AuthRemoteDataSourceImpl({
     required this.auth,
     required this.googleSignIn,
     required this.firestore,
   });
 
+  Future<List<String>> _permissionsForRole(String roleId) async {
+    if (roleId == 'super_admin') {
+      return AppPermission.values.map((p) => p.toPermissionString()).toList();
+    }
+    if (roleId == 'admin') {
+      return AppPermission.values
+          .where((p) => p != AppPermission.manageRoles)
+          .map((p) => p.toPermissionString())
+          .toList();
+    }
+    try {
+      final roleDoc = await firestore.collection('roles').doc(roleId).get();
+      if (!roleDoc.exists) return const [];
+      final raw = roleDoc.data()?['permissions'] as List<dynamic>? ?? [];
+      return raw.map((e) => e.toString()).toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Resolves authorized role for a Firebase user.
+  /// Throws [AuthenticationException] if not in allow-list or inactive.
+  Future<({String roleId, List<String> permissions})> _resolveAuthorizedUser(
+    User user,
+  ) async {
+    final email = user.email?.toLowerCase().trim();
+    if (email == null || email.isEmpty) {
+      throw AuthenticationException(
+        'Your account has no email address and cannot sign in.',
+      );
+    }
+
+    try {
+      // 1. Canonical: users/{uid}
+      var userDoc = await firestore.collection('users').doc(user.uid).get();
+
+      // 2. Legacy email-as-document-id
+      if (!userDoc.exists) {
+        userDoc = await firestore.collection('users').doc(email).get();
+      }
+
+      // 3. Query by email field (single-doc model)
+      if (!userDoc.exists) {
+        final query = await firestore
+            .collection('users')
+            .where('email', isEqualTo: email)
+            .limit(1)
+            .get();
+        if (query.docs.isNotEmpty) {
+          userDoc = query.docs.first;
+        }
+      }
+
+      if (userDoc.exists) {
+        final data = userDoc.data() ?? {};
+        final isActive = data['isActive'] ?? true;
+        if (!isActive) {
+          throw AuthenticationException(
+            'Your account has been deactivated. Contact an administrator.',
+          );
+        }
+        final roleId = (data['roleId'] as String?)?.trim().isNotEmpty == true
+            ? data['roleId'] as String
+            : 'office_staff';
+        final permissions = await _permissionsForRole(roleId);
+        return (roleId: roleId, permissions: permissions);
+      }
+
+      // 4. Legacy allowed_users collection
+      final allowedDoc =
+          await firestore.collection('allowed_users').doc(email).get();
+      if (allowedDoc.exists) {
+        final data = allowedDoc.data() ?? {};
+        final isActive = data['active'] ?? true;
+        if (!isActive) {
+          throw AuthenticationException(
+            'Your account is not active. Contact an administrator.',
+          );
+        }
+        final isAdmin = data['isAdmin'] ?? false;
+        final roleId = isAdmin ? 'admin' : 'office_staff';
+        final permissions = await _permissionsForRole(roleId);
+        return (roleId: roleId, permissions: permissions);
+      }
+    } on AuthenticationException {
+      rethrow;
+    } catch (e) {
+      throw AuthenticationException(
+        'Unable to verify account access. Please try again.',
+      );
+    }
+
+    // One-time bootstrap for the designated Super Admin account
+    if (email == _bootstrapSuperAdminEmail) {
+      await firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'email': email,
+        'displayName': user.displayName ?? 'Super Admin',
+        'roleId': 'super_admin',
+        'isActive': true,
+        'createdAt': FieldValue.serverTimestamp(),
+        'createdBy': 'system_bootstrap',
+      }, SetOptions(merge: true));
+      await firestore.collection('allowed_users').doc(email).set({
+        'active': true,
+        'isAdmin': true,
+      }, SetOptions(merge: true));
+      final permissions = await _permissionsForRole('super_admin');
+      return (roleId: 'super_admin', permissions: permissions);
+    }
+
+    throw AuthenticationException(
+      'You are not authorized to access this application. Contact an administrator.',
+    );
+  }
+
+  Future<UserModel> _buildAuthorizedUserModel(User user) async {
+    final resolved = await _resolveAuthorizedUser(user);
+    final model = UserModel.fromFirebaseUser(
+      user,
+      roleId: resolved.roleId,
+      permissions: resolved.permissions,
+    );
+    _cachedUser = model;
+    return model;
+  }
+
+  Future<void> _rejectAndSignOut(User? user) async {
+    _cachedUser = null;
+    try {
+      await auth.signOut();
+      await googleSignIn.signOut();
+    } catch (_) {}
+  }
+
   @override
   Stream<UserModel?> get authStateChanges {
     return auth.authStateChanges().asyncMap((user) async {
-      if (user != null) {
-        bool isAdmin = false;
-        if (user.email != null) {
-          try {
-            final userDoc = await firestore
-                .collection('allowed_users')
-                .doc(user.email!.toLowerCase())
-                .get();
-            if (userDoc.exists) {
-              isAdmin = userDoc.data()?['isAdmin'] ?? false;
-            }
-          } catch (_) {}
-        }
-        return UserModel.fromFirebaseUser(user, isAdmin: isAdmin);
+      if (user == null) {
+        _cachedUser = null;
+        return null;
       }
-      return null;
+      try {
+        return await _buildAuthorizedUserModel(user);
+      } on AuthenticationException {
+        await _rejectAndSignOut(user);
+        return null;
+      } catch (_) {
+        await _rejectAndSignOut(user);
+        return null;
+      }
     });
   }
 
   @override
   UserModel? get currentUser {
-    final user = auth.currentUser;
-    if (user != null) {
-      // Synchronous getter won't have the real isAdmin value, 
-      // but authStateChanges will update it shortly.
-      return UserModel.fromFirebaseUser(user);
+    if (_cachedUser != null && _cachedUser!.id == auth.currentUser?.uid) {
+      return _cachedUser;
     }
-    return null;
+    final user = auth.currentUser;
+    if (user == null) return null;
+    // Synchronous snapshot without role; authStateChanges will enrich shortly.
+    // Prefer not to claim isAdmin until resolved — return null only if no cache
+    // would break redirects; keep minimal model with default non-admin role.
+    return UserModel.fromFirebaseUser(user);
   }
 
   @override
@@ -64,25 +206,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   ) async {
     try {
       final credential = await auth.signInWithEmailAndPassword(
-        email: email,
+        email: email.trim(),
         password: password,
       );
-      if (credential.user != null) {
-        bool isAdmin = false;
-        try {
-          final userDoc = await firestore
-              .collection('allowed_users')
-              .doc(credential.user!.email!.toLowerCase())
-              .get();
-          if (userDoc.exists) {
-            isAdmin = userDoc.data()?['isAdmin'] ?? false;
-          }
-        } catch (_) {}
-        return UserModel.fromFirebaseUser(credential.user!, isAdmin: isAdmin);
+      if (credential.user == null) {
+        throw AuthenticationException('Login failed');
       }
-      throw AuthenticationException('Login failed');
+      try {
+        return await _buildAuthorizedUserModel(credential.user!);
+      } on AuthenticationException {
+        await _rejectAndSignOut(credential.user);
+        rethrow;
+      }
     } on FirebaseAuthException catch (e) {
       throw AuthenticationException(e.message ?? 'Authentication error');
+    } on AuthenticationException {
+      rethrow;
     } catch (e) {
       throw ServerException('Unexpected error');
     }
@@ -92,7 +231,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<UserModel> signInWithGoogle() async {
     try {
       User? user;
-      
+
       if (kIsWeb) {
         final googleProvider = GoogleAuthProvider();
         final userCredential = await auth.signInWithPopup(googleProvider);
@@ -113,40 +252,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         user = userCredential.user;
       }
 
-      bool isAdmin = false;
-
-      if (user != null && user.email != null) {
-        try {
-          final userDoc = await firestore
-              .collection('allowed_users')
-              .doc(user.email!.toLowerCase())
-              .get();
-
-          if (!userDoc.exists) {
-            await signOut();
-            throw AuthenticationException(
-              'This email is not authorized to access the application.',
-            );
-          }
-          
-          isAdmin = userDoc.data()?['isAdmin'] ?? false;
-        } catch (e) {
-          if (e is AuthenticationException) rethrow;
-          await signOut();
-          throw AuthenticationException(
-            'Failed to verify user authorization. Please try again.',
-          );
-        }
+      if (user == null || user.email == null) {
+        throw AuthenticationException('Login failed');
       }
 
-      if (user != null) {
-        return UserModel.fromFirebaseUser(user, isAdmin: isAdmin);
+      try {
+        return await _buildAuthorizedUserModel(user);
+      } on AuthenticationException {
+        await _rejectAndSignOut(user);
+        rethrow;
       }
-      throw AuthenticationException('Login failed');
     } on FirebaseAuthException catch (e) {
       throw AuthenticationException(e.message ?? 'Google Sign-in failed');
+    } on AuthenticationException {
+      rethrow;
     } catch (e) {
-      if (e is AuthenticationException) rethrow;
       throw ServerException('Unexpected error during Google Sign-in');
     }
   }
@@ -154,6 +274,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<void> signOut() async {
     try {
+      _cachedUser = null;
       await googleSignIn.signOut();
       await auth.signOut();
     } catch (e) {
