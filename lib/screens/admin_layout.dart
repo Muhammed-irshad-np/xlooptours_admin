@@ -73,7 +73,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'Dashboard',
       icon: Icons.dashboard_outlined,
       activeIcon: Icons.dashboard_rounded,
-      // null requiredPermission → any authenticated user
+      requiredPermission: AppPermission.viewDashboard,
       subItems: [
         _SubNavItem(
           label: 'All Expiries',
@@ -135,7 +135,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'New Trip',
       icon: Icons.add_location_alt_outlined,
       activeIcon: Icons.add_location_alt_rounded,
-      requiredPermission: AppPermission.manageInvoices,
+      requiredPermission: AppPermission.manageTrips,
       subItems: [
         _SubNavItem(
           label: 'Start Booking',
@@ -589,8 +589,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'Feedback',
       icon: Icons.rate_review_outlined,
       activeIcon: Icons.rate_review_rounded,
-      // Feedback history historically admin-only; treat as activity visibility
-      requiredPermission: AppPermission.viewActivityLogs,
+      requiredPermission: AppPermission.viewFeedback,
       subItems: [
         _SubNavItem(
           label: 'Share Feedback Link',

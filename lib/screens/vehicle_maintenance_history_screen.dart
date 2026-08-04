@@ -82,7 +82,8 @@ class _VehicleMaintenanceHistoryScreenState
           body: Column(
             children: [
               _buildFilterBar(availableShops.toList()),
-              _buildCostSummaryCard(totalCost, filteredHistory.length),
+              if (isAdmin)
+                _buildCostSummaryCard(totalCost, filteredHistory.length),
               Expanded(
                 child: filteredHistory.isEmpty
                     ? Center(
