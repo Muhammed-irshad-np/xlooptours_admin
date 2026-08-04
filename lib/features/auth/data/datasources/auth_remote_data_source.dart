@@ -1,7 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/rbac/permission.dart';
 import '../../../../core/rbac/rbac_manager.dart';
@@ -11,7 +9,6 @@ abstract class AuthRemoteDataSource {
   Stream<UserModel?> get authStateChanges;
   UserModel? get currentUser;
   Future<UserModel> signInWithEmailAndPassword(String email, String password);
-  Future<UserModel> signInWithGoogle();
   Future<void> signOut();
   /// Updates lastActiveAt for online presence (safe to call periodically).
   Future<void> touchLastActive();
@@ -19,7 +16,6 @@ abstract class AuthRemoteDataSource {
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final FirebaseAuth auth;
-  final GoogleSignIn googleSignIn;
   final FirebaseFirestore firestore;
 
   /// Initial Super Admin — bootstrapped into `users` on first successful Auth login
@@ -35,9 +31,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   AuthRemoteDataSourceImpl({
     required this.auth,
-    required this.googleSignIn,
     required this.firestore,
   });
+
+  /// Only email/password accounts created via User Management are allowed.
+  /// Google-only sessions are rejected and signed out.
+  void _ensurePasswordLoginAllowed(User user) {
+    final providers = user.providerData.map((p) => p.providerId).toSet();
+    final hasPassword = providers.contains('password');
+    if (!hasPassword) {
+      throw AuthenticationException(
+        'Google sign-in is no longer supported. '
+        'Use the email and password from User Management, or contact an administrator.',
+      );
+    }
+  }
 
   /// Records last login (once per app session) + last active heartbeat.
   /// Sets [sessionActive] true so admins can see online status.
@@ -281,6 +289,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   Future<UserModel> _buildAuthorizedUserModel(User user) async {
+    // Invalidate Google-only / non-password sessions immediately
+    _ensurePasswordLoginAllowed(user);
     final resolved = await _resolveAuthorizedUser(user);
     // Track login / presence for User Management (admin visibility)
     await _recordSessionActivity(user);
@@ -307,7 +317,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         await _recordLogout(user);
       }
       await auth.signOut();
-      await googleSignIn.signOut();
     } catch (_) {}
   }
 
@@ -372,50 +381,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<UserModel> signInWithGoogle() async {
-    try {
-      User? user;
-
-      if (kIsWeb) {
-        final googleProvider = GoogleAuthProvider();
-        final userCredential = await auth.signInWithPopup(googleProvider);
-        user = userCredential.user;
-      } else {
-        final googleUser = await googleSignIn.signIn();
-        if (googleUser == null) {
-          throw AuthenticationException('Google sign-in canceled');
-        }
-
-        final googleAuth = await googleUser.authentication;
-        final credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-
-        final userCredential = await auth.signInWithCredential(credential);
-        user = userCredential.user;
-      }
-
-      if (user == null || user.email == null) {
-        throw AuthenticationException('Login failed');
-      }
-
-      try {
-        return await _buildAuthorizedUserModel(user);
-      } on AuthenticationException {
-        await _rejectAndSignOut(user);
-        rethrow;
-      }
-    } on FirebaseAuthException catch (e) {
-      throw AuthenticationException(e.message ?? 'Google Sign-in failed');
-    } on AuthenticationException {
-      rethrow;
-    } catch (e) {
-      throw ServerException('Unexpected error during Google Sign-in');
-    }
-  }
-
-  @override
   Future<void> signOut() async {
     try {
       final user = auth.currentUser;
@@ -425,7 +390,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       _cachedUser = null;
       _sessionLoginRecordedForUid = null;
-      await googleSignIn.signOut();
       await auth.signOut();
     } catch (e) {
       throw ServerException('Failed to sign out');
