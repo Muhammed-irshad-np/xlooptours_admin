@@ -15,7 +15,16 @@ class ManagedUserModel extends ManagedUserEntity {
     super.employeeId,
     super.employeeName,
     super.photoUrl,
+    super.lastLoginAt,
+    super.lastActiveAt,
+    super.loginCount = 0,
   });
+
+  static DateTime? _asDate(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    return null;
+  }
 
   factory ManagedUserModel.fromFirestore(
     DocumentSnapshot doc, {
@@ -37,11 +46,14 @@ class ManagedUserModel extends ManagedUserEntity {
       roleId: roleId,
       roleName: roleName.isNotEmpty ? roleName : (data['roleName'] ?? roleId),
       isActive: data['isActive'] ?? true,
-      createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
+      createdAt: _asDate(data['createdAt']),
       createdBy: data['createdBy'],
       employeeId: data['employeeId'] as String?,
       employeeName: data['employeeName'] as String?,
       photoUrl: photoUrl,
+      lastLoginAt: _asDate(data['lastLoginAt']),
+      lastActiveAt: _asDate(data['lastActiveAt']),
+      loginCount: (data['loginCount'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -58,6 +70,9 @@ class ManagedUserModel extends ManagedUserEntity {
       employeeId: employeeId,
       employeeName: employeeName,
       photoUrl: url,
+      lastLoginAt: lastLoginAt,
+      lastActiveAt: lastActiveAt,
+      loginCount: loginCount,
     );
   }
 
@@ -78,6 +93,7 @@ class ManagedUserModel extends ManagedUserEntity {
       'createdBy': createdBy,
       'employeeId': employeeId,
       'employeeName': employeeName,
+      // Activity fields are written by auth session tracking, not form create
     };
   }
 
@@ -100,4 +116,3 @@ class ManagedUserModel extends ManagedUserEntity {
     return map;
   }
 }
-

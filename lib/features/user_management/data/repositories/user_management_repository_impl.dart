@@ -31,6 +31,9 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
               employeeId: m.employeeId,
               employeeName: m.employeeName,
               photoUrl: m.photoUrl,
+              lastLoginAt: m.lastLoginAt,
+              lastActiveAt: m.lastActiveAt,
+              loginCount: m.loginCount,
             ),
           )
           .toList();
@@ -73,6 +76,9 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
           employeeId: m.employeeId,
           employeeName: m.employeeName,
           photoUrl: m.photoUrl,
+          lastLoginAt: m.lastLoginAt,
+          lastActiveAt: m.lastActiveAt,
+          loginCount: m.loginCount,
         ),
       );
     } on AuthenticationException catch (e) {

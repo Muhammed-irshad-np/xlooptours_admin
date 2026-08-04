@@ -140,6 +140,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
         employeeId: _selectedEmployeeId,
         employeeName: employeeName,
         photoUrl: photoUrl,
+        lastLoginAt: widget.userToEdit!.lastLoginAt,
+        lastActiveAt: widget.userToEdit!.lastActiveAt,
+        loginCount: widget.userToEdit!.loginCount,
       );
       success = await provider.editUser(updatedUser);
     } else {

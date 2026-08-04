@@ -55,4 +55,9 @@ class AuthRepositoryImpl implements AuthRepository {
       return Left(ServerFailure(e.message));
     }
   }
+
+  @override
+  Future<void> touchLastActive() {
+    return remoteDataSource.touchLastActive();
+  }
 }
