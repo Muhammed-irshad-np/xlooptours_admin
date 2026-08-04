@@ -26,14 +26,15 @@ import 'invoice_list_screen.dart';
 import 'expiries_list_screen.dart';
 import '../core/utils/share_dialog.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:convert';
-import 'package:crypto/crypto.dart';
 import 'package:provider/provider.dart';
+import '../core/rbac/permission.dart';
+import '../core/rbac/rbac_manager.dart';
+import '../features/auth/domain/entities/user_entity.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../features/xloop_vault/presentation/pages/vault_screen.dart';
-import '../features/xloop_vault/presentation/providers/vault_provider.dart';
 import 'companies_screen.dart';
+import '../features/user_management/presentation/pages/user_management_screen.dart';
 
 /// The main admin scaffold with a professional, dark-themed sidebar.
 class AdminLayout extends StatefulWidget {
@@ -57,6 +58,7 @@ class _AdminLayoutState extends State<AdminLayout> {
     const HomeScreen(), // Invoices
     const FeedbackHistoryScreen(), // Feedback
     const PendingEvaluationsScreen(), // Evaluations
+    const UserManagementScreen(), // System Settings
   ];
 
   static const Color _sidebarBg = Color(0xFF0B0F1A);
@@ -71,6 +73,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'Dashboard',
       icon: Icons.dashboard_outlined,
       activeIcon: Icons.dashboard_rounded,
+      // null requiredPermission → any authenticated user
       subItems: [
         _SubNavItem(
           label: 'All Expiries',
@@ -132,6 +135,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'New Trip',
       icon: Icons.add_location_alt_outlined,
       activeIcon: Icons.add_location_alt_rounded,
+      requiredPermission: AppPermission.manageInvoices,
       subItems: [
         _SubNavItem(
           label: 'Start Booking',
@@ -198,6 +202,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       icon: Icons.history_outlined,
       activeIcon: Icons.history_rounded,
       hasBadge: true,
+      requiredPermission: AppPermission.viewActivityLogs,
       subItems: [
         _SubNavItem(
           label: 'All Expiries',
@@ -262,6 +267,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'Employees',
       icon: Icons.badge_outlined,
       activeIcon: Icons.badge_rounded,
+      requiredPermission: AppPermission.manageEmployees,
       subItems: [
         _SubNavItem(
           label: 'Add Employee',
@@ -329,6 +335,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'Vehicles',
       icon: Icons.directions_car_outlined,
       activeIcon: Icons.directions_car_rounded,
+      requiredPermission: AppPermission.manageVehicles,
       subItems: [
         _SubNavItem(
           label: 'Add Vehicle',
@@ -409,6 +416,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'Companies',
       icon: Icons.business_outlined,
       activeIcon: Icons.business_rounded,
+      requiredPermission: AppPermission.manageCompanies,
       subItems: [
         _SubNavItem(
           label: 'Add Company',
@@ -469,6 +477,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'Customers',
       icon: Icons.people_outline_rounded,
       activeIcon: Icons.people_rounded,
+      requiredPermission: AppPermission.manageCustomers,
       subItems: [
         _SubNavItem(
           label: 'Add Customer',
@@ -524,6 +533,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'Invoices',
       icon: Icons.receipt_long_outlined,
       activeIcon: Icons.receipt_long_rounded,
+      requiredPermission: AppPermission.manageInvoices,
       subItems: [
         _SubNavItem(
           label: 'Create Invoice',
@@ -579,6 +589,8 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'Feedback',
       icon: Icons.rate_review_outlined,
       activeIcon: Icons.rate_review_rounded,
+      // Feedback history historically admin-only; treat as activity visibility
+      requiredPermission: AppPermission.viewActivityLogs,
       subItems: [
         _SubNavItem(
           label: 'Share Feedback Link',
@@ -642,6 +654,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'Evaluations',
       icon: Icons.assignment_outlined,
       activeIcon: Icons.assignment_rounded,
+      requiredPermission: AppPermission.manageEvaluations,
       subItems: [
         _SubNavItem(
           label: 'Share Eval Link',
@@ -700,11 +713,31 @@ class _AdminLayoutState extends State<AdminLayout> {
         ),
       ],
     ),
+    // ── System Settings ───────────────────────────────────────
+    _NavItem(
+      label: 'System Settings',
+      icon: Icons.settings_outlined,
+      activeIcon: Icons.settings_rounded,
+      requiredPermission: AppPermission.manageUsers,
+      subItems: [
+        _SubNavItem(
+          label: 'User Management',
+          icon: Icons.manage_accounts_outlined,
+          adminOnly: true,
+          onAction: (context) {
+            // Body already hosts UserManagementScreen when this nav is selected
+          },
+        ),
+      ],
+    ),
   ];
 
-  bool _isAdmin(BuildContext context) {
-    final user = context.watch<AuthProvider>().user;
-    return user?.isAdmin ?? false;
+  UserEntity? _currentUser(BuildContext context) {
+    return context.watch<AuthProvider>().user;
+  }
+
+  bool _canAccessNav(UserEntity? user, _NavItem item) {
+    return RbacManager.canAccessNav(user, item.requiredPermission);
   }
 
   @override
@@ -715,17 +748,23 @@ class _AdminLayoutState extends State<AdminLayout> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = _isAdmin(context);
+    final user = _currentUser(context);
+    final isAdmin = user?.isAdmin ?? false;
 
     final List<Widget> allowedScreens = [];
     final List<_NavItem> allowedNavItems = [];
 
     for (int i = 0; i < _navItems.length; i++) {
-      // 0: Dashboard, 3: Employees, 4: Vehicles
-      if (isAdmin || [0, 3, 4].contains(i)) {
+      if (_canAccessNav(user, _navItems[i])) {
         allowedScreens.add(_screens[i]);
         allowedNavItems.add(_navItems[i]);
       }
+    }
+
+    // Always keep at least Dashboard if somehow empty
+    if (allowedScreens.isEmpty && _screens.isNotEmpty) {
+      allowedScreens.add(_screens.first);
+      allowedNavItems.add(_navItems.first);
     }
 
     return Scaffold(
@@ -793,6 +832,8 @@ class _NavItem {
   final IconData activeIcon;
   final bool hasBadge;
   final List<_SubNavItem>? subItems;
+  /// When null, any authenticated user may open this nav item.
+  final AppPermission? requiredPermission;
 
   const _NavItem({
     required this.label,
@@ -800,6 +841,7 @@ class _NavItem {
     required this.activeIcon,
     this.hasBadge = false,
     this.subItems,
+    this.requiredPermission,
   });
 }
 
@@ -904,9 +946,81 @@ class _Sidebar extends StatelessWidget {
             color: dividerColor,
             margin: EdgeInsets.symmetric(horizontal: 16.w),
           ),
+          // Logged-in user profile
+          _buildProfileSection(context),
           // Logout
           _buildLogoutButton(),
         ],
+      ),
+    );
+  }
+
+  Widget _buildProfileSection(BuildContext context) {
+    final user = context.watch<AuthProvider>().user;
+    if (user == null) return const SizedBox.shrink();
+
+    final initial = user.displayLabel.isNotEmpty
+        ? user.displayLabel[0].toUpperCase()
+        : 'U';
+    final photoUrl = user.photoUrl?.trim();
+    final hasPhoto = photoUrl != null && photoUrl.isNotEmpty;
+
+    return Padding(
+      padding: EdgeInsets.fromLTRB(12.w, 12.h, 12.w, 0),
+      child: Container(
+        padding: EdgeInsets.all(12.w),
+        decoration: BoxDecoration(
+          color: activeBg,
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(color: dividerColor),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20.r,
+              backgroundColor: brandBlue.withValues(alpha: 0.2),
+              backgroundImage: hasPhoto ? NetworkImage(photoUrl) : null,
+              onBackgroundImageError: hasPhoto ? (_, __) {} : null,
+              child: hasPhoto
+                  ? null
+                  : Text(
+                      initial,
+                      style: GoogleFonts.notoSans(
+                        color: brandBlue,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14.sp,
+                      ),
+                    ),
+            ),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.displayLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.notoSans(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12.sp,
+                    ),
+                  ),
+                  Text(
+                    user.email ?? '',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.notoSans(
+                      color: inactiveText,
+                      fontSize: 10.sp,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

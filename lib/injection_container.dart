@@ -123,12 +123,28 @@ import 'features/driver_evaluation/domain/usecases/delete_evaluation_usecase.dar
 import 'features/driver_evaluation/presentation/providers/admin_evaluation_provider.dart';
 import 'features/driver_evaluation/presentation/providers/driver_form_provider.dart';
 
+import 'features/user_management/data/datasources/user_management_remote_data_source.dart';
+import 'features/user_management/data/repositories/user_management_repository_impl.dart';
+import 'features/user_management/domain/repositories/user_management_repository.dart';
+import 'features/user_management/domain/usecases/change_user_login_email.dart';
+import 'features/user_management/domain/usecases/change_user_password.dart';
+import 'features/user_management/domain/usecases/create_role.dart';
+import 'features/user_management/domain/usecases/create_user.dart';
+import 'features/user_management/domain/usecases/delete_role.dart';
+import 'features/user_management/domain/usecases/get_all_roles.dart';
+import 'features/user_management/domain/usecases/get_all_users.dart';
+import 'features/user_management/domain/usecases/seed_default_roles.dart';
+import 'features/user_management/domain/usecases/toggle_user_status.dart';
+import 'features/user_management/domain/usecases/update_role.dart';
+import 'features/user_management/domain/usecases/update_user.dart';
+import 'features/user_management/presentation/providers/user_management_provider.dart';
+
 final sl = GetIt.instance; // sl stands for Service Locator
 
 Future<void> init() async {
   //! Features - Authentication
-  // State Management (Provider)
-  sl.registerFactory(
+  // State Management (Provider) - Must be LazySingleton so GoRouter and MultiProvider share the exact same instance!
+  sl.registerLazySingleton(
     () => AuthProvider(
       signInWithEmail: sl(),
       signInWithGoogle: sl(),
@@ -481,6 +497,47 @@ Future<void> init() async {
   // Data sources
   sl.registerLazySingleton<EvaluationRemoteDataSource>(
     () => EvaluationRemoteDataSourceImpl(firestore: sl()),
+  );
+
+  //! Features - User Management
+  // State Management (Provider)
+  sl.registerFactory(
+    () => UserManagementProvider(
+      getAllUsers: sl(),
+      createUser: sl(),
+      updateUser: sl(),
+      toggleUserStatus: sl(),
+      changeUserPassword: sl(),
+      changeUserLoginEmail: sl(),
+      getAllRoles: sl(),
+      createRole: sl(),
+      updateRole: sl(),
+      deleteRole: sl(),
+      seedDefaultRoles: sl(),
+    ),
+  );
+
+  // UseCases
+  sl.registerLazySingleton(() => GetAllUsers(sl()));
+  sl.registerLazySingleton(() => CreateUser(sl()));
+  sl.registerLazySingleton(() => UpdateUser(sl()));
+  sl.registerLazySingleton(() => ToggleUserStatus(sl()));
+  sl.registerLazySingleton(() => ChangeUserPassword(sl()));
+  sl.registerLazySingleton(() => ChangeUserLoginEmail(sl()));
+  sl.registerLazySingleton(() => GetAllRoles(sl()));
+  sl.registerLazySingleton(() => CreateRole(sl()));
+  sl.registerLazySingleton(() => UpdateRole(sl()));
+  sl.registerLazySingleton(() => DeleteRole(sl()));
+  sl.registerLazySingleton(() => SeedDefaultRoles(sl()));
+
+  // Repositories
+  sl.registerLazySingleton<UserManagementRepository>(
+    () => UserManagementRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data sources
+  sl.registerLazySingleton<UserManagementRemoteDataSource>(
+    () => UserManagementRemoteDataSourceImpl(auth: sl(), firestore: sl()),
   );
 
   //! Core

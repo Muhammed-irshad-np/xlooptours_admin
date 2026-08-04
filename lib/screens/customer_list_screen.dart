@@ -30,6 +30,8 @@ class CustomerListScreen extends StatefulWidget {
 
 class _CustomerListScreenState extends State<CustomerListScreen> {
   bool _showInactive = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -37,6 +39,12 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CustomerProvider>().fetchAllCustomers();
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _deleteCustomer(CustomerEntity customer) async {
@@ -146,8 +154,30 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
     return Consumer<CustomerProvider>(
       builder: (context, provider, child) {
         final filteredCustomers = provider.customers.where((c) {
-          if (_showInactive) return c.status == 'INACTIVE';
-          return c.status == 'ACTIVE';
+          final matchesStatus =
+              _showInactive ? c.status == 'INACTIVE' : c.status == 'ACTIVE';
+          if (!matchesStatus) return false;
+
+          if (_searchQuery.isNotEmpty) {
+            final query = _searchQuery.toLowerCase();
+            final nameMatches = c.name.toLowerCase().contains(query);
+            final phoneMatches = c.phone.toLowerCase().contains(query);
+            final emailMatches =
+                c.email?.toLowerCase().contains(query) ?? false;
+            final companyMatches =
+                c.companyName?.toLowerCase().contains(query) ?? false;
+            final caseCodeMatches = c.assignedCaseCodes.any(
+              (code) => code.toLowerCase().contains(query),
+            );
+
+            return nameMatches ||
+                phoneMatches ||
+                emailMatches ||
+                companyMatches ||
+                caseCodeMatches;
+          }
+
+          return true;
         }).toList();
 
         return Scaffold(
@@ -180,56 +210,98 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
               ),
             ],
           ),
-          body: provider.isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : filteredCustomers.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.people_outline,
-                        size: 64,
-                        color: Colors.grey,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        provider.customers.isEmpty
-                            ? 'No customers yet'
-                            : 'No customers match the filter',
-                        style: const TextStyle(fontSize: 18, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 8),
-                      if (provider.customers.isEmpty)
-                        ElevatedButton.icon(
-                          onPressed: () => _navigateToForm(null),
-                          icon: const Icon(Icons.add),
-                          label: const Text('Add First Customer'),
-                        ),
-                    ],
+          body: Column(
+            children: [
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search customer by name, phone, company...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 16.w,
+                      vertical: 12.h,
+                    ),
                   ),
-                )
-              : ResponsiveLayout(
-                  mobile: ListView.builder(
-                    itemCount: filteredCustomers.length,
-                    padding: const EdgeInsets.all(8),
-                    itemBuilder: (context, index) =>
-                        _buildCustomerCard(filteredCustomers[index]),
-                  ),
-                  desktop: GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate:
-                        const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 400,
-                          childAspectRatio: 1.6,
-                          crossAxisSpacing: 16,
-                          mainAxisSpacing: 16,
-                        ),
-                    itemCount: filteredCustomers.length,
-                    itemBuilder: (context, index) =>
-                        _buildCustomerCard(filteredCustomers[index]),
-                  ),
+                  onChanged: (val) {
+                    setState(() {
+                      _searchQuery = val.trim();
+                    });
+                  },
                 ),
+              ),
+              Expanded(
+                child: provider.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : filteredCustomers.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.people_outline,
+                              size: 64,
+                              color: Colors.grey,
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              provider.customers.isEmpty
+                                  ? 'No customers yet'
+                                  : 'No customers match the filter',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            if (provider.customers.isEmpty)
+                              ElevatedButton.icon(
+                                onPressed: () => _navigateToForm(null),
+                                icon: const Icon(Icons.add),
+                                label: const Text('Add First Customer'),
+                              ),
+                          ],
+                        ),
+                      )
+                    : ResponsiveLayout(
+                        mobile: ListView.builder(
+                          itemCount: filteredCustomers.length,
+                          padding: const EdgeInsets.all(8),
+                          itemBuilder: (context, index) =>
+                              _buildCustomerCard(filteredCustomers[index]),
+                        ),
+                        desktop: GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate:
+                              const SliverGridDelegateWithMaxCrossAxisExtent(
+                                maxCrossAxisExtent: 400,
+                                childAspectRatio: 1.6,
+                                crossAxisSpacing: 16,
+                                mainAxisSpacing: 16,
+                              ),
+                          itemCount: filteredCustomers.length,
+                          itemBuilder: (context, index) =>
+                              _buildCustomerCard(filteredCustomers[index]),
+                        ),
+                      ),
+              ),
+            ],
+          ),
         );
       },
     );
