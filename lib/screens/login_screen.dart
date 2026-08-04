@@ -82,31 +82,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _loginWithGoogle() async {
-    _isLoading.value = true;
-    _errorMessage.value = null;
-
-    try {
-      final success = await context.read<AuthProvider>().loginWithGoogle();
-      if (!success && mounted) {
-        _errorMessage.value =
-            context.read<AuthProvider>().errorMessage ??
-            'Google Sign-in failed.';
-      } else if (success && mounted) {
-        context.go('/home');
-      }
-    } catch (e) {
-      if (mounted) {
-        _errorMessage.value =
-            'An unexpected error occurred during Google sign in.';
-      }
-    } finally {
-      if (mounted) {
-        _isLoading.value = false;
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -517,87 +492,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 );
               },
             ),
-            SizedBox(height: 24.h),
-
-            // Divider
-            Row(
-              children: [
-                Expanded(
-                  child: Container(height: 1, color: const Color(0xFFE2E8F0)),
-                ),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
-                  child: Text(
-                    'OR CONTINUE WITH',
-                    style: GoogleFonts.notoSans(
-                      color: const Color(0xFF94A3B8),
-                      fontSize: 11.sp,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Container(height: 1, color: const Color(0xFFE2E8F0)),
-                ),
-              ],
-            ),
-            SizedBox(height: 24.h),
-
-            // Google Sign-In Button (Pure Flutter UI rendering - no SVG or CORS errors)
-            ValueListenableBuilder<bool>(
-              valueListenable: _isLoading,
-              builder: (context, isLoading, _) {
-                return OutlinedButton(
-                  onPressed: isLoading ? null : _loginWithGoogle,
-                  style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 14.h),
-                    backgroundColor: Colors.white,
-                    side: const BorderSide(color: Color(0xFFE2E8F0)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildGoogleLogoBadge(),
-                      SizedBox(width: 12.w),
-                      Text(
-                        'Sign in with Google',
-                        style: GoogleFonts.notoSans(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF334155),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
           ],
-        ),
-      ),
-    );
-  }
-
-  /// Pure Flutter Google 'G' Logo render (eliminates SVG parsing & CORS errors)
-  Widget _buildGoogleLogoBadge() {
-    return Container(
-      width: 20.w,
-      height: 20.h,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: const Color(0xFF4285F4),
-        borderRadius: BorderRadius.circular(4.r),
-      ),
-      child: Text(
-        'G',
-        style: GoogleFonts.notoSans(
-          fontSize: 13.sp,
-          fontWeight: FontWeight.w900,
-          color: Colors.white,
         ),
       ),
     );
