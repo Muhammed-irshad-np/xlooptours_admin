@@ -5,12 +5,10 @@ import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/auth_getters.dart';
 import '../../domain/usecases/sign_in_with_email.dart';
-import '../../domain/usecases/sign_in_with_google.dart';
 import '../../domain/usecases/sign_out.dart';
 
 class AuthProvider extends ChangeNotifier {
   final SignInWithEmail _signInWithEmail;
-  final SignInWithGoogle _signInWithGoogle;
   final SignOut _signOut;
   final GetAuthStateChanges _getAuthStateChanges;
   final AuthRepository _authRepository;
@@ -24,13 +22,11 @@ class AuthProvider extends ChangeNotifier {
 
   AuthProvider({
     required SignInWithEmail signInWithEmail,
-    required SignInWithGoogle signInWithGoogle,
     required SignOut signOut,
     required GetCurrentUser getCurrentUser,
     required GetAuthStateChanges getAuthStateChanges,
     required AuthRepository authRepository,
   })  : _signInWithEmail = signInWithEmail,
-        _signInWithGoogle = signInWithGoogle,
         _signOut = signOut,
         _getAuthStateChanges = getAuthStateChanges,
         _authRepository = authRepository {
@@ -90,28 +86,6 @@ class AuthProvider extends ChangeNotifier {
     final result = await _signInWithEmail(
       SignInParams(email: email, password: password),
     );
-
-    return result.fold(
-      (failure) {
-        _errorMessage = failure.message;
-        _user = null;
-        _setLoading(false);
-        return false;
-      },
-      (user) {
-        _user = user;
-        _errorMessage = null;
-        _isResolvingSession = false;
-        _startPresenceHeartbeat();
-        _setLoading(false);
-        return true;
-      },
-    );
-  }
-
-  Future<bool> loginWithGoogle() async {
-    _setLoading(true);
-    final result = await _signInWithGoogle(NoParams());
 
     return result.fold(
       (failure) {

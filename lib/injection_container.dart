@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:get_it/get_it.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'services/dev_database_sync_service.dart';
@@ -12,7 +11,6 @@ import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/domain/usecases/auth_getters.dart';
 import 'features/auth/domain/usecases/sign_in_with_email.dart';
-import 'features/auth/domain/usecases/sign_in_with_google.dart';
 import 'features/auth/domain/usecases/sign_out.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 
@@ -143,7 +141,6 @@ Future<void> init() async {
   sl.registerLazySingleton(
     () => AuthProvider(
       signInWithEmail: sl(),
-      signInWithGoogle: sl(),
       signOut: sl(),
       getCurrentUser: sl(),
       getAuthStateChanges: sl(),
@@ -153,7 +150,6 @@ Future<void> init() async {
 
   // UseCases
   sl.registerLazySingleton(() => SignInWithEmail(sl()));
-  sl.registerLazySingleton(() => SignInWithGoogle(sl()));
   sl.registerLazySingleton(() => SignOut(sl()));
   sl.registerLazySingleton(() => GetCurrentUser(sl()));
   sl.registerLazySingleton(() => GetAuthStateChanges(sl()));
@@ -167,7 +163,6 @@ Future<void> init() async {
   sl.registerLazySingleton<AuthRemoteDataSource>(
     () => AuthRemoteDataSourceImpl(
       auth: sl(),
-      googleSignIn: sl(),
       firestore: sl(),
     ),
   );
@@ -534,18 +529,11 @@ Future<void> init() async {
   //! External
   final auth = FirebaseAuth.instance;
   final firestore = FirebaseFirestore.instance;
-  final isDev = const String.fromEnvironment('ENV', defaultValue: 'prod') == 'dev';
-  final googleSignIn = GoogleSignIn(
-    clientId: isDev
-        ? '1014331668523-sso54ruvdpk1qt3htlab9fo08rl2b73u.apps.googleusercontent.com'
-        : '1098817651136-nv3hg1dtaio5tvfk7flbn3b4f6k5fgqt.apps.googleusercontent.com',
-  );
   final storage = FirebaseStorage.instance;
   final sharedPreferences = await SharedPreferences.getInstance();
 
   sl.registerLazySingleton(() => auth);
   sl.registerLazySingleton(() => firestore);
-  sl.registerLazySingleton(() => googleSignIn);
   sl.registerLazySingleton(() => storage);
   sl.registerLazySingleton(() => sharedPreferences);
   sl.registerLazySingleton(() => http.Client());
