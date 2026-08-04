@@ -182,9 +182,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                 mobile: Column(
                   children: [
                     const _ExpiriesSection(),
-                    SizedBox(height: 32.h),
-                    _buildRecentActivitySection(),
                     if (isAdmin) ...[
+                      SizedBox(height: 32.h),
+                      _buildRecentActivitySection(),
                       SizedBox(height: 32.h),
                       _buildFeedbacksSection(),
                     ],
@@ -200,9 +200,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                       child: Column(
                         children: [
                           const _ExpiriesSection(),
-                          SizedBox(height: 32.h),
-                          _buildRecentActivitySection(),
                           if (isAdmin) ...[
+                            SizedBox(height: 32.h),
+                            _buildRecentActivitySection(),
                             SizedBox(height: 32.h),
                             _buildFeedbacksSection(),
                           ],
