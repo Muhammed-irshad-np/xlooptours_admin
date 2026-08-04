@@ -164,6 +164,8 @@ class UserManagementProvider extends ChangeNotifier {
             photoUrl: old.photoUrl,
             lastLoginAt: old.lastLoginAt,
             lastActiveAt: old.lastActiveAt,
+            lastLogoutAt: old.lastLogoutAt,
+            sessionActive: old.sessionActive,
             loginCount: old.loginCount,
           );
           notifyListeners();
@@ -227,6 +229,8 @@ class UserManagementProvider extends ChangeNotifier {
             photoUrl: old.photoUrl,
             lastLoginAt: old.lastLoginAt,
             lastActiveAt: old.lastActiveAt,
+            lastLogoutAt: old.lastLogoutAt,
+            sessionActive: old.sessionActive,
             loginCount: old.loginCount,
           );
           notifyListeners();

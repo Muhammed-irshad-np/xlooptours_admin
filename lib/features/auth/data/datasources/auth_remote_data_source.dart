@@ -40,12 +40,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   });
 
   /// Records last login (once per app session) + last active heartbeat.
+  /// Sets [sessionActive] true so admins can see online status.
   Future<void> _recordSessionActivity(User user, {bool heartbeatOnly = false}) async {
     try {
       final isNewSession =
           !heartbeatOnly && _sessionLoginRecordedForUid != user.uid;
       final updates = <String, dynamic>{
         'lastActiveAt': FieldValue.serverTimestamp(),
+        'sessionActive': true,
         'uid': user.uid,
       };
       if (user.email != null && user.email!.isNotEmpty) {
@@ -62,6 +64,20 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           );
     } catch (_) {
       // Non-fatal: don't block login if activity write fails
+    }
+  }
+
+  /// Marks the user offline for User Management (must run while still signed in).
+  Future<void> _recordLogout(User user) async {
+    try {
+      await firestore.collection('users').doc(user.uid).set({
+        'sessionActive': false,
+        'lastActiveAt': FieldValue.serverTimestamp(),
+        'lastLogoutAt': FieldValue.serverTimestamp(),
+        'uid': user.uid,
+      }, SetOptions(merge: true));
+    } catch (_) {
+      // Non-fatal
     }
   }
 
@@ -286,6 +302,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     _cachedUser = null;
     _sessionLoginRecordedForUid = null;
     try {
+      // Still authenticated — mark offline before sign-out
+      if (user != null) {
+        await _recordLogout(user);
+      }
       await auth.signOut();
       await googleSignIn.signOut();
     } catch (_) {}
@@ -398,6 +418,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<void> signOut() async {
     try {
+      final user = auth.currentUser;
+      // Write offline / last seen BEFORE ending Auth session (Firestore rules)
+      if (user != null) {
+        await _recordLogout(user);
+      }
       _cachedUser = null;
       _sessionLoginRecordedForUid = null;
       await googleSignIn.signOut();

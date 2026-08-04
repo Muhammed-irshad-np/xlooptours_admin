@@ -33,6 +33,8 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
               photoUrl: m.photoUrl,
               lastLoginAt: m.lastLoginAt,
               lastActiveAt: m.lastActiveAt,
+              lastLogoutAt: m.lastLogoutAt,
+              sessionActive: m.sessionActive,
               loginCount: m.loginCount,
             ),
           )
@@ -78,6 +80,8 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
           photoUrl: m.photoUrl,
           lastLoginAt: m.lastLoginAt,
           lastActiveAt: m.lastActiveAt,
+          lastLogoutAt: m.lastLogoutAt,
+          sessionActive: m.sessionActive,
           loginCount: m.loginCount,
         ),
       );

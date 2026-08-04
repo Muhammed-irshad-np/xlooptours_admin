@@ -1137,7 +1137,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
   Widget _buildActivityColumn(ManagedUserEntity user) {
     final loginText = _formatActivityTime(user.lastLoginAt);
-    final seenText = _formatActivityTime(user.lastActiveAt ?? user.lastLoginAt);
+    final seenAt = user.lastSeenAt;
+    final seenText = user.isOnlineNow
+        ? 'Active now'
+        : _formatActivityTime(seenAt);
     final dateFmt = DateFormat('dd MMM yyyy · HH:mm');
 
     return Column(
@@ -1169,7 +1172,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           ),
         SizedBox(height: 6.h),
         Text(
-          'Last seen  ·  ${user.loginCount} logins',
+          user.isOnlineNow
+              ? 'Last seen  ·  ${user.loginCount} logins'
+              : 'Last seen  ·  ${user.loginCount} logins',
           style: GoogleFonts.notoSans(
             fontSize: 10.sp,
             color: const Color(0xFF94A3B8),
@@ -1180,9 +1185,21 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
           seenText,
           style: GoogleFonts.notoSans(
             fontSize: 11.sp,
-            color: const Color(0xFF64748B),
+            color: user.isOnlineNow
+                ? const Color(0xFF059669)
+                : const Color(0xFF64748B),
+            fontWeight:
+                user.isOnlineNow ? FontWeight.w700 : FontWeight.normal,
           ),
         ),
+        if (!user.isOnlineNow && seenAt != null)
+          Text(
+            dateFmt.format(seenAt),
+            style: GoogleFonts.notoSans(
+              fontSize: 10.sp,
+              color: const Color(0xFF94A3B8),
+            ),
+          ),
       ],
     );
   }
