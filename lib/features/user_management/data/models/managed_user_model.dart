@@ -17,6 +17,8 @@ class ManagedUserModel extends ManagedUserEntity {
     super.photoUrl,
     super.lastLoginAt,
     super.lastActiveAt,
+    super.lastLogoutAt,
+    super.sessionActive = false,
     super.loginCount = 0,
   });
 
@@ -53,6 +55,9 @@ class ManagedUserModel extends ManagedUserEntity {
       photoUrl: photoUrl,
       lastLoginAt: _asDate(data['lastLoginAt']),
       lastActiveAt: _asDate(data['lastActiveAt']),
+      lastLogoutAt: _asDate(data['lastLogoutAt']),
+      // Default false: missing field means offline (do not treat old docs as online)
+      sessionActive: data['sessionActive'] == true,
       loginCount: (data['loginCount'] as num?)?.toInt() ?? 0,
     );
   }
@@ -72,6 +77,8 @@ class ManagedUserModel extends ManagedUserEntity {
       photoUrl: url,
       lastLoginAt: lastLoginAt,
       lastActiveAt: lastActiveAt,
+      lastLogoutAt: lastLogoutAt,
+      sessionActive: sessionActive,
       loginCount: loginCount,
     );
   }
@@ -93,12 +100,9 @@ class ManagedUserModel extends ManagedUserEntity {
       'createdBy': createdBy,
       'employeeId': employeeId,
       'employeeName': employeeName,
-      // Activity fields are written by auth session tracking, not form create
     };
   }
 
-  /// Profile/role fields only. Login email is handled separately and must not
-  /// be overwritten when linking an employee.
   Map<String, dynamic> toFirestoreUpdate({bool includeEmail = false}) {
     final normalizedRole = RbacManager.normalizeRoleId(roleId);
     final map = <String, dynamic>{
