@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:timeago/timeago.dart' as timeago;
 import '../../../../core/rbac/permission.dart';
 import '../../../../core/rbac/rbac_manager.dart';
 import '../../../../core/widgets/modern_app_bar.dart';
@@ -96,7 +98,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     // Stats calculations
     final totalUsers = provider.users.length;
     final activeUsers = provider.users.where((u) => u.isActive).length;
-    final totalRoles = provider.roles.length;
+    final onlineNow = provider.users.where((u) => u.isOnlineNow).length;
     final adminCount = provider.users
         .where((u) => u.roleId == 'super_admin' || u.roleId == 'admin')
         .length;
@@ -205,10 +207,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 SizedBox(width: 16.w),
                 Expanded(
                   child: _buildKpiCard(
-                    title: 'Configured Roles',
-                    value: totalRoles.toString(),
-                    icon: Icons.shield_outlined,
-                    color: const Color(0xFF8B5CF6),
+                    title: 'Online Now',
+                    value: onlineNow.toString(),
+                    icon: Icons.sensors,
+                    color: const Color(0xFF10B981),
                   ),
                 ),
                 SizedBox(width: 16.w),
@@ -401,11 +403,24 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       final matchesRole = _roleFilter == 'ALL' || user.roleId == _roleFilter;
       final matchesStatus =
           _statusFilter == 'ALL' ||
+          (_statusFilter == 'ONLINE' && user.isOnlineNow) ||
           (_statusFilter == 'ACTIVE' && user.isActive) ||
           (_statusFilter == 'INACTIVE' && !user.isActive);
 
       return matchesQuery && matchesRole && matchesStatus;
-    }).toList();
+    }).toList()
+      // Online first, then by most recent login
+      ..sort((a, b) {
+        final aOnline = a.isOnlineNow ? 0 : 1;
+        final bOnline = b.isOnlineNow ? 0 : 1;
+        if (aOnline != bOnline) return aOnline.compareTo(bOnline);
+        final aLogin = a.lastLoginAt ?? a.lastActiveAt;
+        final bLogin = b.lastLoginAt ?? b.lastActiveAt;
+        if (aLogin == null && bLogin == null) return 0;
+        if (aLogin == null) return 1;
+        if (bLogin == null) return -1;
+        return bLogin.compareTo(aLogin);
+      });
 
     return Column(
       children: [
@@ -530,6 +545,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     items: const [
                       DropdownMenuItem(value: 'ALL', child: Text('All Status')),
                       DropdownMenuItem(
+                        value: 'ONLINE',
+                        child: Text('Online Now'),
+                      ),
+                      DropdownMenuItem(
                         value: 'ACTIVE',
                         child: Text('Active Only'),
                       ),
@@ -625,16 +644,21 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      user.displayName,
-                      style: GoogleFonts.notoSans(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14.sp,
-                        color: const Color(0xFF0F172A),
+                    Flexible(
+                      child: Text(
+                        user.displayName,
+                        style: GoogleFonts.notoSans(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14.sp,
+                          color: const Color(0xFF0F172A),
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    SizedBox(width: 8.w),
+                    _buildPresenceChip(user),
                     if (!user.isActive) ...[
-                      SizedBox(width: 8.w),
+                      SizedBox(width: 6.w),
                       Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: 6.w,
@@ -707,13 +731,22 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
               ),
             ),
           ),
-          SizedBox(width: 20.w),
+          SizedBox(width: 16.w),
 
-          // Status Switch & Label
+          // Activity (last login / last seen) — admin visibility
+          if (context.read<AuthProvider>().user?.isAdmin == true)
+            SizedBox(
+              width: 160.w,
+              child: _buildActivityColumn(user),
+            ),
+
+          SizedBox(width: 12.w),
+
+          // Account enabled switch
           Row(
             children: [
               Text(
-                user.isActive ? 'Active' : 'Inactive',
+                user.isActive ? 'Enabled' : 'Disabled',
                 style: GoogleFonts.notoSans(
                   fontSize: 12.sp,
                   color: user.isActive
@@ -1042,6 +1075,138 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildPresenceChip(ManagedUserEntity user) {
+    final Color color;
+    final Color bg;
+    switch (user.presence) {
+      case UserPresence.online:
+        color = const Color(0xFF059669);
+        bg = const Color(0xFFECFDF5);
+        break;
+      case UserPresence.away:
+        color = const Color(0xFFD97706);
+        bg = const Color(0xFFFFFBEB);
+        break;
+      case UserPresence.offline:
+        color = const Color(0xFF64748B);
+        bg = const Color(0xFFF1F5F9);
+        break;
+      case UserPresence.never:
+        color = const Color(0xFF94A3B8);
+        bg = const Color(0xFFF8FAFC);
+        break;
+      case UserPresence.deactivated:
+        color = const Color(0xFFDC2626);
+        bg = const Color(0xFFFEF2F2);
+        break;
+    }
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7.w,
+            height: 7.w,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          SizedBox(width: 5.w),
+          Text(
+            user.presenceLabel,
+            style: GoogleFonts.notoSans(
+              fontSize: 10.sp,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityColumn(ManagedUserEntity user) {
+    final loginText = _formatActivityTime(user.lastLoginAt);
+    final seenAt = user.lastSeenAt;
+    final seenText = user.isOnlineNow
+        ? 'Active now'
+        : _formatActivityTime(seenAt);
+    final dateFmt = DateFormat('dd MMM yyyy · HH:mm');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Last login',
+          style: GoogleFonts.notoSans(
+            fontSize: 10.sp,
+            color: const Color(0xFF94A3B8),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          loginText,
+          style: GoogleFonts.notoSans(
+            fontSize: 12.sp,
+            color: const Color(0xFF0F172A),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        if (user.lastLoginAt != null)
+          Text(
+            dateFmt.format(user.lastLoginAt!),
+            style: GoogleFonts.notoSans(
+              fontSize: 10.sp,
+              color: const Color(0xFF94A3B8),
+            ),
+          ),
+        SizedBox(height: 6.h),
+        Text(
+          user.isOnlineNow
+              ? 'Last seen  ·  ${user.loginCount} logins'
+              : 'Last seen  ·  ${user.loginCount} logins',
+          style: GoogleFonts.notoSans(
+            fontSize: 10.sp,
+            color: const Color(0xFF94A3B8),
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          seenText,
+          style: GoogleFonts.notoSans(
+            fontSize: 11.sp,
+            color: user.isOnlineNow
+                ? const Color(0xFF059669)
+                : const Color(0xFF64748B),
+            fontWeight:
+                user.isOnlineNow ? FontWeight.w700 : FontWeight.normal,
+          ),
+        ),
+        if (!user.isOnlineNow && seenAt != null)
+          Text(
+            dateFmt.format(seenAt),
+            style: GoogleFonts.notoSans(
+              fontSize: 10.sp,
+              color: const Color(0xFF94A3B8),
+            ),
+          ),
+      ],
+    );
+  }
+
+  String _formatActivityTime(DateTime? time) {
+    if (time == null) return '—';
+    return timeago.format(time, allowFromNow: true);
   }
 
   Color _getRoleBadgeColor(String roleId) {

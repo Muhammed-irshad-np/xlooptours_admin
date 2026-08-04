@@ -13,6 +13,8 @@ abstract class AuthRemoteDataSource {
   Future<UserModel> signInWithEmailAndPassword(String email, String password);
   Future<UserModel> signInWithGoogle();
   Future<void> signOut();
+  /// Updates lastActiveAt for online presence (safe to call periodically).
+  Future<void> touchLastActive();
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -28,11 +30,64 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   /// Cache role info so [currentUser] is not empty on cold start.
   UserModel? _cachedUser;
 
+  /// Tracks which uid already got a loginCount bump this app session.
+  String? _sessionLoginRecordedForUid;
+
   AuthRemoteDataSourceImpl({
     required this.auth,
     required this.googleSignIn,
     required this.firestore,
   });
+
+  /// Records last login (once per app session) + last active heartbeat.
+  /// Sets [sessionActive] true so admins can see online status.
+  Future<void> _recordSessionActivity(User user, {bool heartbeatOnly = false}) async {
+    try {
+      final isNewSession =
+          !heartbeatOnly && _sessionLoginRecordedForUid != user.uid;
+      final updates = <String, dynamic>{
+        'lastActiveAt': FieldValue.serverTimestamp(),
+        'sessionActive': true,
+        'uid': user.uid,
+      };
+      if (user.email != null && user.email!.isNotEmpty) {
+        updates['email'] = user.email!.toLowerCase();
+      }
+      if (isNewSession) {
+        updates['lastLoginAt'] = FieldValue.serverTimestamp();
+        updates['loginCount'] = FieldValue.increment(1);
+        _sessionLoginRecordedForUid = user.uid;
+      }
+      await firestore.collection('users').doc(user.uid).set(
+            updates,
+            SetOptions(merge: true),
+          );
+    } catch (_) {
+      // Non-fatal: don't block login if activity write fails
+    }
+  }
+
+  /// Marks the user offline for User Management (must run while still signed in).
+  Future<void> _recordLogout(User user) async {
+    try {
+      await firestore.collection('users').doc(user.uid).set({
+        'sessionActive': false,
+        'lastActiveAt': FieldValue.serverTimestamp(),
+        'lastLogoutAt': FieldValue.serverTimestamp(),
+        'uid': user.uid,
+      }, SetOptions(merge: true));
+    } catch (_) {
+      // Non-fatal
+    }
+  }
+
+  /// Call while the admin app is open so "online now" stays accurate.
+  @override
+  Future<void> touchLastActive() async {
+    final user = auth.currentUser;
+    if (user == null) return;
+    await _recordSessionActivity(user, heartbeatOnly: true);
+  }
 
   Future<List<String>> _permissionsForRole(String roleId) async {
     final id = RbacManager.normalizeRoleId(roleId);
@@ -227,6 +282,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   Future<UserModel> _buildAuthorizedUserModel(User user) async {
     final resolved = await _resolveAuthorizedUser(user);
+    // Track login / presence for User Management (admin visibility)
+    await _recordSessionActivity(user);
     final model = UserModel.fromFirebaseUser(
       user,
       roleId: resolved.roleId,
@@ -243,7 +300,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   Future<void> _rejectAndSignOut(User? user) async {
     _cachedUser = null;
+    _sessionLoginRecordedForUid = null;
     try {
+      // Still authenticated — mark offline before sign-out
+      if (user != null) {
+        await _recordLogout(user);
+      }
       await auth.signOut();
       await googleSignIn.signOut();
     } catch (_) {}
@@ -356,7 +418,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<void> signOut() async {
     try {
+      final user = auth.currentUser;
+      // Write offline / last seen BEFORE ending Auth session (Firestore rules)
+      if (user != null) {
+        await _recordLogout(user);
+      }
       _cachedUser = null;
+      _sessionLoginRecordedForUid = null;
       await googleSignIn.signOut();
       await auth.signOut();
     } catch (e) {
