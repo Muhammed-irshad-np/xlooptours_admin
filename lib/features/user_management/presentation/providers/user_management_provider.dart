@@ -162,6 +162,9 @@ class UserManagementProvider extends ChangeNotifier {
             employeeId: old.employeeId,
             employeeName: old.employeeName,
             photoUrl: old.photoUrl,
+            lastLoginAt: old.lastLoginAt,
+            lastActiveAt: old.lastActiveAt,
+            loginCount: old.loginCount,
           );
           notifyListeners();
         }
@@ -222,6 +225,9 @@ class UserManagementProvider extends ChangeNotifier {
             employeeId: old.employeeId,
             employeeName: old.employeeName,
             photoUrl: old.photoUrl,
+            lastLoginAt: old.lastLoginAt,
+            lastActiveAt: old.lastActiveAt,
+            loginCount: old.loginCount,
           );
           notifyListeners();
         }

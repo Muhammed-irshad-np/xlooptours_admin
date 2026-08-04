@@ -15,4 +15,7 @@ abstract class AuthRepository {
   Future<Either<Failure, UserEntity>> signInWithGoogle();
 
   Future<Either<Failure, void>> signOut();
+
+  /// Heartbeat for online presence in User Management.
+  Future<void> touchLastActive();
 }
