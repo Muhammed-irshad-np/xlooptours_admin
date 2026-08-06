@@ -103,6 +103,7 @@ class _RoleFormDialogState extends State<RoleFormDialog> {
   Widget build(BuildContext context) {
     final isEditing = widget.roleToEdit != null;
     final isSystem = widget.roleToEdit?.isSystem ?? false;
+    final isCoreSystemRole = widget.roleToEdit?.id == 'super_admin' || widget.roleToEdit?.id == 'admin';
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
@@ -183,7 +184,7 @@ class _RoleFormDialogState extends State<RoleFormDialog> {
                           fontWeight:
                               isSelected ? FontWeight.bold : FontWeight.normal,
                         ),
-                        onSelected: isSystem
+                        onSelected: isCoreSystemRole
                             ? null
                             : (bool selected) {
                                 setState(() {
@@ -210,7 +211,7 @@ class _RoleFormDialogState extends State<RoleFormDialog> {
                     child: const Text('Cancel'),
                   ),
                   SizedBox(width: 12.w),
-                  if (!isSystem)
+                  if (!isCoreSystemRole)
                     ElevatedButton(
                       onPressed: _isSubmitting ? null : _submit,
                       style: ElevatedButton.styleFrom(

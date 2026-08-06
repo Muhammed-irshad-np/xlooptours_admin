@@ -667,11 +667,14 @@ class UserManagementRemoteDataSourceImpl
         'name': 'Coordinator',
         'isSystem': true,
         'permissions': [
+          AppPermission.viewDashboard.toPermissionString(),
+          AppPermission.manageTrips.toPermissionString(),
           AppPermission.manageVehicles.toPermissionString(),
           AppPermission.manageEmployees.toPermissionString(),
           AppPermission.manageCustomers.toPermissionString(),
           AppPermission.manageCompanies.toPermissionString(),
           AppPermission.viewActivityLogs.toPermissionString(),
+          AppPermission.viewFeedback.toPermissionString(),
         ],
         'createdAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -682,6 +685,7 @@ class UserManagementRemoteDataSourceImpl
         'name': 'Driver',
         'isSystem': true,
         'permissions': <String>[
+          AppPermission.viewDashboard.toPermissionString(),
           AppPermission.manageEvaluations.toPermissionString(),
         ],
         'createdAt': FieldValue.serverTimestamp(),
@@ -692,6 +696,8 @@ class UserManagementRemoteDataSourceImpl
         'name': 'Office Staff',
         'isSystem': true,
         'permissions': [
+          AppPermission.viewDashboard.toPermissionString(),
+          AppPermission.manageTrips.toPermissionString(),
           AppPermission.manageInvoices.toPermissionString(),
           AppPermission.manageCustomers.toPermissionString(),
           AppPermission.manageCompanies.toPermissionString(),

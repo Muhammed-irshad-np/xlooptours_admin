@@ -1,4 +1,6 @@
 enum AppPermission {
+  viewDashboard,
+  manageTrips,
   manageUsers,
   manageRoles,
   manageVehicles,
@@ -9,6 +11,7 @@ enum AppPermission {
   viewAnalytics,
   viewVault,
   viewActivityLogs,
+  viewFeedback,
   viewMasterData,
   manageEvaluations,
 }
@@ -16,6 +19,10 @@ enum AppPermission {
 extension AppPermissionExtension on AppPermission {
   String toPermissionString() {
     switch (this) {
+      case AppPermission.viewDashboard:
+        return 'view_dashboard';
+      case AppPermission.manageTrips:
+        return 'manage_trips';
       case AppPermission.manageUsers:
         return 'manage_users';
       case AppPermission.manageRoles:
@@ -36,6 +43,8 @@ extension AppPermissionExtension on AppPermission {
         return 'view_vault';
       case AppPermission.viewActivityLogs:
         return 'view_activity_logs';
+      case AppPermission.viewFeedback:
+        return 'view_feedback';
       case AppPermission.viewMasterData:
         return 'view_master_data';
       case AppPermission.manageEvaluations:
@@ -45,6 +54,10 @@ extension AppPermissionExtension on AppPermission {
 
   String get label {
     switch (this) {
+      case AppPermission.viewDashboard:
+        return 'View Dashboard';
+      case AppPermission.manageTrips:
+        return 'Manage Trips';
       case AppPermission.manageUsers:
         return 'Manage Users';
       case AppPermission.manageRoles:
@@ -65,6 +78,8 @@ extension AppPermissionExtension on AppPermission {
         return 'View Vault';
       case AppPermission.viewActivityLogs:
         return 'View Activity Logs';
+      case AppPermission.viewFeedback:
+        return 'View Feedback';
       case AppPermission.viewMasterData:
         return 'View Master Data';
       case AppPermission.manageEvaluations:
