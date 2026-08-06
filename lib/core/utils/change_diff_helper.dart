@@ -13,9 +13,6 @@ class ChangeDiffHelper {
   // Employee
   // ---------------------------------------------------------------------------
 
-  /// Compares two [EmployeeEntity] instances and returns a human-readable
-  /// summary of the fields that changed.  Returns `null` when no trackable
-  /// field differs (shouldn't happen in practice).
   static String? describeEmployeeChanges(
     EmployeeEntity oldE,
     EmployeeEntity newE,
@@ -25,6 +22,7 @@ class ChangeDiffHelper {
     _addIfChanged(changes, 'Name', oldE.fullName, newE.fullName);
     _addIfChanged(changes, 'Position', oldE.position, newE.position);
     _addIfChanged(changes, 'Email', oldE.email, newE.email);
+    _addIfChanged(changes, 'Country Code', oldE.countryCode, newE.countryCode);
     _addIfChanged(changes, 'Phone', oldE.phoneNumber, newE.phoneNumber);
     _addIfChanged(changes, 'Nationality', oldE.nationality, newE.nationality);
     _addIfChanged(changes, 'ID Type', oldE.idType, newE.idType);
@@ -38,6 +36,71 @@ class ChangeDiffHelper {
 
     if ((oldE.imageUrl ?? '') != (newE.imageUrl ?? '')) {
       changes.add('Photo updated');
+    }
+
+    // Iqama
+    _addIfChanged(changes, 'Iqama Number', oldE.iqama?.number, newE.iqama?.number);
+    _addDateIfChanged(changes, 'Iqama Expiry', oldE.iqama?.expiryDate, newE.iqama?.expiryDate);
+    if ((oldE.iqama?.attachmentUrl ?? '') != (newE.iqama?.attachmentUrl ?? '')) changes.add('Iqama attachment updated');
+
+    // Bahrain Residence
+    _addIfChanged(changes, 'Bahrain Residence Number', oldE.bahrainResidence?.number, newE.bahrainResidence?.number);
+    _addDateIfChanged(changes, 'Bahrain Residence Expiry', oldE.bahrainResidence?.expiryDate, newE.bahrainResidence?.expiryDate);
+    if ((oldE.bahrainResidence?.attachmentUrl ?? '') != (newE.bahrainResidence?.attachmentUrl ?? '')) changes.add('Bahrain Residence attachment updated');
+
+    // Health Insurance
+    _addDateIfChanged(changes, 'Health Insurance Expiry', oldE.healthInsurance?.expiryDate, newE.healthInsurance?.expiryDate);
+    if ((oldE.healthInsurance?.attachmentUrl ?? '') != (newE.healthInsurance?.attachmentUrl ?? '')) changes.add('Health Insurance attachment updated');
+
+    // Passport
+    _addIfChanged(changes, 'Passport Name', oldE.passport?.nameOnPassport, newE.passport?.nameOnPassport);
+    _addIfChanged(changes, 'Passport Number', oldE.passport?.number, newE.passport?.number);
+    _addDateIfChanged(changes, 'Passport Expiry', oldE.passport?.expiryDate, newE.passport?.expiryDate);
+    if ((oldE.passport?.attachmentUrl ?? '') != (newE.passport?.attachmentUrl ?? '')) changes.add('Passport attachment updated');
+
+    // Saudi Visa
+    _addIfChanged(changes, 'Saudi Visa Number', oldE.saudiVisa?.number, newE.saudiVisa?.number);
+    _addDateIfChanged(changes, 'Saudi Visa Expiry', oldE.saudiVisa?.expiryDate, newE.saudiVisa?.expiryDate);
+    _addIfChanged(changes, 'Saudi Visa Type', oldE.saudiVisa?.type?.name, newE.saudiVisa?.type?.name);
+    if ((oldE.saudiVisa?.attachmentUrl ?? '') != (newE.saudiVisa?.attachmentUrl ?? '')) changes.add('Saudi Visa attachment updated');
+
+    // Bahrain Visa
+    _addIfChanged(changes, 'Bahrain Visa Number', oldE.bahrainVisa?.number, newE.bahrainVisa?.number);
+    _addDateIfChanged(changes, 'Bahrain Visa Expiry', oldE.bahrainVisa?.expiryDate, newE.bahrainVisa?.expiryDate);
+    _addIfChanged(changes, 'Bahrain Visa Type', oldE.bahrainVisa?.type?.name, newE.bahrainVisa?.type?.name);
+    if ((oldE.bahrainVisa?.attachmentUrl ?? '') != (newE.bahrainVisa?.attachmentUrl ?? '')) changes.add('Bahrain Visa attachment updated');
+
+    // Dubai Visa
+    _addIfChanged(changes, 'Dubai Visa Number', oldE.dubaiVisa?.number, newE.dubaiVisa?.number);
+    _addDateIfChanged(changes, 'Dubai Visa Expiry', oldE.dubaiVisa?.expiryDate, newE.dubaiVisa?.expiryDate);
+    _addIfChanged(changes, 'Dubai Visa Type', oldE.dubaiVisa?.type?.name, newE.dubaiVisa?.type?.name);
+    if ((oldE.dubaiVisa?.attachmentUrl ?? '') != (newE.dubaiVisa?.attachmentUrl ?? '')) changes.add('Dubai Visa attachment updated');
+
+    // Qatar Visa
+    _addIfChanged(changes, 'Qatar Visa Number', oldE.qatarVisa?.number, newE.qatarVisa?.number);
+    _addDateIfChanged(changes, 'Qatar Visa Expiry', oldE.qatarVisa?.expiryDate, newE.qatarVisa?.expiryDate);
+    _addIfChanged(changes, 'Qatar Visa Type', oldE.qatarVisa?.type?.name, newE.qatarVisa?.type?.name);
+    if ((oldE.qatarVisa?.attachmentUrl ?? '') != (newE.qatarVisa?.attachmentUrl ?? '')) changes.add('Qatar Visa attachment updated');
+
+    // Driving License
+    _addIfChanged(changes, 'License Country', oldE.drivingLicense?.countryOfOrigin, newE.drivingLicense?.countryOfOrigin);
+    _addIfChanged(changes, 'License Number', oldE.drivingLicense?.number, newE.drivingLicense?.number);
+    _addDateIfChanged(changes, 'License Expiry', oldE.drivingLicense?.expiryDate, newE.drivingLicense?.expiryDate);
+    _addIfChanged(changes, 'License Type', oldE.drivingLicense?.type?.name, newE.drivingLicense?.type?.name);
+    if ((oldE.drivingLicense?.attachmentUrl ?? '') != (newE.drivingLicense?.attachmentUrl ?? '')) changes.add('Driving License attachment updated');
+
+    // Contacts
+    if (oldE.contacts.length != newE.contacts.length) {
+      changes.add('Contacts list updated');
+    } else {
+      bool contactsChanged = false;
+      for (int i = 0; i < oldE.contacts.length; i++) {
+        if (oldE.contacts[i] != newE.contacts[i]) {
+          contactsChanged = true;
+          break;
+        }
+      }
+      if (contactsChanged) changes.add('Contacts list updated');
     }
 
     if (changes.isEmpty) return null;

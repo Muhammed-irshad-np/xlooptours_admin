@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'document_viewer_screen.dart';
 import 'package:xloop_invoice/core/utils/share_helper.dart';
+import '../core/utils/activity_logger.dart';
 
 import '../features/employee/domain/entities/employee_contact.dart';
 import '../features/employee/domain/entities/employee_documents.dart';
@@ -481,6 +482,12 @@ class EmployeeDetailsScreen extends StatelessWidget {
       try {
         await context.read<VehicleProvider>().deleteTafweed(vehicle, record);
         if (context.mounted) {
+          await ActivityLogger.log(
+            context,
+            title: 'Tafweed Deleted',
+            message: 'Tafweed authorization for vehicle ${vehicle.plateNumber} has been removed from employee ${employee.fullName}.',
+            relatedId: employee.id,
+          );
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Tafweed deleted successfully')),
           );
