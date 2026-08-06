@@ -35,7 +35,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
     _emailController = TextEditingController(text: user?.email ?? '');
     _nameController = TextEditingController(text: user?.displayName ?? '');
     _passwordController = TextEditingController();
-    _selectedRoleId = user?.roleId ?? 'office_staff';
+    _selectedRoleId = user?.roleId;
     _selectedEmployeeId = user?.employeeId;
     _isActive = user?.isActive ?? true;
 
@@ -100,6 +100,43 @@ class _UserFormDialogState extends State<UserFormDialog> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (widget.userToEdit == null) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+          title: Text(
+            'Confirm User Creation',
+            style: GoogleFonts.notoSans(
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to create a new user with the provided details?',
+            style: GoogleFonts.notoSans(
+              color: const Color(0xFF475569),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF13B1F2),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
 
     setState(() => _isSubmitting = true);
 
