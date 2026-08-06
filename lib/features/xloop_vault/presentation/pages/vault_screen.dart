@@ -512,7 +512,8 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
   Widget _buildExpiryBadge(DateTime? expiryDate, int alertDays) {
     if (expiryDate == null) return const SizedBox.shrink();
 
-    final now = DateTime.now();
+    final _now = DateTime.now();
+    final now = DateTime(_now.year, _now.month, _now.day);
     final difference = expiryDate.difference(now).inDays;
     
     Color baseColor;

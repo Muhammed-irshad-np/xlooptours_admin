@@ -145,7 +145,9 @@ class _VehicleExpiryTrackerScreenState
     } else if (alert is VehicleFollowUpAlert) {
       // Prioritize past due dates, then closer dates
       if (alert.nextServiceDate != null) {
-        return alert.nextServiceDate!.difference(DateTime.now()).inDays;
+        final _now = DateTime.now();
+        final today = DateTime(_now.year, _now.month, _now.day);
+        return alert.nextServiceDate!.difference(today).inDays;
       }
       return 0; // Default to urgent if no date
     }
@@ -1061,7 +1063,9 @@ class _VehicleFollowUpCardState extends State<_VehicleFollowUpCard> {
     bool isOverdue = false;
     bool isCritical = false;
     if (a.nextServiceDate != null) {
-      final days = a.nextServiceDate!.difference(DateTime.now()).inDays;
+      final _now = DateTime.now();
+      final today = DateTime(_now.year, _now.month, _now.day);
+      final days = a.nextServiceDate!.difference(today).inDays;
       isOverdue = days < 0;
       isCritical = days >= 0 && days <= 15;
     } else {

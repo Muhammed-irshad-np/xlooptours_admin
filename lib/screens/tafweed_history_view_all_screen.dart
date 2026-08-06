@@ -101,7 +101,8 @@ class TafweedHistoryViewAllScreen extends StatelessWidget {
   }
 
   Widget _buildHistoryCard(_GenericTafweedEntry entry) {
-    final now = DateTime.now();
+    final _now = DateTime.now();
+    final now = DateTime(_now.year, _now.month, _now.day);
     final isExpired = entry.record.expiryDate.isBefore(now);
 
     final Color statusColor;

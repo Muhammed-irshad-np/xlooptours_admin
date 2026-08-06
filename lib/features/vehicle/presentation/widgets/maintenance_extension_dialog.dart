@@ -68,12 +68,14 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
   }
 
   Future<void> _selectTargetDate() async {
+    final _now = DateTime.now();
+    final today = DateTime(_now.year, _now.month, _now.day);
     final initial = _selectedTargetDate ??
         widget.alert.nextServiceDate ??
         DateTime.now().add(const Duration(days: 30));
     final picked = await showDatePicker(
       context: context,
-      initialDate: initial.isBefore(DateTime.now()) ? DateTime.now().add(const Duration(days: 1)) : initial,
+      initialDate: initial.isBefore(today) ? today.add(const Duration(days: 1)) : initial,
       firstDate: DateTime(2000),
       lastDate: DateTime(2100),
     );

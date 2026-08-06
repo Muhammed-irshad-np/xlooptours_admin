@@ -416,7 +416,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
                                       fontSize: 14.sp,
                                       fontWeight: FontWeight.bold,
                                       color: employeeTafweed.expiryDate
-                                              .isBefore(DateTime.now())
+                                              .isBefore(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day))
                                           ? Colors.red
                                           : Colors.green,
                                     ),
@@ -496,9 +496,10 @@ class EmployeeDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildContactCard(EmployeeContact contact) {
-    final bool isExpired =
-        contact.rechargeExpiryDate != null &&
-        contact.rechargeExpiryDate!.isBefore(DateTime.now());
+    final _now = DateTime.now();
+    final today = DateTime(_now.year, _now.month, _now.day);
+    final bool isExpired = contact.rechargeExpiryDate != null &&
+        contact.rechargeExpiryDate!.isBefore(today);
     final bool isSwapped =
         contact.currentHolderId != null &&
         contact.currentHolderId != employee.id;
@@ -741,7 +742,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
     String? extraInfo,
     int? notificationDays,
   }) {
-    final bool isExpired = expiryDate.isBefore(DateTime.now());
+    final _now = DateTime.now();
+    final bool isExpired = expiryDate.isBefore(DateTime(_now.year, _now.month, _now.day));
 
     return Card(
       elevation: 1,
@@ -1000,7 +1002,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildHistoryEntry(_TafweedHistoryEntry entry) {
-    final now = DateTime.now();
+    final _now = DateTime.now();
+    final now = DateTime(_now.year, _now.month, _now.day);
     final isExpired = entry.record.expiryDate.isBefore(now);
 
     final Color statusColor;

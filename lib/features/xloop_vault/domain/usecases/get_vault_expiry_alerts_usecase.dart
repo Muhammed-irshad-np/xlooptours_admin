@@ -10,7 +10,8 @@ class GetVaultExpiryAlertsUseCase {
   Future<List<VaultExpiryAlert>> call({VaultData? localVaultData}) async {
     final vaultData = localVaultData ?? await repository.getVaultData();
     final List<VaultExpiryAlert> alerts = [];
-    final now = DateTime.now();
+    final _now = DateTime.now();
+    final now = DateTime(_now.year, _now.month, _now.day);
 
     // Commercial License
     if (vaultData.license.expiryDate != null) {
