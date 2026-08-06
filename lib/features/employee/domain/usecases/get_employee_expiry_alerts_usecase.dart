@@ -16,7 +16,8 @@ class GetEmployeeExpiryAlertsUseCase {
     final employees = localEmployees ?? await repository.getAllEmployees();
     final settings = localSettings ?? await repository.getEmployeeSettings();
     final List<EmployeeExpiryAlert> alerts = [];
-    final now = DateTime.now();
+    final _now = DateTime.now();
+    final now = DateTime(_now.year, _now.month, _now.day);
 
     for (var employee in employees) {
       if (!employee.isActive) continue;
