@@ -6,15 +6,20 @@ class MaintenanceTypeModel extends MaintenanceTypeEntity {
     required super.name,
     required super.suvIntervalKm,
     required super.sedanIntervalKm,
+    super.triggerType = 'odometer',
+    super.notificationDays = 7,
   });
 
   factory MaintenanceTypeModel.fromJson(Map<String, dynamic> json) {
     final defaultInterval = json['defaultIntervalKm'] as int? ?? 5000;
+
     return MaintenanceTypeModel(
       id: json['id'] as String? ?? json['documentId'] as String? ?? '',
       name: json['name'] as String? ?? '',
       suvIntervalKm: json['suvIntervalKm'] as int? ?? defaultInterval,
       sedanIntervalKm: json['sedanIntervalKm'] as int? ?? defaultInterval,
+      triggerType: json['triggerType'] as String? ?? 'odometer',
+      notificationDays: json['notificationDays'] as int? ?? 7,
     );
   }
 
@@ -24,6 +29,8 @@ class MaintenanceTypeModel extends MaintenanceTypeEntity {
       name: entity.name,
       suvIntervalKm: entity.suvIntervalKm,
       sedanIntervalKm: entity.sedanIntervalKm,
+      triggerType: entity.triggerType,
+      notificationDays: entity.notificationDays,
     );
   }
 
@@ -34,6 +41,8 @@ class MaintenanceTypeModel extends MaintenanceTypeEntity {
       'suvIntervalKm': suvIntervalKm,
       'sedanIntervalKm': sedanIntervalKm,
       'defaultIntervalKm': defaultIntervalKm, // keep writing for legacy clients if any
+      'triggerType': triggerType,
+      'notificationDays': notificationDays,
     };
   }
 
@@ -42,12 +51,16 @@ class MaintenanceTypeModel extends MaintenanceTypeEntity {
     String? name,
     int? suvIntervalKm,
     int? sedanIntervalKm,
+    String? triggerType,
+    int? notificationDays,
   }) {
     return MaintenanceTypeModel(
       id: id ?? this.id,
       name: name ?? this.name,
       suvIntervalKm: suvIntervalKm ?? this.suvIntervalKm,
       sedanIntervalKm: sedanIntervalKm ?? this.sedanIntervalKm,
+      triggerType: triggerType ?? this.triggerType,
+      notificationDays: notificationDays ?? this.notificationDays,
     );
   }
 }

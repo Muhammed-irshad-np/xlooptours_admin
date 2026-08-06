@@ -18,6 +18,7 @@ import 'vehicle_expiry_tracker_screen.dart';
 import 'vehicle_expiry_alert_settings_screen.dart';
 import 'vehicle_makes_screen.dart';
 import 'maintenance_type_master_screen.dart';
+import 'shop_master_screen.dart';
 import 'company_form_screen.dart';
 import 'customer_form_screen.dart';
 import 'invoice_form_screen.dart';
@@ -391,6 +392,19 @@ class _AdminLayoutState extends State<AdminLayout> {
               context,
               MaterialPageRoute(
                 builder: (_) => const MaintenanceTypeMasterScreen(),
+              ),
+            );
+          },
+        ),
+        _SubNavItem(
+          label: 'Maintenance Shops',
+          icon: Icons.storefront_outlined,
+          adminOnly: true,
+          onAction: (context) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const ShopMasterScreen(),
               ),
             );
           },

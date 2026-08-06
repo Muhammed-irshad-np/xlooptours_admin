@@ -605,6 +605,24 @@ class VehicleDetailScreen extends StatelessWidget {
                 color: Colors.grey[600],
               ),
             ),
+            if (record.serviceProvider != null &&
+                record.serviceProvider!.isNotEmpty) ...[
+              SizedBox(height: 2.h),
+              Row(
+                children: [
+                  Icon(Icons.storefront, size: 13.sp, color: Colors.blue.shade700),
+                  SizedBox(width: 4.w),
+                  Text(
+                    record.serviceProvider!,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: Colors.blue.shade800,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (record.isFollowUpRequired == true) ...[
               SizedBox(height: 4.h),
               Row(
@@ -789,7 +807,9 @@ class VehicleDetailScreen extends StatelessWidget {
     BuildContext context,
     _VehicleTafweedHistoryEntry entry,
   ) {
-    final bool isExpired = entry.record.expiryDate.isBefore(DateTime.now());
+    final _now = DateTime.now();
+    final today = DateTime(_now.year, _now.month, _now.day);
+    final bool isExpired = entry.record.expiryDate.isBefore(today);
 
     Color statusColor = Colors.grey;
     String statusLabel = 'Historical';
@@ -1061,8 +1081,10 @@ class VehicleDetailScreen extends StatelessWidget {
     VoidCallback? onDelete,
     VoidCallback? onCancel,
   }) {
+    final _now = DateTime.now();
+    final today = DateTime(_now.year, _now.month, _now.day);
     final bool isExpired =
-        expiryDate != null && expiryDate.isBefore(DateTime.now());
+        expiryDate != null && expiryDate.isBefore(today);
     final bool hasAttachment =
         attachmentUrl != null && attachmentUrl.isNotEmpty;
 

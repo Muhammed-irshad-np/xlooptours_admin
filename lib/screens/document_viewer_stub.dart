@@ -7,3 +7,11 @@ Widget buildPdfWebView(String url) {
     child: Text('PDF viewer not available on this platform.'),
   );
 }
+
+/// Stub implementation for non-web platforms.
+/// On native, WebViewWidget with Google Docs Viewer is used instead.
+Widget buildOfficeDocWebView(String url) {
+  return const Center(
+    child: Text('Office document viewer not available on this platform.'),
+  );
+}

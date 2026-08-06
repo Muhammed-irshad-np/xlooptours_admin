@@ -27,7 +27,8 @@ class GetVehicleExpiryAlertsUseCase {
     };
 
     final List<VehicleExpiryAlert> alerts = [];
-    final now = DateTime.now();
+    final _now = DateTime.now();
+    final now = DateTime(_now.year, _now.month, _now.day);
 
     for (var vehicle in vehicles) {
       if (vehicle.status?.toLowerCase() != 'active') continue;
