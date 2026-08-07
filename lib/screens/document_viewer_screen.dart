@@ -9,7 +9,7 @@ import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xloop_invoice/core/utils/share_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+
 
 // Conditional imports for web platform view
 import 'document_viewer_stub.dart'
@@ -413,28 +413,80 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   }
 
   Widget _buildOfficeDocViewer() {
-    if (kIsWeb) {
-      return platform_viewer.buildOfficeDocWebView(widget.attachmentUrl);
-    }
-
-    final encodedUrl = Uri.encodeComponent(widget.attachmentUrl);
-    final viewerUrl =
-        'https://docs.google.com/gview?embedded=true&url=$encodedUrl';
-
-    final controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (_) =>
-              debugPrint('Office doc viewer: page started loading'),
-          onWebResourceError: (error) => debugPrint(
-            'Office doc viewer error: ${error.description} (${error.errorCode})',
-          ),
+    // Google Docs Viewer cannot access Firebase Storage authenticated URLs.
+    // Instead, show a "Open with native app" UI that downloads the file and
+    // opens it via the system share sheet (Excel, WPS, etc.).
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                _resolvedMime.contains('sheet') || _resolvedMime.contains('excel') || _resolvedMime.contains('csv')
+                    ? Icons.table_chart_outlined
+                    : _resolvedMime.contains('word') || _resolvedMime.contains('msword')
+                        ? Icons.description_outlined
+                        : _resolvedMime.contains('presentation') || _resolvedMime.contains('powerpoint')
+                            ? Icons.slideshow_outlined
+                            : Icons.insert_drive_file_outlined,
+                color: Colors.green.shade700,
+                size: 64,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              widget.title,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _resolvedMime.contains('sheet') || _resolvedMime.contains('excel')
+                  ? 'Excel Spreadsheet'
+                  : _resolvedMime.contains('word') || _resolvedMime.contains('msword')
+                      ? 'Word Document'
+                      : _resolvedMime.contains('presentation') || _resolvedMime.contains('powerpoint')
+                          ? 'PowerPoint Presentation'
+                          : 'Office Document',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _downloading ? null : _download,
+                icon: _downloading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.open_in_new),
+                label: Text(_downloading ? 'Downloading…' : 'Open in App (Excel / WPS / Sheets)'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-      )
-      ..loadRequest(Uri.parse(viewerUrl));
-
-    return WebViewWidget(controller: controller);
+      ),
+    );
   }
 
   Widget _buildPdfViewer() {
