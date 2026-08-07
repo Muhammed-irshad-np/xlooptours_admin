@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:xloop_invoice/screens/vehicle_master_screen.dart'; // Added
+import 'package:xloop_invoice/screens/all_vehicles_maintenance_history_screen.dart';
 import 'package:xloop_invoice/screens/vehicle_detail_screen.dart';
 import 'package:xloop_invoice/screens/vehicle_expiry_tracker_screen.dart';
 import 'package:provider/provider.dart';
@@ -154,7 +155,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     }).toList();
 
     return DefaultTabController(
-      length: isAdmin ? 2 : 1,
+      length: isAdmin ? 3 : 2,
       child: Scaffold(
         appBar: ModernAppBar(
           title: 'Fleet Management',
@@ -199,7 +200,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                 ),
               ),
               style: TextButton.styleFrom(
-                backgroundColor: Colors.blue.withOpacity(0.08),
+                backgroundColor: Colors.blue.withValues(alpha: 0.08),
                 padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8.r),
@@ -216,6 +217,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
           bottom: ModernTabBar(
             tabs: [
               const Tab(text: 'Fleet List'),
+              const Tab(text: 'Maintenance History'),
               if (isAdmin) const Tab(text: 'Vehicle Master'),
             ],
           ),
@@ -272,7 +274,10 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                     },
                   ),
 
-            // Tab 2: Vehicle Master (Admin Only)
+            // Tab 2: All Maintenance History
+            const AllVehiclesMaintenanceHistoryScreen(),
+
+            // Tab 3: Vehicle Master (Admin Only)
             if (isAdmin) const VehicleMasterScreen(),
           ],
         ),
