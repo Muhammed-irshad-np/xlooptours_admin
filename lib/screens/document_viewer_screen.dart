@@ -1,6 +1,10 @@
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xloop_invoice/core/utils/share_helper.dart';
@@ -11,6 +15,9 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'document_viewer_stub.dart'
     if (dart.library.html) 'document_viewer_web.dart'
     as platform_viewer;
+
+/// Resolved file-type information for a document URL.
+enum _DocType { pdf, image, office, unknown }
 
 class DocumentViewerScreen extends StatefulWidget {
   final String attachmentUrl;
@@ -27,115 +34,175 @@ class DocumentViewerScreen extends StatefulWidget {
 }
 
 class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
-  /// Office document file extensions supported by Google Docs Viewer.
-  static const _officeExtensions = {
-    '.doc',
-    '.docx',
-    '.xls',
-    '.xlsx',
-    '.ppt',
-    '.pptx',
-    '.rtf',
-    '.csv',
-    '.txt',
+  /// Office document MIME types supported by Google Docs Viewer.
+  static const _officeMimeTypes = {
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/csv',
+    'text/plain',
+    'application/rtf',
   };
 
-  /// Tracks the resolved content type fetched from Firebase Storage metadata.
-  /// `null` means we haven't resolved it yet; empty string means fetch failed.
-  String? _resolvedContentType;
+  static const _knownExtensions = {
+    '.pdf',
+    '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp',
+    '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+    '.rtf', '.csv', '.txt',
+  };
 
-  /// Whether we are currently fetching the Storage metadata for a URL
-  /// whose extension cannot be determined from the URL alone.
-  bool _fetchingMetadata = false;
+  _DocType _docType = _DocType.unknown;
+
+  /// The resolved MIME string (e.g. 'application/pdf').  Used for downloads.
+  String _resolvedMime = '';
+
+  bool _detecting = false;
+  bool _downloading = false;
 
   @override
   void initState() {
     super.initState();
-    // Always try to fetch Storage metadata — we use it both for type detection
-    // on extensionless files AND for a proper download filename.
-    // Skip only if the URL is obviously not a Firebase Storage URL.
-    _maybeInitMetadata();
+    _detectDocType();
   }
 
-  void _maybeInitMetadata() {
-    final ext = _getExtension(widget.attachmentUrl);
-    // If extension is unrecognised (including false-positives like '.com' from
-    // the bucket name), fetch Storage metadata to determine the real type.
-    if (!_isKnownExtension(ext)) {
-      _fetchStorageMetadata();
-    }
-  }
+  // ──────────────────────────────────────────────────────────────
+  // Detection
+  // ──────────────────────────────────────────────────────────────
 
-  /// Attempts to resolve the file's MIME type by reading its Firebase Storage metadata.
-  ///
-  /// Falls back gracefully to the "unknown format" fallback view if the fetch fails,
-  /// so existing corrupted/extensionless files still show a usable UI.
-  Future<void> _fetchStorageMetadata() async {
+  /// Determines the document type by:
+  /// 1. Checking the file extension from the URL (fast, no network).
+  /// 2. Fetching the first 16 bytes via HTTP Range request and running
+  ///    magic-bytes detection (reliable for existing extensionless files).
+  Future<void> _detectDocType() async {
     if (!mounted) return;
-    setState(() => _fetchingMetadata = true);
+    setState(() => _detecting = true);
 
-    try {
-      // Firebase Storage download URLs contain the object path encoded after
-      // "/o/" in the URL.  Parse that to get a storage reference.
-      final uri = Uri.parse(widget.attachmentUrl);
-      // Typical Firebase Storage URL format:
-      // https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<encoded-path>?...
-      final pathSegments = uri.pathSegments;
-      // pathSegments: ['v0', 'b', '<bucket>', 'o', '<encoded-path>']
-      if (pathSegments.length >= 5 && pathSegments[3] == 'o') {
-        // The encoded path is everything after '/o/' up to the '?' query.
-        final encodedObjectPath = uri.path.split('/o/').last;
-        final objectPath = Uri.decodeComponent(encodedObjectPath);
-        final ref = FirebaseStorage.instance.ref(objectPath);
-        final meta = await ref.getMetadata();
-        final contentType = meta.contentType ?? '';
-        if (mounted) {
-          setState(() {
-            _resolvedContentType = contentType;
-            _fetchingMetadata = false;
-          });
-        }
-        return;
+    // --- Step 1: try extension from URL ---
+    final ext = _extensionFromUrl(widget.attachmentUrl);
+    if (_knownExtensions.contains(ext)) {
+      final type = _typeFromExtension(ext);
+      if (mounted) {
+        setState(() {
+          _docType = type;
+          _resolvedMime = _mimeFromExtension(ext);
+          _detecting = false;
+        });
       }
-    } catch (e) {
-      debugPrint('DocumentViewer: metadata fetch failed: $e');
+      return;
     }
 
+    // --- Step 2: magic bytes via HTTP Range ---
+    try {
+      final response = await http.get(
+        Uri.parse(widget.attachmentUrl),
+        headers: {'Range': 'bytes=0-15'},
+      ).timeout(const Duration(seconds: 15));
+
+      final bytes = response.bodyBytes;
+      final mime = _detectMimeFromBytes(bytes);
+      final type = _typeFromMime(mime);
+
+      if (mounted) {
+        setState(() {
+          _docType = type;
+          _resolvedMime = mime;
+          _detecting = false;
+        });
+      }
+      return;
+    } catch (e) {
+      debugPrint('DocumentViewer: magic-bytes detection failed: $e');
+    }
+
+    // --- Step 3: give up, show fallback ---
     if (mounted) {
       setState(() {
-        _resolvedContentType = '';
-        _fetchingMetadata = false;
+        _docType = _DocType.unknown;
+        _resolvedMime = '';
+        _detecting = false;
       });
     }
   }
 
-  /// Extracts the file extension from the **filename portion** of a Firebase
-  /// Storage URL.
-  ///
-  /// Firebase Storage download URLs have the form:
-  ///   https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<encoded-path>?...
-  ///
-  /// The bucket name often contains dots (e.g. `myapp.appspot.com`), so we
-  /// must NOT search the whole URL path — only the last segment after the
-  /// final `/` in the decoded object path.
-  String _getExtension(String url) {
+  // ──────────────────────────────────────────────────────────────
+  // Type helpers
+  // ──────────────────────────────────────────────────────────────
+
+  /// Detects MIME type from the first bytes of file content (magic bytes).
+  String _detectMimeFromBytes(Uint8List b) {
+    if (b.length >= 4 &&
+        b[0] == 0x25 && b[1] == 0x50 && b[2] == 0x44 && b[3] == 0x46) {
+      return 'application/pdf'; // %PDF
+    }
+    if (b.length >= 3 && b[0] == 0xFF && b[1] == 0xD8 && b[2] == 0xFF) {
+      return 'image/jpeg'; // JPEG
+    }
+    if (b.length >= 8 &&
+        b[0] == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47 &&
+        b[4] == 0x0D && b[5] == 0x0A && b[6] == 0x1A && b[7] == 0x0A) {
+      return 'image/png'; // PNG
+    }
+    if (b.length >= 6 &&
+        b[0] == 0x47 && b[1] == 0x49 && b[2] == 0x46 &&
+        b[3] == 0x38 && (b[4] == 0x37 || b[4] == 0x39) && b[5] == 0x61) {
+      return 'image/gif'; // GIF
+    }
+    if (b.length >= 12 &&
+        b[0] == 0x52 && b[1] == 0x49 && b[2] == 0x46 && b[3] == 0x46 &&
+        b[8] == 0x57 && b[9] == 0x45 && b[10] == 0x42 && b[11] == 0x50) {
+      return 'image/webp'; // WebP
+    }
+    if (b.length >= 4 &&
+        b[0] == 0x50 && b[1] == 0x4B && b[2] == 0x03 && b[3] == 0x04) {
+      // ZIP-based: covers xlsx, docx, pptx — default to xlsx for vault docs
+      // since that is the most common office file type uploaded here.
+      // Google Docs Viewer handles all of them regardless of the exact MIME.
+      return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    }
+    if (b.length >= 8 &&
+        b[0] == 0xD0 && b[1] == 0xCF && b[2] == 0x11 && b[3] == 0xE0 &&
+        b[4] == 0xA1 && b[5] == 0xB1 && b[6] == 0x1A && b[7] == 0xE1) {
+      // OLE2 compound: covers old .xls, .doc, .ppt
+      return 'application/vnd.ms-excel';
+    }
+    return '';
+  }
+
+  _DocType _typeFromMime(String mime) {
+    if (mime.contains('pdf')) return _DocType.pdf;
+    if (mime.startsWith('image/')) return _DocType.image;
+    if (_officeMimeTypes.contains(mime)) return _DocType.office;
+    return _DocType.unknown;
+  }
+
+  _DocType _typeFromExtension(String ext) {
+    if (ext == '.pdf') return _DocType.pdf;
+    const imageExts = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'};
+    if (imageExts.contains(ext)) return _DocType.image;
+    const officeExts = {
+      '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+      '.rtf', '.csv', '.txt',
+    };
+    if (officeExts.contains(ext)) return _DocType.office;
+    return _DocType.unknown;
+  }
+
+  /// Extracts the file extension from **only the filename part** of a Firebase
+  /// Storage URL, ignoring the bucket name and folder paths.
+  String _extensionFromUrl(String url) {
     try {
       final uri = Uri.parse(url);
-      // The object path lives after `/o/` in the URL path.
-      // uri.path example: /v0/b/myapp.appspot.com/o/vault%2Ffolder%2Ffile.pdf
+      // Firebase Storage URL: .../o/<url-encoded-object-path>?...
       final rawPath = uri.path;
       final oIndex = rawPath.indexOf('/o/');
-      final objectEncoded = oIndex != -1
-          ? rawPath.substring(oIndex + 3) // everything after '/o/'
-          : rawPath;
-
-      // Decode percent-encoding (e.g. %2F → /, %20 → space)
+      final objectEncoded =
+          oIndex != -1 ? rawPath.substring(oIndex + 3) : rawPath;
       final objectDecoded = Uri.decodeComponent(objectEncoded);
-
-      // Get the last path segment (the actual filename) — ignore folder names.
-      final segments = objectDecoded.split('/');
-      final filename = segments.last.split('?').first; // strip any trailing query
-
+      // Last segment after splitting on '/' → actual filename
+      final filename = objectDecoded.split('/').last.split('?').first;
       final dotIndex = filename.lastIndexOf('.');
       if (dotIndex != -1 && dotIndex < filename.length - 1) {
         return filename.substring(dotIndex).toLowerCase();
@@ -144,18 +211,25 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     return '';
   }
 
-  /// Returns true if [ext] is one of the extensions the viewer can handle.
-  bool _isKnownExtension(String ext) {
-    const known = {
-      '.pdf',
-      '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp',
-      '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-      '.rtf', '.csv', '.txt',
-    };
-    return known.contains(ext);
+  String _mimeFromExtension(String ext) {
+    switch (ext) {
+      case '.pdf': return 'application/pdf';
+      case '.jpg': case '.jpeg': return 'image/jpeg';
+      case '.png': return 'image/png';
+      case '.gif': return 'image/gif';
+      case '.webp': return 'image/webp';
+      case '.doc': return 'application/msword';
+      case '.docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case '.xls': return 'application/vnd.ms-excel';
+      case '.xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case '.ppt': return 'application/vnd.ms-powerpoint';
+      case '.pptx': return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      case '.csv': return 'text/csv';
+      case '.txt': return 'text/plain';
+      default: return 'application/octet-stream';
+    }
   }
 
-  /// Returns the extension that corresponds to a MIME content type.
   String _extensionFromMime(String mime) {
     switch (mime) {
       case 'application/pdf': return '.pdf';
@@ -175,52 +249,68 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     }
   }
 
-  /// Determines if this document is a PDF.
-  bool get _isPdf {
-    final ext = _getExtension(widget.attachmentUrl);
-    if (ext == '.pdf') return true;
-    if (!_isKnownExtension(ext) && _resolvedContentType != null) {
-      return _resolvedContentType!.contains('pdf');
+  // ──────────────────────────────────────────────────────────────
+  // Download with correct filename
+  // ──────────────────────────────────────────────────────────────
+
+  Future<void> _download() async {
+    if (_downloading) return;
+
+    // Derive the best extension we know.
+    final ext = _resolvedMime.isNotEmpty
+        ? _extensionFromMime(_resolvedMime)
+        : _extensionFromUrl(widget.attachmentUrl);
+    final filename = '${widget.title}${ext.isNotEmpty ? ext : ''}';
+
+    if (kIsWeb) {
+      // On web: open in browser — the browser will download it.
+      // Also show snackbar with correct filename hint.
+      await _openInBrowser();
+      if (mounted && ext.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Save the file as: $filename'),
+            duration: const Duration(seconds: 6),
+            backgroundColor: Colors.blue.shade700,
+          ),
+        );
+      }
+      return;
     }
-    return false;
+
+    // On native: download bytes and save to temp file with correct extension.
+    setState(() => _downloading = true);
+    try {
+      final response = await http
+          .get(Uri.parse(widget.attachmentUrl))
+          .timeout(const Duration(seconds: 60));
+
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/$filename');
+      await file.writeAsBytes(response.bodyBytes);
+
+      if (mounted) {
+        setState(() => _downloading = false);
+        ShareHelper.shareDocument(
+          context,
+          url: widget.attachmentUrl,
+          title: filename,
+        );
+      }
+    } catch (e) {
+      debugPrint('DocumentViewer: download failed: $e');
+      if (mounted) {
+        setState(() => _downloading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Download failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
-  /// Determines if this document is an image.
-  bool get _isImage {
-    const imageExtensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'};
-    final ext = _getExtension(widget.attachmentUrl);
-    if (imageExtensions.contains(ext)) return true;
-    if (!_isKnownExtension(ext) && _resolvedContentType != null) {
-      return _resolvedContentType!.startsWith('image/');
-    }
-    return false;
-  }
-
-  /// Determines if this document is an Office document.
-  bool get _isOfficeDoc {
-    final ext = _getExtension(widget.attachmentUrl);
-    if (_officeExtensions.contains(ext)) return true;
-    if (!_isKnownExtension(ext) && _resolvedContentType != null) {
-      const officeMimeTypes = {
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/vnd.ms-powerpoint',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'text/csv',
-        'text/plain',
-        'application/rtf',
-      };
-      return officeMimeTypes.contains(_resolvedContentType);
-    }
-    return false;
-  }
-
-  /// Opens the document in an external browser for download.
-  ///
-  /// If we resolved metadata (e.g. for an extensionless file), we inform the
-  /// user of the correct file extension so they know which app to open it with.
   Future<void> _openInBrowser() async {
     final uri = Uri.parse(widget.attachmentUrl);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
@@ -229,30 +319,14 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           const SnackBar(content: Text('Could not open document link')),
         );
       }
-      return;
-    }
-    // If the file was extensionless, show a hint about the extension so the
-    // user knows to rename it after download.
-    if (mounted && _resolvedContentType != null && _resolvedContentType!.isNotEmpty) {
-      final hint = _extensionFromMime(_resolvedContentType!);
-      if (hint.isNotEmpty) {
-        final ext = _getExtension(widget.attachmentUrl);
-        if (!_isKnownExtension(ext)) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Tip: add "$hint" to the filename after download (e.g. ${widget.title}$hint)',
-              ),
-              duration: const Duration(seconds: 6),
-              backgroundColor: Colors.blue.shade700,
-            ),
-          );
-        }
-      }
     }
   }
 
-  Widget _buildFallbackView(String message) {
+  // ──────────────────────────────────────────────────────────────
+  // UI builders
+  // ──────────────────────────────────────────────────────────────
+
+  Widget _buildFallbackView() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(32),
       child: Column(
@@ -279,7 +353,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           ),
           const SizedBox(height: 12),
           Text(
-            message,
+            'This document format is not supported for preview.\n'
+            'Tap the button below to open or download it.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -289,9 +364,9 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           ),
           const SizedBox(height: 32),
           ElevatedButton.icon(
-            onPressed: _openInBrowser,
-            icon: const Icon(Icons.open_in_new),
-            label: const Text('Open / Download Document'),
+            onPressed: _download,
+            icon: const Icon(Icons.download),
+            label: const Text('Download / Open'),
             style: ElevatedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
               shape: RoundedRectangleBorder(
@@ -317,11 +392,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
             if (loadingProgress == null) return child;
             return const Center(child: CircularProgressIndicator());
           },
-          errorBuilder: (context, error, stackTrace) {
-            return _buildFallbackView(
-              'Failed to load image on Web due to CORS restriction. You can view or download it directly.',
-            );
-          },
+          errorBuilder: (context, error, stackTrace) =>
+              _buildFallbackView(),
         ),
       );
     }
@@ -335,25 +407,16 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         imageUrl: widget.attachmentUrl,
         placeholder: (context, url) =>
             const Center(child: CircularProgressIndicator()),
-        errorWidget: (context, url, error) {
-          return _buildFallbackView(
-            'Failed to load image. You can view or download it directly.',
-          );
-        },
+        errorWidget: (context, url, error) => _buildFallbackView(),
       ),
     );
   }
 
-  /// Builds a viewer for office documents (Word, Excel, PowerPoint, etc.)
-  /// using Google Docs Viewer.
-  ///
-  /// On web, uses an iframe. On native, uses a WebView widget.
   Widget _buildOfficeDocViewer() {
     if (kIsWeb) {
       return platform_viewer.buildOfficeDocWebView(widget.attachmentUrl);
     }
 
-    // On native platforms, use WebViewWidget with Google Docs Viewer
     final encodedUrl = Uri.encodeComponent(widget.attachmentUrl);
     final viewerUrl =
         'https://docs.google.com/gview?embedded=true&url=$encodedUrl';
@@ -362,14 +425,11 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (_) {
-            debugPrint('Office doc viewer: page started loading');
-          },
-          onWebResourceError: (error) {
-            debugPrint(
-              'Office doc viewer error: ${error.description} (${error.errorCode})',
-            );
-          },
+          onPageStarted: (_) =>
+              debugPrint('Office doc viewer: page started loading'),
+          onWebResourceError: (error) => debugPrint(
+            'Office doc viewer error: ${error.description} (${error.errorCode})',
+          ),
         ),
       )
       ..loadRequest(Uri.parse(viewerUrl));
@@ -377,92 +437,18 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     return WebViewWidget(controller: controller);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Show a loading spinner while we fetch metadata for extensionless files.
-    if (_fetchingMetadata) {
-      return Scaffold(
-        appBar: AppBar(
-          title: Text(widget.title),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.close),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ],
-        ),
-        body: const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Detecting document type…'),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.title),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.share),
-            onPressed: () {
-              ShareHelper.shareDocument(
-                context,
-                url: widget.attachmentUrl,
-                title: widget.title,
-              );
-            },
-            tooltip: 'Share',
-          ),
-          IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: _openInBrowser,
-            tooltip: 'Download',
-          ),
-          IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: () => Navigator.of(context).pop(),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Center(
-          child: _isPdf
-              ? _buildPdfViewer()
-              : _isImage
-                  ? _buildImageViewer()
-                  : _isOfficeDoc
-                      ? _buildOfficeDocViewer()
-                      : _buildFallbackView(
-                          'This document format is not recognized. '
-                          'You can download or open it in an external app.',
-                        ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildPdfViewer() {
     if (kIsWeb) {
-      // On web, use an iframe to leverage the browser's built-in PDF viewer.
-      // This avoids CORS and binary data corruption issues entirely.
       return platform_viewer.buildPdfWebView(widget.attachmentUrl);
     }
 
-    // On native platforms, use SfPdfViewer.network directly (no CORS issues).
     return SfPdfViewer.network(
       widget.attachmentUrl,
       canShowScrollHead: false,
       canShowScrollStatus: false,
       onDocumentLoadFailed: (PdfDocumentLoadFailedDetails details) {
         debugPrint(
-          'PDF Load Failed: ${details.error} - ${details.description}',
-        );
+            'PDF Load Failed: ${details.error} - ${details.description}');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -473,6 +459,67 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           );
         }
       },
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // Build
+  // ──────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.title),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.share),
+            onPressed: () => ShareHelper.shareDocument(
+              context,
+              url: widget.attachmentUrl,
+              title: widget.title,
+            ),
+            tooltip: 'Share',
+          ),
+          IconButton(
+            icon: _downloading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.download),
+            onPressed: _downloading ? null : _download,
+            tooltip: 'Download',
+          ),
+          IconButton(
+            icon: const Icon(Icons.close),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: _detecting
+            ? const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Detecting document type…'),
+                  ],
+                ),
+              )
+            : Center(
+                child: switch (_docType) {
+                  _DocType.pdf => _buildPdfViewer(),
+                  _DocType.image => _buildImageViewer(),
+                  _DocType.office => _buildOfficeDocViewer(),
+                  _DocType.unknown => _buildFallbackView(),
+                },
+              ),
+      ),
     );
   }
 }
