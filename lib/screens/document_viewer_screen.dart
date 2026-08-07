@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xloop_invoice/core/utils/share_helper.dart';
@@ -39,41 +40,187 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     '.txt',
   };
 
-  /// Extracts the file extension from a Firebase Storage URL.
+  /// Tracks the resolved content type fetched from Firebase Storage metadata.
+  /// `null` means we haven't resolved it yet; empty string means fetch failed.
+  String? _resolvedContentType;
+
+  /// Whether we are currently fetching the Storage metadata for a URL
+  /// whose extension cannot be determined from the URL alone.
+  bool _fetchingMetadata = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Always try to fetch Storage metadata — we use it both for type detection
+    // on extensionless files AND for a proper download filename.
+    // Skip only if the URL is obviously not a Firebase Storage URL.
+    _maybeInitMetadata();
+  }
+
+  void _maybeInitMetadata() {
+    final ext = _getExtension(widget.attachmentUrl);
+    // If extension is unrecognised (including false-positives like '.com' from
+    // the bucket name), fetch Storage metadata to determine the real type.
+    if (!_isKnownExtension(ext)) {
+      _fetchStorageMetadata();
+    }
+  }
+
+  /// Attempts to resolve the file's MIME type by reading its Firebase Storage metadata.
   ///
-  /// Firebase encodes filenames in the path segment, so we URL-decode before
-  /// extracting the extension to handle names like `Insurance%20Policy.docx`.
+  /// Falls back gracefully to the "unknown format" fallback view if the fetch fails,
+  /// so existing corrupted/extensionless files still show a usable UI.
+  Future<void> _fetchStorageMetadata() async {
+    if (!mounted) return;
+    setState(() => _fetchingMetadata = true);
+
+    try {
+      // Firebase Storage download URLs contain the object path encoded after
+      // "/o/" in the URL.  Parse that to get a storage reference.
+      final uri = Uri.parse(widget.attachmentUrl);
+      // Typical Firebase Storage URL format:
+      // https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<encoded-path>?...
+      final pathSegments = uri.pathSegments;
+      // pathSegments: ['v0', 'b', '<bucket>', 'o', '<encoded-path>']
+      if (pathSegments.length >= 5 && pathSegments[3] == 'o') {
+        // The encoded path is everything after '/o/' up to the '?' query.
+        final encodedObjectPath = uri.path.split('/o/').last;
+        final objectPath = Uri.decodeComponent(encodedObjectPath);
+        final ref = FirebaseStorage.instance.ref(objectPath);
+        final meta = await ref.getMetadata();
+        final contentType = meta.contentType ?? '';
+        if (mounted) {
+          setState(() {
+            _resolvedContentType = contentType;
+            _fetchingMetadata = false;
+          });
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint('DocumentViewer: metadata fetch failed: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _resolvedContentType = '';
+        _fetchingMetadata = false;
+      });
+    }
+  }
+
+  /// Extracts the file extension from the **filename portion** of a Firebase
+  /// Storage URL.
+  ///
+  /// Firebase Storage download URLs have the form:
+  ///   https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<encoded-path>?...
+  ///
+  /// The bucket name often contains dots (e.g. `myapp.appspot.com`), so we
+  /// must NOT search the whole URL path — only the last segment after the
+  /// final `/` in the decoded object path.
   String _getExtension(String url) {
     try {
       final uri = Uri.parse(url);
-      // Decode the path to handle URL-encoded filenames
-      final decodedPath = Uri.decodeFull(uri.path);
-      // Remove query parameters and get the extension
-      final cleanPath = decodedPath.split('?').first;
-      final dotIndex = cleanPath.lastIndexOf('.');
-      if (dotIndex != -1) {
-        return cleanPath.substring(dotIndex).toLowerCase();
+      // The object path lives after `/o/` in the URL path.
+      // uri.path example: /v0/b/myapp.appspot.com/o/vault%2Ffolder%2Ffile.pdf
+      final rawPath = uri.path;
+      final oIndex = rawPath.indexOf('/o/');
+      final objectEncoded = oIndex != -1
+          ? rawPath.substring(oIndex + 3) // everything after '/o/'
+          : rawPath;
+
+      // Decode percent-encoding (e.g. %2F → /, %20 → space)
+      final objectDecoded = Uri.decodeComponent(objectEncoded);
+
+      // Get the last path segment (the actual filename) — ignore folder names.
+      final segments = objectDecoded.split('/');
+      final filename = segments.last.split('?').first; // strip any trailing query
+
+      final dotIndex = filename.lastIndexOf('.');
+      if (dotIndex != -1 && dotIndex < filename.length - 1) {
+        return filename.substring(dotIndex).toLowerCase();
       }
     } catch (_) {}
     return '';
   }
 
-  bool _isPdfUrl(String url) {
-    final ext = _getExtension(url);
-    return ext == '.pdf';
+  /// Returns true if [ext] is one of the extensions the viewer can handle.
+  bool _isKnownExtension(String ext) {
+    const known = {
+      '.pdf',
+      '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp',
+      '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+      '.rtf', '.csv', '.txt',
+    };
+    return known.contains(ext);
   }
 
-  bool _isImageUrl(String url) {
+  /// Returns the extension that corresponds to a MIME content type.
+  String _extensionFromMime(String mime) {
+    switch (mime) {
+      case 'application/pdf': return '.pdf';
+      case 'image/jpeg': return '.jpg';
+      case 'image/png': return '.png';
+      case 'image/gif': return '.gif';
+      case 'image/webp': return '.webp';
+      case 'application/msword': return '.doc';
+      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': return '.docx';
+      case 'application/vnd.ms-excel': return '.xls';
+      case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': return '.xlsx';
+      case 'application/vnd.ms-powerpoint': return '.ppt';
+      case 'application/vnd.openxmlformats-officedocument.presentationml.presentation': return '.pptx';
+      case 'text/csv': return '.csv';
+      case 'text/plain': return '.txt';
+      default: return '';
+    }
+  }
+
+  /// Determines if this document is a PDF.
+  bool get _isPdf {
+    final ext = _getExtension(widget.attachmentUrl);
+    if (ext == '.pdf') return true;
+    if (!_isKnownExtension(ext) && _resolvedContentType != null) {
+      return _resolvedContentType!.contains('pdf');
+    }
+    return false;
+  }
+
+  /// Determines if this document is an image.
+  bool get _isImage {
     const imageExtensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'};
-    final ext = _getExtension(url);
-    return imageExtensions.contains(ext);
+    final ext = _getExtension(widget.attachmentUrl);
+    if (imageExtensions.contains(ext)) return true;
+    if (!_isKnownExtension(ext) && _resolvedContentType != null) {
+      return _resolvedContentType!.startsWith('image/');
+    }
+    return false;
   }
 
-  bool _isOfficeDoc(String url) {
-    final ext = _getExtension(url);
-    return _officeExtensions.contains(ext);
+  /// Determines if this document is an Office document.
+  bool get _isOfficeDoc {
+    final ext = _getExtension(widget.attachmentUrl);
+    if (_officeExtensions.contains(ext)) return true;
+    if (!_isKnownExtension(ext) && _resolvedContentType != null) {
+      const officeMimeTypes = {
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'text/csv',
+        'text/plain',
+        'application/rtf',
+      };
+      return officeMimeTypes.contains(_resolvedContentType);
+    }
+    return false;
   }
 
+  /// Opens the document in an external browser for download.
+  ///
+  /// If we resolved metadata (e.g. for an extensionless file), we inform the
+  /// user of the correct file extension so they know which app to open it with.
   Future<void> _openInBrowser() async {
     final uri = Uri.parse(widget.attachmentUrl);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
@@ -81,6 +228,26 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not open document link')),
         );
+      }
+      return;
+    }
+    // If the file was extensionless, show a hint about the extension so the
+    // user knows to rename it after download.
+    if (mounted && _resolvedContentType != null && _resolvedContentType!.isNotEmpty) {
+      final hint = _extensionFromMime(_resolvedContentType!);
+      if (hint.isNotEmpty) {
+        final ext = _getExtension(widget.attachmentUrl);
+        if (!_isKnownExtension(ext)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Tip: add "$hint" to the filename after download (e.g. ${widget.title}$hint)',
+              ),
+              duration: const Duration(seconds: 6),
+              backgroundColor: Colors.blue.shade700,
+            ),
+          );
+        }
       }
     }
   }
@@ -212,9 +379,30 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isPdf = _isPdfUrl(widget.attachmentUrl);
-    final isImage = _isImageUrl(widget.attachmentUrl);
-    final isOfficeDoc = _isOfficeDoc(widget.attachmentUrl);
+    // Show a loading spinner while we fetch metadata for extensionless files.
+    if (_fetchingMetadata) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.title),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Detecting document type…'),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -244,11 +432,11 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       ),
       body: SafeArea(
         child: Center(
-          child: isPdf
+          child: _isPdf
               ? _buildPdfViewer()
-              : isImage
+              : _isImage
                   ? _buildImageViewer()
-                  : isOfficeDoc
+                  : _isOfficeDoc
                       ? _buildOfficeDocViewer()
                       : _buildFallbackView(
                           'This document format is not recognized. '
