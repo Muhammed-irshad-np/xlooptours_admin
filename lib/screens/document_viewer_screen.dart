@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:xloop_invoice/core/utils/share_helper.dart';
@@ -39,6 +40,67 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     '.txt',
   };
 
+  /// Tracks the resolved content type fetched from Firebase Storage metadata.
+  /// `null` means we haven't resolved it yet; empty string means fetch failed.
+  String? _resolvedContentType;
+
+  /// Whether we are currently fetching the Storage metadata for a URL
+  /// whose extension cannot be determined from the URL alone.
+  bool _fetchingMetadata = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // If the URL has no recognisable extension, fetch metadata from Firebase Storage.
+    final ext = _getExtension(widget.attachmentUrl);
+    if (ext.isEmpty) {
+      _fetchStorageMetadata();
+    }
+  }
+
+  /// Attempts to resolve the file's MIME type by reading its Firebase Storage metadata.
+  ///
+  /// Falls back gracefully to the "unknown format" fallback view if the fetch fails,
+  /// so existing corrupted/extensionless files still show a usable UI.
+  Future<void> _fetchStorageMetadata() async {
+    if (!mounted) return;
+    setState(() => _fetchingMetadata = true);
+
+    try {
+      // Firebase Storage download URLs contain the object path encoded after
+      // "/o/" in the URL.  Parse that to get a storage reference.
+      final uri = Uri.parse(widget.attachmentUrl);
+      // Typical Firebase Storage URL format:
+      // https://firebasestorage.googleapis.com/v0/b/<bucket>/o/<encoded-path>?...
+      final pathSegments = uri.pathSegments;
+      // pathSegments: ['v0', 'b', '<bucket>', 'o', '<encoded-path>']
+      if (pathSegments.length >= 5 && pathSegments[3] == 'o') {
+        // The encoded path is everything after '/o/' up to the '?' query.
+        final encodedObjectPath = uri.path.split('/o/').last;
+        final objectPath = Uri.decodeComponent(encodedObjectPath);
+        final ref = FirebaseStorage.instance.ref(objectPath);
+        final meta = await ref.getMetadata();
+        final contentType = meta.contentType ?? '';
+        if (mounted) {
+          setState(() {
+            _resolvedContentType = contentType;
+            _fetchingMetadata = false;
+          });
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint('DocumentViewer: metadata fetch failed: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _resolvedContentType = '';
+        _fetchingMetadata = false;
+      });
+    }
+  }
+
   /// Extracts the file extension from a Firebase Storage URL.
   ///
   /// Firebase encodes filenames in the path segment, so we URL-decode before
@@ -58,20 +120,47 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     return '';
   }
 
-  bool _isPdfUrl(String url) {
-    final ext = _getExtension(url);
-    return ext == '.pdf';
+  /// Determines if this document is a PDF, considering both URL extension
+  /// and resolved Storage contentType for extensionless files.
+  bool get _isPdf {
+    final ext = _getExtension(widget.attachmentUrl);
+    if (ext == '.pdf') return true;
+    if (ext.isEmpty && _resolvedContentType != null) {
+      return _resolvedContentType!.contains('pdf');
+    }
+    return false;
   }
 
-  bool _isImageUrl(String url) {
+  /// Determines if this document is an image.
+  bool get _isImage {
     const imageExtensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'};
-    final ext = _getExtension(url);
-    return imageExtensions.contains(ext);
+    final ext = _getExtension(widget.attachmentUrl);
+    if (imageExtensions.contains(ext)) return true;
+    if (ext.isEmpty && _resolvedContentType != null) {
+      return _resolvedContentType!.startsWith('image/');
+    }
+    return false;
   }
 
-  bool _isOfficeDoc(String url) {
-    final ext = _getExtension(url);
-    return _officeExtensions.contains(ext);
+  /// Determines if this document is an Office document.
+  bool get _isOfficeDoc {
+    final ext = _getExtension(widget.attachmentUrl);
+    if (_officeExtensions.contains(ext)) return true;
+    if (ext.isEmpty && _resolvedContentType != null) {
+      const officeMimeTypes = {
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'text/csv',
+        'text/plain',
+        'application/rtf',
+      };
+      return officeMimeTypes.contains(_resolvedContentType);
+    }
+    return false;
   }
 
   Future<void> _openInBrowser() async {
@@ -212,9 +301,30 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isPdf = _isPdfUrl(widget.attachmentUrl);
-    final isImage = _isImageUrl(widget.attachmentUrl);
-    final isOfficeDoc = _isOfficeDoc(widget.attachmentUrl);
+    // Show a loading spinner while we fetch metadata for extensionless files.
+    if (_fetchingMetadata) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(widget.title),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+          ],
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Detecting document type…'),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -244,11 +354,11 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       ),
       body: SafeArea(
         child: Center(
-          child: isPdf
+          child: _isPdf
               ? _buildPdfViewer()
-              : isImage
+              : _isImage
                   ? _buildImageViewer()
-                  : isOfficeDoc
+                  : _isOfficeDoc
                       ? _buildOfficeDocViewer()
                       : _buildFallbackView(
                           'This document format is not recognized. '
