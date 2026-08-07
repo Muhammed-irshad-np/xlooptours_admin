@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/rbac/rbac_manager.dart';
+import '../../../../core/utils/activity_logger.dart';
 import '../../../employee/domain/entities/employee_entity.dart';
 import '../../../employee/presentation/providers/employee_provider.dart';
 import '../../domain/entities/managed_user_entity.dart';
@@ -62,7 +63,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
   void _onEmployeeSelected(String? employeeId, List<EmployeeEntity> employees) {
     setState(() => _selectedEmployeeId = employeeId);
     if (employeeId == null) return;
-    if (widget.userToEdit != null) return; // editing: don't overwrite login email
+    if (widget.userToEdit != null)
+      return; // editing: don't overwrite login email
 
     EmployeeEntity? match;
     for (final e in employees) {
@@ -105,7 +107,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
       final confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12.r),
+          ),
           title: Text(
             'Confirm User Creation',
             style: GoogleFonts.notoSans(
@@ -115,9 +119,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
           ),
           content: Text(
             'Are you sure you want to create a new user with the provided details?',
-            style: GoogleFonts.notoSans(
-              color: const Color(0xFF475569),
-            ),
+            style: GoogleFonts.notoSans(color: const Color(0xFF475569)),
           ),
           actions: [
             TextButton(
@@ -138,6 +140,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
       if (confirm != true) return;
     }
 
+    if (!mounted) return;
     setState(() => _isSubmitting = true);
 
     final provider = context.read<UserManagementProvider>();
@@ -198,17 +201,31 @@ class _UserFormDialogState extends State<UserFormDialog> {
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (success) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.userToEdit != null
-                  ? 'User updated successfully'
-                  : 'User created successfully',
-            ),
-            backgroundColor: Colors.green,
-          ),
+        final emailVal = widget.userToEdit != null
+            ? widget.userToEdit!.email
+            : _emailController.text.trim();
+        final uidVal = widget.userToEdit?.uid;
+        await ActivityLogger.log(
+          context,
+          title: widget.userToEdit != null ? 'User Updated' : 'User Created',
+          message: widget.userToEdit != null
+              ? 'User $emailVal has been updated.'
+              : 'User $emailVal has been created.',
+          relatedId: uidVal,
         );
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                widget.userToEdit != null
+                    ? 'User updated successfully'
+                    : 'User created successfully',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -225,10 +242,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
     final isEditing = widget.userToEdit != null;
     final roles = context.watch<UserManagementProvider>().roles;
     final employeeProvider = context.watch<EmployeeProvider>();
-    final employees = employeeProvider.employees
-        .where((e) => e.isActive)
-        .toList()
-      ..sort((a, b) => a.fullName.compareTo(b.fullName));
+    final employees =
+        employeeProvider.employees.where((e) => e.isActive).toList()
+          ..sort((a, b) => a.fullName.compareTo(b.fullName));
 
     // Employees already linked to another login (exclude current user when editing)
     final linkedElsewhere = <String>{};
@@ -240,8 +256,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
 
     final selectableEmployees = employees
         .where(
-          (e) =>
-              !linkedElsewhere.contains(e.id) || e.id == _selectedEmployeeId,
+          (e) => !linkedElsewhere.contains(e.id) || e.id == _selectedEmployeeId,
         )
         .toList();
 
@@ -311,10 +326,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                           : '${e.fullName} (${e.position})';
                       return DropdownMenuItem<String?>(
                         value: e.id,
-                        child: Text(
-                          label,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        child: Text(label, overflow: TextOverflow.ellipsis),
                       );
                     }),
                   ],
@@ -328,8 +340,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   ),
                 Builder(
                   builder: (_) {
-                    final contact =
-                        _selectedEmployeeContactEmail(selectableEmployees);
+                    final contact = _selectedEmployeeContactEmail(
+                      selectableEmployees,
+                    );
                     if (contact == null) return const SizedBox.shrink();
                     return Padding(
                       padding: EdgeInsets.only(top: 6.h),
@@ -354,10 +367,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
                       borderRadius: BorderRadius.circular(8.r),
                     ),
                   ),
-                  validator: (val) =>
-                      val == null || val.trim().isEmpty
-                          ? 'Name is required'
-                          : null,
+                  validator: (val) => val == null || val.trim().isEmpty
+                      ? 'Name is required'
+                      : null,
                 ),
                 SizedBox(height: 16.h),
 
@@ -428,8 +440,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   value: _selectedRoleId,
                   decoration: InputDecoration(
                     labelText: 'Role',
-                    prefixIcon:
-                        const Icon(Icons.admin_panel_settings_outlined),
+                    prefixIcon: const Icon(Icons.admin_panel_settings_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8.r),
                     ),
@@ -449,9 +460,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   SwitchListTile(
                     title: const Text('Active Account'),
                     subtitle: Text(
-                      _isActive
-                          ? 'User can sign in'
-                          : 'Account is deactivated',
+                      _isActive ? 'User can sign in' : 'Account is deactivated',
                     ),
                     value: _isActive,
                     activeThumbColor: const Color(0xFF13B1F2),
@@ -464,8 +473,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton(
-                      onPressed:
-                          _isSubmitting ? null : () => Navigator.pop(context),
+                      onPressed: _isSubmitting
+                          ? null
+                          : () => Navigator.pop(context),
                       child: const Text('Cancel'),
                     ),
                     SizedBox(width: 12.w),
@@ -510,10 +520,7 @@ class _LoginEmailFixSection extends StatefulWidget {
   final String uid;
   final String currentEmail;
 
-  const _LoginEmailFixSection({
-    required this.uid,
-    required this.currentEmail,
-  });
+  const _LoginEmailFixSection({required this.uid, required this.currentEmail});
 
   @override
   State<_LoginEmailFixSection> createState() => _LoginEmailFixSectionState();
@@ -549,9 +556,9 @@ class _LoginEmailFixSectionState extends State<_LoginEmailFixSection> {
     }
     setState(() => _saving = true);
     final ok = await context.read<UserManagementProvider>().changeLoginEmail(
-          uid: widget.uid,
-          newEmail: email,
-        );
+      uid: widget.uid,
+      newEmail: email,
+    );
     if (!mounted) return;
     setState(() => _saving = false);
     final provider = context.read<UserManagementProvider>();

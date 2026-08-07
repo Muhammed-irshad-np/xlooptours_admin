@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../domain/entities/managed_user_entity.dart';
 import '../providers/user_management_provider.dart';
+import '../../../../core/utils/activity_logger.dart';
 
 /// Admin / Super Admin: change a user's login email (username).
 class ChangeLoginEmailDialog extends StatefulWidget {
@@ -49,15 +50,24 @@ class _ChangeLoginEmailDialogState extends State<ChangeLoginEmailDialog> {
     setState(() => _isSubmitting = false);
 
     if (success) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Login email updated for ${widget.user.displayName.isNotEmpty ? widget.user.displayName : widget.user.email}',
-          ),
-          backgroundColor: Colors.green,
-        ),
+      final newEmail = _emailController.text.trim();
+      await ActivityLogger.log(
+        context,
+        title: 'User Email Changed',
+        message: 'Email for user ${widget.user.email} has been changed to $newEmail.',
+        relatedId: widget.user.uid,
       );
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Login email updated for ${widget.user.displayName.isNotEmpty ? widget.user.displayName : widget.user.email}',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
