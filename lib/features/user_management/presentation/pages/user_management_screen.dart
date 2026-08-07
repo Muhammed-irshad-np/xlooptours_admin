@@ -15,6 +15,9 @@ import '../widgets/change_login_email_dialog.dart';
 import '../widgets/change_password_dialog.dart';
 import '../widgets/role_form_dialog.dart';
 import '../widgets/user_form_dialog.dart';
+import '../../../../core/utils/activity_logger.dart';
+import '../../../notifications/domain/entities/notification_entity.dart';
+import '../../../notifications/presentation/providers/notification_provider.dart';
 
 class UserManagementScreen extends StatefulWidget {
   const UserManagementScreen({super.key});
@@ -96,6 +99,19 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     }
 
     // Stats calculations
+    final notificationProvider = context.watch<NotificationProvider>();
+    final userManagementLogs = notificationProvider.notifications.where((n) {
+      return n.type == NotificationType.activity &&
+          (n.title == 'User Created' ||
+           n.title == 'User Updated' ||
+           n.title == 'User Status Updated' ||
+           n.title == 'User Password Changed' ||
+           n.title == 'User Email Changed' ||
+           n.title == 'Role Created' ||
+           n.title == 'Role Updated' ||
+           n.title == 'Role Deleted');
+    }).toList();
+
     final totalUsers = provider.users.length;
     final activeUsers = provider.users.where((u) => u.isActive).length;
     final onlineNow = provider.users.where((u) => u.isOnlineNow).length;
@@ -249,6 +265,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     icon: Icons.security_outlined,
                     count: provider.roles.length,
                   ),
+                  SizedBox(width: 4.w),
+                  _buildTabItem(
+                    index: 2,
+                    label: 'Activity Logs',
+                    icon: Icons.history_outlined,
+                    count: userManagementLogs.length,
+                  ),
                 ],
               ),
             ),
@@ -262,7 +285,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   )
                 : _selectedTabIndex == 0
                 ? _buildUsersTab(provider)
-                : _buildRolesTab(provider),
+                : _selectedTabIndex == 1
+                ? _buildRolesTab(provider)
+                : _buildActivityLogsTab(userManagementLogs),
           ],
         ),
       ),
@@ -763,8 +788,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     RbacManager.canManageUsers(
                       context.read<AuthProvider>().user,
                     )
-                    ? (val) {
-                        provider.toggleStatus(user.uid, val);
+                    ? (val) async {
+                        final ok = await provider.toggleStatus(user.uid, val);
+                        if (context.mounted && ok) {
+                          await ActivityLogger.log(
+                            context,
+                            title: 'User Status Updated',
+                            message: 'User ${user.email} status has been updated to ${val ? 'ENABLED' : 'DISABLED'}.',
+                            relatedId: user.uid,
+                          );
+                        }
                       }
                     : null,
               ),
@@ -996,15 +1029,24 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
                     if (confirm == true) {
                       final ok = await provider.removeRole(role.id);
-                      if (context.mounted && !ok) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              provider.errorMessage ?? 'Failed to delete role',
+                      if (context.mounted) {
+                        if (!ok) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                provider.errorMessage ?? 'Failed to delete role',
+                              ),
+                              backgroundColor: Colors.red,
                             ),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
+                          );
+                        } else {
+                          await ActivityLogger.log(
+                            context,
+                            title: 'Role Deleted',
+                            message: 'Role "${role.name}" has been deleted.',
+                            relatedId: role.id,
+                          );
+                        }
                       }
                     }
                   },
@@ -1224,5 +1266,181 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       default:
         return Colors.blueGrey;
     }
+  }
+
+  Widget _buildActivityLogsTab(List<NotificationEntity> logs) {
+    if (logs.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: 60.h),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: EdgeInsets.all(16.w),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE2E8F0),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.history_toggle_off_outlined,
+                  size: 40.sp,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+              SizedBox(height: 16.h),
+              Text(
+                'No activities recorded yet',
+                style: GoogleFonts.merriweather(
+                  fontSize: 16.sp,
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFF334155),
+                ),
+              ),
+              SizedBox(height: 6.h),
+              Text(
+                'Operations on users and roles will appear here.',
+                style: GoogleFonts.notoSans(
+                  fontSize: 12.sp,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: logs.map((log) {
+        IconData icon;
+        Color color;
+
+        if (log.title.contains('Created')) {
+          icon = log.title.contains('Role') ? Icons.security : Icons.person_add;
+          color = const Color(0xFF10B981);
+        } else if (log.title.contains('Deleted')) {
+          icon = log.title.contains('Role') ? Icons.remove_moderator : Icons.person_off;
+          color = const Color(0xFFEF4444);
+        } else if (log.title.contains('Password')) {
+          icon = Icons.lock_outline;
+          color = const Color(0xFFF59E0B);
+        } else if (log.title.contains('Email')) {
+          icon = Icons.alternate_email;
+          color = const Color(0xFF13B1F2);
+        } else if (log.title.contains('Status')) {
+          icon = Icons.toggle_on_outlined;
+          color = const Color(0xFF6366F1);
+        } else {
+          icon = Icons.edit_note_outlined;
+          color = const Color(0xFF64748B);
+        }
+
+        return Container(
+          margin: EdgeInsets.only(bottom: 12.h),
+          padding: EdgeInsets.all(16.w),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.01),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: EdgeInsets.all(10.w),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 20.sp),
+              ),
+              SizedBox(width: 16.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          log.title,
+                          style: GoogleFonts.notoSans(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                        if (log.userName != null)
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6.r),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.person_outline, size: 10.sp, color: const Color(0xFF475569)),
+                                SizedBox(width: 4.w),
+                                Text(
+                                  log.userName!,
+                                  style: GoogleFonts.notoSans(
+                                    fontSize: 10.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF475569),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    SizedBox(height: 6.h),
+                    Text(
+                      log.message,
+                      style: GoogleFonts.notoSans(
+                        fontSize: 13.sp,
+                        color: const Color(0xFF475569),
+                      ),
+                    ),
+                    SizedBox(height: 8.h),
+                    Row(
+                      children: [
+                        Icon(Icons.access_time_filled_rounded, size: 12.sp, color: const Color(0xFF94A3B8)),
+                        SizedBox(width: 4.w),
+                        Text(
+                          DateFormat('yyyy-MM-dd HH:mm').format(log.timestamp),
+                          style: GoogleFonts.notoSans(
+                            fontSize: 11.sp,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        ),
+                        SizedBox(width: 8.w),
+                        Text(
+                          '(${timeago.format(log.timestamp)})',
+                          style: GoogleFonts.notoSans(
+                            fontSize: 10.sp,
+                            color: const Color(0xFF94A3B8),
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
   }
 }

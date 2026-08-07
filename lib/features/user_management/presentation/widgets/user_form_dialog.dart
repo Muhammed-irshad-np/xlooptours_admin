@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/rbac/rbac_manager.dart';
+import '../../../../core/utils/activity_logger.dart';
 import '../../../employee/domain/entities/employee_entity.dart';
 import '../../../employee/presentation/providers/employee_provider.dart';
 import '../../domain/entities/managed_user_entity.dart';
@@ -101,6 +102,44 @@ class _UserFormDialogState extends State<UserFormDialog> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
+    if (widget.userToEdit == null) {
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
+          title: Text(
+            'Confirm User Creation',
+            style: GoogleFonts.notoSans(
+              fontWeight: FontWeight.bold,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to create a new user with the provided details?',
+            style: GoogleFonts.notoSans(
+              color: const Color(0xFF475569),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF13B1F2),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
+      );
+      if (confirm != true) return;
+    }
+
+    if (!mounted) return;
     setState(() => _isSubmitting = true);
 
     final provider = context.read<UserManagementProvider>();
@@ -161,17 +200,29 @@ class _UserFormDialogState extends State<UserFormDialog> {
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (success) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              widget.userToEdit != null
-                  ? 'User updated successfully'
-                  : 'User created successfully',
-            ),
-            backgroundColor: Colors.green,
-          ),
+        final emailVal = widget.userToEdit != null ? widget.userToEdit!.email : _emailController.text.trim();
+        final uidVal = widget.userToEdit?.uid;
+        await ActivityLogger.log(
+          context,
+          title: widget.userToEdit != null ? 'User Updated' : 'User Created',
+          message: widget.userToEdit != null
+              ? 'User $emailVal has been updated.'
+              : 'User $emailVal has been created.',
+          relatedId: uidVal,
         );
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                widget.userToEdit != null
+                    ? 'User updated successfully'
+                    : 'User created successfully',
+              ),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
