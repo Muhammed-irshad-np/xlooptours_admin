@@ -26,8 +26,12 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
   DateTime? _date;
   DateTime? _fromDate;
   DateTime? _toDate;
-  List<XFile> _selectedFiles = [];
-  List<VaultDocument> _existingDocuments = [];
+  VaultDocument? _billReceipt;
+  VaultDocument? _bankStatement;
+  VaultDocument? _paymentReceipt;
+  XFile? _selectedBillReceipt;
+  XFile? _selectedBankStatement;
+  XFile? _selectedPaymentReceipt;
   bool _isSaving = false;
 
   @override
@@ -40,7 +44,28 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       _amountController.text = widget.filing!.amount.toString();
       _billNumberController.text = widget.filing!.billNumber;
       _currency = widget.filing!.currency;
-      _existingDocuments = List.from(widget.filing!.documents);
+      
+      final docs = widget.filing!.documents;
+      int fallbackIndex = 0;
+      for (var doc in docs) {
+        if (doc.name == 'Bill Receipt') {
+          _billReceipt = doc;
+        } else if (doc.name == 'Bank Statement') {
+          _bankStatement = doc;
+        } else if (doc.name == 'Payment Receipt') {
+          _paymentReceipt = doc;
+        } else {
+          // Fallback for older documents without these names
+          if (fallbackIndex == 0) {
+            _billReceipt = doc;
+          } else if (fallbackIndex == 1) {
+            _bankStatement = doc;
+          } else if (fallbackIndex == 2) {
+            _paymentReceipt = doc;
+          }
+          fallbackIndex++;
+        }
+      }
     }
   }
 
@@ -51,51 +76,44 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
     super.dispose();
   }
 
-  Future<void> _pickFiles() async {
+  Future<void> _pickFileForSlot(String slot) async {
     try {
       final result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
+        allowMultiple: false,
         type: FileType.any,
         withData: false,
       );
-      if (result != null) {
-        final totalAfterAdd = result.files.length + _selectedFiles.length + _existingDocuments.length;
-        if (totalAfterAdd > 3) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Maximum 3 documents allowed total')),
-            );
-          }
-          return;
-        }
-
-        final List<XFile> validFiles = [];
-        for (final pf in result.files) {
-          if (pf.path != null) {
-            final xf = XFile(pf.path!);
-            final size = await xf.length();
-            if (size > 5 * 1024 * 1024) {
-              if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('${pf.name} exceeds 5MB limit')),
-                );
-              }
-              continue; // skip oversized files, allow rest
+      if (result != null && result.files.isNotEmpty) {
+        final pf = result.files.first;
+        if (pf.path != null) {
+          final xf = XFile(pf.path!);
+          final size = await xf.length();
+          if (size > 5 * 1024 * 1024) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${pf.name} exceeds 5MB limit')),
+              );
             }
-            validFiles.add(xf);
+            return;
           }
-        }
-
-        if (validFiles.isNotEmpty) {
           setState(() {
-            _selectedFiles = [..._selectedFiles, ...validFiles];
+            if (slot == 'billReceipt') {
+              _selectedBillReceipt = xf;
+              _billReceipt = null; // Replace existing
+            } else if (slot == 'bankStatement') {
+              _selectedBankStatement = xf;
+              _bankStatement = null; // Replace existing
+            } else if (slot == 'paymentReceipt') {
+              _selectedPaymentReceipt = xf;
+              _paymentReceipt = null; // Replace existing
+            }
           });
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking files: $e')),
+          SnackBar(content: Text('Error picking file: $e')),
         );
       }
     }
@@ -138,13 +156,41 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
     setState(() => _isSaving = true);
     final provider = context.read<VaultProvider>();
 
-    List<VaultDocument> uploadedDocuments = [];
-    for (var file in _selectedFiles) {
-      final doc = await provider.uploadDocument(file, 'vat_filings');
+    // 1. Upload any newly selected files for each slot and label them correctly
+    VaultDocument? billReceipt = _billReceipt;
+    if (_selectedBillReceipt != null) {
+      final doc = await provider.uploadDocument(_selectedBillReceipt!, 'vat_filings');
       if (doc != null) {
-        uploadedDocuments.add(doc);
+        billReceipt = VaultDocument(url: doc.url, name: 'Bill Receipt');
       }
+    } else if (billReceipt != null) {
+      billReceipt = VaultDocument(url: billReceipt.url, name: 'Bill Receipt');
     }
+
+    VaultDocument? bankStatement = _bankStatement;
+    if (_selectedBankStatement != null) {
+      final doc = await provider.uploadDocument(_selectedBankStatement!, 'vat_filings');
+      if (doc != null) {
+        bankStatement = VaultDocument(url: doc.url, name: 'Bank Statement');
+      }
+    } else if (bankStatement != null) {
+      bankStatement = VaultDocument(url: bankStatement.url, name: 'Bank Statement');
+    }
+
+    VaultDocument? paymentReceipt = _paymentReceipt;
+    if (_selectedPaymentReceipt != null) {
+      final doc = await provider.uploadDocument(_selectedPaymentReceipt!, 'vat_filings');
+      if (doc != null) {
+        paymentReceipt = VaultDocument(url: doc.url, name: 'Payment Receipt');
+      }
+    } else if (paymentReceipt != null) {
+      paymentReceipt = VaultDocument(url: paymentReceipt.url, name: 'Payment Receipt');
+    }
+
+    final List<VaultDocument> finalDocuments = [];
+    if (billReceipt != null) finalDocuments.add(billReceipt);
+    if (bankStatement != null) finalDocuments.add(bankStatement);
+    if (paymentReceipt != null) finalDocuments.add(paymentReceipt);
 
     final filing = VatFiling(
       id: widget.filing?.id ?? '', 
@@ -154,7 +200,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       billNumber: _billNumberController.text.trim(),
       fromDate: _fromDate!,
       toDate: _toDate!,
-      documents: [..._existingDocuments, ...uploadedDocuments],
+      documents: finalDocuments,
     );
 
     final success = widget.filing == null 
@@ -422,88 +468,141 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
   }
 
   Widget _buildDocumentManager() {
-    final int totalDocs = _selectedFiles.length + _existingDocuments.length;
     return Container(
       padding: EdgeInsets.all(16.r),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12.r),
-        border: Border.all(color: const Color(0xFFE2E8F0), style: BorderStyle.solid),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_existingDocuments.isNotEmpty) ...[
-            Wrap(
-              spacing: 8.w,
-              runSpacing: 8.h,
-              children: _existingDocuments.asMap().entries.map((entry) {
-                final doc = entry.value;
-                return Semantics(
-                  label: 'Uploaded document ${entry.key + 1}: ${doc.name}',
-                  child: InputChip(
-                    backgroundColor: const Color(0xFFE2E8F0),
-                    avatar: Icon(Icons.visibility_outlined, size: 14.sp, color: const Color(0xFF2563EB)),
-                    label: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: 100.w),
-                      child: Text(
-                        doc.name, 
-                        style: TextStyle(fontSize: 11.sp),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    onPressed: () => _viewDocument(doc.url),
-                    onDeleted: () => setState(() => _existingDocuments.removeAt(entry.key)),
-                    deleteIconColor: const Color(0xFFF43F5E),
-                  ),
-                );
-              }).toList(),
-            ),
-            SizedBox(height: 12.h),
-          ],
-          if (_selectedFiles.isNotEmpty) ...[
-            Wrap(
-              spacing: 8.w,
-              runSpacing: 8.h,
-              children: _selectedFiles.asMap().entries.map((entry) {
-                final file = entry.value;
-                return Semantics(
-                  label: 'New file to upload: ${file.name}',
-                  child: InputChip(
-                    backgroundColor: const Color(0xFF2563EB).withOpacity(0.1),
-                    label: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: 100.w),
-                      child: Text(
-                        file.name, 
-                        style: TextStyle(fontSize: 11.sp, color: const Color(0xFF2563EB)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    onDeleted: () => setState(() => _selectedFiles.removeAt(entry.key)),
-                    deleteIconColor: const Color(0xFF2563EB),
-                  ),
-                );
-              }).toList(),
-            ),
-            SizedBox(height: 12.h),
-          ],
-          Semantics(
-            label: 'Attach up to 3 VAT documents',
-            button: true,
-            enabled: totalDocs < 3,
-            child: OutlinedButton.icon(
-              onPressed: totalDocs < 3 ? _pickFiles : null,
-              icon: const Icon(Icons.add_a_photo_outlined),
-              label: Text('Add Documentation ($totalDocs/3)'),
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-              ),
-            ),
+          _buildDocumentSlot(
+            label: 'Bill Receipt',
+            document: _billReceipt,
+            selectedFile: _selectedBillReceipt,
+            onPick: () => _pickFileForSlot('billReceipt'),
+            onRemove: () => setState(() {
+              _billReceipt = null;
+              _selectedBillReceipt = null;
+            }),
+          ),
+          SizedBox(height: 16.h),
+          _buildDocumentSlot(
+            label: 'Bank Statement',
+            document: _bankStatement,
+            selectedFile: _selectedBankStatement,
+            onPick: () => _pickFileForSlot('bankStatement'),
+            onRemove: () => setState(() {
+              _bankStatement = null;
+              _selectedBankStatement = null;
+            }),
+          ),
+          SizedBox(height: 16.h),
+          _buildDocumentSlot(
+            label: 'Payment Receipt',
+            document: _paymentReceipt,
+            selectedFile: _selectedPaymentReceipt,
+            onPick: () => _pickFileForSlot('paymentReceipt'),
+            onRemove: () => setState(() {
+              _paymentReceipt = null;
+              _selectedPaymentReceipt = null;
+            }),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildDocumentSlot({
+    required String label,
+    required VaultDocument? document,
+    required XFile? selectedFile,
+    required VoidCallback onPick,
+    required VoidCallback onRemove,
+  }) {
+    final hasFile = document != null || selectedFile != null;
+    final displayName = document != null 
+        ? document.name 
+        : (selectedFile != null ? selectedFile.name : 'No file selected');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 12.sp,
+            fontWeight: FontWeight.w600,
+            color: const Color(0xFF475569),
+          ),
+        ),
+        SizedBox(height: 6.h),
+        Container(
+          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(8.r),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                hasFile ? Icons.file_present_outlined : Icons.upload_file_outlined,
+                size: 18.sp,
+                color: hasFile ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+              ),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Text(
+                  displayName,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 12.sp,
+                    color: hasFile ? const Color(0xFF1E293B) : const Color(0xFF94A3B8),
+                    fontWeight: hasFile ? FontWeight.w500 : FontWeight.normal,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (hasFile) ...[
+                if (document != null)
+                  IconButton(
+                    icon: Icon(Icons.visibility_outlined, size: 16.sp, color: const Color(0xFF64748B)),
+                    onPressed: () => _viewDocument(document.url),
+                    constraints: BoxConstraints(minWidth: 32.w, minHeight: 32.h),
+                    padding: EdgeInsets.zero,
+                    tooltip: 'View',
+                  ),
+                IconButton(
+                  icon: Icon(Icons.delete_outline, size: 16.sp, color: const Color(0xFFF43F5E)),
+                  onPressed: onRemove,
+                  constraints: BoxConstraints(minWidth: 32.w, minHeight: 32.h),
+                  padding: EdgeInsets.zero,
+                  tooltip: 'Remove',
+                ),
+              ] else
+                TextButton(
+                  onPressed: onPick,
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    'Upload',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.bold,
+                      color: const Color(0xFF2563EB),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/rbac/permission.dart';
+import '../../../../core/utils/activity_logger.dart';
 import '../../domain/entities/role_entity.dart';
 import '../providers/user_management_provider.dart';
 
@@ -79,15 +80,27 @@ class _RoleFormDialogState extends State<RoleFormDialog> {
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (success) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(widget.roleToEdit != null
-                ? 'Role updated successfully'
-                : 'Role created successfully'),
-            backgroundColor: Colors.green,
-          ),
+        final roleName = _nameController.text.trim();
+        final roleId = widget.roleToEdit != null ? widget.roleToEdit!.id : roleName.toLowerCase().replaceAll(' ', '_');
+        await ActivityLogger.log(
+          context,
+          title: widget.roleToEdit != null ? 'Role Updated' : 'Role Created',
+          message: widget.roleToEdit != null
+              ? 'Role "$roleName" permissions updated.'
+              : 'Role "$roleName" has been created.',
+          relatedId: roleId,
         );
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(widget.roleToEdit != null
+                  ? 'Role updated successfully'
+                  : 'Role created successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

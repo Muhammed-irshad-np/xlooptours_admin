@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../domain/entities/managed_user_entity.dart';
 import '../providers/user_management_provider.dart';
+import '../../../../core/utils/activity_logger.dart';
 
 /// Simple dialog for Admin / Super Admin to set a user's password.
 class ChangePasswordDialog extends StatefulWidget {
@@ -44,15 +45,23 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
     setState(() => _isSubmitting = false);
 
     if (success) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Password updated for ${widget.user.displayName.isNotEmpty ? widget.user.displayName : widget.user.email}',
-          ),
-          backgroundColor: Colors.green,
-        ),
+      await ActivityLogger.log(
+        context,
+        title: 'User Password Changed',
+        message: 'Password for user ${widget.user.email} has been changed.',
+        relatedId: widget.user.uid,
       );
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Password updated for ${widget.user.displayName.isNotEmpty ? widget.user.displayName : widget.user.email}',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
