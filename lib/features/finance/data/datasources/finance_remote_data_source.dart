@@ -3,6 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as path;
+import 'package:xloop_invoice/core/utils/file_upload_helper.dart';
 import '../models/expense_model.dart';
 import '../models/fund_account_model.dart';
 import '../models/fund_transaction_model.dart';
@@ -150,11 +152,16 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   @override
   Future<String> uploadReceipt(XFile file, String expenseId) async {
-    final ext = file.name.split('.').last;
-    final ref = storage.ref('expenses/$expenseId/receipt_${DateTime.now().millisecondsSinceEpoch}.$ext');
-
     final Uint8List bytes = await file.readAsBytes();
-    final metadata = SettableMetadata(contentType: _getMimeType(ext));
+    final info = FileUploadHelper.getUploadInfo(bytes, file.name);
+    final nameWithoutExt = path.basenameWithoutExtension(file.name).isNotEmpty
+        ? path.basenameWithoutExtension(file.name)
+        : 'receipt';
+    final ref = storage.ref('expenses/$expenseId/${nameWithoutExt}_${DateTime.now().millisecondsSinceEpoch}${info.extension}');
+    final metadata = SettableMetadata(
+      contentType: info.mimeType,
+      customMetadata: {'originalName': file.name},
+    );
     await ref.putData(bytes, metadata);
     return await ref.getDownloadURL();
   }
@@ -294,11 +301,16 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   @override
   Future<String> uploadClosingSheet(XFile file, String sessionId) async {
-    final ext = file.name.split('.').last;
-    final ref = storage.ref('petty_cash/$sessionId/closing_sheet.$ext');
-
     final Uint8List bytes = await file.readAsBytes();
-    final metadata = SettableMetadata(contentType: _getMimeType(ext));
+    final info = FileUploadHelper.getUploadInfo(bytes, file.name);
+    final nameWithoutExt = path.basenameWithoutExtension(file.name).isNotEmpty
+        ? path.basenameWithoutExtension(file.name)
+        : 'closing_sheet';
+    final ref = storage.ref('petty_cash/$sessionId/${nameWithoutExt}_${DateTime.now().millisecondsSinceEpoch}${info.extension}');
+    final metadata = SettableMetadata(
+      contentType: info.mimeType,
+      customMetadata: {'originalName': file.name},
+    );
     await ref.putData(bytes, metadata);
     return await ref.getDownloadURL();
   }
@@ -337,25 +349,5 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   @override
   Future<void> deleteExpenseCategory(String id) async {
     await firestore.collection('expense_categories').doc(id).delete();
-  }
-
-  // ═══════════════════════════════════════════════════════════
-  // HELPERS
-  // ═══════════════════════════════════════════════════════════
-
-  String _getMimeType(String ext) {
-    switch (ext.toLowerCase().replaceAll('.', '')) {
-      case 'pdf':
-        return 'application/pdf';
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'webp':
-        return 'image/webp';
-      default:
-        return 'application/octet-stream';
-    }
   }
 }
