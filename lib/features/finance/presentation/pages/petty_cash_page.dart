@@ -6,11 +6,11 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/petty_cash_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
-import '../../domain/entities/fund_transaction_entity.dart';
 import 'finance_dashboard_page.dart';
 
 /// Screen for managing daily petty cash open/close flows and verification.
@@ -223,19 +223,75 @@ class _PettyCashPageState extends State<PettyCashPage> {
           ),
           SizedBox(height: 20.h),
           if (session != null) ...[
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _buildSessionStat('Opening Balance', '${formatter.format(session.openingBalance)} SAR'),
-                _buildSessionStat('Total Expenses Today', '${formatter.format(session.totalExpenses)} SAR'),
-                _buildSessionStat('Total Deposits Today', '${formatter.format(session.deposits)} SAR'),
-                _buildSessionStat(
-                  'Expected Closing',
-                  '${formatter.format(session.expectedClosingBalance)} SAR',
-                  highlight: true,
-                ),
-              ],
-            ),
+            Builder(builder: (_) {
+              final live = provider.previewTotals;
+              final cashExp = live?.cashExpenses ?? session.cashExpenses;
+              final stcExp = live?.stcPayExpenses ?? session.stcPayExpenses;
+              final cashDep = live?.cashDeposits ?? session.cashDeposits;
+              final stcDep = live?.stcPayDeposits ?? session.stcPayDeposits;
+              final expTotal = cashExp + stcExp;
+              final depTotal = cashDep + stcDep;
+              final expectedCash =
+                  session.openingCashBalance + cashDep - cashExp;
+              final expectedStc =
+                  session.openingStcPayBalance + stcDep - stcExp;
+              final expected = expectedCash + expectedStc;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (live != null)
+                    Padding(
+                      padding: EdgeInsets.only(bottom: 8.h),
+                      child: Text(
+                        'Live from ledger (not typed) — refresh when money moves',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          color: FinDT.brand,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildSessionStat(
+                        'Opening Total',
+                        '${formatter.format(session.openingBalance)} SAR',
+                        subtext:
+                            'Cash: ${formatter.format(session.openingCashBalance)} | STC: ${formatter.format(session.openingStcPayBalance)}',
+                      ),
+                      _buildSessionStat(
+                        'Total Expenses Today',
+                        '${formatter.format(expTotal)} SAR',
+                        subtext:
+                            'Cash: ${formatter.format(cashExp)} | STC: ${formatter.format(stcExp)}',
+                      ),
+                      _buildSessionStat(
+                        'Total Deposits Today',
+                        '${formatter.format(depTotal)} SAR',
+                        subtext:
+                            'Cash: ${formatter.format(cashDep)} | STC: ${formatter.format(stcDep)}',
+                      ),
+                      _buildSessionStat(
+                        'Expected Closing',
+                        '${formatter.format(expected)} SAR',
+                        highlight: true,
+                        subtext:
+                            'Cash: ${formatter.format(expectedCash)} | STC: ${formatter.format(expectedStc)}',
+                      ),
+                    ],
+                  ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => provider.refreshDayTotals(),
+                      icon: Icon(Icons.refresh, size: 16.sp),
+                      label: const Text('Refresh ledger totals'),
+                    ),
+                  ),
+                ],
+              );
+            }),
             SizedBox(height: 24.h),
             Row(
               children: [
@@ -286,7 +342,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
     );
   }
 
-  Widget _buildSessionStat(String label, String value, {bool highlight = false}) {
+  Widget _buildSessionStat(String label, String value, {bool highlight = false, String? subtext}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -302,11 +358,22 @@ class _PettyCashPageState extends State<PettyCashPage> {
         Text(
           value,
           style: GoogleFonts.inter(
-            fontSize: highlight ? 18.sp : 15.sp,
+            fontSize: highlight ? 17.sp : 14.sp,
             fontWeight: FontWeight.w700,
             color: highlight ? FinDT.brand : FinDT.textPrimary,
           ),
         ),
+        if (subtext != null) ...[
+          SizedBox(height: 2.h),
+          Text(
+            subtext,
+            style: GoogleFonts.inter(
+              fontSize: 10.sp,
+              color: FinDT.textMuted,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -448,18 +515,20 @@ class _PettyCashPageState extends State<PettyCashPage> {
     final formKey = GlobalKey<FormState>();
     final accProv = context.read<FundAccountProvider>();
     final selectedAcc = accProv.getAccountById(_selectedAccountId ?? '');
-    final currentBalance = selectedAcc?.currentBalance ?? 0.0;
+    final currentCash = selectedAcc?.cashBalance ?? 0.0;
+    final currentStc = selectedAcc?.stcPayBalance ?? 0.0;
+    final currentTotal = selectedAcc?.currentBalance ?? (currentCash + currentStc);
 
-    final openingCtrl = TextEditingController(text: currentBalance.toStringAsFixed(2));
-    bool autoSyncBalance = true;
+    final cashCtrl = TextEditingController(text: currentCash.toStringAsFixed(2));
+    final stcCtrl = TextEditingController(text: currentStc.toStringAsFixed(2));
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setStateDialog) {
-          final enteredVal = double.tryParse(openingCtrl.text) ?? 0.0;
-          final hasDiff = selectedAcc != null && (enteredVal - currentBalance).abs() > 0.01;
-          final diffAmount = enteredVal - currentBalance;
+          final enteredCash = double.tryParse(cashCtrl.text) ?? 0.0;
+          final enteredStc = double.tryParse(stcCtrl.text) ?? 0.0;
+          final enteredTotal = enteredCash + enteredStc;
 
           return AlertDialog(
             backgroundColor: Colors.white,
@@ -476,7 +545,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
               ),
             ),
             content: SizedBox(
-              width: 420.w,
+              width: 440.w,
               child: Form(
                 key: formKey,
                 child: Column(
@@ -492,34 +561,37 @@ class _PettyCashPageState extends State<PettyCashPage> {
                           border: Border.all(color: FinDT.border),
                         ),
                         child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(Icons.account_balance_wallet_outlined, size: 16.sp, color: FinDT.brand),
-                            SizedBox(width: 8.w),
-                            Expanded(
-                              child: Text(
-                                '${selectedAcc.name} Ledger Balance:',
-                                style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
-                              ),
+                            Row(
+                              children: [
+                                Icon(Icons.account_balance_wallet_outlined, size: 16.sp, color: FinDT.brand),
+                                SizedBox(width: 8.w),
+                                Text(
+                                  'Ledger Balance:',
+                                  style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
+                                ),
+                              ],
                             ),
                             Text(
-                              '${currentBalance.toStringAsFixed(2)} SAR',
-                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w700, color: FinDT.brand),
+                              'Cash ${currentCash.toStringAsFixed(0)} | STC ${currentStc.toStringAsFixed(0)} | Total ${currentTotal.toStringAsFixed(2)} SAR',
+                              style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w700, color: FinDT.brand),
                             ),
                           ],
                         ),
                       ),
-                      SizedBox(height: 14.h),
+                      SizedBox(height: 16.h),
                     ],
 
                     TextFormField(
-                      controller: openingCtrl,
+                      controller: cashCtrl,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                       ],
                       onChanged: (_) => setStateDialog(() {}),
                       decoration: InputDecoration(
-                        labelText: 'Opening Cash Balance *',
+                        labelText: 'Physical Cash Opening Balance *',
                         labelStyle: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
                         hintText: 'Enter physical starting cash',
                         suffixText: 'SAR',
@@ -545,75 +617,63 @@ class _PettyCashPageState extends State<PettyCashPage> {
                       validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                     ),
 
-                    if (hasDiff) ...[
-                      SizedBox(height: 14.h),
-                      Container(
-                        padding: EdgeInsets.all(12.w),
-                        decoration: BoxDecoration(
-                          color: FinDT.warning.withValues(alpha: 0.08),
+                    SizedBox(height: 12.h),
+
+                    TextFormField(
+                      controller: stcCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                      ],
+                      onChanged: (_) => setStateDialog(() {}),
+                      decoration: InputDecoration(
+                        labelText: 'STC Pay Opening Balance *',
+                        labelStyle: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
+                        hintText: 'Enter starting STC Pay balance',
+                        suffixText: 'SAR',
+                        suffixStyle: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
+                        prefixIcon: Icon(Icons.phone_android_outlined, size: 18.sp, color: const Color(0xFF6D28D9)),
+                        filled: true,
+                        fillColor: FinDT.bgPage,
+                        contentPadding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                        border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10.r),
-                          border: Border.all(color: FinDT.warning.withValues(alpha: 0.3)),
+                          borderSide: const BorderSide(color: FinDT.border),
                         ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.warning_amber_rounded, size: 18.sp, color: FinDT.warning),
-                                SizedBox(width: 8.w),
-                                Text(
-                                  'Balance Mismatch Notice',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12.sp,
-                                    fontWeight: FontWeight.w700,
-                                    color: FinDT.warning,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 6.h),
-                            Text(
-                              'The virtual account balance (${currentBalance.toStringAsFixed(2)} SAR) differs from the opened amount (${enteredVal.toStringAsFixed(2)} SAR).',
-                              style: GoogleFonts.inter(
-                                fontSize: 11.sp,
-                                color: FinDT.textPrimary,
-                                height: 1.3,
-                              ),
-                            ),
-                            SizedBox(height: 8.h),
-                            InkWell(
-                              onTap: () => setStateDialog(() => autoSyncBalance = !autoSyncBalance),
-                              child: Row(
-                                children: [
-                                  SizedBox(
-                                    height: 20.w,
-                                    width: 20.w,
-                                    child: Checkbox(
-                                      value: autoSyncBalance,
-                                      activeColor: FinDT.brand,
-                                      onChanged: (v) => setStateDialog(() => autoSyncBalance = v ?? true),
-                                    ),
-                                  ),
-                                  SizedBox(width: 8.w),
-                                  Expanded(
-                                    child: Text(
-                                      diffAmount > 0
-                                          ? 'Auto-deposit +${diffAmount.toStringAsFixed(2)} SAR into Virtual Account'
-                                          : 'Auto-adjust Virtual Account balance to match',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11.sp,
-                                        fontWeight: FontWeight.w600,
-                                        color: FinDT.brand,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10.r),
+                          borderSide: const BorderSide(color: FinDT.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10.r),
+                          borderSide: const BorderSide(color: FinDT.brand, width: 1.5),
                         ),
                       ),
-                    ],
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                    ),
+
+                    SizedBox(height: 14.h),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                      decoration: BoxDecoration(
+                        color: FinDT.brand.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Total Opening Balance:',
+                            style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
+                          ),
+                          Text(
+                            '${enteredTotal.toStringAsFixed(2)} SAR',
+                            style: GoogleFonts.inter(fontSize: 14.sp, fontWeight: FontWeight.w700, color: FinDT.brand),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -626,33 +686,18 @@ class _PettyCashPageState extends State<PettyCashPage> {
               FilledButton(
                 onPressed: () async {
                   if (!formKey.currentState!.validate()) return;
-                  final openingAmount = double.parse(openingCtrl.text);
-
-                  // Auto-sync virtual account balance if requested and different
-                  if (selectedAcc != null && hasDiff && autoSyncBalance) {
-                    final diff = openingAmount - currentBalance;
-                    final tx = FundTransactionEntity(
-                      id: const Uuid().v4(),
-                      fundAccountId: selectedAcc.id,
-                      type: diff > 0 ? FundTransactionType.deposit : FundTransactionType.withdrawal,
-                      amount: diff.abs(),
-                      currency: selectedAcc.currency,
-                      description: 'Auto-sync opening cash balance for daily session',
-                      performedBy: 'Admin',
-                      date: DateTime.now(),
-                      createdAt: DateTime.now(),
-                      balanceBefore: currentBalance,
-                      balanceAfter: openingAmount,
-                    );
-                    await accProv.recordTransaction(tx);
-                  }
+                  final openCash = double.parse(cashCtrl.text);
+                  final openStc = double.parse(stcCtrl.text);
 
                   final session = PettyCashSessionEntity(
                     id: const Uuid().v4(),
                     fundAccountId: _selectedAccountId!,
                     date: DateTime.now(),
-                    openedBy: 'Admin',
-                    openingBalance: openingAmount,
+                    openedBy:
+                        context.read<AuthProvider>().user?.actorLabel ??
+                            'Unknown',
+                    openingCashBalance: openCash,
+                    openingStcPayBalance: openStc,
                     createdAt: DateTime.now(),
                   );
 
@@ -681,9 +726,8 @@ class _PettyCashPageState extends State<PettyCashPage> {
     PettyCashSessionEntity session,
   ) {
     final formKey = GlobalKey<FormState>();
-    final cashCtrl = TextEditingController();
-    final digitalCtrl = TextEditingController();
-    final otherCtrl = TextEditingController();
+    final cashCtrl = TextEditingController(text: session.expectedCashClosing.toStringAsFixed(2));
+    final digitalCtrl = TextEditingController(text: session.expectedStcPayClosing.toStringAsFixed(2));
     String? closingSheetUrl;
 
     showDialog(
@@ -696,10 +740,52 @@ class _PettyCashPageState extends State<PettyCashPage> {
               key: formKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Expected Closing: ${session.expectedClosingBalance.toStringAsFixed(2)} SAR',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, color: FinDT.brand),
+                  Container(
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: FinDT.brand.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10.r),
+                      border: Border.all(color: FinDT.brand.withValues(alpha: 0.2)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Expected Closing Breakdown:',
+                          style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w600, color: FinDT.textSecondary),
+                        ),
+                        SizedBox(height: 4.h),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Cash: ${session.expectedCashClosing.toStringAsFixed(2)} SAR',
+                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w700, color: FinDT.textPrimary),
+                            ),
+                            Text(
+                              'STC Pay: ${session.expectedStcPayClosing.toStringAsFixed(2)} SAR',
+                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w700, color: const Color(0xFF6D28D9)),
+                            ),
+                          ],
+                        ),
+                        Divider(height: 12.h, color: FinDT.border),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Total Expected:',
+                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
+                            ),
+                            Text(
+                              '${session.expectedClosingBalance.toStringAsFixed(2)} SAR',
+                              style: GoogleFonts.inter(fontSize: 13.sp, fontWeight: FontWeight.w700, color: FinDT.brand),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                   SizedBox(height: 16.h),
                   TextFormField(
@@ -718,16 +804,8 @@ class _PettyCashPageState extends State<PettyCashPage> {
                     inputFormatters: [
                       FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                     ],
-                    decoration: const InputDecoration(labelText: 'STC Pay Balance'),
-                  ),
-                  SizedBox(height: 12.h),
-                  TextFormField(
-                    controller: otherCtrl,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                    ],
-                    decoration: const InputDecoration(labelText: 'Other Digital Balance'),
+                    decoration: const InputDecoration(labelText: 'STC Pay Balance *'),
+                    validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                   ),
                   SizedBox(height: 16.h),
                   // Closing Sheet Upload
@@ -778,21 +856,42 @@ class _PettyCashPageState extends State<PettyCashPage> {
               onPressed: () {
                 if (!formKey.currentState!.validate()) return;
                 final cash = double.parse(cashCtrl.text);
-                final digital = double.tryParse(digitalCtrl.text) ?? 0.0;
-                final other = double.tryParse(otherCtrl.text) ?? 0.0;
-                final closing = cash + digital + other;
+                final digital = double.parse(digitalCtrl.text);
+                final closing = cash + digital;
 
+                final user = context.read<AuthProvider>().user;
                 final closed = session.copyWith(
                   closingBalance: closing,
                   cashInHand: cash,
                   stcPayBalance: digital,
-                  otherDigitalBalance: other,
                   closingSheetUrl: closingSheetUrl,
-                  closedBy: 'Admin',
+                  closedBy: user?.actorLabel ?? 'Unknown',
                 );
 
-                provider.closeSession(closed);
                 Navigator.pop(ctx);
+                provider
+                    .closeSession(
+                  session: closed,
+                  closedBy: user?.actorLabel ?? 'Unknown',
+                  closedByUserId: user?.id,
+                )
+                    .then((_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Session closed using ledger totals for the day',
+                        ),
+                      ),
+                    );
+                  }
+                }).catchError((e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
+                    );
+                  }
+                });
               },
               style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
               child: const Text('Close Session'),
@@ -803,30 +902,56 @@ class _PettyCashPageState extends State<PettyCashPage> {
     );
   }
 
-  void _confirmVerifySession(
+  Future<void> _confirmVerifySession(
     BuildContext context,
     PettyCashProvider provider,
     PettyCashSessionEntity session,
-  ) {
-    showDialog(
+  ) async {
+    final user = context.read<AuthProvider>().user;
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Verify Daily Closing?'),
+        title: const Text('Verify & lock day?'),
         content: Text(
-          'Confirm that the declared closing balance of ${session.closingBalance.toStringAsFixed(2)} SAR matches the daily receipts and cash in hand.',
+          'Confirm closing ${session.closingBalance.toStringAsFixed(2)} SAR '
+          '(discrepancy: ${session.discrepancy?.toStringAsFixed(2) ?? "0"}).\n\n'
+          'This LOCKS the day — no further deposits, withdrawals, or expense '
+          'payments can be posted to this fund for that calendar day.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-            onPressed: () {
-              provider.verifySession(session.id, 'Admin');
-              Navigator.pop(ctx);
-            },
+            onPressed: () => Navigator.pop(ctx, true),
             style: FilledButton.styleFrom(backgroundColor: FinDT.success),
-            child: const Text('Verify'),
+            child: const Text('Verify & lock'),
           ),
         ],
       ),
     );
+    if (ok != true || !context.mounted) return;
+    try {
+      await provider.verifySession(
+        sessionId: session.id,
+        verifiedBy: user?.actorLabel ?? 'Unknown',
+        verifiedByUserId: user?.id,
+      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Day verified and locked'),
+            backgroundColor: FinDT.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
+        );
+      }
+    }
   }
 }

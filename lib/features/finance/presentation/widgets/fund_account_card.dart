@@ -50,7 +50,7 @@ class FundAccountCard extends StatelessWidget {
           children: [
             // Header with gradient
             Container(
-              padding: EdgeInsets.all(16.w),
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
@@ -68,18 +68,18 @@ class FundAccountCard extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(10.w),
+                    padding: EdgeInsets.all(8.w),
                     decoration: BoxDecoration(
                       color: colors.primary.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12.r),
+                      borderRadius: BorderRadius.circular(10.r),
                     ),
                     child: Icon(
                       colors.icon,
                       color: colors.primary,
-                      size: 20.sp,
+                      size: 18.sp,
                     ),
                   ),
-                  SizedBox(width: 12.w),
+                  SizedBox(width: 10.w),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -128,23 +128,23 @@ class FundAccountCard extends StatelessWidget {
 
             // Balance section
             Padding(
-              padding: EdgeInsets.all(16.w),
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Current Balance',
                     style: GoogleFonts.inter(
-                      fontSize: 11.sp,
+                      fontSize: 10.sp,
                       fontWeight: FontWeight.w500,
                       color: const Color(0xFF9CA3AF),
                     ),
                   ),
-                  SizedBox(height: 4.h),
+                  SizedBox(height: 2.h),
                   Text(
                     '${formatter.format(account.currentBalance)} ${account.currency}',
                     style: GoogleFonts.inter(
-                      fontSize: 20.sp,
+                      fontSize: 17.sp,
                       fontWeight: FontWeight.w700,
                       color: account.currentBalance >= 0
                           ? const Color(0xFF111827)
@@ -153,21 +153,78 @@ class FundAccountCard extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (account.type == FundAccountType.pettyCash) ...[
+                    SizedBox(height: 6.h),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F4F6),
+                        borderRadius: BorderRadius.circular(6.r),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Icon(Icons.payments_outlined, size: 12.sp, color: const Color(0xFF16A34A)),
+                                SizedBox(width: 3.w),
+                                Text(
+                                  'Cash: ',
+                                  style: GoogleFonts.inter(fontSize: 10.sp, color: const Color(0xFF6B7280)),
+                                ),
+                                Flexible(
+                                  child: Text(
+                                    formatter.format(account.cashBalance),
+                                    style: GoogleFonts.inter(fontSize: 10.sp, fontWeight: FontWeight.w700, color: const Color(0xFF111827)),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(height: 10.h, width: 1, color: const Color(0xFFD1D5DB)),
+                          SizedBox(width: 6.w),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Icon(Icons.phone_android_outlined, size: 12.sp, color: const Color(0xFF6D28D9)),
+                                SizedBox(width: 3.w),
+                                Text(
+                                  'STC: ',
+                                  style: GoogleFonts.inter(fontSize: 10.sp, color: const Color(0xFF6B7280)),
+                                ),
+                                Flexible(
+                                  child: Text(
+                                    formatter.format(account.stcPayBalance),
+                                    style: GoogleFonts.inter(fontSize: 10.sp, fontWeight: FontWeight.w700, color: const Color(0xFF111827)),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   if (account.assignedTo != null) ...[
-                    SizedBox(height: 10.h),
+                    SizedBox(height: 6.h),
                     Row(
                       children: [
                         Icon(
                           Icons.person_outline_rounded,
-                          size: 14.sp,
+                          size: 13.sp,
                           color: const Color(0xFF9CA3AF),
                         ),
                         SizedBox(width: 4.w),
-                        Text(
-                          account.assignedTo!,
-                          style: GoogleFonts.inter(
-                            fontSize: 11.sp,
-                            color: const Color(0xFF6B7280),
+                        Expanded(
+                          child: Text(
+                            account.assignedTo!,
+                            style: GoogleFonts.inter(
+                              fontSize: 11.sp,
+                              color: const Color(0xFF6B7280),
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],

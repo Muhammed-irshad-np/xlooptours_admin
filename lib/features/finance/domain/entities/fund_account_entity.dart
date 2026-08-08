@@ -45,6 +45,8 @@ class FundAccountEntity extends Equatable {
   final String code;
   final FundAccountType type;
   final double currentBalance;
+  final double cashBalance;
+  final double stcPayBalance;
   final String currency;
 
   /// The coordinator or employee assigned to manage this account.
@@ -59,6 +61,8 @@ class FundAccountEntity extends Equatable {
     required this.code,
     required this.type,
     this.currentBalance = 0.0,
+    this.cashBalance = 0.0,
+    this.stcPayBalance = 0.0,
     required this.currency,
     this.assignedTo,
     this.assignedToId,
@@ -83,6 +87,8 @@ class FundAccountEntity extends Equatable {
     String? code,
     FundAccountType? type,
     double? currentBalance,
+    double? cashBalance,
+    double? stcPayBalance,
     String? currency,
     String? assignedTo,
     String? assignedToId,
@@ -97,6 +103,8 @@ class FundAccountEntity extends Equatable {
       code: code ?? this.code,
       type: type ?? this.type,
       currentBalance: currentBalance ?? this.currentBalance,
+      cashBalance: cashBalance ?? this.cashBalance,
+      stcPayBalance: stcPayBalance ?? this.stcPayBalance,
       currency: currency ?? this.currency,
       assignedTo:
           clearAssignedTo ? null : (assignedTo ?? this.assignedTo),
@@ -114,6 +122,8 @@ class FundAccountEntity extends Equatable {
         code,
         type,
         currentBalance,
+        cashBalance,
+        stcPayBalance,
         currency,
         assignedTo,
         assignedToId,

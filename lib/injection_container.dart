@@ -132,6 +132,7 @@ import 'features/finance/domain/usecases/update_expense_usecase.dart';
 import 'features/finance/domain/usecases/delete_expense_usecase.dart';
 import 'features/finance/domain/usecases/approve_expense_usecase.dart';
 import 'features/finance/domain/usecases/reject_expense_usecase.dart';
+import 'features/finance/domain/usecases/void_expense_usecase.dart';
 import 'features/finance/domain/usecases/generate_reference_number_usecase.dart';
 import 'features/finance/domain/usecases/upload_receipt_usecase.dart';
 import 'features/finance/domain/usecases/get_all_fund_accounts_usecase.dart';
@@ -140,6 +141,10 @@ import 'features/finance/domain/usecases/update_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/delete_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/get_transactions_usecase.dart';
 import 'features/finance/domain/usecases/insert_transaction_usecase.dart';
+import 'features/finance/domain/usecases/post_fund_movement_usecase.dart';
+import 'features/finance/domain/usecases/transfer_funds_usecase.dart';
+import 'features/finance/domain/usecases/cash_advance_usecases.dart';
+import 'features/finance/domain/usecases/finance_policy_usecases.dart';
 import 'features/finance/domain/usecases/get_petty_cash_sessions_usecase.dart';
 import 'features/finance/domain/usecases/get_open_session_usecase.dart';
 import 'features/finance/domain/usecases/open_petty_cash_session_usecase.dart';
@@ -153,6 +158,7 @@ import 'features/finance/domain/usecases/delete_expense_category_usecase.dart';
 import 'features/finance/presentation/providers/finance_provider.dart';
 import 'features/finance/presentation/providers/fund_account_provider.dart';
 import 'features/finance/presentation/providers/petty_cash_provider.dart';
+import 'features/finance/presentation/providers/cash_advance_provider.dart';
 
 import 'features/user_management/data/datasources/user_management_remote_data_source.dart';
 import 'features/user_management/data/repositories/user_management_repository_impl.dart';
@@ -540,6 +546,7 @@ Future<void> init() async {
       deleteExpenseUseCase: sl(),
       approveExpenseUseCase: sl(),
       rejectExpenseUseCase: sl(),
+      voidExpenseUseCase: sl(),
       generateReferenceNumberUseCase: sl(),
       uploadReceiptUseCase: sl(),
       getExpenseCategoriesUseCase: sl(),
@@ -556,6 +563,8 @@ Future<void> init() async {
       deleteFundAccountUseCase: sl(),
       getTransactionsUseCase: sl(),
       insertTransactionUseCase: sl(),
+      postFundMovementUseCase: sl(),
+      transferFundsUseCase: sl(),
     ),
   );
   sl.registerFactory(
@@ -566,6 +575,15 @@ Future<void> init() async {
       closePettyCashSessionUseCase: sl(),
       verifyPettyCashSessionUseCase: sl(),
       uploadClosingSheetUseCase: sl(),
+      financeRepository: sl(),
+    ),
+  );
+  sl.registerFactory(
+    () => CashAdvanceProvider(
+      getCashAdvancesUseCase: sl(),
+      issueCashAdvanceUseCase: sl(),
+      settleCashAdvanceUseCase: sl(),
+      writeOffCashAdvanceUseCase: sl(),
     ),
   );
 
@@ -578,6 +596,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => DeleteExpenseUseCase(sl()));
   sl.registerLazySingleton(() => ApproveExpenseUseCase(sl()));
   sl.registerLazySingleton(() => RejectExpenseUseCase(sl()));
+  sl.registerLazySingleton(() => VoidExpenseUseCase(sl()));
   sl.registerLazySingleton(() => GenerateReferenceNumberUseCase(sl()));
   sl.registerLazySingleton(() => UploadReceiptUseCase(sl()));
 
@@ -588,6 +607,15 @@ Future<void> init() async {
   sl.registerLazySingleton(() => DeleteFundAccountUseCase(sl()));
   sl.registerLazySingleton(() => GetTransactionsUseCase(sl()));
   sl.registerLazySingleton(() => InsertTransactionUseCase(sl()));
+  sl.registerLazySingleton(() => PostFundMovementUseCase(sl()));
+  sl.registerLazySingleton(() => TransferFundsUseCase(sl()));
+  sl.registerLazySingleton(() => GetCashAdvancesUseCase(sl()));
+  sl.registerLazySingleton(() => IssueCashAdvanceUseCase(sl()));
+  sl.registerLazySingleton(() => SettleCashAdvanceUseCase(sl()));
+  sl.registerLazySingleton(() => WriteOffCashAdvanceUseCase(sl()));
+  sl.registerLazySingleton(() => GetFinancePolicyUseCase(sl()));
+  sl.registerLazySingleton(() => SaveFinancePolicyUseCase(sl()));
+  sl.registerLazySingleton(() => GetLedgerDayTotalsUseCase(sl()));
 
   // UseCases - Petty Cash
   sl.registerLazySingleton(() => GetPettyCashSessionsUseCase(sl()));
