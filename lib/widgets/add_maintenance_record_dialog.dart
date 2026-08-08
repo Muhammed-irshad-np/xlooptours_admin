@@ -332,7 +332,7 @@ class _AddMaintenanceRecordDialogState
               name: platformFile.name,
             );
           } else if (platformFile.path != null) {
-            xFile = XFile(platformFile.path!);
+            xFile = XFile(platformFile.path!, name: platformFile.name);
           } else {
             continue;
           }

@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/vault_data_model.dart';
-import 'package:path/path.dart' as path;
 
 abstract class VaultRemoteDataSource {
   Future<VaultDataModel> getVaultData();
@@ -77,9 +76,11 @@ class VaultRemoteDataSourceImpl implements VaultRemoteDataSource {
 
   @override
   Future<VaultDocumentModel> uploadVaultDocument(XFile file, String folderPath) async {
-    final extension = path.extension(file.name).isNotEmpty
-        ? path.extension(file.name)
-        : '.${file.name.split('.').last}';
+    final originalName = file.name;
+    final dotIndex = originalName.lastIndexOf('.');
+    final extension = dotIndex != -1 && dotIndex < originalName.length - 1
+        ? originalName.substring(dotIndex).toLowerCase()
+        : '';
     final fileName = '${DateTime.now().millisecondsSinceEpoch}$extension';
     final ref = storage.ref().child('vault/$folderPath/$fileName');
     // Use putData to avoid platform-specific "unsupported file _namespace"

@@ -1188,7 +1188,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
       );
       if (result != null && result.files.isNotEmpty && result.files.single.path != null) {
         final pf = result.files.single;
-        final xFile = XFile(pf.path!);
+        final xFile = XFile(pf.path!, name: pf.name);
 
         // Size check using XFile.length()
         final fileSize = await xFile.length();
