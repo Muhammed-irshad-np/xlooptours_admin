@@ -1123,7 +1123,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                             name: platformFile.name,
                           );
                         } else if (platformFile.path != null) {
-                          pickedFileNotifier.value = XFile(platformFile.path!);
+                          pickedFileNotifier.value = XFile(platformFile.path!, name: platformFile.name);
                         }
                       }
                     } catch (e) {
