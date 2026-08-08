@@ -80,8 +80,15 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     if (!mounted) return;
     setState(() => _detecting = true);
 
-    // --- Step 1: try extension from URL ---
-    final ext = _extensionFromUrl(widget.attachmentUrl);
+    // --- Step 1: try extension from URL or Title ---
+    String ext = _extensionFromUrl(widget.attachmentUrl);
+    if (!_knownExtensions.contains(ext)) {
+      final dotIndex = widget.title.lastIndexOf('.');
+      if (dotIndex != -1 && dotIndex < widget.title.length - 1) {
+        ext = widget.title.substring(dotIndex).toLowerCase();
+      }
+    }
+
     if (_knownExtensions.contains(ext)) {
       final type = _typeFromExtension(ext);
       if (mounted) {
@@ -260,7 +267,14 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     final ext = _resolvedMime.isNotEmpty
         ? _extensionFromMime(_resolvedMime)
         : _extensionFromUrl(widget.attachmentUrl);
-    final filename = '${widget.title}${ext.isNotEmpty ? ext : ''}';
+        
+    String filename = widget.title;
+    if (ext.isNotEmpty && !filename.toLowerCase().endsWith(ext.toLowerCase())) {
+      filename = '$filename$ext';
+    } else if (ext.isEmpty && !filename.contains('.')) {
+      // Fallback if we have no extension
+      filename = '$filename.bin';
+    }
 
     if (kIsWeb) {
       // On web: open in browser — the browser will download it.

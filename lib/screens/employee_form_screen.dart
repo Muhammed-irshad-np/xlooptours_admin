@@ -1969,7 +1969,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                             name: platformFile.name,
                           );
                         } else if (platformFile.path != null) {
-                          pickedFileNotifier.value = XFile(platformFile.path!);
+                          pickedFileNotifier.value = XFile(platformFile.path!, name: platformFile.name);
                         }
                       }
                     } catch (e) {

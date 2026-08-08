@@ -44,7 +44,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       _amountController.text = widget.filing!.amount.toString();
       _billNumberController.text = widget.filing!.billNumber;
       _currency = widget.filing!.currency;
-      
+
       final docs = widget.filing!.documents;
       int fallbackIndex = 0;
       for (var doc in docs) {
@@ -86,7 +86,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       if (result != null && result.files.isNotEmpty) {
         final pf = result.files.first;
         if (pf.path != null) {
-          final xf = XFile(pf.path!);
+          final xf = XFile(pf.path!, name: pf.name);
           final size = await xf.length();
           if (size > 5 * 1024 * 1024) {
             if (mounted) {
@@ -112,14 +112,18 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking file: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking file: $e')));
       }
     }
   }
 
-  Future<void> _selectDate(BuildContext context, DateTime? initialDate, Function(DateTime) onSelect) async {
+  Future<void> _selectDate(
+    BuildContext context,
+    DateTime? initialDate,
+    Function(DateTime) onSelect,
+  ) async {
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate ?? DateTime.now(),
@@ -142,14 +146,21 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
   }
 
   Future<void> _saveFiling() async {
-    if (_date == null || _fromDate == null || _toDate == null || _amountController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill all date and amount fields')));
+    if (_date == null ||
+        _fromDate == null ||
+        _toDate == null ||
+        _amountController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill all date and amount fields')),
+      );
       return;
     }
 
     final amountValue = double.tryParse(_amountController.text);
     if (amountValue == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Invalid amount')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Invalid amount')));
       return;
     }
 
@@ -159,7 +170,10 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
     // 1. Upload any newly selected files for each slot and label them correctly
     VaultDocument? billReceipt = _billReceipt;
     if (_selectedBillReceipt != null) {
-      final doc = await provider.uploadDocument(_selectedBillReceipt!, 'vat_filings');
+      final doc = await provider.uploadDocument(
+        _selectedBillReceipt!,
+        'vat_filings',
+      );
       if (doc != null) {
         billReceipt = VaultDocument(url: doc.url, name: 'Bill Receipt');
       }
@@ -169,22 +183,34 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
 
     VaultDocument? bankStatement = _bankStatement;
     if (_selectedBankStatement != null) {
-      final doc = await provider.uploadDocument(_selectedBankStatement!, 'vat_filings');
+      final doc = await provider.uploadDocument(
+        _selectedBankStatement!,
+        'vat_filings',
+      );
       if (doc != null) {
         bankStatement = VaultDocument(url: doc.url, name: 'Bank Statement');
       }
     } else if (bankStatement != null) {
-      bankStatement = VaultDocument(url: bankStatement.url, name: 'Bank Statement');
+      bankStatement = VaultDocument(
+        url: bankStatement.url,
+        name: 'Bank Statement',
+      );
     }
 
     VaultDocument? paymentReceipt = _paymentReceipt;
     if (_selectedPaymentReceipt != null) {
-      final doc = await provider.uploadDocument(_selectedPaymentReceipt!, 'vat_filings');
+      final doc = await provider.uploadDocument(
+        _selectedPaymentReceipt!,
+        'vat_filings',
+      );
       if (doc != null) {
         paymentReceipt = VaultDocument(url: doc.url, name: 'Payment Receipt');
       }
     } else if (paymentReceipt != null) {
-      paymentReceipt = VaultDocument(url: paymentReceipt.url, name: 'Payment Receipt');
+      paymentReceipt = VaultDocument(
+        url: paymentReceipt.url,
+        name: 'Payment Receipt',
+      );
     }
 
     final List<VaultDocument> finalDocuments = [];
@@ -193,7 +219,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
     if (paymentReceipt != null) finalDocuments.add(paymentReceipt);
 
     final filing = VatFiling(
-      id: widget.filing?.id ?? '', 
+      id: widget.filing?.id ?? '',
       date: _date!,
       amount: amountValue,
       currency: _currency,
@@ -203,7 +229,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       documents: finalDocuments,
     );
 
-    final success = widget.filing == null 
+    final success = widget.filing == null
         ? await provider.addVatFiling(filing)
         : await provider.updateVatFiling(filing);
 
@@ -212,8 +238,11 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       if (success) {
         await ActivityLogger.log(
           context,
-          title: widget.filing == null ? 'VAT Filing Added' : 'VAT Filing Updated',
-          message: 'VAT filing for bill ${_billNumberController.text.trim()} has been ${widget.filing == null ? 'added' : 'updated'}.',
+          title: widget.filing == null
+              ? 'VAT Filing Added'
+              : 'VAT Filing Updated',
+          message:
+              'VAT filing for bill ${_billNumberController.text.trim()} has been ${widget.filing == null ? 'added' : 'updated'}.',
           relatedId: 'vault',
         );
         Navigator.pop(context);
@@ -221,7 +250,11 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
           const SnackBar(content: Text('VAT filing saved successfully')),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to save filing: ${provider.errorMessage}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save filing: ${provider.errorMessage}'),
+          ),
+        );
       }
     }
   }
@@ -251,7 +284,11 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
                       label: 'Filing Date',
                       date: _date,
                       icon: Icons.calendar_today_outlined,
-                      onTap: () => _selectDate(context, _date, (d) => setState(() => _date = d)),
+                      onTap: () => _selectDate(
+                        context,
+                        _date,
+                        (d) => setState(() => _date = d),
+                      ),
                       semanticsLabel: 'Date of filing',
                     ),
                     SizedBox(height: 16.h),
@@ -265,15 +302,15 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
                               controller: _amountController,
                               label: 'Amount',
                               icon: Icons.payments_outlined,
-                              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              keyboardType:
+                                  const TextInputType.numberWithOptions(
+                                    decimal: true,
+                                  ),
                             ),
                           ),
                         ),
                         SizedBox(width: 12.w),
-                        Expanded(
-                          flex: 1,
-                          child: _buildCurrencyDropdown(),
-                        ),
+                        Expanded(flex: 1, child: _buildCurrencyDropdown()),
                       ],
                     ),
                     SizedBox(height: 16.h),
@@ -296,7 +333,11 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
                             label: 'From',
                             date: _fromDate,
                             semanticsLabel: 'Period start date',
-                            onTap: () => _selectDate(context, _fromDate, (d) => setState(() => _fromDate = d)),
+                            onTap: () => _selectDate(
+                              context,
+                              _fromDate,
+                              (d) => setState(() => _fromDate = d),
+                            ),
                           ),
                         ),
                         SizedBox(width: 12.w),
@@ -305,7 +346,11 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
                             label: 'To',
                             date: _toDate,
                             semanticsLabel: 'Period end date',
-                            onTap: () => _selectDate(context, _toDate, (d) => setState(() => _toDate = d)),
+                            onTap: () => _selectDate(
+                              context,
+                              _toDate,
+                              (d) => setState(() => _toDate = d),
+                            ),
                           ),
                         ),
                       ],
@@ -332,7 +377,11 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       child: Row(
         children: [
           const ExcludeSemantics(
-            child: Icon(Icons.description_outlined, color: Colors.white, size: 24),
+            child: Icon(
+              Icons.description_outlined,
+              color: Colors.white,
+              size: 24,
+            ),
           ),
           SizedBox(width: 12.w),
           Text(
@@ -369,23 +418,27 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
     );
   }
 
-  Widget _buildTextField({required TextEditingController controller, required String label, required IconData icon, TextInputType? keyboardType, String? hint}) {
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType? keyboardType,
+    String? hint,
+  }) {
     // Automatically derive inputFormatters from keyboardType
     List<TextInputFormatter>? formatters;
     if (keyboardType == TextInputType.number) {
       formatters = [FilteringTextInputFormatter.digitsOnly];
     } else if (keyboardType != null &&
         keyboardType.toString().contains('number')) {
-      formatters = [
-        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-      ];
+      formatters = [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))];
     }
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: formatters,
       style: GoogleFonts.plusJakartaSans(
-        fontSize: 14.sp, 
+        fontSize: 14.sp,
         fontWeight: FontWeight.w600,
         fontFeatures: const [FontFeature.tabularFigures()],
       ),
@@ -394,7 +447,10 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
         prefixIcon: ExcludeSemantics(child: Icon(icon, size: 20.sp)),
         filled: true,
         fillColor: const Color(0xFFF1F5F9),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12.r), borderSide: BorderSide.none),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12.r),
+          borderSide: BorderSide.none,
+        ),
         labelStyle: TextStyle(color: const Color(0xFF64748B), fontSize: 13.sp),
         hintText: hint ?? '0.00…',
       ),
@@ -412,21 +468,39 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
         child: DropdownButtonFormField<String>(
           value: _currency,
           decoration: const InputDecoration(border: InputBorder.none),
-          items: ['SAR', 'BHD'].map((c) => DropdownMenuItem(
-            value: c,
-            child: Text(c, style: GoogleFonts.plusJakartaSans(fontSize: 14.sp, fontWeight: FontWeight.bold)),
-          )).toList(),
+          items: ['SAR', 'BHD']
+              .map(
+                (c) => DropdownMenuItem(
+                  value: c,
+                  child: Text(
+                    c,
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 14.sp,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              )
+              .toList(),
           onChanged: (v) => setState(() => _currency = v ?? 'SAR'),
         ),
       ),
     );
   }
 
-  Widget _buildDatePickerTile({required String label, DateTime? date, IconData? icon, String? semanticsLabel, required VoidCallback onTap}) {
+  Widget _buildDatePickerTile({
+    required String label,
+    DateTime? date,
+    IconData? icon,
+    String? semanticsLabel,
+    required VoidCallback onTap,
+  }) {
     return Semantics(
       button: true,
       label: semanticsLabel ?? label,
-      value: date != null ? DateFormat('dd MMM yyyy').format(date) : 'Not selected',
+      value: date != null
+          ? DateFormat('dd MMM yyyy').format(date)
+          : 'Not selected',
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12.r),
@@ -439,27 +513,49 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
           child: Row(
             children: [
               if (icon != null) ...[
-                ExcludeSemantics(child: Icon(icon, size: 20.sp, color: const Color(0xFF64748B))),
+                ExcludeSemantics(
+                  child: Icon(
+                    icon,
+                    size: 20.sp,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
                 SizedBox(width: 12.w),
               ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(label, style: TextStyle(color: const Color(0xFF64748B), fontSize: 11.sp)),
                     Text(
-                      date != null ? DateFormat('dd MMM yyyy').format(date) : 'Select Date…',
+                      label,
+                      style: TextStyle(
+                        color: const Color(0xFF64748B),
+                        fontSize: 11.sp,
+                      ),
+                    ),
+                    Text(
+                      date != null
+                          ? DateFormat('dd MMM yyyy').format(date)
+                          : 'Select Date…',
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 14.sp,
                         fontWeight: FontWeight.w600,
-                        color: date != null ? const Color(0xFF1E293B) : const Color(0xFF94A3B8),
+                        color: date != null
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFF94A3B8),
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
                   ],
                 ),
               ),
-              ExcludeSemantics(child: Icon(Icons.calendar_month_outlined, size: 18.sp, color: const Color(0xFF94A3B8))),
+              ExcludeSemantics(
+                child: Icon(
+                  Icons.calendar_month_outlined,
+                  size: 18.sp,
+                  color: const Color(0xFF94A3B8),
+                ),
+              ),
             ],
           ),
         ),
@@ -523,8 +619,8 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
     required VoidCallback onRemove,
   }) {
     final hasFile = document != null || selectedFile != null;
-    final displayName = document != null 
-        ? document.name 
+    final displayName = document != null
+        ? document.name
         : (selectedFile != null ? selectedFile.name : 'No file selected');
 
     return Column(
@@ -549,9 +645,13 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
           child: Row(
             children: [
               Icon(
-                hasFile ? Icons.file_present_outlined : Icons.upload_file_outlined,
+                hasFile
+                    ? Icons.file_present_outlined
+                    : Icons.upload_file_outlined,
                 size: 18.sp,
-                color: hasFile ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                color: hasFile
+                    ? const Color(0xFF2563EB)
+                    : const Color(0xFF94A3B8),
               ),
               SizedBox(width: 8.w),
               Expanded(
@@ -559,7 +659,9 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
                   displayName,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12.sp,
-                    color: hasFile ? const Color(0xFF1E293B) : const Color(0xFF94A3B8),
+                    color: hasFile
+                        ? const Color(0xFF1E293B)
+                        : const Color(0xFF94A3B8),
                     fontWeight: hasFile ? FontWeight.w500 : FontWeight.normal,
                   ),
                   maxLines: 1,
@@ -569,14 +671,25 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
               if (hasFile) ...[
                 if (document != null)
                   IconButton(
-                    icon: Icon(Icons.visibility_outlined, size: 16.sp, color: const Color(0xFF64748B)),
+                    icon: Icon(
+                      Icons.visibility_outlined,
+                      size: 16.sp,
+                      color: const Color(0xFF64748B),
+                    ),
                     onPressed: () => _viewDocument(document.url),
-                    constraints: BoxConstraints(minWidth: 32.w, minHeight: 32.h),
+                    constraints: BoxConstraints(
+                      minWidth: 32.w,
+                      minHeight: 32.h,
+                    ),
                     padding: EdgeInsets.zero,
                     tooltip: 'View',
                   ),
                 IconButton(
-                  icon: Icon(Icons.delete_outline, size: 16.sp, color: const Color(0xFFF43F5E)),
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: 16.sp,
+                    color: const Color(0xFFF43F5E),
+                  ),
                   onPressed: onRemove,
                   constraints: BoxConstraints(minWidth: 32.w, minHeight: 32.h),
                   padding: EdgeInsets.zero,
@@ -586,7 +699,10 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
                 TextButton(
                   onPressed: onPick,
                   style: TextButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12.w,
+                      vertical: 4.h,
+                    ),
                     minimumSize: Size.zero,
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
@@ -618,36 +734,63 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
         children: [
           TextButton(
             onPressed: _isSaving ? null : () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.plusJakartaSans(color: const Color(0xFF64748B), fontWeight: FontWeight.w600)),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.plusJakartaSans(
+                color: const Color(0xFF64748B),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           SizedBox(width: 12.w),
-          _isSaving 
-            ? Row(
-                children: [
-                  SizedBox(width: 20.r, height: 20.r, child: const CircularProgressIndicator(strokeWidth: 2)),
-                  SizedBox(width: 12.w),
-                  Text('Saving Filing…', style: TextStyle(fontSize: 13.sp, color: const Color(0xFF64748B))),
-                ],
-              )
-            : Semantics(
-                label: 'Save VAT filing record',
-                button: true,
-                child: ElevatedButton(
-                  onPressed: _saveFiling,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0F172A),
-                    foregroundColor: Colors.white,
-                    padding: EdgeInsets.symmetric(horizontal: 32.w, vertical: 14.h),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
-                    elevation: 0,
+          _isSaving
+              ? Row(
+                  children: [
+                    SizedBox(
+                      width: 20.r,
+                      height: 20.r,
+                      child: const CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                    SizedBox(width: 12.w),
+                    Text(
+                      'Saving Filing…',
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                )
+              : Semantics(
+                  label: 'Save VAT filing record',
+                  button: true,
+                  child: ElevatedButton(
+                    onPressed: _saveFiling,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0F172A),
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 32.w,
+                        vertical: 14.h,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: Text(
+                      'Save Filing',
+                      style: GoogleFonts.plusJakartaSans(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
-                  child: Text('Save Filing', style: GoogleFonts.plusJakartaSans(fontWeight: FontWeight.bold)),
                 ),
-              ),
         ],
       ),
     );
   }
+
   Future<void> _viewDocument(String url) async {
     try {
       final uri = Uri.parse(url);
@@ -660,9 +803,9 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to open document: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to open document: $e')));
       }
     }
   }

@@ -2,8 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/vault_data_model.dart';
-import 'package:path/path.dart' as path;
-import 'package:xloop_invoice/core/utils/file_upload_helper.dart';
 
 abstract class VaultRemoteDataSource {
   Future<VaultDataModel> getVaultData();
@@ -78,28 +76,46 @@ class VaultRemoteDataSourceImpl implements VaultRemoteDataSource {
 
   @override
   Future<VaultDocumentModel> uploadVaultDocument(XFile file, String folderPath) async {
-    // Read bytes first so we can detect the true file type via magic bytes.
-    final bytes = await file.readAsBytes();
-    final info = FileUploadHelper.getUploadInfo(bytes, file.name);
-
-    // Build a storage filename that always carries the correct extension.
-    final nameWithoutExt = path.basenameWithoutExtension(file.name).isNotEmpty
-        ? path.basenameWithoutExtension(file.name)
-        : '${DateTime.now().millisecondsSinceEpoch}';
-    final fileName = '${nameWithoutExt}_${DateTime.now().millisecondsSinceEpoch}${info.extension}';
+    final originalName = file.name;
+    final dotIndex = originalName.lastIndexOf('.');
+    final extension = dotIndex != -1 && dotIndex < originalName.length - 1
+        ? originalName.substring(dotIndex).toLowerCase()
+        : '';
+    final fileName = '${DateTime.now().millisecondsSinceEpoch}$extension';
     final ref = storage.ref().child('vault/$folderPath/$fileName');
-
     // Use putData to avoid platform-specific "unsupported file _namespace"
     // errors that occur on iOS/macOS when using putFile with security-scoped paths.
-    await ref.putData(
+    final bytes = await file.readAsBytes();
+    final uploadTask = await ref.putData(
       bytes,
       SettableMetadata(
-        contentType: info.mimeType,
+        contentType: _mimeType(extension),
         customMetadata: {'originalName': file.name},
       ),
     );
-    final url = await ref.getDownloadURL();
+    final url = await uploadTask.ref.getDownloadURL();
     return VaultDocumentModel(url: url, name: file.name);
+  }
+
+  /// Returns a best-guess MIME type from file extension.
+  String _mimeType(String ext) {
+    switch (ext.toLowerCase().replaceAll('.', '')) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'xlsx':
+      case 'xls':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'doc':
+      case 'docx':
+        return 'application/msword';
+      default:
+        return 'application/octet-stream';
+    }
   }
 
   @override
