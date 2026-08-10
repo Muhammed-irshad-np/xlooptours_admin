@@ -54,7 +54,7 @@ import 'features/feedback/presentation/pages/feedback_form_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  setPathUrlStrategy(); // Remove hash (#) from URL
+  setPathUrlStrategy(); // Remove hash (#) from url
 
   // Global Error Handling
   FlutterError.onError = (FlutterErrorDetails details) {
