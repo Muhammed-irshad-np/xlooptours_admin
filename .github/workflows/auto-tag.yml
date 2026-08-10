@@ -1,0 +1,45 @@
+name: Auto Tag Release
+
+on:
+  push:
+    branches:
+      - development
+      - main
+
+jobs:
+  auto-tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Required to push tags to the repository
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # We need the full history to count commits properly
+
+      - name: Generate and Push Tag
+        run: |
+          # 1. Extract the base version from pubspec.yaml (e.g., 1.0.0)
+          BASE_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //g' | cut -d '+' -f 1 | tr -d '\r')
+          
+          # 2. Get the total number of Git commits (Build Number)
+          BUILD_NUMBER=$(git rev-list --count HEAD)
+          
+          # 3. Construct the Tag Name
+          TAG_NAME="v${BASE_VERSION}+${BUILD_NUMBER}"
+          
+          echo "Calculated Tag: $TAG_NAME"
+          
+          # 4. Configure Git identity for the bot
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # 5. Check if the tag already exists, otherwise create and push
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
+            echo "Tag $TAG_NAME already exists. Skipping."
+          else
+            git tag -a "$TAG_NAME" -m "Auto-generated release tag $TAG_NAME"
+            git push origin "$TAG_NAME"
+            echo "Successfully created and pushed tag: $TAG_NAME"
+          fi
