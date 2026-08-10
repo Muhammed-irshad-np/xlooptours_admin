@@ -18,7 +18,6 @@ class FinanceNavTabs extends StatelessWidget {
     _TabData(icon: Icons.receipt_long_outlined, label: 'Expenses'),
     _TabData(icon: Icons.account_balance_wallet_outlined, label: 'Accounts'),
     _TabData(icon: Icons.book_outlined, label: 'Petty Cash'),
-    _TabData(icon: Icons.payments_outlined, label: 'Advances'),
     _TabData(icon: Icons.category_outlined, label: 'Categories'),
   ];
 

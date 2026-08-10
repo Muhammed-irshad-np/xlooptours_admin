@@ -3,12 +3,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/finance_provider.dart';
-import '../providers/fund_account_provider.dart';
 import '../widgets/expense_status_badge.dart';
 import '../../domain/entities/expense_entity.dart';
-import '../../domain/services/finance_export_service.dart';
 import 'expense_form_page.dart';
 import 'finance_dashboard_page.dart';
 
@@ -18,23 +15,17 @@ class ExpenseListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<FinanceProvider, FundAccountProvider>(
-      builder: (context, provider, accountProvider, _) {
+    return Consumer<FinanceProvider>(
+      builder: (context, provider, _) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Filters Bar ─────────────────────────────────
-            _FiltersBar(
-              provider: provider,
-              accountProvider: accountProvider,
-            ),
+            _FiltersBar(provider: provider),
             SizedBox(height: 16.h),
 
             // ── Expense Table ───────────────────────────────
-            _ExpenseDataTable(
-              provider: provider,
-              accountProvider: accountProvider,
-            ),
+            _ExpenseDataTable(provider: provider),
           ],
         );
       },
@@ -48,39 +39,10 @@ class ExpenseListPage extends StatelessWidget {
 
 class _FiltersBar extends StatelessWidget {
   final FinanceProvider provider;
-  final FundAccountProvider accountProvider;
-  const _FiltersBar({
-    required this.provider,
-    required this.accountProvider,
-  });
+  const _FiltersBar({required this.provider});
 
   @override
   Widget build(BuildContext context) {
-    final accounts = accountProvider.activeAccounts;
-    // Keep dropdown value valid even if the selected account is inactive.
-    final selectedAccountId = provider.accountFilter;
-    final accountItems = accounts
-        .map((a) => DropdownMenuItem(
-              value: a.id,
-              child: Text(a.name),
-            ))
-        .toList();
-    if (selectedAccountId != null &&
-        !accounts.any((a) => a.id == selectedAccountId)) {
-      final inactive = accountProvider.accounts
-          .where((a) => a.id == selectedAccountId)
-          .toList();
-      if (inactive.isNotEmpty) {
-        accountItems.insert(
-          0,
-          DropdownMenuItem(
-            value: inactive.first.id,
-            child: Text(inactive.first.name),
-          ),
-        );
-      }
-    }
-
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -127,60 +89,16 @@ class _FiltersBar extends StatelessWidget {
             ),
             SizedBox(width: 12.w),
 
-            // Fund account filter
-            _FilterDropdown<String>(
-              hint: 'Account',
-              value: selectedAccountId,
-              items: accountItems,
-              onChanged: (id) => provider.setAccountFilter(id),
-            ),
-            SizedBox(width: 12.w),
-
             // Date range
             _DateRangeButton(provider: provider),
 
             if (provider.statusFilter != null ||
                 provider.categoryFilter != null ||
-                provider.accountFilter != null ||
                 provider.searchQuery != null ||
                 provider.dateFrom != null) ...[
               SizedBox(width: 12.w),
               _ClearFilterButton(provider: provider),
             ],
-            SizedBox(width: 12.w),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final list = provider.filteredExpenses;
-                if (list.isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('No expenses to export')),
-                  );
-                  return;
-                }
-                final name =
-                    'expenses_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv';
-                try {
-                  await FinanceExportService.shareCsv(
-                    fileName: name,
-                    csvContent: FinanceExportService.expensesToCsv(list),
-                  );
-                } catch (e) {
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Export failed: $e')),
-                    );
-                  }
-                }
-              },
-              icon: Icon(Icons.download_rounded, size: 16.sp),
-              label: Text(
-                'Export CSV',
-                style: GoogleFonts.inter(
-                  fontSize: 12.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
           ],
         ),
       ),
@@ -369,25 +287,7 @@ class _ClearFilterButton extends StatelessWidget {
 
 class _ExpenseDataTable extends StatelessWidget {
   final FinanceProvider provider;
-  final FundAccountProvider accountProvider;
-  const _ExpenseDataTable({
-    required this.provider,
-    required this.accountProvider,
-  });
-
-  String _resolveAccountName(ExpenseEntity expense) {
-    if (expense.fundAccountName != null &&
-        expense.fundAccountName!.trim().isNotEmpty) {
-      return expense.fundAccountName!;
-    }
-    try {
-      return accountProvider.accounts
-          .firstWhere((a) => a.id == expense.fundAccountId)
-          .name;
-    } catch (_) {
-      return expense.fundAccountId.isEmpty ? '—' : expense.fundAccountId;
-    }
-  }
+  const _ExpenseDataTable({required this.provider});
 
   @override
   Widget build(BuildContext context) {
@@ -558,14 +458,12 @@ class _ExpenseDataTable extends StatelessWidget {
             DataColumn(label: Text('DATE')),
             DataColumn(label: Text('TYPE')),
             DataColumn(label: Text('CATEGORY')),
-            DataColumn(label: Text('ACCOUNT')),
             DataColumn(label: Text('SUBMITTED BY')),
             DataColumn(label: Text('AMOUNT'), numeric: true),
             DataColumn(label: Text('STATUS')),
             DataColumn(label: Text('ACTIONS')),
           ],
           rows: expenses.map((expense) {
-            final accountName = _resolveAccountName(expense);
             return DataRow(
               cells: [
                 DataCell(
@@ -610,24 +508,6 @@ class _ExpenseDataTable extends StatelessWidget {
                     ),
                   ),
                 ),
-                DataCell(
-                  Container(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
-                    decoration: BoxDecoration(
-                      color: FinDT.brandLight,
-                      borderRadius: BorderRadius.circular(6.r),
-                    ),
-                    child: Text(
-                      accountName,
-                      style: GoogleFonts.inter(
-                        fontSize: 10.sp,
-                        fontWeight: FontWeight.w600,
-                        color: FinDT.brand,
-                      ),
-                    ),
-                  ),
-                ),
                 DataCell(Text(expense.submittedBy)),
                 DataCell(
                   Text(
@@ -646,20 +526,14 @@ class _ExpenseDataTable extends StatelessWidget {
   }
 
   Widget _buildActions(BuildContext context, ExpenseEntity expense) {
-    final auth = context.read<AuthProvider>().user;
-    final canApprove = auth?.canApproveExpense ?? false;
-    final canReverse = auth?.canReverseMoney ?? false;
-
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (expense.status.canApprove && canApprove) ...[
+        if (expense.status == ExpenseStatus.pending) ...[
           _actionIcon(
             icon: Icons.check_circle_outline,
             color: FinDT.success,
-            tooltip: expense.isNonWallet
-                ? 'Approve'
-                : 'Approve & post to wallet',
+            tooltip: 'Approve',
             onTap: () => _confirmApprove(context, expense),
           ),
           SizedBox(width: 4.w),
@@ -671,36 +545,24 @@ class _ExpenseDataTable extends StatelessWidget {
           ),
           SizedBox(width: 4.w),
         ],
-        if (expense.status.canVoid && canReverse) ...[
-          _actionIcon(
-            icon: Icons.undo_rounded,
-            color: const Color(0xFF7C3AED),
-            tooltip: 'Void & reverse payment',
-            onTap: () => _confirmVoid(context, expense),
-          ),
-          SizedBox(width: 4.w),
-        ],
-        if (expense.status.canEdit)
-          _actionIcon(
-            icon: Icons.edit_outlined,
-            color: FinDT.brand,
-            tooltip: 'Edit',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => ExpenseFormPage(expense: expense),
-              ),
+        _actionIcon(
+          icon: Icons.edit_outlined,
+          color: FinDT.brand,
+          tooltip: 'Edit',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ExpenseFormPage(expense: expense),
             ),
           ),
-        if (expense.status.canHardDelete) ...[
-          SizedBox(width: 4.w),
-          _actionIcon(
-            icon: Icons.delete_outline,
-            color: FinDT.danger,
-            tooltip: 'Delete draft/pending',
-            onTap: () => _confirmDelete(context, expense),
-          ),
-        ],
+        ),
+        SizedBox(width: 4.w),
+        _actionIcon(
+          icon: Icons.delete_outline,
+          color: FinDT.danger,
+          tooltip: 'Delete',
+          onTap: () => _confirmDelete(context, expense),
+        ),
       ],
     );
   }
@@ -724,96 +586,37 @@ class _ExpenseDataTable extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmApprove(
-    BuildContext context,
-    ExpenseEntity expense,
-  ) async {
-    final user = context.read<AuthProvider>().user;
-    if (user == null) return;
-
-    final postsMoney = !expense.isNonWallet;
-    final ok = await showDialog<bool>(
+  void _confirmApprove(BuildContext context, ExpenseEntity expense) {
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(postsMoney ? 'Approve & pay from wallet?' : 'Approve?'),
+        title: const Text('Approve Expense?'),
         content: Text(
-          postsMoney
-              ? 'Approve ${expense.referenceNumber} — ${expense.expenseType} '
-                  'for ${expense.amount} ${expense.currency}?\n\n'
-                  'This will deduct the amount from ${expense.fundAccountName ?? 'the fund account'}.'
-              : 'Approve ${expense.referenceNumber} as non-wallet (no balance change)?',
+          'Approve ${expense.referenceNumber} — ${expense.expenseType} for ${expense.amount} ${expense.currency}?',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () {
+              Navigator.pop(ctx);
+              context
+                  .read<FinanceProvider>()
+                  .approveExpense(expense, 'Admin');
+            },
             style: FilledButton.styleFrom(backgroundColor: FinDT.success),
-            child: Text(postsMoney ? 'Approve & pay' : 'Approve'),
+            child: const Text('Approve'),
           ),
         ],
       ),
     );
-    if (ok != true || !context.mounted) return;
-
-    try {
-      await context.read<FinanceProvider>().approveExpense(
-            expenseId: expense.id,
-            actorName: user.actorLabel,
-            actorUserId: user.id,
-            actorRole: user.role.name,
-            allowSelfApprove: user.isAdmin,
-          );
-      if (context.mounted) {
-        await context.read<FundAccountProvider>().fetchAllAccounts();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              postsMoney
-                  ? 'Approved and paid from wallet'
-                  : 'Expense approved',
-            ),
-            backgroundColor: FinDT.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        final msg = _friendlyError(e);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: FinDT.danger,
-            duration: const Duration(seconds: 6),
-          ),
-        );
-      }
-    }
   }
 
-  String _friendlyError(Object e) {
-    final raw = e.toString();
-    if (raw.contains('failed-precondition') && raw.contains('index')) {
-      return 'Firestore needs an index for this query. Hot-restart after deploy, '
-          'or the app will use a fallback query on next build.';
-    }
-    return raw
-        .replaceFirst('StateError: ', '')
-        .replaceFirst('Exception: ', '')
-        .replaceFirst('Error: ', '');
-  }
-
-  Future<void> _confirmReject(
-    BuildContext context,
-    ExpenseEntity expense,
-  ) async {
-    final user = context.read<AuthProvider>().user;
-    if (user == null) return;
+  void _confirmReject(BuildContext context, ExpenseEntity expense) {
     final controller = TextEditingController();
-
-    final ok = await showDialog<bool>(
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Reject Expense?'),
@@ -834,157 +637,49 @@ class _ExpenseDataTable extends StatelessWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<FinanceProvider>().rejectExpense(
+                    expense,
+                    'Admin',
+                    controller.text,
+                  );
+            },
             style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
             child: const Text('Reject'),
           ),
         ],
       ),
     );
-    if (ok != true || !context.mounted) return;
-    if (controller.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Rejection reason is required')),
-      );
-      return;
-    }
-
-    try {
-      await context.read<FinanceProvider>().rejectExpense(
-            expenseId: expense.id,
-            actorName: user.actorLabel,
-            actorUserId: user.id,
-            reason: controller.text.trim(),
-          );
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
-        );
-      }
-    }
   }
 
-  Future<void> _confirmVoid(
-    BuildContext context,
-    ExpenseEntity expense,
-  ) async {
-    final user = context.read<AuthProvider>().user;
-    if (user == null) return;
-    final controller = TextEditingController();
-
-    final ok = await showDialog<bool>(
+  void _confirmDelete(BuildContext context, ExpenseEntity expense) {
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Void paid expense?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'This reverses the wallet payment for ${expense.referenceNumber} '
-              'and keeps full history (does not delete).',
-            ),
-            SizedBox(height: 12.h),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                hintText: 'Reason for void...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF7C3AED),
-            ),
-            child: const Text('Void & reverse'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-    if (controller.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Void reason is required')),
-      );
-      return;
-    }
-
-    try {
-      await context.read<FinanceProvider>().voidExpense(
-            expenseId: expense.id,
-            actorName: user.actorLabel,
-            actorUserId: user.id,
-            reason: controller.text.trim(),
-          );
-      if (context.mounted) {
-        await context.read<FundAccountProvider>().fetchAllAccounts();
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
-        );
-      }
-    }
-  }
-
-  Future<void> _confirmDelete(
-    BuildContext context,
-    ExpenseEntity expense,
-  ) async {
-    if (!expense.status.canHardDelete) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Posted expenses cannot be deleted. Void them instead.'),
-        ),
-      );
-      return;
-    }
-
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete draft/pending?'),
+        title: const Text('Delete Expense?'),
         content: Text(
-          'Delete ${expense.referenceNumber}? Only allowed before payment.',
+          'This will permanently delete ${expense.referenceNumber}. This action cannot be undone.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: () => Navigator.pop(ctx),
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: () {
+              Navigator.pop(ctx);
+              context.read<FinanceProvider>().deleteExpense(expense.id);
+            },
             style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
             child: const Text('Delete'),
           ),
         ],
       ),
     );
-    if (ok != true || !context.mounted) return;
-
-    try {
-      await context.read<FinanceProvider>().deleteExpense(expense.id);
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
-        );
-      }
-    }
   }
 }

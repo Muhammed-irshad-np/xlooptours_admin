@@ -1,8 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../domain/entities/ledger_day_totals.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
-import '../../domain/repositories/finance_repository.dart';
 import '../../domain/usecases/get_petty_cash_sessions_usecase.dart';
 import '../../domain/usecases/get_open_session_usecase.dart';
 import '../../domain/usecases/open_petty_cash_session_usecase.dart';
@@ -10,6 +8,10 @@ import '../../domain/usecases/close_petty_cash_session_usecase.dart';
 import '../../domain/usecases/verify_petty_cash_session_usecase.dart';
 import '../../domain/usecases/upload_closing_sheet_usecase.dart';
 
+/// Provider managing the daily petty cash open/close workflow.
+///
+/// Handles opening sessions, recording closing balances,
+/// admin verification, and session history.
 class PettyCashProvider with ChangeNotifier {
   final GetPettyCashSessionsUseCase getPettyCashSessionsUseCase;
   final GetOpenSessionUseCase getOpenSessionUseCase;
@@ -17,7 +19,6 @@ class PettyCashProvider with ChangeNotifier {
   final ClosePettyCashSessionUseCase closePettyCashSessionUseCase;
   final VerifyPettyCashSessionUseCase verifyPettyCashSessionUseCase;
   final UploadClosingSheetUseCase uploadClosingSheetUseCase;
-  final FinanceRepository financeRepository;
 
   PettyCashProvider({
     required this.getPettyCashSessionsUseCase,
@@ -26,27 +27,38 @@ class PettyCashProvider with ChangeNotifier {
     required this.closePettyCashSessionUseCase,
     required this.verifyPettyCashSessionUseCase,
     required this.uploadClosingSheetUseCase,
-    required this.financeRepository,
   });
+
+  // ─── State ──────────────────────────────────────────────────
 
   List<PettyCashSessionEntity> _sessions = [];
   PettyCashSessionEntity? _currentSession;
   String? _selectedAccountId;
   bool _isLoading = false;
   String? _error;
-  LedgerDayTotals? _previewTotals;
+
+  // ─── Getters ────────────────────────────────────────────────
 
   List<PettyCashSessionEntity> get sessions => _sessions;
   PettyCashSessionEntity? get currentSession => _currentSession;
   String? get selectedAccountId => _selectedAccountId;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  LedgerDayTotals? get previewTotals => _previewTotals;
+
+  /// Whether a session is currently open for the selected account.
   bool get hasOpenSession => _currentSession != null;
 
+  /// Sessions that have been closed but not yet verified by admin.
   List<PettyCashSessionEntity> get unverifiedSessions => _sessions
       .where((s) => s.status == PettyCashSessionStatus.closed)
       .toList();
+
+  /// Sessions with discrepancies (non-zero discrepancy).
+  List<PettyCashSessionEntity> get sessionsWithDiscrepancies => _sessions
+      .where((s) => s.discrepancy != null && s.discrepancy != 0)
+      .toList();
+
+  // ─── Operations ─────────────────────────────────────────────
 
   Future<void> loadSessions(String accountId) async {
     _selectedAccountId = accountId;
@@ -57,14 +69,6 @@ class PettyCashProvider with ChangeNotifier {
     try {
       _sessions = await getPettyCashSessionsUseCase(accountId);
       _currentSession = await getOpenSessionUseCase(accountId);
-      if (_currentSession != null) {
-        _previewTotals = await financeRepository.getLedgerDayTotals(
-          accountId,
-          _currentSession!.date,
-        );
-      } else {
-        _previewTotals = null;
-      }
     } catch (e) {
       _error = e.toString();
       debugPrint('Error loading petty cash sessions: $e');
@@ -83,63 +87,50 @@ class PettyCashProvider with ChangeNotifier {
       await openPettyCashSessionUseCase(session);
       _currentSession = session;
       _sessions.insert(0, session);
-      _previewTotals = await financeRepository.getLedgerDayTotals(
-        session.fundAccountId,
-        session.date,
-      );
     } catch (e) {
       _error = e.toString();
       debugPrint('Error opening petty cash session: $e');
-      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> closeSession({
-    required PettyCashSessionEntity session,
-    required String closedBy,
-    required String? closedByUserId,
-  }) async {
+  Future<void> closeSession(PettyCashSessionEntity session) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final closed = await closePettyCashSessionUseCase(
-        session: session,
-        closedBy: closedBy,
-        closedByUserId: closedByUserId,
+      // Calculate discrepancy before saving.
+      final discrepancy =
+          session.closingBalance - session.expectedClosingBalance;
+      final closedSession = session.copyWith(
+        status: PettyCashSessionStatus.closed,
+        discrepancy: discrepancy,
       );
+
+      await closePettyCashSessionUseCase(closedSession);
       _currentSession = null;
-      _previewTotals = null;
+
+      // Update the session in the list.
       final index = _sessions.indexWhere((s) => s.id == session.id);
       if (index != -1) {
-        _sessions[index] = closed;
+        _sessions[index] = closedSession;
       }
     } catch (e) {
       _error = e.toString();
       debugPrint('Error closing petty cash session: $e');
-      rethrow;
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  Future<void> verifySession({
-    required String sessionId,
-    required String verifiedBy,
-    required String? verifiedByUserId,
-  }) async {
+  Future<void> verifySession(String sessionId, String verifiedBy) async {
     _error = null;
     try {
-      await verifyPettyCashSessionUseCase(
-        sessionId: sessionId,
-        verifiedBy: verifiedBy,
-        verifiedByUserId: verifiedByUserId,
-      );
+      await verifyPettyCashSessionUseCase(sessionId, verifiedBy);
       final index = _sessions.indexWhere((s) => s.id == sessionId);
       if (index != -1) {
         _sessions[index] = _sessions[index].copyWith(
@@ -147,26 +138,16 @@ class PettyCashProvider with ChangeNotifier {
           verifiedBy: verifiedBy,
           verifiedAt: DateTime.now(),
         );
+        notifyListeners();
       }
-      notifyListeners();
     } catch (e) {
       _error = e.toString();
       debugPrint('Error verifying petty cash session: $e');
       notifyListeners();
-      rethrow;
     }
   }
 
   Future<String> uploadClosingSheet(XFile file, String sessionId) async {
     return await uploadClosingSheetUseCase(file, sessionId);
-  }
-
-  Future<void> refreshDayTotals() async {
-    if (_currentSession == null) return;
-    _previewTotals = await financeRepository.getLedgerDayTotals(
-      _currentSession!.fundAccountId,
-      _currentSession!.date,
-    );
-    notifyListeners();
   }
 }
