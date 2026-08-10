@@ -1177,7 +1177,8 @@ class _Sidebar extends StatelessWidget {
                 'v$version+$build',
                 style: GoogleFonts.notoSans(
                   fontSize: 10.sp,
-                  color: inactiveText.withOpacity(0.6),
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
                   letterSpacing: 1.2,
                 ),
               ),
