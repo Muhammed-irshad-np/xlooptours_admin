@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'home_screen.dart';
 import 'employees_screen.dart';
 import 'vehicles_screen.dart';
@@ -981,6 +982,8 @@ class _Sidebar extends StatelessWidget {
           _buildProfileSection(context),
           // Logout
           _buildLogoutButton(),
+          // App Version
+          _buildVersionInfo(),
         ],
       ),
     );
@@ -1128,7 +1131,7 @@ class _Sidebar extends StatelessWidget {
 
   Widget _buildLogoutButton() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 16.h),
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -1156,6 +1159,32 @@ class _Sidebar extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildVersionInfo() {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 16.h),
+      child: FutureBuilder<PackageInfo>(
+        future: PackageInfo.fromPlatform(),
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            final version = snapshot.data!.version;
+            final build = snapshot.data!.buildNumber;
+            return Center(
+              child: Text(
+                'v$version+$build',
+                style: GoogleFonts.notoSans(
+                  fontSize: 10.sp,
+                  color: inactiveText.withOpacity(0.6),
+                  letterSpacing: 1.2,
+                ),
+              ),
+            );
+          }
+          return const SizedBox.shrink();
+        },
       ),
     );
   }
