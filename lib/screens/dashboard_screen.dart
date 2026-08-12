@@ -31,6 +31,7 @@ import 'package:xloop_invoice/screens/employee_expiry_tracker_screen.dart';
 import 'package:xloop_invoice/screens/vehicle_expiry_tracker_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xloop_invoice/widgets/dev_sync_dialog.dart';
+import 'package:xloop_invoice/core/utils/activity_logger.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 class _DT {
@@ -765,22 +766,35 @@ class _DashboardScreenState extends State<DashboardScreen>
       builder: (ctx) => _OdometerDialog(
         vehicle: vehicle,
         controller: controller,
-        onConfirm: (km) {
+        onConfirm: (km) async {
+          final oldKm = vehicle.currentOdometer ?? 0;
           context.read<VehicleProvider>().updateVehicleOdometer(vehicle.id, km);
-          Navigator.pop(ctx);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.r),
+          if (context.mounted) {
+            await ActivityLogger.log(
+              context,
+              title: 'Odometer Updated',
+              message:
+                  'Odometer updated for ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}): '
+                  '$oldKm KM → $km KM.',
+              relatedId: vehicle.id,
+            );
+          }
+          if (ctx.mounted) Navigator.pop(ctx);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                backgroundColor: _DT.success,
+                content: Text(
+                  'Odometer updated successfully',
+                  style: GoogleFonts.inter(color: Colors.white),
+                ),
               ),
-              backgroundColor: _DT.success,
-              content: Text(
-                'Odometer updated successfully',
-                style: GoogleFonts.inter(color: Colors.white),
-              ),
-            ),
-          );
+            );
+          }
         },
       ),
     );

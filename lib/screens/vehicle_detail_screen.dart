@@ -13,6 +13,7 @@ import '../core/widgets/modern_app_bar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+import '../core/utils/activity_logger.dart';
 
 import '../features/auth/presentation/providers/auth_provider.dart';
 
@@ -995,6 +996,26 @@ class VehicleDetailScreen extends StatelessWidget {
         tafweedHistory: updatedHistory,
       );
       await context.read<VehicleProvider>().updateVehicle(updatedVehicle);
+
+      if (context.mounted) {
+        // Look up the driver name for a descriptive log message
+        final employeeProvider = context.read<EmployeeProvider>();
+        final driver = employeeProvider.employees
+            .cast<EmployeeEntity?>()
+            .firstWhere(
+              (e) => e?.id == record.driverId,
+              orElse: () => null,
+            );
+        final driverName = driver?.fullName ?? record.driverId;
+        await ActivityLogger.log(
+          context,
+          title: 'Tafweed Cancelled',
+          message:
+              'Tafweed authorization cancelled for ${currentVehicle.make} ${currentVehicle.model} '
+              '(${currentVehicle.plateNumber}) — Driver: $driverName.',
+          relatedId: currentVehicle.id,
+        );
+      }
     }
   }
 

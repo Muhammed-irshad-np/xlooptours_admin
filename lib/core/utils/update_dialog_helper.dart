@@ -2064,9 +2064,63 @@ class UpdateDialogHelper {
                             await vehicleProvider.updateVehicle(updatedVehicle);
 
                             if (ctx.mounted) {
+                              // Build a specific activity log message for this document change
+                              final String activityMsg;
+                              String fmt(DateTime? d) => d != null
+                                  ? '${d.day}/${d.month}/${d.year}'
+                                  : '—';
+                              if (documentType == 'Tafweed') {
+                                final driver = employeeProvider.employees
+                                    .cast<EmployeeEntity?>()
+                                    .firstWhere(
+                                      (e) => e?.id == selectedDriverId,
+                                      orElse: () => null,
+                                    );
+                                final driverName =
+                                    driver?.fullName ?? selectedDriverId ?? '—';
+                                final oldExpiry = existingTafweed?.expiryDate;
+                                activityMsg =
+                                    'Tafweed updated for ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}): '
+                                    'Driver "$driverName", Expiry: ${fmt(oldExpiry)} → ${fmt(selectedDate)}.';
+                              } else {
+                                // Find old expiry for the changed doc type
+                                DateTime? oldExpiry;
+                                switch (documentType) {
+                                  case 'Istimara':
+                                    oldExpiry = vehicle.registration?.expiryDate;
+                                  case 'Insurance':
+                                    oldExpiry = vehicle.insurance?.expiryDate;
+                                  case 'Fahas':
+                                    oldExpiry = vehicle.fahas?.expiryDate;
+                                  case 'Bahrain Insurance':
+                                    oldExpiry =
+                                        vehicle.bahrainInsurance?.expiryDate;
+                                }
+                                final cleared = selectedDate == null;
+                                if (cleared) {
+                                  activityMsg =
+                                      '$documentType cleared for ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}).';
+                                } else if (oldExpiry == null) {
+                                  activityMsg =
+                                      '$documentType set for ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}): '
+                                      'Expiry set to ${fmt(selectedDate)}.';
+                                } else {
+                                  activityMsg =
+                                      '$documentType updated for ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}): '
+                                      'Expiry: ${fmt(oldExpiry)} → ${fmt(selectedDate)}.';
+                                }
+                              }
+
+                              await ActivityLogger.log(
+                                ctx,
+                                title: 'Vehicle Document Updated',
+                                message: activityMsg,
+                                relatedId: vehicle.id,
+                              );
+
                               final notifProvider = ctx
                                   .read<NotificationProvider>();
-                              final employeeProvider = ctx
+                              final employeeProvider2 = ctx
                                   .read<EmployeeProvider>();
                               final vaultProvider = ctx.read<VaultProvider>();
                               await notifProvider.markAsRead(notification.id);
@@ -2074,8 +2128,8 @@ class UpdateDialogHelper {
                                 vehicles: vehicleProvider.vehicles,
                                 maintenanceTypes:
                                     vehicleProvider.maintenanceTypes,
-                                employees: employeeProvider.employees,
-                                employeeSettings: employeeProvider.settings,
+                                employees: employeeProvider2.employees,
+                                employeeSettings: employeeProvider2.settings,
                                 vehicleSettings: vehicleProvider.settings,
                                 vaultData: vaultProvider.vaultData,
                               );

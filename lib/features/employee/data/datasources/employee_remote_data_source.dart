@@ -1,11 +1,8 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cross_file/cross_file.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path/path.dart' as path;
-import 'package:xloop_invoice/core/utils/file_upload_helper.dart';
 import '../models/employee_model.dart';
 import '../models/employee_settings_model.dart';
 
@@ -69,6 +66,24 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     await firestore.collection('employees').doc(id).delete();
   }
 
+  String _getMimeType(String ext) {
+    switch (ext.toLowerCase().replaceAll('.', '')) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'gif':
+        return 'image/gif';
+      default:
+        return 'application/octet-stream';
+    }
+  }
+
   @override
   Future<String> uploadEmployeeImage(XFile image, String employeeId) async {
     final storageRef = storage
@@ -96,29 +111,22 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     String employeeId,
     String docType,
   ) async {
-    // Read bytes and detect true file type via magic bytes.
-    final bytes = await file.readAsBytes();
-    final info = FileUploadHelper.getUploadInfo(bytes, file.name);
-
-    // Use detected extension so the storage path always has a proper extension.
-    final nameWithoutExt = path.basenameWithoutExtension(file.name).isNotEmpty
-        ? path.basenameWithoutExtension(file.name)
-        : docType;
+    final ext = file.name.split('.').last.toLowerCase();
     final storageRef = storage
         .ref()
         .child('employee_documents')
         .child(employeeId)
-        .child('${nameWithoutExt}_${DateTime.now().millisecondsSinceEpoch}${info.extension}');
+        .child('$docType.$ext');
 
-    final metadata = SettableMetadata(
-      contentType: info.mimeType,
-      customMetadata: {'originalName': file.name, 'docType': docType},
-    );
+    final metadata = SettableMetadata(contentType: _getMimeType(ext));
 
     if (kIsWeb) {
-      await storageRef.putData(bytes, metadata);
+      await storageRef.putData(
+        await file.readAsBytes(),
+        metadata,
+      );
     } else {
-      await storageRef.putData(bytes, metadata);
+      await storageRef.putFile(File(file.path), metadata);
     }
 
     return await storageRef.getDownloadURL();
