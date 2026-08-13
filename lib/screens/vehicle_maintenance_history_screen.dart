@@ -9,6 +9,7 @@ import 'package:xloop_invoice/core/widgets/modern_app_bar.dart';
 import 'package:xloop_invoice/screens/document_viewer_screen.dart';
 import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 import 'package:xloop_invoice/widgets/complete_follow_up_dialog.dart';
+import 'package:xloop_invoice/core/utils/activity_logger.dart';
 
 class VehicleMaintenanceHistoryScreen extends StatefulWidget {
   final VehicleEntity vehicle;
@@ -378,8 +379,7 @@ class _VehicleMaintenanceHistoryScreenState
                           size: 20,
                         ),
                         onPressed: () => _showDeleteConfirmation(
-                          context,
-                          currentVehicle,
+                          widget.vehicle,
                           record,
                         ),
                         constraints: const BoxConstraints(),
@@ -713,29 +713,52 @@ class _VehicleMaintenanceHistoryScreenState
   }
 
   void _showDeleteConfirmation(
-    BuildContext context,
     VehicleEntity currentVehicle,
     MaintenanceRecord record,
   ) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Delete Record'),
         content: const Text(
           'Are you sure you want to delete this maintenance record? This action cannot be undone.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('CANCEL'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.read<VehicleProvider>().deleteMaintenanceRecord(
-                currentVehicle,
-                record,
-              );
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final messenger = ScaffoldMessenger.of(context);
+              try {
+                await context.read<VehicleProvider>().deleteMaintenanceRecord(
+                  currentVehicle,
+                  record,
+                );
+                if (mounted) {
+                  await ActivityLogger.log(
+                    context,
+                    title: 'Maintenance Deleted',
+                    message: 'Deleted maintenance record (${record.serviceType}) for vehicle ${currentVehicle.make} ${currentVehicle.model} (${currentVehicle.plateNumber}).',
+                    relatedId: currentVehicle.id,
+                  );
+                }
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Maintenance record deleted successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              } catch (e) {
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Failed to delete maintenance record: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
             },
             child: const Text('DELETE', style: TextStyle(color: Colors.red)),
           ),

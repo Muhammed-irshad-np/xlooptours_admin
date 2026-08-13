@@ -118,8 +118,20 @@ class NotificationsScreen extends StatelessWidget {
         color = Colors.blue;
         break;
       case NotificationType.activity:
-        icon = Icons.bolt;
-        color = Colors.indigo;
+        final lowerTitle = notification.title.toLowerCase();
+        if (lowerTitle.contains('delete') || lowerTitle.contains('remove') || lowerTitle.contains('cancel')) {
+          icon = Icons.delete_outline;
+          color = Colors.red;
+        } else if (lowerTitle.contains('add') || lowerTitle.contains('create') || lowerTitle.contains('new')) {
+          icon = Icons.add_circle_outline;
+          color = Colors.green;
+        } else if (lowerTitle.contains('update') || lowerTitle.contains('edit') || lowerTitle.contains('change')) {
+          icon = Icons.edit_outlined;
+          color = Colors.blue;
+        } else {
+          icon = Icons.bolt;
+          color = Colors.indigo;
+        }
         break;
       case NotificationType.expiry:
         icon = Icons.warning_amber_rounded;
