@@ -1523,12 +1523,26 @@ class _ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (icon, color) = switch (activity.type) {
+    var (icon, color) = switch (activity.type) {
       NotificationType.registration => (Icons.person_add_rounded, _DT.success),
       NotificationType.invoice => (Icons.receipt_long_rounded, _DT.brand),
       NotificationType.activity => (Icons.bolt_rounded, _DT.brand),
       _ => (Icons.info_outline_rounded, _DT.warning),
     };
+
+    if (activity.type == NotificationType.activity) {
+      final lowerTitle = activity.title.toLowerCase();
+      if (lowerTitle.contains('delete') || lowerTitle.contains('remove') || lowerTitle.contains('cancel')) {
+        icon = Icons.delete_outline_rounded;
+        color = Colors.red;
+      } else if (lowerTitle.contains('add') || lowerTitle.contains('create') || lowerTitle.contains('new')) {
+        icon = Icons.add_circle_outline_rounded;
+        color = Colors.green;
+      } else if (lowerTitle.contains('update') || lowerTitle.contains('edit') || lowerTitle.contains('change')) {
+        icon = Icons.edit_outlined;
+        color = Colors.blue;
+      }
+    }
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),
