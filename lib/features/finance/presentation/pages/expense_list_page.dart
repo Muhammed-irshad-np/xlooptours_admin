@@ -10,6 +10,7 @@ import '../widgets/expense_status_badge.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/services/finance_export_service.dart';
 import 'expense_form_page.dart';
+import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
 
 /// Expense list page with filtering, search, and data table.
@@ -732,42 +733,34 @@ class _ExpenseDataTable extends StatelessWidget {
     if (user == null) return;
 
     final postsMoney = !expense.isNonWallet;
-    final ok = await showDialog<bool>(
+    final ok = await showFinConfirmationDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(postsMoney ? 'Approve & pay from wallet?' : 'Approve?'),
-        content: Text(
-          postsMoney
-              ? 'Approve ${expense.referenceNumber} — ${expense.expenseType} '
-                  'for ${expense.amount} ${expense.currency}?\n\n'
-                  'This will deduct the amount from ${expense.fundAccountName ?? 'the fund account'}.'
-              : 'Approve ${expense.referenceNumber} as non-wallet (no balance change)?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: FinDT.success),
-            child: Text(postsMoney ? 'Approve & pay' : 'Approve'),
-          ),
-        ],
-      ),
+      title: postsMoney ? 'Approve & Pay Expense?' : 'Approve Expense?',
+      message: postsMoney
+          ? 'Approve ${expense.referenceNumber} — ${expense.expenseType} for ${expense.amount} ${expense.currency}?'
+          : 'Approve ${expense.referenceNumber} as non-wallet (no balance change)?',
+      highlightNote: postsMoney
+          ? 'This will deduct ${expense.amount} ${expense.currency} from ${expense.fundAccountName ?? "the fund account"}.'
+          : null,
+      confirmLabel: postsMoney ? 'Approve & Pay' : 'Approve',
+      confirmColor: FinDT.success,
+      icon: Icons.check_circle_outline_rounded,
     );
     if (ok != true || !context.mounted) return;
 
+    final finProv = context.read<FinanceProvider>();
+    final fundProv = context.read<FundAccountProvider>();
+
     try {
-      await context.read<FinanceProvider>().approveExpense(
-            expenseId: expense.id,
-            actorName: user.actorLabel,
-            actorUserId: user.id,
-            actorRole: user.role.name,
-            allowSelfApprove: user.isAdmin,
-          );
+      await finProv.approveExpense(
+        expenseId: expense.id,
+        actorName: user.actorLabel,
+        actorUserId: user.id,
+        actorRole: user.role.name,
+        allowSelfApprove: user.isAdmin,
+      );
+      await fundProv.fetchAllAccounts();
       if (context.mounted) {
-        await context.read<FundAccountProvider>().fetchAllAccounts();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -816,31 +809,40 @@ class _ExpenseDataTable extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reject Expense?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Reject ${expense.referenceNumber}?'),
-            SizedBox(height: 12.h),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                hintText: 'Reason for rejection...',
-                border: OutlineInputBorder(),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: finDialogShape,
+        title: finDialogTitle('Reject Expense?', icon: Icons.cancel_outlined, iconColor: FinDT.danger),
+        content: SizedBox(
+          width: 420.w,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Reject expense ${expense.referenceNumber} (${expense.expenseType} - ${expense.amount} ${expense.currency})?',
+                style: GoogleFonts.inter(fontSize: 13.sp, color: FinDT.textSecondary, height: 1.4),
               ),
-              maxLines: 2,
-            ),
-          ],
+              SizedBox(height: 14.h),
+              TextField(
+                controller: controller,
+                maxLines: 2,
+                decoration: finDialogInputDecoration(
+                  label: 'Rejection Reason *',
+                  hint: 'Explain why this expense is being rejected...',
+                  prefixIcon: Icons.edit_note_rounded,
+                ),
+                style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+              ),
+            ],
+          ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
+          finDialogCancelButton(ctx),
+          finDialogActionButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-            child: const Text('Reject'),
+            label: 'Reject Expense',
+            backgroundColor: FinDT.danger,
           ),
         ],
       ),
@@ -880,37 +882,48 @@ class _ExpenseDataTable extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Void paid expense?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'This reverses the wallet payment for ${expense.referenceNumber} '
-              'and keeps full history (does not delete).',
-            ),
-            SizedBox(height: 12.h),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                hintText: 'Reason for void...',
-                border: OutlineInputBorder(),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: finDialogShape,
+        title: finDialogTitle('Void Paid Expense?', icon: Icons.restart_alt_rounded, iconColor: const Color(0xFF7C3AED)),
+        content: SizedBox(
+          width: 420.w,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: EdgeInsets.all(12.w),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.25)),
+                ),
+                child: Text(
+                  'This reverses the wallet payment for ${expense.referenceNumber} (${expense.amount} ${expense.currency}) and keeps full audit history.',
+                  style: GoogleFonts.inter(fontSize: 12.sp, color: const Color(0xFF7C3AED), height: 1.4),
+                ),
               ),
-              maxLines: 2,
-            ),
-          ],
+              SizedBox(height: 14.h),
+              TextField(
+                controller: controller,
+                maxLines: 2,
+                decoration: finDialogInputDecoration(
+                  label: 'Void Reason *',
+                  hint: 'Explain why this payment is being voided...',
+                  prefixIcon: Icons.edit_note_rounded,
+                ),
+                style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+              ),
+            ],
+          ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
+          finDialogCancelButton(ctx),
+          finDialogActionButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF7C3AED),
-            ),
-            child: const Text('Void & reverse'),
+            label: 'Void & Reverse',
+            backgroundColor: const Color(0xFF7C3AED),
           ),
         ],
       ),
@@ -955,25 +968,13 @@ class _ExpenseDataTable extends StatelessWidget {
       return;
     }
 
-    final ok = await showDialog<bool>(
+    final ok = await showFinConfirmationDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete draft/pending?'),
-        content: Text(
-          'Delete ${expense.referenceNumber}? Only allowed before payment.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Draft Expense?',
+      message: 'Delete ${expense.referenceNumber}? Only draft and pending expenses can be deleted before payment.',
+      confirmLabel: 'Delete Expense',
+      confirmColor: FinDT.danger,
+      icon: Icons.delete_outline_rounded,
     );
     if (ok != true || !context.mounted) return;
 

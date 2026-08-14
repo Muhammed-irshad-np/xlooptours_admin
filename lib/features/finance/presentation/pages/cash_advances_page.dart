@@ -12,6 +12,7 @@ import '../../domain/entities/cash_advance_entity.dart';
 import '../../domain/services/finance_export_service.dart';
 import '../providers/cash_advance_provider.dart';
 import '../providers/fund_account_provider.dart';
+import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
 
 /// Issue and settle staff cash advances / floats.
@@ -65,14 +66,42 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                     );
                   },
                   icon: Icon(Icons.download_rounded, size: 16.sp),
-                  label: const Text('Export CSV'),
+                  label: Text(
+                    'Export CSV',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: FinDT.brand,
+                    side: BorderSide(color: FinDT.brand.withValues(alpha: 0.5)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                  ),
                 ),
                 SizedBox(width: 8.w),
-                FilledButton.icon(
+                ElevatedButton.icon(
                   onPressed: () => _showIssueDialog(context),
-                  icon: Icon(Icons.add, size: 16.sp),
-                  label: const Text('Issue advance'),
-                  style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
+                  icon: Icon(Icons.add_rounded, size: 16.sp),
+                  label: Text(
+                    'Issue Advance',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: FinDT.brand,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10.r),
+                    ),
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 11.h),
+                  ),
                 ),
               ],
             ),
@@ -161,18 +190,64 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                                 ),
                               ),
                               if (a.isOpen) ...[
-                                TextButton(
-                                  onPressed: () =>
-                                      _showSettleDialog(context, a),
-                                  child: const Text('Settle'),
-                                ),
-                                TextButton(
-                                  onPressed: () =>
-                                      _showWriteOffDialog(context, a),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: FinDT.danger,
-                                  ),
-                                  child: const Text('Write off'),
+                                SizedBox(height: 6.h),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    OutlinedButton(
+                                      onPressed: () =>
+                                          _showSettleDialog(context, a),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: FinDT.brand,
+                                        side: const BorderSide(color: FinDT.brand),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8.r),
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 12.w,
+                                          vertical: 6.h,
+                                        ),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      child: Text(
+                                        'Settle',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11.sp,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 6.w),
+                                    OutlinedButton(
+                                      onPressed: () =>
+                                          _showWriteOffDialog(context, a),
+                                      style: OutlinedButton.styleFrom(
+                                        foregroundColor: FinDT.danger,
+                                        side: BorderSide(
+                                          color: FinDT.danger.withValues(alpha: 0.5),
+                                        ),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8.r),
+                                        ),
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 10.w,
+                                          vertical: 6.h,
+                                        ),
+                                        minimumSize: Size.zero,
+                                        tapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                      ),
+                                      child: Text(
+                                        'Write off',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11.sp,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ],
@@ -202,75 +277,99 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          title: const Text('Issue cash advance'),
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle('Issue Cash Advance', icon: Icons.payments_outlined),
           content: SizedBox(
             width: 420.w,
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  DropdownButtonFormField<String>(
-                    value: accountId,
-                    decoration: const InputDecoration(labelText: 'Fund account'),
-                    items: accounts
-                        .map(
-                          (a) => DropdownMenuItem(
-                            value: a.id,
-                            child: Text('${a.name} (${a.currentBalance.toStringAsFixed(0)})'),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setLocal(() => accountId = v),
-                    validator: (v) => v == null ? 'Required' : null,
-                  ),
-                  SizedBox(height: 12.h),
-                  DropdownButtonFormField<EmployeeEntity>(
-                    value: employee,
-                    decoration: const InputDecoration(labelText: 'Employee'),
-                    items: employees
-                        .map(
-                          (e) => DropdownMenuItem(
-                            value: e,
-                            child: Text(e.fullName),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (v) => setLocal(() => employee = v),
-                    validator: (v) => v == null ? 'Required' : null,
-                  ),
-                  SizedBox(height: 12.h),
-                  TextFormField(
-                    controller: amountCtrl,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                    ],
-                    decoration: const InputDecoration(labelText: 'Amount'),
-                    validator: (v) {
-                      final n = double.tryParse(v ?? '');
-                      if (n == null || n <= 0) return 'Invalid';
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 12.h),
-                  TextFormField(
-                    controller: purposeCtrl,
-                    decoration: const InputDecoration(labelText: 'Purpose'),
-                    validator: (v) =>
-                        (v == null || v.isEmpty) ? 'Required' : null,
-                  ),
-                ],
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(height: 8.h),
+                    DropdownButtonFormField<String>(
+                      initialValue: accountId,
+                      decoration: finDialogInputDecoration(
+                        label: 'Fund Account *',
+                        hint: 'Select fund source',
+                        prefixIcon: Icons.account_balance_wallet_outlined,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      items: accounts
+                          .map(
+                            (a) => DropdownMenuItem(
+                              value: a.id,
+                              child: Text('${a.name} (${a.currentBalance.toStringAsFixed(0)} ${a.currency})'),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setLocal(() => accountId = v),
+                      validator: (v) => v == null ? 'Required' : null,
+                    ),
+                    SizedBox(height: 14.h),
+                    DropdownButtonFormField<EmployeeEntity>(
+                      initialValue: employee,
+                      decoration: finDialogInputDecoration(
+                        label: 'Employee *',
+                        hint: 'Select employee recipient',
+                        prefixIcon: Icons.person_outline,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      items: employees
+                          .map(
+                            (e) => DropdownMenuItem(
+                              value: e,
+                              child: Text(e.fullName),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setLocal(() => employee = v),
+                      validator: (v) => v == null ? 'Required' : null,
+                    ),
+                    SizedBox(height: 14.h),
+                    TextFormField(
+                      controller: amountCtrl,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                      ],
+                      decoration: finDialogInputDecoration(
+                        label: 'Advance Amount *',
+                        hint: '0.00',
+                        prefixIcon: Icons.attach_money_rounded,
+                        suffixText: 'SAR',
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      validator: (v) {
+                        final n = double.tryParse(v ?? '');
+                        if (n == null || n <= 0) return 'Enter a valid positive amount';
+                        return null;
+                      },
+                    ),
+                    SizedBox(height: 14.h),
+                    TextFormField(
+                      controller: purposeCtrl,
+                      decoration: finDialogInputDecoration(
+                        label: 'Purpose *',
+                        hint: 'e.g. Fuel float, driver emergency trip expenses',
+                        prefixIcon: Icons.description_outlined,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Purpose required' : null,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
+            finDialogCancelButton(ctx),
+            finDialogActionButton(
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
                 final user = context.read<AuthProvider>().user;
@@ -291,10 +390,12 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                   issuedAt: DateTime.now(),
                   createdAt: DateTime.now(),
                 );
+                final advProv = context.read<CashAdvanceProvider>();
+                final fundProv = context.read<FundAccountProvider>();
                 Navigator.pop(ctx);
                 try {
-                  await context.read<CashAdvanceProvider>().issue(advance);
-                  await context.read<FundAccountProvider>().fetchAllAccounts();
+                  await advProv.issue(advance);
+                  await fundProv.fetchAllAccounts();
                 } catch (e) {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -306,7 +407,8 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                   }
                 }
               },
-              child: const Text('Issue (deduct from fund)'),
+              label: 'Issue Advance',
+              backgroundColor: FinDT.brand,
             ),
           ],
         ),
@@ -322,39 +424,50 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Write off advance?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Mark remaining ${advance.outstanding.toStringAsFixed(2)} '
-              '${advance.currency} for ${advance.employeeName} as a loss.\n\n'
-              'Cash does NOT return to the fund (it already left when issued). '
-              'This only closes the open advance.',
-              style: GoogleFonts.inter(fontSize: 13.sp, height: 1.4),
-            ),
-            SizedBox(height: 12.h),
-            TextField(
-              controller: reasonCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Reason *',
-                hintText: 'e.g. Employee left, unrecoverable',
-                border: OutlineInputBorder(),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: finDialogShape,
+        title: finDialogTitle('Write Off Advance?', icon: Icons.warning_amber_rounded, iconColor: FinDT.danger),
+        content: SizedBox(
+          width: 420.w,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: EdgeInsets.all(12.w),
+                decoration: BoxDecoration(
+                  color: FinDT.danger.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10.r),
+                  border: Border.all(color: FinDT.danger.withValues(alpha: 0.25)),
+                ),
+                child: Text(
+                  'Mark remaining ${advance.outstanding.toStringAsFixed(2)} '
+                  '${advance.currency} for ${advance.employeeName} as a loss.\n\n'
+                  'Cash does NOT return to the fund. This only closes the open advance.',
+                  style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.danger, height: 1.4),
+                ),
               ),
-            ),
-          ],
+              SizedBox(height: 14.h),
+              TextField(
+                controller: reasonCtrl,
+                maxLines: 2,
+                decoration: finDialogInputDecoration(
+                  label: 'Reason *',
+                  hint: 'e.g. Employee left, unrecoverable',
+                  prefixIcon: Icons.edit_note_rounded,
+                ),
+                style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+              ),
+            ],
+          ),
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
+          finDialogCancelButton(ctx),
+          finDialogActionButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-            child: const Text('Write off'),
+            label: 'Write Off',
+            backgroundColor: FinDT.danger,
           ),
         ],
       ),
@@ -395,6 +508,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
     BuildContext context,
     CashAdvanceEntity advance,
   ) async {
+    final formKey = GlobalKey<FormState>();
     final ctrl = TextEditingController(
       text: advance.outstanding.toStringAsFixed(2),
     );
@@ -403,34 +517,110 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
-          title: Text('Settle ${advance.employeeName}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('Outstanding: ${advance.outstanding.toStringAsFixed(2)}'),
-              SizedBox(height: 12.h),
-              TextField(
-                controller: ctrl,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(labelText: 'Settle amount'),
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle('Settle Advance', icon: Icons.receipt_long_rounded),
+          content: SizedBox(
+            width: 420.w,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(12.w),
+                    decoration: BoxDecoration(
+                      color: FinDT.bgPage,
+                      borderRadius: BorderRadius.circular(10.r),
+                      border: Border.all(color: FinDT.border),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Recipient:',
+                              style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
+                            ),
+                            Text(
+                              advance.employeeName,
+                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 6.h),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Outstanding Amount:',
+                              style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
+                            ),
+                            Text(
+                              '${advance.outstanding.toStringAsFixed(2)} ${advance.currency}',
+                              style: GoogleFonts.inter(fontSize: 13.sp, fontWeight: FontWeight.w700, color: FinDT.warning),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 14.h),
+                  TextFormField(
+                    controller: ctrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                    ],
+                    decoration: finDialogInputDecoration(
+                      label: 'Settle Amount *',
+                      prefixIcon: Icons.payments_outlined,
+                      suffixText: advance.currency,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                    validator: (v) {
+                      final val = double.tryParse(v ?? '');
+                      if (val == null || val <= 0) return 'Enter a valid positive amount';
+                      if (val > advance.outstanding) return 'Cannot exceed outstanding balance';
+                      return null;
+                    },
+                  ),
+                  SizedBox(height: 12.h),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: FinDT.bgPage,
+                      borderRadius: BorderRadius.circular(10.r),
+                      border: Border.all(color: FinDT.border),
+                    ),
+                    child: CheckboxListTile(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 10.w),
+                      title: Text(
+                        'Return cash to fund account',
+                        style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w500, color: FinDT.textPrimary),
+                      ),
+                      activeColor: FinDT.brand,
+                      value: returnToFund,
+                      onChanged: (v) => setLocal(() => returnToFund = v ?? true),
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                  ),
+                ],
               ),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Return cash to fund account'),
-                value: returnToFund,
-                onChanged: (v) => setLocal(() => returnToFund = v ?? true),
-              ),
-            ],
+            ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Settle'),
+            finDialogCancelButton(ctx),
+            finDialogActionButton(
+              onPressed: () {
+                if (!formKey.currentState!.validate()) return;
+                Navigator.pop(ctx, true);
+              },
+              label: 'Settle Advance',
+              backgroundColor: FinDT.brand,
             ),
           ],
         ),
@@ -439,15 +629,17 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
     if (ok != true || !context.mounted) return;
     final amount = double.tryParse(ctrl.text) ?? 0;
     final user = context.read<AuthProvider>().user;
+    final advProv = context.read<CashAdvanceProvider>();
+    final fundProv = context.read<FundAccountProvider>();
     try {
-      await context.read<CashAdvanceProvider>().settle(
-            advanceId: advance.id,
-            amount: amount,
-            actorName: user?.actorLabel ?? 'Unknown',
-            actorUserId: user?.id ?? '',
-            returnToFund: returnToFund,
-          );
-      await context.read<FundAccountProvider>().fetchAllAccounts();
+      await advProv.settle(
+        advanceId: advance.id,
+        amount: amount,
+        actorName: user?.actorLabel ?? 'Unknown',
+        actorUserId: user?.id ?? '',
+        returnToFund: returnToFund,
+      );
+      await fundProv.fetchAllAccounts();
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

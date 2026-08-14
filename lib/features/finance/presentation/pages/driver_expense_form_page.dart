@@ -11,6 +11,7 @@ import '../../../vehicle/presentation/providers/vehicle_provider.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../pages/finance_dashboard_page.dart';
+import '../widgets/finance_dialog_helpers.dart';
 
 /// Public-facing mobile web form for drivers to submit daily expenses.
 class DriverExpenseFormPage extends StatefulWidget {
@@ -116,7 +117,7 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
                       // Vehicle Dropdown
                       _buildLabel('Select Vehicle *'),
                       DropdownButtonFormField<String>(
-                        value: _selectedVehicleId,
+                        initialValue: _selectedVehicleId,
                         decoration: _inputDecoration('Choose vehicle plate/model'),
                         items: vehicleProv.vehicles.map((v) {
                           return DropdownMenuItem(
@@ -132,7 +133,7 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
                       // Expense Type
                       _buildLabel('Expense Type *'),
                       DropdownButtonFormField<String>(
-                        value: _selectedType,
+                        initialValue: _selectedType,
                         decoration: _inputDecoration('Choose expense type'),
                         items: _expenseTypes.map((t) {
                           return DropdownMenuItem(value: t, child: Text(t));
@@ -325,9 +326,11 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
       final url = await provider.uploadReceipt(file, expenseId);
       setState(() => _receiptUrl = url);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to upload: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to upload: $e')),
+        );
+      }
     } finally {
       setState(() => _uploadingReceipt = false);
     }
@@ -405,9 +408,11 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
         _showSuccessDialog();
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -418,24 +423,25 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.check_circle_rounded, color: FinDT.success, size: 24.sp),
-            SizedBox(width: 8.w),
-            const Text('Submitted!'),
-          ],
-        ),
-        content: const Text(
-          'Your expense has been successfully submitted for review. You can close this page now.',
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: finDialogShape,
+        title: finDialogTitle('Expense Submitted!', icon: Icons.check_circle_rounded, iconColor: FinDT.success),
+        content: SizedBox(
+          width: 400.w,
+          child: Text(
+            'Your expense has been successfully submitted for review. You can close this page now.',
+            style: GoogleFonts.inter(fontSize: 13.sp, color: FinDT.textSecondary, height: 1.4),
+          ),
         ),
         actions: [
-          FilledButton(
+          finDialogActionButton(
             onPressed: () {
               Navigator.pop(ctx);
               _resetForm();
             },
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF13B1F2)),
-            child: const Text('OK'),
+            label: 'Done',
+            backgroundColor: FinDT.brand,
           ),
         ],
       ),

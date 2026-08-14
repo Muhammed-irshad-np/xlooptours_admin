@@ -16,6 +16,7 @@ import '../../../../features/employee/presentation/providers/employee_provider.d
 import '../../../../features/employee/domain/entities/employee_entity.dart';
 import '../../../../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../../../../features/vehicle/domain/entities/vehicle_entity.dart';
+import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
 
 /// Full-featured expense entry/edit form.
@@ -56,9 +57,50 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   String? _selectedVehicleName;
   List<String> _receiptUrls = [];
 
-  bool get _isFuelType {
-    final t = (_selectedType ?? '').toUpperCase();
-    return t.contains('FUEL') || t.contains('PETROL') || t.contains('DIESEL');
+  bool get _isVehicleRelated {
+    final cat = (_selectedCategory ?? '').trim().toUpperCase();
+    final type = (_selectedType ?? '').trim().toUpperCase();
+
+    // Check if category is vehicle related
+    if (cat.contains('VEHICLE') ||
+        cat.contains('FLEET') ||
+        cat.contains('CAR') ||
+        cat.contains('AUTO') ||
+        cat.contains('TRANSPORT')) {
+      return true;
+    }
+
+    // Check if expense type is vehicle related
+    const vehicleKeywords = [
+      'FUEL',
+      'PETROL',
+      'DIESEL',
+      'GAS',
+      'MAINTENANCE',
+      'REPAIR',
+      'CAR WASH',
+      'WASH',
+      'OIL',
+      'TIRE',
+      'TYRE',
+      'SERVICE',
+      'VEHICLE',
+      'ODOMETER',
+      'MILEAGE',
+      'REGISTRATION',
+      'FAHAS',
+      'MVPI',
+      'ISTIMARA',
+      'TOLL',
+      'SALIK',
+      'SPARE',
+    ];
+
+    for (final kw in vehicleKeywords) {
+      if (type.contains(kw)) return true;
+    }
+
+    return false;
   }
 
   @override
@@ -66,14 +108,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     super.initState();
     _isEditing = widget.expense != null;
     final e = widget.expense;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final veh = context.read<VehicleProvider>();
-      if (veh.vehicles.isEmpty) {
-        veh.fetchAllVehicles();
-      }
-    });
-
     _amountController = TextEditingController(
       text: e != null ? e.amount.toString() : '',
     );
@@ -94,6 +128,28 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       text: e?.numberOfTrips?.toString() ?? '',
     );
 
+    _amountController.addListener(_onAmountChanged);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final veh = context.read<VehicleProvider>();
+      if (veh.vehicles.isEmpty) {
+        veh.fetchAllVehicles();
+      }
+      final acc = context.read<FundAccountProvider>();
+      if (acc.accounts.isEmpty) {
+        acc.fetchAllAccounts();
+      }
+      final fin = context.read<FinanceProvider>();
+      if (fin.categories.isEmpty) {
+        fin.fetchCategories();
+      }
+      final emp = context.read<EmployeeProvider>();
+      if (emp.employees.isEmpty) {
+        emp.fetchAllEmployees();
+      }
+    });
+
     if (e != null) {
       _selectedDate = e.date;
       _selectedCategory = e.expenseCategory;
@@ -110,8 +166,13 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     }
   }
 
+  void _onAmountChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    _amountController.removeListener(_onAmountChanged);
     _amountController.dispose();
     _descriptionController.dispose();
     _paymentDetailsController.dispose();
@@ -170,21 +231,19 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                   ),
                   SizedBox(height: 20.h),
 
-                  // ── Vehicle (required for fuel) ───────────────
-                  _buildFormCard(
-                    title: _isFuelType
-                        ? 'Vehicle * (required for fuel)'
-                        : 'Vehicle (optional)',
-                    icon: Icons.directions_car_outlined,
-                    children: [
-                      _buildVehicleField(vehProv),
-                      if (_isFuelType) ...[
+                  // ── Vehicle (mandatory for vehicle-related expenses) ───────────
+                  if (_isVehicleRelated) ...[
+                    _buildFormCard(
+                      title: 'Vehicle Details *',
+                      icon: Icons.directions_car_outlined,
+                      children: [
+                        _buildVehicleField(vehProv),
                         SizedBox(height: 16.h),
                         _buildMileageField(),
                       ],
-                    ],
-                  ),
-                  SizedBox(height: 20.h),
+                    ),
+                    SizedBox(height: 20.h),
+                  ],
 
                   // ── Receipt Upload ────────────────────────────
                   _buildFormCard(
@@ -352,7 +411,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     return _FieldWrapper(
       label: 'Currency',
       child: DropdownButtonFormField<String>(
-        value: _selectedCurrency,
+        initialValue: _selectedCurrency,
         items: ['SAR', 'BHD', 'AED', 'QAR', 'USD']
             .map((c) => DropdownMenuItem(value: c, child: Text(c)))
             .toList(),
@@ -498,17 +557,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
             return AlertDialog(
               backgroundColor: Colors.white,
               surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.r),
-              ),
-              title: Text(
-                'Select Employee',
-                style: GoogleFonts.inter(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w700,
-                  color: FinDT.textPrimary,
-                ),
-              ),
+              shape: finDialogShape,
+              title: finDialogTitle('Select Employee', icon: Icons.person_search_outlined),
               content: SizedBox(
                 width: 400.w,
                 child: Column(
@@ -517,29 +567,12 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                     TextField(
                       autofocus: true,
                       onChanged: (v) => setStateDialog(() => searchQuery = v),
-                      decoration: InputDecoration(
-                        hintText: 'Search by name or position...',
-                        hintStyle: GoogleFonts.inter(
-                          fontSize: 12.sp,
-                          color: FinDT.textSecondary,
-                        ),
-                        prefixIcon: Icon(Icons.search, size: 18.sp, color: FinDT.brand),
-                        filled: true,
-                        fillColor: FinDT.bgPage,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10.r),
-                          borderSide: BorderSide(color: FinDT.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10.r),
-                          borderSide: BorderSide(color: FinDT.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10.r),
-                          borderSide: BorderSide(color: FinDT.brand),
-                        ),
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+                      decoration: finDialogInputDecoration(
+                        label: 'Search Employee',
+                        hint: 'Search by name or position...',
+                        prefixIcon: Icons.search,
                       ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
                     ),
                     SizedBox(height: 12.h),
                     ConstrainedBox(
@@ -558,28 +591,25 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                           : ListView.separated(
                               shrinkWrap: true,
                               itemCount: filtered.length,
-                              separatorBuilder: (_, __) => Divider(
+                              separatorBuilder: (_, __) => const Divider(
                                 height: 1,
                                 color: FinDT.borderLight,
                               ),
                               itemBuilder: (context, index) {
                                 final emp = filtered[index];
-                                final isSelected = emp.id == _selectedEmployeeId;
                                 return ListTile(
                                   onTap: () {
                                     onSelect(emp);
                                     Navigator.pop(ctx);
                                   },
                                   leading: CircleAvatar(
-                                    backgroundColor: isSelected
-                                        ? FinDT.brand
-                                        : FinDT.brand.withValues(alpha: 0.1),
+                                    backgroundColor: FinDT.brand.withValues(alpha: 0.1),
                                     child: Text(
                                       emp.fullName.isNotEmpty
                                           ? emp.fullName[0].toUpperCase()
                                           : 'E',
                                       style: GoogleFonts.inter(
-                                        color: isSelected ? Colors.white : FinDT.brand,
+                                        color: FinDT.brand,
                                         fontWeight: FontWeight.w600,
                                         fontSize: 12.sp,
                                       ),
@@ -600,9 +630,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                                       color: FinDT.textSecondary,
                                     ),
                                   ),
-                                  trailing: isSelected
-                                      ? Icon(Icons.check_circle, color: FinDT.brand, size: 18.sp)
-                                      : null,
                                 );
                               },
                             ),
@@ -611,13 +638,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                 ),
               ),
               actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: Text(
-                    'Cancel',
-                    style: GoogleFonts.inter(color: FinDT.textSecondary),
-                  ),
-                ),
+                finDialogCancelButton(ctx),
               ],
             );
           },
@@ -630,7 +651,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     return _FieldWrapper(
       label: 'Category *',
       child: DropdownButtonFormField<String>(
-        value: _selectedCategory,
+        initialValue: _selectedCategory,
         items: finProv.categories
             .where((c) => c.isActive)
             .map((c) => DropdownMenuItem(value: c.name, child: Text(c.name)))
@@ -639,6 +660,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
           setState(() {
             _selectedCategory = v;
             _selectedType = null;
+            if (!_isVehicleRelated) {
+              _selectedVehicleId = null;
+              _selectedVehicleName = null;
+              _mileageController.clear();
+            }
           });
         },
         validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
@@ -656,11 +682,20 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     return _FieldWrapper(
       label: 'Type *',
       child: DropdownButtonFormField<String>(
-        value: _selectedType,
+        initialValue: _selectedType,
         items: types
             .map((t) => DropdownMenuItem(value: t.name, child: Text(t.name)))
             .toList(),
-        onChanged: (v) => setState(() => _selectedType = v),
+        onChanged: (v) {
+          setState(() {
+            _selectedType = v;
+            if (!_isVehicleRelated) {
+              _selectedVehicleId = null;
+              _selectedVehicleName = null;
+              _mileageController.clear();
+            }
+          });
+        },
         validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
         decoration: _inputDecoration(
           hint: _selectedCategory == null
@@ -675,6 +710,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   Widget _buildAccountDropdown(FundAccountProvider accProv) {
     final selectedAcc = accProv.getAccountById(_selectedAccountId ?? '');
     final isPettyCash = selectedAcc?.type == FundAccountType.pettyCash;
+    final currencyFormat = NumberFormat('#,##0.00', 'en_US');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -682,20 +718,134 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         _FieldWrapper(
           label: 'Fund Account *',
           child: DropdownButtonFormField<String>(
-            value: _selectedAccountId,
-            items: accProv.activeAccounts
-                .map((a) => DropdownMenuItem(
-                      value: a.id,
-                      child: Text('${a.name} (${a.code})'),
-                    ))
-                .toList(),
+            initialValue: _selectedAccountId,
+            isExpanded: true,
+            items: accProv.activeAccounts.map((a) {
+              final isPos = a.currentBalance >= 0;
+              return DropdownMenuItem<String>(
+                value: a.id,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            a.name,
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w600,
+                              color: FinDT.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            '${a.code} • ${a.type.displayName}',
+                            style: GoogleFonts.inter(
+                              fontSize: 10.sp,
+                              color: FinDT.textSecondary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+                    Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                      decoration: BoxDecoration(
+                        color: isPos
+                            ? FinDT.success.withValues(alpha: 0.08)
+                            : FinDT.danger.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6.r),
+                        border: Border.all(
+                          color: isPos
+                              ? FinDT.success.withValues(alpha: 0.25)
+                              : FinDT.danger.withValues(alpha: 0.25),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            '${a.currency} ${currencyFormat.format(a.currentBalance)}',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.sp,
+                              fontWeight: FontWeight.w700,
+                              color: isPos ? FinDT.success : FinDT.danger,
+                            ),
+                          ),
+                          Text(
+                            'Available',
+                            style: GoogleFonts.inter(
+                              fontSize: 8.sp,
+                              color: isPos ? FinDT.success : FinDT.danger,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+            selectedItemBuilder: (context) {
+              return accProv.activeAccounts.map((a) {
+                final isPos = a.currentBalance >= 0;
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${a.name} (${a.code})',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w500,
+                          color: FinDT.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+                    Container(
+                      padding:
+                          EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                      decoration: BoxDecoration(
+                        color: isPos
+                            ? FinDT.success.withValues(alpha: 0.1)
+                            : FinDT.danger.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(6.r),
+                      ),
+                      child: Text(
+                        'Avail: ${a.currency} ${currencyFormat.format(a.currentBalance)}',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.sp,
+                          fontWeight: FontWeight.w600,
+                          color: isPos ? FinDT.success : FinDT.danger,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList();
+            },
             onChanged: (v) => setState(() => _selectedAccountId = v),
             validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
             decoration: _inputDecoration(hint: 'Select account'),
             style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
           ),
         ),
-        if (isPettyCash) ...[
+        if (selectedAcc != null) ...[
+          SizedBox(height: 12.h),
+          _buildAccountBalanceCard(selectedAcc, currencyFormat),
+        ],
+        if (isPettyCash && selectedAcc != null) ...[
           SizedBox(height: 14.h),
           _FieldWrapper(
             label: 'Payment Method (Petty Cash Bucket) *',
@@ -707,32 +857,59 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                     borderRadius: BorderRadius.circular(10.r),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 14.w),
+                      padding: EdgeInsets.symmetric(
+                          vertical: 10.h, horizontal: 12.w),
                       decoration: BoxDecoration(
                         color: _paymentMethod == 'cash'
                             ? FinDT.brand.withValues(alpha: 0.1)
                             : FinDT.bgPage,
                         borderRadius: BorderRadius.circular(10.r),
                         border: Border.all(
-                          color: _paymentMethod == 'cash' ? FinDT.brand : FinDT.border,
+                          color: _paymentMethod == 'cash'
+                              ? FinDT.brand
+                              : FinDT.border,
                           width: _paymentMethod == 'cash' ? 1.5 : 1,
                         ),
                       ),
-                      child: Row(
+                      child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.payments_outlined,
-                            size: 16.sp,
-                            color: _paymentMethod == 'cash' ? FinDT.brand : FinDT.textSecondary,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.payments_outlined,
+                                size: 15.sp,
+                                color: _paymentMethod == 'cash'
+                                    ? FinDT.brand
+                                    : FinDT.textSecondary,
+                              ),
+                              SizedBox(width: 6.w),
+                              Text(
+                                'Physical Cash',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.sp,
+                                  fontWeight: _paymentMethod == 'cash'
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: _paymentMethod == 'cash'
+                                      ? FinDT.brand
+                                      : FinDT.textPrimary,
+                                ),
+                              ),
+                            ],
                           ),
-                          SizedBox(width: 8.w),
+                          SizedBox(height: 3.h),
                           Text(
-                            'Physical Cash',
+                            'Avail: ${selectedAcc.currency} ${currencyFormat.format(selectedAcc.cashBalance)}',
                             style: GoogleFonts.inter(
-                              fontSize: 12.sp,
-                              fontWeight: _paymentMethod == 'cash' ? FontWeight.w700 : FontWeight.w500,
-                              color: _paymentMethod == 'cash' ? FinDT.brand : FinDT.textPrimary,
+                              fontSize: 10.sp,
+                              fontWeight: FontWeight.w600,
+                              color: selectedAcc.cashBalance >= 0
+                                  ? (_paymentMethod == 'cash'
+                                      ? FinDT.brand
+                                      : FinDT.textSecondary)
+                                  : FinDT.danger,
                             ),
                           ),
                         ],
@@ -747,32 +924,59 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                     borderRadius: BorderRadius.circular(10.r),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 14.w),
+                      padding: EdgeInsets.symmetric(
+                          vertical: 10.h, horizontal: 12.w),
                       decoration: BoxDecoration(
                         color: _paymentMethod == 'stcPay'
                             ? const Color(0xFF6D28D9).withValues(alpha: 0.1)
                             : FinDT.bgPage,
                         borderRadius: BorderRadius.circular(10.r),
                         border: Border.all(
-                          color: _paymentMethod == 'stcPay' ? const Color(0xFF6D28D9) : FinDT.border,
+                          color: _paymentMethod == 'stcPay'
+                              ? const Color(0xFF6D28D9)
+                              : FinDT.border,
                           width: _paymentMethod == 'stcPay' ? 1.5 : 1,
                         ),
                       ),
-                      child: Row(
+                      child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            Icons.phone_android_outlined,
-                            size: 16.sp,
-                            color: _paymentMethod == 'stcPay' ? const Color(0xFF6D28D9) : FinDT.textSecondary,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.phone_android_outlined,
+                                size: 15.sp,
+                                color: _paymentMethod == 'stcPay'
+                                    ? const Color(0xFF6D28D9)
+                                    : FinDT.textSecondary,
+                              ),
+                              SizedBox(width: 6.w),
+                              Text(
+                                'STC Pay',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.sp,
+                                  fontWeight: _paymentMethod == 'stcPay'
+                                      ? FontWeight.w700
+                                      : FontWeight.w500,
+                                  color: _paymentMethod == 'stcPay'
+                                      ? const Color(0xFF6D28D9)
+                                      : FinDT.textPrimary,
+                                ),
+                              ),
+                            ],
                           ),
-                          SizedBox(width: 8.w),
+                          SizedBox(height: 3.h),
                           Text(
-                            'STC Pay',
+                            'Avail: ${selectedAcc.currency} ${currencyFormat.format(selectedAcc.stcPayBalance)}',
                             style: GoogleFonts.inter(
-                              fontSize: 12.sp,
-                              fontWeight: _paymentMethod == 'stcPay' ? FontWeight.w700 : FontWeight.w500,
-                              color: _paymentMethod == 'stcPay' ? const Color(0xFF6D28D9) : FinDT.textPrimary,
+                              fontSize: 10.sp,
+                              fontWeight: FontWeight.w600,
+                              color: selectedAcc.stcPayBalance >= 0
+                                  ? (_paymentMethod == 'stcPay'
+                                      ? const Color(0xFF6D28D9)
+                                      : FinDT.textSecondary)
+                                  : FinDT.danger,
                             ),
                           ),
                         ],
@@ -788,6 +992,190 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     );
   }
 
+  Widget _buildAccountBalanceCard(
+    FundAccountEntity account,
+    NumberFormat currencyFormat,
+  ) {
+    final isPettyCash = account.type == FundAccountType.pettyCash;
+    final enteredAmount = double.tryParse(_amountController.text) ?? 0.0;
+    final relevantBalance = isPettyCash
+        ? (_paymentMethod == 'cash'
+            ? account.cashBalance
+            : account.stcPayBalance)
+        : account.currentBalance;
+    final isOverBalance = enteredAmount > 0 && enteredAmount > relevantBalance;
+    final remaining = relevantBalance - enteredAmount;
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: isOverBalance ? const Color(0xFFFEF2F2) : const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(
+          color: isOverBalance
+              ? FinDT.danger.withValues(alpha: 0.3)
+              : FinDT.success.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 16.sp,
+                    color: isOverBalance ? FinDT.danger : FinDT.success,
+                  ),
+                  SizedBox(width: 8.w),
+                  Text(
+                    'Available Balance',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          isOverBalance ? FinDT.danger : const Color(0xFF166534),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                '${account.currency} ${currencyFormat.format(account.currentBalance)}',
+                style: GoogleFonts.inter(
+                  fontSize: 14.sp,
+                  fontWeight: FontWeight.w700,
+                  color: account.currentBalance >= 0
+                      ? const Color(0xFF166534)
+                      : FinDT.danger,
+                ),
+              ),
+            ],
+          ),
+          if (isPettyCash) ...[
+            SizedBox(height: 8.h),
+            Divider(
+              height: 1,
+              color: isOverBalance
+                  ? FinDT.danger.withValues(alpha: 0.15)
+                  : FinDT.success.withValues(alpha: 0.15),
+            ),
+            SizedBox(height: 8.h),
+            Row(
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(Icons.payments_outlined,
+                          size: 13.sp, color: FinDT.brand),
+                      SizedBox(width: 4.w),
+                      Text(
+                        'Cash: ',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          color: FinDT.textSecondary,
+                        ),
+                      ),
+                      Flexible(
+                        child: Text(
+                          '${account.currency} ${currencyFormat.format(account.cashBalance)}',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w700,
+                            color: account.cashBalance >= 0
+                                ? FinDT.textPrimary
+                                : FinDT.danger,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  height: 12.h,
+                  width: 1,
+                  color: FinDT.border,
+                ),
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(Icons.phone_android_outlined,
+                          size: 13.sp, color: const Color(0xFF6D28D9)),
+                      SizedBox(width: 4.w),
+                      Text(
+                        'STC Pay: ',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          color: FinDT.textSecondary,
+                        ),
+                      ),
+                      Flexible(
+                        child: Text(
+                          '${account.currency} ${currencyFormat.format(account.stcPayBalance)}',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w700,
+                            color: account.stcPayBalance >= 0
+                                ? FinDT.textPrimary
+                                : FinDT.danger,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+          if (enteredAmount > 0) ...[
+            SizedBox(height: 8.h),
+            Divider(
+              height: 1,
+              color: isOverBalance
+                  ? FinDT.danger.withValues(alpha: 0.15)
+                  : FinDT.success.withValues(alpha: 0.15),
+            ),
+            SizedBox(height: 8.h),
+            Row(
+              children: [
+                Icon(
+                  isOverBalance
+                      ? Icons.warning_amber_rounded
+                      : Icons.check_circle_outline_rounded,
+                  size: 14.sp,
+                  color: isOverBalance ? FinDT.danger : FinDT.success,
+                ),
+                SizedBox(width: 6.w),
+                Expanded(
+                  child: Text(
+                    isOverBalance
+                        ? 'Expense amount (${currencyFormat.format(enteredAmount)}) exceeds ${isPettyCash ? (_paymentMethod == "cash" ? "Physical Cash" : "STC Pay") : "available"} balance (${currencyFormat.format(relevantBalance)})'
+                        : 'Projected balance after expense: ${account.currency} ${currencyFormat.format(remaining)}',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      fontWeight:
+                          isOverBalance ? FontWeight.w600 : FontWeight.w500,
+                      color: isOverBalance
+                          ? FinDT.danger
+                          : const Color(0xFF166534),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildVehicleField(VehicleProvider vehProv) {
     VehicleEntity? selected;
     if (_selectedVehicleId != null && _selectedVehicleId!.isNotEmpty) {
@@ -800,11 +1188,12 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         : (_selectedVehicleName ?? '');
 
     return FormField<String>(
+      key: ValueKey(_selectedVehicleId),
       initialValue: _selectedVehicleId,
       validator: (v) {
-        if (_isFuelType &&
+        if (_isVehicleRelated &&
             (_selectedVehicleId == null || _selectedVehicleId!.isEmpty)) {
-          return 'Vehicle is required for fuel expenses';
+          return 'Please select a vehicle';
         }
         return null;
       },
@@ -844,9 +1233,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                       child: Text(
                         display.isNotEmpty
                             ? display
-                            : (_isFuelType
-                                ? 'Select vehicle (required for fuel)...'
-                                : 'Search & select vehicle (optional)...'),
+                            : 'Search & select vehicle *',
                         style: GoogleFonts.inter(
                           fontSize: 12.sp,
                           color: display.isNotEmpty
@@ -925,65 +1312,85 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
           }).toList();
 
           return AlertDialog(
-            title: const Text('Select vehicle'),
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: finDialogShape,
+            title: finDialogTitle('Select Vehicle', icon: Icons.directions_car_outlined),
             content: SizedBox(
-              width: 480.w,
-              height: 420.h,
+              width: 440.w,
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   TextField(
                     controller: searchCtrl,
-                    decoration: const InputDecoration(
-                      hintText: 'Search plate, make, model...',
-                      prefixIcon: Icon(Icons.search),
-                      border: OutlineInputBorder(),
+                    decoration: finDialogInputDecoration(
+                      label: 'Search Vehicle',
+                      hint: 'Search plate, make, model...',
+                      prefixIcon: Icons.search,
                     ),
+                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
                     onChanged: (v) => setLocal(() => query = v),
                   ),
                   SizedBox(height: 12.h),
-                  if (vehProv.vehicles.isEmpty)
-                    const Expanded(
-                      child: Center(child: Text('No vehicles loaded')),
-                    )
-                  else
-                    Expanded(
-                      child: ListView.builder(
-                        itemCount: vehicles.length,
-                        itemBuilder: (_, i) {
-                          final v = vehicles[i];
-                          return ListTile(
-                            leading: Icon(
-                              Icons.directions_car,
-                              color: FinDT.brand,
-                              size: 20.sp,
-                            ),
-                            title: Text(
-                              v.plateNumber,
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: 300.h),
+                    child: vehicles.isEmpty
+                        ? Padding(
+                            padding: EdgeInsets.all(24.w),
+                            child: Text(
+                              'No vehicles found',
                               style: GoogleFonts.inter(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13.sp,
+                                fontSize: 12.sp,
+                                color: FinDT.textSecondary,
                               ),
                             ),
-                            subtitle: Text(
-                              '${v.make} ${v.model} · ${v.year}',
-                              style: GoogleFonts.inter(fontSize: 11.sp),
+                          )
+                        : ListView.separated(
+                            shrinkWrap: true,
+                            itemCount: vehicles.length,
+                            separatorBuilder: (_, __) => const Divider(
+                              height: 1,
+                              color: FinDT.borderLight,
                             ),
-                            onTap: () {
-                              Navigator.pop(ctx);
-                              onSelect(v);
+                            itemBuilder: (_, i) {
+                              final v = vehicles[i];
+                              return ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: FinDT.brand.withValues(alpha: 0.1),
+                                  child: Icon(
+                                    Icons.directions_car_rounded,
+                                    color: FinDT.brand,
+                                    size: 18.sp,
+                                  ),
+                                ),
+                                title: Text(
+                                  v.plateNumber,
+                                  style: GoogleFonts.inter(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 13.sp,
+                                    color: FinDT.textPrimary,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  '${v.make} ${v.model} · ${v.year}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.sp,
+                                    color: FinDT.textSecondary,
+                                  ),
+                                ),
+                                onTap: () {
+                                  Navigator.pop(ctx);
+                                  onSelect(v);
+                                },
+                              );
                             },
-                          );
-                        },
-                      ),
-                    ),
+                          ),
+                  ),
                 ],
               ),
             ),
             actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
-              ),
+              finDialogCancelButton(ctx),
             ],
           );
         },
@@ -1144,11 +1551,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   Future<void> _saveExpense(FinanceProvider finProv) async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_isFuelType &&
+    if (_isVehicleRelated &&
         (_selectedVehicleId == null || _selectedVehicleId!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Select a vehicle for fuel expenses'),
+          content: Text('Please select a vehicle for vehicle-related expenses'),
           backgroundColor: FinDT.danger,
         ),
       );
@@ -1200,9 +1607,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
             ? widget.expense!.status
             : ExpenseStatus.pending,
         employeeId: _selectedEmployeeId,
-        vehicleId: _selectedVehicleId,
-        vehicleName: _selectedVehicleName,
-        mileageKm: _mileageController.text.isNotEmpty
+        vehicleId: _isVehicleRelated ? _selectedVehicleId : null,
+        vehicleName: _isVehicleRelated ? _selectedVehicleName : null,
+        mileageKm: _isVehicleRelated && _mileageController.text.isNotEmpty
             ? double.tryParse(_mileageController.text)
             : null,
         receiptUrls: _receiptUrls,
