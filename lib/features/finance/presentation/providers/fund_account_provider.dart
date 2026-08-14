@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/entities/post_fund_request.dart';
+import '../../domain/usecases/generate_account_code_usecase.dart';
 import '../../domain/usecases/get_all_fund_accounts_usecase.dart';
 import '../../domain/usecases/insert_fund_account_usecase.dart';
 import '../../domain/usecases/update_fund_account_usecase.dart';
@@ -20,6 +21,7 @@ class FundAccountProvider with ChangeNotifier {
   final InsertTransactionUseCase insertTransactionUseCase;
   final PostFundMovementUseCase postFundMovementUseCase;
   final TransferFundsUseCase transferFundsUseCase;
+  final GenerateAccountCodeUseCase generateAccountCodeUseCase;
 
   FundAccountProvider({
     required this.getAllFundAccountsUseCase,
@@ -30,6 +32,7 @@ class FundAccountProvider with ChangeNotifier {
     required this.insertTransactionUseCase,
     required this.postFundMovementUseCase,
     required this.transferFundsUseCase,
+    required this.generateAccountCodeUseCase,
   });
 
   List<FundAccountEntity> _accounts = [];
@@ -76,15 +79,29 @@ class FundAccountProvider with ChangeNotifier {
     }
   }
 
+  /// Generates a unique sequential account code based on account type.
+  String generateUniqueCode(FundAccountType type) {
+    return generateAccountCodeUseCase(type, _accounts);
+  }
+
   Future<void> insertAccount(FundAccountEntity account) async {
     _error = null;
-    _accounts = [account, ..._accounts];
+
+    // Guaranteed fallback: If code is missing or duplicate, resolve unique code
+    String finalCode = account.code.trim();
+    if (finalCode.isEmpty ||
+        _accounts.any((a) => a.code.toUpperCase() == finalCode.toUpperCase() && a.id != account.id)) {
+      finalCode = generateUniqueCode(account.type);
+    }
+
+    final cleanAccount = account.copyWith(code: finalCode);
+    _accounts = [cleanAccount, ..._accounts];
     notifyListeners();
 
     try {
-      await insertFundAccountUseCase(account);
+      await insertFundAccountUseCase(cleanAccount);
     } catch (e) {
-      _accounts = _accounts.where((a) => a.id != account.id).toList();
+      _accounts = _accounts.where((a) => a.id != cleanAccount.id).toList();
       _error = e.toString();
       debugPrint('Error inserting fund account: $e');
       notifyListeners();

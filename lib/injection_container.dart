@@ -135,6 +135,7 @@ import 'features/finance/domain/usecases/reject_expense_usecase.dart';
 import 'features/finance/domain/usecases/void_expense_usecase.dart';
 import 'features/finance/domain/usecases/generate_reference_number_usecase.dart';
 import 'features/finance/domain/usecases/upload_receipt_usecase.dart';
+import 'features/finance/domain/usecases/generate_account_code_usecase.dart';
 import 'features/finance/domain/usecases/get_all_fund_accounts_usecase.dart';
 import 'features/finance/domain/usecases/insert_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/update_fund_account_usecase.dart';
@@ -565,6 +566,7 @@ Future<void> init() async {
       insertTransactionUseCase: sl(),
       postFundMovementUseCase: sl(),
       transferFundsUseCase: sl(),
+      generateAccountCodeUseCase: sl(),
     ),
   );
   sl.registerFactory(
@@ -601,6 +603,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => UploadReceiptUseCase(sl()));
 
   // UseCases - Fund Accounts
+  sl.registerLazySingleton(() => GenerateAccountCodeUseCase());
   sl.registerLazySingleton(() => GetAllFundAccountsUseCase(sl()));
   sl.registerLazySingleton(() => InsertFundAccountUseCase(sl()));
   sl.registerLazySingleton(() => UpdateFundAccountUseCase(sl()));

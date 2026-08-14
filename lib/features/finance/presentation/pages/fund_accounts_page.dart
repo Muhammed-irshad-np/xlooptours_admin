@@ -1661,9 +1661,12 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     final isEditing = account != null;
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: account?.name);
-    final codeCtrl = TextEditingController(text: account?.code);
-    String? assignedName = account?.assignedTo;
     FundAccountType selectedType = account?.type ?? FundAccountType.pettyCash;
+    final initialCode = isEditing
+        ? (account.code.isNotEmpty ? account.code : provider.generateUniqueCode(selectedType))
+        : provider.generateUniqueCode(selectedType);
+    final codeCtrl = TextEditingController(text: initialCode);
+    String? assignedName = account?.assignedTo;
     String currency = account?.currency ?? 'SAR';
 
     showDialog(
@@ -1697,17 +1700,6 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                       validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                     ),
                     SizedBox(height: 14.h),
-                    TextFormField(
-                      controller: codeCtrl,
-                      decoration: _dialogInputDecoration(
-                        label: 'Account Code *',
-                        hint: 'e.g. ACC-PETTY-01',
-                        prefixIcon: Icons.qr_code_rounded,
-                      ),
-                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                      validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-                    ),
-                    SizedBox(height: 14.h),
                     DropdownButtonFormField<FundAccountType>(
                       initialValue: selectedType,
                       decoration: _dialogInputDecoration(
@@ -1723,7 +1715,57 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                             ),
                           )
                           .toList(),
-                      onChanged: (v) => setStateDialog(() => selectedType = v ?? FundAccountType.pettyCash),
+                      onChanged: (v) {
+                        final newType = v ?? FundAccountType.pettyCash;
+                        setStateDialog(() {
+                          selectedType = newType;
+                          if (!isEditing) {
+                            codeCtrl.text = provider.generateUniqueCode(newType);
+                          }
+                        });
+                      },
+                    ),
+                    SizedBox(height: 14.h),
+                    TextFormField(
+                      controller: codeCtrl,
+                      readOnly: true,
+                      decoration: _dialogInputDecoration(
+                        label: 'Account Code',
+                        hint: 'Auto-generated',
+                        prefixIcon: Icons.qr_code_rounded,
+                      ).copyWith(
+                        fillColor: FinDT.bgPage,
+                        suffixIcon: Container(
+                          margin: EdgeInsets.only(right: 8.w),
+                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                          decoration: BoxDecoration(
+                            color: FinDT.brand.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6.r),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.auto_awesome_rounded, size: 12.sp, color: FinDT.brand),
+                              SizedBox(width: 4.w),
+                              Text(
+                                'Auto',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: FinDT.brand,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
+                        color: FinDT.textPrimary,
+                        letterSpacing: 0.5,
+                      ),
+                      validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                     ),
                     SizedBox(height: 14.h),
                     DropdownButtonFormField<String>(

@@ -31,6 +31,27 @@ enum FundAccountType {
         return 'Other';
     }
   }
+
+  String get codePrefix {
+    switch (this) {
+      case FundAccountType.pettyCash:
+        return 'PC';
+      case FundAccountType.driverAccount:
+        return 'DRV';
+      case FundAccountType.tamkeen:
+        return 'TMK';
+      case FundAccountType.admin:
+        return 'ADM';
+      case FundAccountType.fuelCard:
+        return 'FL';
+      case FundAccountType.stcPay:
+        return 'STC';
+      case FundAccountType.bank:
+        return 'BNK';
+      case FundAccountType.other:
+        return 'ACC';
+    }
+  }
 }
 
 /// Represents a virtual fund account used for tracking money flow.
