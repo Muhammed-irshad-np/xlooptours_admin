@@ -512,7 +512,8 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
   Widget _buildExpiryBadge(DateTime? expiryDate, int alertDays) {
     if (expiryDate == null) return const SizedBox.shrink();
 
-    final now = DateTime.now();
+    final _now = DateTime.now();
+    final now = DateTime(_now.year, _now.month, _now.day);
     final difference = expiryDate.difference(now).inDays;
     
     Color baseColor;
@@ -705,7 +706,17 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                               Wrap(
                                 spacing: 8.w,
                                 runSpacing: 8.h,
-                                  children: filing.documents.map((doc) {
+                                  children: filing.documents.asMap().entries.map((entry) {
+                                    final index = entry.key;
+                                    final doc = entry.value;
+                                    String displayName = doc.name;
+                                    if (index == 0) {
+                                      displayName = 'Bill Receipt';
+                                    } else if (index == 1) {
+                                      displayName = 'Bank Statement';
+                                    } else if (index == 2) {
+                                      displayName = 'Payment Receipt';
+                                    }
                                     return Container(
                                       padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
                                       decoration: BoxDecoration(
@@ -722,7 +733,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                                             child: ConstrainedBox(
                                               constraints: BoxConstraints(maxWidth: 120.w),
                                               child: Text(
-                                                doc.name,
+                                                displayName,
                                                 maxLines: 1,
                                                 overflow: TextOverflow.ellipsis,
                                                 style: GoogleFonts.plusJakartaSans(
@@ -736,14 +747,14 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                                           SizedBox(width: 4.w),
                                           IconButton(
                                             icon: Icon(Icons.visibility_outlined, size: 16.sp, color: const Color(0xFF64748B)),
-                                            onPressed: () => _viewDocument(doc.url, doc.name),
+                                            onPressed: () => _viewDocument(doc.url, displayName),
                                             constraints: BoxConstraints(minWidth: 32.w, minHeight: 32.h),
                                             padding: EdgeInsets.zero,
                                             tooltip: 'View',
                                           ),
                                           IconButton(
                                             icon: Icon(Icons.share_outlined, size: 16.sp, color: const Color(0xFFF59E0B)),
-                                            onPressed: () => ShareHelper.shareDocument(context, url: doc.url, title: doc.name),
+                                            onPressed: () => ShareHelper.shareDocument(context, url: doc.url, title: displayName),
                                             constraints: BoxConstraints(minWidth: 32.w, minHeight: 32.h),
                                             padding: EdgeInsets.zero,
                                             tooltip: 'Share',
@@ -1187,7 +1198,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
       );
       if (result != null && result.files.isNotEmpty && result.files.single.path != null) {
         final pf = result.files.single;
-        final xFile = XFile(pf.path!);
+        final xFile = XFile(pf.path!, name: pf.name);
 
         // Size check using XFile.length()
         final fileSize = await xFile.length();

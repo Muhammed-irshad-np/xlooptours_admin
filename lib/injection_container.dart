@@ -2,7 +2,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:get_it/get_it.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'services/dev_database_sync_service.dart';
@@ -12,7 +11,6 @@ import 'features/auth/data/repositories/auth_repository_impl.dart';
 import 'features/auth/domain/repositories/auth_repository.dart';
 import 'features/auth/domain/usecases/auth_getters.dart';
 import 'features/auth/domain/usecases/sign_in_with_email.dart';
-import 'features/auth/domain/usecases/sign_in_with_google.dart';
 import 'features/auth/domain/usecases/sign_out.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 
@@ -62,6 +60,10 @@ import 'features/vehicle/domain/usecases/get_vehicle_settings_usecase.dart';
 import 'features/vehicle/domain/usecases/update_vehicle_settings_usecase.dart';
 import 'features/vehicle/domain/usecases/get_vehicle_followup_alerts_usecase.dart';
 import 'features/vehicle/domain/usecases/extend_vehicle_maintenance_usecase.dart';
+import 'features/vehicle/domain/usecases/get_all_shops_usecase.dart';
+import 'features/vehicle/domain/usecases/insert_shop_usecase.dart';
+import 'features/vehicle/domain/usecases/update_shop_usecase.dart';
+import 'features/vehicle/domain/usecases/delete_shop_usecase.dart';
 import 'features/vehicle/presentation/providers/vehicle_provider.dart';
 
 import 'features/company/data/datasources/company_remote_data_source.dart';
@@ -158,24 +160,39 @@ import 'features/finance/presentation/providers/fund_account_provider.dart';
 import 'features/finance/presentation/providers/petty_cash_provider.dart';
 import 'features/finance/presentation/providers/cash_advance_provider.dart';
 
+import 'features/user_management/data/datasources/user_management_remote_data_source.dart';
+import 'features/user_management/data/repositories/user_management_repository_impl.dart';
+import 'features/user_management/domain/repositories/user_management_repository.dart';
+import 'features/user_management/domain/usecases/change_user_login_email.dart';
+import 'features/user_management/domain/usecases/change_user_password.dart';
+import 'features/user_management/domain/usecases/create_role.dart';
+import 'features/user_management/domain/usecases/create_user.dart';
+import 'features/user_management/domain/usecases/delete_role.dart';
+import 'features/user_management/domain/usecases/get_all_roles.dart';
+import 'features/user_management/domain/usecases/get_all_users.dart';
+import 'features/user_management/domain/usecases/seed_default_roles.dart';
+import 'features/user_management/domain/usecases/toggle_user_status.dart';
+import 'features/user_management/domain/usecases/update_role.dart';
+import 'features/user_management/domain/usecases/update_user.dart';
+import 'features/user_management/presentation/providers/user_management_provider.dart';
+
 final sl = GetIt.instance; // sl stands for Service Locator
 
 Future<void> init() async {
   //! Features - Authentication
-  // State Management (Provider)
-  sl.registerFactory(
+  // State Management (Provider) - Must be LazySingleton so GoRouter and MultiProvider share the exact same instance!
+  sl.registerLazySingleton(
     () => AuthProvider(
       signInWithEmail: sl(),
-      signInWithGoogle: sl(),
       signOut: sl(),
       getCurrentUser: sl(),
       getAuthStateChanges: sl(),
+      authRepository: sl(),
     ),
   );
 
   // UseCases
   sl.registerLazySingleton(() => SignInWithEmail(sl()));
-  sl.registerLazySingleton(() => SignInWithGoogle(sl()));
   sl.registerLazySingleton(() => SignOut(sl()));
   sl.registerLazySingleton(() => GetCurrentUser(sl()));
   sl.registerLazySingleton(() => GetAuthStateChanges(sl()));
@@ -189,7 +206,6 @@ Future<void> init() async {
   sl.registerLazySingleton<AuthRemoteDataSource>(
     () => AuthRemoteDataSourceImpl(
       auth: sl(),
-      googleSignIn: sl(),
       firestore: sl(),
     ),
   );
@@ -339,6 +355,10 @@ Future<void> init() async {
       insertMaintenanceTypeUseCase: sl(),
       updateMaintenanceTypeUseCase: sl(),
       deleteMaintenanceTypeUseCase: sl(),
+      getAllShopsUseCase: sl(),
+      insertShopUseCase: sl(),
+      updateShopUseCase: sl(),
+      deleteShopUseCase: sl(),
       getVehicleSettingsUseCase: sl(),
       updateVehicleSettingsUseCase: sl(),
       extendVehicleMaintenanceUseCase: sl(),
@@ -368,6 +388,11 @@ Future<void> init() async {
   sl.registerLazySingleton(() => InsertMaintenanceTypeUseCase(sl()));
   sl.registerLazySingleton(() => UpdateMaintenanceTypeUseCase(sl()));
   sl.registerLazySingleton(() => DeleteMaintenanceTypeUseCase(sl()));
+
+  sl.registerLazySingleton(() => GetAllShopsUseCase(sl()));
+  sl.registerLazySingleton(() => InsertShopUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateShopUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteShopUseCase(sl()));
 
   // Repositories
   sl.registerLazySingleton<VehicleRepository>(
@@ -616,24 +641,58 @@ Future<void> init() async {
     () => FinanceRemoteDataSourceImpl(firestore: sl(), storage: sl()),
   );
 
+  //! Features - User Management
+  // State Management (Provider)
+  sl.registerFactory(
+    () => UserManagementProvider(
+      getAllUsers: sl(),
+      createUser: sl(),
+      updateUser: sl(),
+      toggleUserStatus: sl(),
+      changeUserPassword: sl(),
+      changeUserLoginEmail: sl(),
+      getAllRoles: sl(),
+      createRole: sl(),
+      updateRole: sl(),
+      deleteRole: sl(),
+      seedDefaultRoles: sl(),
+    ),
+  );
+
+  // UseCases
+  sl.registerLazySingleton(() => GetAllUsers(sl()));
+  sl.registerLazySingleton(() => CreateUser(sl()));
+  sl.registerLazySingleton(() => UpdateUser(sl()));
+  sl.registerLazySingleton(() => ToggleUserStatus(sl()));
+  sl.registerLazySingleton(() => ChangeUserPassword(sl()));
+  sl.registerLazySingleton(() => ChangeUserLoginEmail(sl()));
+  sl.registerLazySingleton(() => GetAllRoles(sl()));
+  sl.registerLazySingleton(() => CreateRole(sl()));
+  sl.registerLazySingleton(() => UpdateRole(sl()));
+  sl.registerLazySingleton(() => DeleteRole(sl()));
+  sl.registerLazySingleton(() => SeedDefaultRoles(sl()));
+
+  // Repositories
+  sl.registerLazySingleton<UserManagementRepository>(
+    () => UserManagementRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data sources
+  sl.registerLazySingleton<UserManagementRemoteDataSource>(
+    () => UserManagementRemoteDataSourceImpl(auth: sl(), firestore: sl()),
+  );
+
   //! Core
   // e.g. NetworkInfo
 
   //! External
   final auth = FirebaseAuth.instance;
   final firestore = FirebaseFirestore.instance;
-  final isDev = const String.fromEnvironment('ENV', defaultValue: 'prod') == 'dev';
-  final googleSignIn = GoogleSignIn(
-    clientId: isDev
-        ? '1014331668523-sso54ruvdpk1qt3htlab9fo08rl2b73u.apps.googleusercontent.com'
-        : '1098817651136-nv3hg1dtaio5tvfk7flbn3b4f6k5fgqt.apps.googleusercontent.com',
-  );
   final storage = FirebaseStorage.instance;
   final sharedPreferences = await SharedPreferences.getInstance();
 
   sl.registerLazySingleton(() => auth);
   sl.registerLazySingleton(() => firestore);
-  sl.registerLazySingleton(() => googleSignIn);
   sl.registerLazySingleton(() => storage);
   sl.registerLazySingleton(() => sharedPreferences);
   sl.registerLazySingleton(() => http.Client());

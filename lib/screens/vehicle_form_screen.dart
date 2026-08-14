@@ -20,6 +20,7 @@ import 'package:file_picker/file_picker.dart';
 import '../services/image_service.dart';
 import 'document_viewer_screen.dart';
 import '../core/utils/activity_logger.dart';
+import '../core/utils/change_diff_helper.dart';
 
 class VehicleFormScreen extends StatefulWidget {
   final VehicleEntity? vehicle;
@@ -609,10 +610,17 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       if (widget.vehicle != null) {
         await provider.updateVehicle(vehicle);
         if (mounted) {
+          final changeSummary = ChangeDiffHelper.describeVehicleChanges(
+            widget.vehicle!,
+            vehicle,
+          );
+          
           await ActivityLogger.log(
             context,
             title: 'Vehicle Updated',
-            message: 'Vehicle ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}) has been updated.',
+            message: changeSummary != null
+                ? 'Vehicle ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}) updated: $changeSummary.'
+                : 'Vehicle ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}) has been updated.',
             relatedId: vehicleId,
           );
         }
@@ -1115,7 +1123,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                             name: platformFile.name,
                           );
                         } else if (platformFile.path != null) {
-                          pickedFileNotifier.value = XFile(platformFile.path!);
+                          pickedFileNotifier.value = XFile(platformFile.path!, name: platformFile.name);
                         }
                       }
                     } catch (e) {

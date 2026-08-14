@@ -94,7 +94,7 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
               name: platformFile.name,
             );
           } else if (platformFile.path != null) {
-            xFile = XFile(platformFile.path!);
+            xFile = XFile(platformFile.path!, name: platformFile.name);
           } else {
             continue;
           }
@@ -223,7 +223,7 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
         await ActivityLogger.log(
           context,
           title: 'Follow-up Completed',
-          message: 'Follow-up maintenance (${widget.record.serviceType}) completed for vehicle ${widget.vehicle.make} ${widget.vehicle.model} (${widget.vehicle.plateNumber}). Cost: SAR ${completion.cost.toStringAsFixed(2)}, Odometer: ${completion.mileage} km.',
+          message: 'Follow-up maintenance (${widget.record.serviceType}) completed for vehicle ${widget.vehicle.make} ${widget.vehicle.model} (${widget.vehicle.plateNumber}). Cost: SAR ${completion.cost.toStringAsFixed(2)}, Service Odometer: ${completion.mileage} km.',
           relatedId: widget.vehicle.id,
         );
       }

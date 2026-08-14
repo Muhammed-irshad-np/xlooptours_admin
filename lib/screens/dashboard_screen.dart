@@ -31,6 +31,7 @@ import 'package:xloop_invoice/screens/employee_expiry_tracker_screen.dart';
 import 'package:xloop_invoice/screens/vehicle_expiry_tracker_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:xloop_invoice/widgets/dev_sync_dialog.dart';
+import 'package:xloop_invoice/core/utils/activity_logger.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
 class _DT {
@@ -182,9 +183,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                 mobile: Column(
                   children: [
                     const _ExpiriesSection(),
-                    SizedBox(height: 32.h),
-                    _buildRecentActivitySection(),
                     if (isAdmin) ...[
+                      SizedBox(height: 32.h),
+                      _buildRecentActivitySection(),
                       SizedBox(height: 32.h),
                       _buildFeedbacksSection(),
                     ],
@@ -200,9 +201,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                       child: Column(
                         children: [
                           const _ExpiriesSection(),
-                          SizedBox(height: 32.h),
-                          _buildRecentActivitySection(),
                           if (isAdmin) ...[
+                            SizedBox(height: 32.h),
+                            _buildRecentActivitySection(),
                             SizedBox(height: 32.h),
                             _buildFeedbacksSection(),
                           ],
@@ -765,22 +766,35 @@ class _DashboardScreenState extends State<DashboardScreen>
       builder: (ctx) => _OdometerDialog(
         vehicle: vehicle,
         controller: controller,
-        onConfirm: (km) {
+        onConfirm: (km) async {
+          final oldKm = vehicle.currentOdometer ?? 0;
           context.read<VehicleProvider>().updateVehicleOdometer(vehicle.id, km);
-          Navigator.pop(ctx);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12.r),
+          if (context.mounted) {
+            await ActivityLogger.log(
+              context,
+              title: 'Odometer Updated',
+              message:
+                  'Odometer updated for ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}): '
+                  '$oldKm KM → $km KM.',
+              relatedId: vehicle.id,
+            );
+          }
+          if (ctx.mounted) Navigator.pop(ctx);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12.r),
+                ),
+                backgroundColor: _DT.success,
+                content: Text(
+                  'Odometer updated successfully',
+                  style: GoogleFonts.inter(color: Colors.white),
+                ),
               ),
-              backgroundColor: _DT.success,
-              content: Text(
-                'Odometer updated successfully',
-                style: GoogleFonts.inter(color: Colors.white),
-              ),
-            ),
-          );
+            );
+          }
         },
       ),
     );
@@ -1297,7 +1311,11 @@ class _ExpiryCardState extends State<_ExpiryCard> {
         // Step 0: Original Due
         _buildTimelineStep(
           title: 'Originally Due',
-          subtitle: '${mAlert.originalDueMileage} km',
+          subtitle: mAlert.isDateTrigger
+              ? (mAlert.lastServiceDate != null
+                  ? DateFormat('MMM dd, yyyy').format(mAlert.lastServiceDate!)
+                  : 'Scheduled Date')
+              : '${mAlert.originalDueMileage} km',
           icon: Icons.flag_outlined,
           color: _DT.textSecondary,
           isLast: mAlert.extensionHistory.isEmpty,
@@ -1308,9 +1326,14 @@ class _ExpiryCardState extends State<_ExpiryCard> {
           final ext = entry.value;
           final isLast = index == mAlert.extensionHistory.length - 1;
 
+          final titleText = (mAlert.isDateTrigger || ext.nextServiceDate != null)
+              ? (ext.nextServiceDate != null
+                  ? 'Extended to target date ${DateFormat('MMM dd, yyyy').format(ext.nextServiceDate!)}'
+                  : 'Extended target date')
+              : 'Extended by ${ext.extendedMileage ?? 0} km to ${ext.nextServiceMileage ?? 0} km';
+
           return _buildTimelineStep(
-            title:
-                'Extended by ${ext.extendedMileage ?? 0} km to ${ext.nextServiceMileage ?? 0} km',
+            title: titleText,
             subtitle:
                 '${DateFormat('MMM dd, yyyy').format(ext.date)} • By ${ext.performedBy ?? "Unknown"}\nReason: ${_cleanReason(ext.notes)}',
             icon: Icons.history,
@@ -1500,12 +1523,26 @@ class _ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (icon, color) = switch (activity.type) {
+    var (icon, color) = switch (activity.type) {
       NotificationType.registration => (Icons.person_add_rounded, _DT.success),
       NotificationType.invoice => (Icons.receipt_long_rounded, _DT.brand),
       NotificationType.activity => (Icons.bolt_rounded, _DT.brand),
       _ => (Icons.info_outline_rounded, _DT.warning),
     };
+
+    if (activity.type == NotificationType.activity) {
+      final lowerTitle = activity.title.toLowerCase();
+      if (lowerTitle.contains('delete') || lowerTitle.contains('remove') || lowerTitle.contains('cancel')) {
+        icon = Icons.delete_outline_rounded;
+        color = Colors.red;
+      } else if (lowerTitle.contains('add') || lowerTitle.contains('create') || lowerTitle.contains('new')) {
+        icon = Icons.add_circle_outline_rounded;
+        color = Colors.green;
+      } else if (lowerTitle.contains('update') || lowerTitle.contains('edit') || lowerTitle.contains('change')) {
+        icon = Icons.edit_outlined;
+        color = Colors.blue;
+      }
+    }
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 14.h),

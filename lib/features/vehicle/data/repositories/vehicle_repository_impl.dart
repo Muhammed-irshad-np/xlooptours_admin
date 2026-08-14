@@ -11,6 +11,9 @@ import '../models/maintenance_type_model.dart';
 import '../models/vehicle_settings_model.dart';
 import '../../domain/entities/vehicle_settings_entity.dart';
 
+import '../../domain/entities/shop_entity.dart';
+import '../models/shop_model.dart';
+
 class VehicleRepositoryImpl implements VehicleRepository {
   final VehicleRemoteDataSource remoteDataSource;
 
@@ -101,6 +104,28 @@ class VehicleRepositoryImpl implements VehicleRepository {
   }
 
   @override
+  Future<List<ShopEntity>> getAllShops() async {
+    return await remoteDataSource.getAllShops();
+  }
+
+  @override
+  Future<void> insertShop(ShopEntity shop) async {
+    final shopModel = ShopModel.fromEntity(shop);
+    return await remoteDataSource.insertShop(shopModel);
+  }
+
+  @override
+  Future<void> updateShop(ShopEntity shop) async {
+    final shopModel = ShopModel.fromEntity(shop);
+    return await remoteDataSource.updateShop(shopModel);
+  }
+
+  @override
+  Future<void> deleteShop(String id) async {
+    return await remoteDataSource.deleteShop(id);
+  }
+
+  @override
   Future<VehicleSettingsEntity> getVehicleSettings() async {
     return await remoteDataSource.getVehicleSettings();
   }
@@ -111,3 +136,4 @@ class VehicleRepositoryImpl implements VehicleRepository {
     return await remoteDataSource.updateVehicleSettings(settingsModel);
   }
 }
+

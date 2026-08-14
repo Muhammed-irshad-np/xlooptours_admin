@@ -3,11 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:xloop_invoice/features/vehicle/data/models/vehicle_settings_model.dart';
 
 import '../models/vehicle_model.dart';
 import '../models/vehicle_make_model.dart';
 import '../models/maintenance_type_model.dart';
-import '../models/vehicle_settings_model.dart';
+import '../models/shop_model.dart';
 
 abstract class VehicleRemoteDataSource {
   // Vehicle
@@ -28,6 +29,12 @@ abstract class VehicleRemoteDataSource {
   Future<void> insertMaintenanceType(MaintenanceTypeModel type);
   Future<void> updateMaintenanceType(MaintenanceTypeModel type);
   Future<void> deleteMaintenanceType(String id);
+
+  // Shops
+  Future<List<ShopModel>> getAllShops();
+  Future<void> insertShop(ShopModel shop);
+  Future<void> updateShop(ShopModel shop);
+  Future<void> deleteShop(String id);
 
   /// Uploads a scanned document attachment to Firebase Storage.
   Future<String> uploadDocumentAttachment(
@@ -131,10 +138,7 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
     final metadata = SettableMetadata(contentType: _getMimeType(ext));
 
     if (kIsWeb) {
-      await storageRef.putData(
-        await file.readAsBytes(),
-        metadata,
-      );
+      await storageRef.putData(await file.readAsBytes(), metadata);
     } else {
       await storageRef.putFile(File(file.path), metadata);
     }
@@ -208,8 +212,34 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
   }
 
   @override
+  Future<List<ShopModel>> getAllShops() async {
+    final snapshot = await firestore.collection('shops').orderBy('name').get();
+    return snapshot.docs
+        .map((doc) => ShopModel.fromJson(doc.data()..['id'] = doc.id))
+        .toList();
+  }
+
+  @override
+  Future<void> insertShop(ShopModel shop) async {
+    await firestore.collection('shops').doc(shop.id).set(shop.toJson());
+  }
+
+  @override
+  Future<void> updateShop(ShopModel shop) async {
+    await firestore.collection('shops').doc(shop.id).update(shop.toJson());
+  }
+
+  @override
+  Future<void> deleteShop(String id) async {
+    await firestore.collection('shops').doc(id).delete();
+  }
+
+  @override
   Future<VehicleSettingsModel> getVehicleSettings() async {
-    final doc = await firestore.collection('settings').doc('vehicle_alerts').get();
+    final doc = await firestore
+        .collection('settings')
+        .doc('vehicle_alerts')
+        .get();
     if (doc.exists) {
       return VehicleSettingsModel.fromJson(doc.data()!);
     }

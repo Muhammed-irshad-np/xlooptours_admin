@@ -145,7 +145,9 @@ class _VehicleExpiryTrackerScreenState
     } else if (alert is VehicleFollowUpAlert) {
       // Prioritize past due dates, then closer dates
       if (alert.nextServiceDate != null) {
-        return alert.nextServiceDate!.difference(DateTime.now()).inDays;
+        final _now = DateTime.now();
+        final today = DateTime(_now.year, _now.month, _now.day);
+        return alert.nextServiceDate!.difference(today).inDays;
       }
       return 0; // Default to urgent if no date
     }
@@ -646,9 +648,12 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
   @override
   Widget build(BuildContext context) {
     final a = widget.alert;
-    final isOverdue = a.kmOverdue > 0;
-    final isCritical =
-        a.kmOverdue <= 0 && a.kmOverdue >= -1000; // Within 1000km
+    final isOverdue = a.isDateTrigger
+        ? ((a.daysOverdue ?? 0) > 0)
+        : a.kmOverdue > 0;
+    final isCritical = a.isDateTrigger
+        ? ((a.daysRemaining ?? 99) <= 7 && (a.daysOverdue ?? 0) <= 0)
+        : (a.kmOverdue <= 0 && a.kmOverdue >= -1000);
 
     final color = isOverdue
         ? _DT.danger
@@ -779,7 +784,11 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
                           ),
                           SizedBox(width: 8.w),
                           Text(
-                            'Due at: ${a.nextServiceMileage} km',
+                            a.isDateTrigger
+                                ? (a.nextServiceDate != null
+                                    ? 'Due on: ${DateFormat('MMM dd, yyyy').format(a.nextServiceDate!)}'
+                                    : '')
+                                : 'Due at: ${a.nextServiceMileage} km',
                             style: GoogleFonts.inter(
                               fontSize: 13.sp,
                               color: _DT.textSecondary,
@@ -787,6 +796,23 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
                           ),
                         ],
                       ),
+                      if (a.shopName != null && a.shopName!.isNotEmpty) ...[
+                        SizedBox(height: 4.h),
+                        Row(
+                          children: [
+                            Icon(Icons.storefront_outlined, size: 13.sp, color: _DT.brand),
+                            SizedBox(width: 4.w),
+                            Text(
+                              'Shop: ${a.shopName}',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w600,
+                                color: _DT.brand,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -803,9 +829,13 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
                       ),
                     ),
                     Text(
-                      isOverdue
-                          ? '${a.kmOverdue} km past'
-                          : '${a.nextServiceMileage - a.currentMileage} km left',
+                      a.isDateTrigger
+                          ? (isOverdue
+                              ? '${a.daysOverdue ?? 0} days past'
+                              : '${a.daysRemaining ?? 0} days left')
+                          : (isOverdue
+                              ? '${a.kmOverdue} km past'
+                              : '${a.nextServiceMileage - a.currentMileage} km left'),
                       style: GoogleFonts.inter(
                         fontSize: 11.sp,
                         color: color.withOpacity(0.8),
@@ -966,7 +996,11 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
         // Step 0: Original Due
         _buildTimelineStep(
           title: 'Originally Due',
-          subtitle: '${mAlert.originalDueMileage} km',
+          subtitle: mAlert.isDateTrigger
+              ? (mAlert.lastServiceDate != null
+                  ? DateFormat('MMM dd, yyyy').format(mAlert.lastServiceDate!)
+                  : 'Scheduled Date')
+              : '${mAlert.originalDueMileage} km',
           icon: Icons.flag_outlined,
           color: _DT.textSecondary,
           isLast: mAlert.extensionHistory.isEmpty,
@@ -976,9 +1010,15 @@ class _VehicleMaintenanceCardState extends State<_VehicleMaintenanceCard> {
           final index = entry.key;
           final ext = entry.value;
           final isLast = index == mAlert.extensionHistory.length - 1;
-          
+
+          final titleText = (mAlert.isDateTrigger || ext.nextServiceDate != null)
+              ? (ext.nextServiceDate != null
+                  ? 'Extended to target date ${DateFormat('MMM dd, yyyy').format(ext.nextServiceDate!)}'
+                  : 'Extended target date')
+              : 'Extended by ${ext.extendedMileage ?? 0} km to ${ext.nextServiceMileage ?? 0} km';
+
           return _buildTimelineStep(
-            title: 'Extended by ${ext.extendedMileage ?? 0} km to ${ext.nextServiceMileage ?? 0} km',
+            title: titleText,
             subtitle: '${DateFormat('MMM dd, yyyy').format(ext.date)} • By ${ext.performedBy ?? "Unknown"}\nReason: ${_cleanReason(ext.notes)}',
             icon: Icons.history,
             color: _DT.brand,
@@ -1023,7 +1063,9 @@ class _VehicleFollowUpCardState extends State<_VehicleFollowUpCard> {
     bool isOverdue = false;
     bool isCritical = false;
     if (a.nextServiceDate != null) {
-      final days = a.nextServiceDate!.difference(DateTime.now()).inDays;
+      final _now = DateTime.now();
+      final today = DateTime(_now.year, _now.month, _now.day);
+      final days = a.nextServiceDate!.difference(today).inDays;
       isOverdue = days < 0;
       isCritical = days >= 0 && days <= 15;
     } else {

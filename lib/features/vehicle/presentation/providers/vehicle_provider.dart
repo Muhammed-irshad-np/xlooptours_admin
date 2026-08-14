@@ -23,6 +23,11 @@ import '../../domain/usecases/get_vehicle_settings_usecase.dart';
 import '../../domain/usecases/update_vehicle_settings_usecase.dart';
 import '../../domain/entities/vehicle_settings_entity.dart';
 import '../../domain/usecases/extend_vehicle_maintenance_usecase.dart';
+import '../../domain/entities/shop_entity.dart';
+import '../../domain/usecases/get_all_shops_usecase.dart';
+import '../../domain/usecases/insert_shop_usecase.dart';
+import '../../domain/usecases/update_shop_usecase.dart';
+import '../../domain/usecases/delete_shop_usecase.dart';
 
 class VehicleProvider extends ChangeNotifier {
   final GetAllVehiclesUseCase getAllVehiclesUseCase;
@@ -42,6 +47,11 @@ class VehicleProvider extends ChangeNotifier {
   final UpdateMaintenanceTypeUseCase updateMaintenanceTypeUseCase;
   final DeleteMaintenanceTypeUseCase deleteMaintenanceTypeUseCase;
 
+  final GetAllShopsUseCase getAllShopsUseCase;
+  final InsertShopUseCase insertShopUseCase;
+  final UpdateShopUseCase updateShopUseCase;
+  final DeleteShopUseCase deleteShopUseCase;
+
   final GetVehicleSettingsUseCase getVehicleSettingsUseCase;
   final UpdateVehicleSettingsUseCase updateVehicleSettingsUseCase;
   final ExtendVehicleMaintenanceUseCase extendVehicleMaintenanceUseCase;
@@ -49,6 +59,7 @@ class VehicleProvider extends ChangeNotifier {
   List<VehicleEntity> _vehicles = [];
   List<VehicleMakeEntity> _vehicleMakes = [];
   List<MaintenanceTypeEntity> _maintenanceTypes = [];
+  List<ShopEntity> _shops = [];
   VehicleSettingsEntity? _settings;
   bool _isLoading = false;
   String? _errorMessage;
@@ -68,6 +79,10 @@ class VehicleProvider extends ChangeNotifier {
     required this.insertMaintenanceTypeUseCase,
     required this.updateMaintenanceTypeUseCase,
     required this.deleteMaintenanceTypeUseCase,
+    required this.getAllShopsUseCase,
+    required this.insertShopUseCase,
+    required this.updateShopUseCase,
+    required this.deleteShopUseCase,
     required this.getVehicleSettingsUseCase,
     required this.updateVehicleSettingsUseCase,
     required this.extendVehicleMaintenanceUseCase,
@@ -76,9 +91,11 @@ class VehicleProvider extends ChangeNotifier {
   List<VehicleEntity> get vehicles => _vehicles;
   List<VehicleMakeEntity> get vehicleMakes => _vehicleMakes;
   List<MaintenanceTypeEntity> get maintenanceTypes => _maintenanceTypes;
+  List<ShopEntity> get shops => _shops;
   VehicleSettingsEntity? get settings => _settings;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+
 
   // ======================
   // Vehicle Methods
@@ -440,8 +457,65 @@ class VehicleProvider extends ChangeNotifier {
   }
 
   // ======================
+  // Shop Methods
+  // ======================
+
+  Future<void> fetchAllShops() async {
+    _setLoading(true);
+    try {
+      _shops = await getAllShopsUseCase();
+      _errorMessage = null;
+    } catch (e) {
+      _errorMessage = 'Failed to fetch shops: $e';
+      debugPrint(_errorMessage);
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  Future<void> addShop(ShopEntity shop) async {
+    _setLoading(true);
+    try {
+      await insertShopUseCase(shop);
+      await fetchAllShops();
+    } catch (e) {
+      _errorMessage = 'Failed to add shop: $e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
+    }
+  }
+
+  Future<void> updateShop(ShopEntity shop) async {
+    _setLoading(true);
+    try {
+      await updateShopUseCase(shop);
+      await fetchAllShops();
+    } catch (e) {
+      _errorMessage = 'Failed to update shop: $e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
+    }
+  }
+
+  Future<void> deleteShop(String id) async {
+    _setLoading(true);
+    try {
+      await deleteShopUseCase(id);
+      await fetchAllShops();
+    } catch (e) {
+      _errorMessage = 'Failed to delete shop: $e';
+      debugPrint(_errorMessage);
+      _setLoading(false);
+      rethrow;
+    }
+  }
+
+  // ======================
   // Settings Methods
   // ======================
+
 
   Future<void> fetchVehicleSettings() async {
     _setLoading(true);
@@ -475,7 +549,8 @@ class VehicleProvider extends ChangeNotifier {
   Future<void> extendVehicleMaintenance({
     required VehicleEntity vehicle,
     required String category,
-    required int extensionKm,
+    int extensionKm = 0,
+    DateTime? extensionDate,
     required String reason,
     String? performedBy,
     int? baseOdometer,
@@ -486,6 +561,7 @@ class VehicleProvider extends ChangeNotifier {
         vehicle: vehicle,
         category: category,
         extensionKm: extensionKm,
+        extensionDate: extensionDate,
         reason: reason,
         performedBy: performedBy,
         baseOdometer: baseOdometer,

@@ -1,5 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../domain/entities/app_role.dart';
+import '../../../../core/rbac/rbac_manager.dart';
 import '../../domain/entities/user_entity.dart';
 
 class UserModel extends UserEntity {
@@ -7,30 +7,41 @@ class UserModel extends UserEntity {
     required super.id,
     super.email,
     super.displayName,
-    super.isAdmin = false,
-    super.role = AppRole.viewer,
+    super.roleId = 'office_staff',
+    super.roleName,
+    super.permissions = const [],
+    super.employeeId,
+    super.employeeName,
+    super.photoUrl,
     super.isActive = true,
   });
 
   factory UserModel.fromFirebaseUser(
     User user, {
-    bool isAdmin = false,
-    AppRole role = AppRole.viewer,
+    String roleId = 'office_staff',
+    String? roleName,
+    List<String> permissions = const [],
+    String? displayName,
+    String? employeeId,
+    String? employeeName,
+    String? photoUrl,
     bool isActive = true,
   }) {
-    final resolvedRole = role;
-    final resolvedAdmin = isAdmin || resolvedRole.isAdminRole;
     return UserModel(
       id: user.uid,
       email: user.email,
-      displayName: user.displayName,
-      isAdmin: resolvedAdmin,
-      role: resolvedRole,
+      displayName: displayName ?? user.displayName,
+      roleId: RbacManager.normalizeRoleId(roleId),
+      roleName: roleName,
+      permissions: permissions,
+      employeeId: employeeId,
+      employeeName: employeeName,
+      photoUrl: photoUrl,
       isActive: isActive,
     );
   }
 
-  /// Build from Firebase user + `allowed_users` document data.
+  /// Backward-compatible whitelist builder (for legacy docs if any).
   factory UserModel.fromFirebaseUserAndWhitelist(
     User user,
     Map<String, dynamic>? whitelistData,
@@ -39,15 +50,17 @@ class UserModel extends UserEntity {
       return UserModel.fromFirebaseUser(user);
     }
     final isAdmin = whitelistData['isAdmin'] as bool? ?? false;
-    final isActive = whitelistData['isActive'] as bool? ?? true;
-    final role = AppRole.fromFirestore(
-      role: whitelistData['role'] as String?,
-      isAdmin: isAdmin,
-    );
+    final isActive = (whitelistData['isActive'] as bool?) ??
+        (whitelistData['active'] as bool?) ??
+        true;
+    final rawRole = whitelistData['role'] as String? ??
+        whitelistData['roleId'] as String? ??
+        (isAdmin ? 'admin' : 'office_staff');
+
     return UserModel.fromFirebaseUser(
       user,
-      isAdmin: isAdmin || role.isAdminRole,
-      role: role,
+      roleId: rawRole,
+      displayName: whitelistData['displayName'] as String?,
       isActive: isActive,
     );
   }

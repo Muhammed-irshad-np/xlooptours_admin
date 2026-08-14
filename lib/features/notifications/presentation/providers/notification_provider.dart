@@ -1,3 +1,4 @@
+import 'package:intl/intl.dart';
 import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.dart';
 import 'package:xloop_invoice/features/employee/domain/entities/employee_settings_entity.dart';
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_settings_entity.dart';
@@ -168,14 +169,20 @@ class NotificationProvider extends ChangeNotifier {
       final maintenanceNotifications = maintenanceAlerts.map((alert) {
         final id =
             'maintenance_${alert.vehicle.id}_${alert.category.replaceAll(' ', '_')}';
+        final messageStr = alert.isDateTrigger
+            ? '${alert.vehicle.make} ${alert.vehicle.model} '
+                '(${alert.vehicle.plateNumber}): due on '
+                '${alert.nextServiceDate != null ? DateFormat('MMM dd, yyyy').format(alert.nextServiceDate!) : 'N/A'} — '
+                '${alert.daysOverdue ?? 0} days overdue'
+            : '${alert.vehicle.make} ${alert.vehicle.model} '
+                '(${alert.vehicle.plateNumber}): last serviced at '
+                '${alert.lastServiceMileage} km, due at ${alert.nextServiceMileage} km — '
+                '${alert.kmOverdue} km overdue (current: ${alert.currentMileage} km)';
+
         return NotificationEntity(
           id: id,
           title: '⚠️ ${alert.category} Overdue',
-          message:
-              '${alert.vehicle.make} ${alert.vehicle.model} '
-              '(${alert.vehicle.plateNumber}): last serviced at '
-              '${alert.lastServiceMileage} km, due at ${alert.nextServiceMileage} km — '
-              '${alert.kmOverdue} km overdue (current: ${alert.currentMileage} km)',
+          message: messageStr,
           timestamp: DateTime.now(),
           isRead: _readVirtualIds.contains(id),
           type: NotificationType.expiry, // shows in Action Items section

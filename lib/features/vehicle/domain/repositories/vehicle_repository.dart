@@ -4,6 +4,8 @@ import '../entities/vehicle_make_entity.dart';
 import '../entities/maintenance_type_entity.dart';
 import '../entities/vehicle_settings_entity.dart';
 
+import '../entities/shop_entity.dart';
+
 abstract class VehicleRepository {
   // Vehicle Methods
   Future<List<VehicleEntity>> getAllVehicles();
@@ -29,7 +31,14 @@ abstract class VehicleRepository {
   Future<void> updateMaintenanceType(MaintenanceTypeEntity type);
   Future<void> deleteMaintenanceType(String id);
 
+  // Shop Methods
+  Future<List<ShopEntity>> getAllShops();
+  Future<void> insertShop(ShopEntity shop);
+  Future<void> updateShop(ShopEntity shop);
+  Future<void> deleteShop(String id);
+
   // Settings Methods
   Future<VehicleSettingsEntity> getVehicleSettings();
   Future<void> updateVehicleSettings(VehicleSettingsEntity settings);
 }
+

@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../features/employee/domain/entities/employee_settings_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
+import '../core/utils/activity_logger.dart';
 
 class EmployeeExpiryAlertSettingsScreen extends StatefulWidget {
   const EmployeeExpiryAlertSettingsScreen({super.key});
@@ -99,6 +100,12 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
       try {
         await provider.updateEmployeeSettings(newSettings);
         if (mounted) {
+          await ActivityLogger.log(
+            context,
+            title: 'Employee Settings Updated',
+            message: 'Employee expiry alert settings have been updated.',
+            relatedId: 'employee_settings',
+          );
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Alert settings updated successfully')),
           );

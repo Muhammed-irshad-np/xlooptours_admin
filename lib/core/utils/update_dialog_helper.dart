@@ -20,9 +20,12 @@ import '../../features/xloop_vault/presentation/providers/vault_provider.dart';
 import '../../features/xloop_vault/domain/entities/vault_data.dart';
 import '../../features/vehicle/presentation/widgets/maintenance_extension_dialog.dart';
 import '../../features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
+import 'package:uuid/uuid.dart';
+import '../../features/vehicle/domain/entities/shop_entity.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../injection_container.dart';
 import '../utils/activity_logger.dart';
+import '../utils/change_diff_helper.dart';
 
 class UpdateDialogHelper {
   static void showUpdateDialog(
@@ -690,8 +693,11 @@ class UpdateDialogHelper {
                               await ActivityLogger.log(
                                 ctx,
                                 title: 'Employee Document Updated',
-                                message:
-                                    '${employee.fullName}\'s $documentType has been updated.',
+                                message: ChangeDiffHelper.describeEmployeeDocumentUpdate(
+                                  employeeName: employee.fullName,
+                                  documentType: documentType,
+                                  newExpiryDate: selectedDate,
+                                ),
                                 relatedId: employee.id,
                               );
 
@@ -763,15 +769,19 @@ class UpdateDialogHelper {
     final followUpDateController = TextEditingController();
     final followUpKmController = TextEditingController();
 
-    if (vehicle.currentOdometer != null) {
-      mileageController.text = vehicle.currentOdometer.toString();
-    }
+    String? selectedShopName;
+
+    // Fetch shops for dropdown
+    context.read<VehicleProvider>().fetchAllShops();
 
     await showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
+            final shops = context.watch<VehicleProvider>().shops;
+            final bool valueInShops = shops.any((s) => s.name == selectedShopName);
+
             return AlertDialog(
               title: Text('Update $category'),
               content: SingleChildScrollView(
@@ -784,6 +794,30 @@ class UpdateDialogHelper {
                     ),
                     const SizedBox(height: 8),
                     Text('Maintenance Category: $category'),
+                    const SizedBox(height: 16),
+                    // ---------- Shop Selection Dropdown ----------
+                    DropdownButtonFormField<String>(
+                      value: valueInShops ? selectedShopName : null,
+                      decoration: const InputDecoration(
+                        labelText: 'Shop / Workshop (Optional)',
+                        prefixIcon: Icon(Icons.storefront_outlined),
+                        border: OutlineInputBorder(),
+                      ),
+                      isExpanded: true,
+                      items: [
+                        ...shops.map((s) {
+                          return DropdownMenuItem(
+                            value: s.name,
+                            child: Text(s.name, overflow: TextOverflow.ellipsis),
+                          );
+                        }),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          selectedShopName = value;
+                        });
+                      },
+                    ),
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: mileageController,
@@ -1019,6 +1053,7 @@ class UpdateDialogHelper {
                       date: selectedDate!,
                       mileage: newMileage,
                       cost: double.tryParse(costController.text),
+                      serviceProvider: selectedShopName ?? '',
                       notes: notesController.text,
                       serviceType: category,
                       isFollowUpRequired: isFollowUpRequired,
@@ -1151,8 +1186,11 @@ class UpdateDialogHelper {
                       await ActivityLogger.log(
                         context,
                         title: 'Maintenance Updated',
-                        message:
-                            'Maintenance record for $category updated on vehicle ${vehicle.plateNumber}.',
+                        message: ChangeDiffHelper.describeMaintenanceUpdate(
+                          category: category,
+                          plateNumber: vehicle.plateNumber,
+                          newRecord: newRecord,
+                        ),
                         relatedId: vehicle.id,
                       );
 
@@ -2026,9 +2064,63 @@ class UpdateDialogHelper {
                             await vehicleProvider.updateVehicle(updatedVehicle);
 
                             if (ctx.mounted) {
+                              // Build a specific activity log message for this document change
+                              final String activityMsg;
+                              String fmt(DateTime? d) => d != null
+                                  ? '${d.day}/${d.month}/${d.year}'
+                                  : '—';
+                              if (documentType == 'Tafweed') {
+                                final driver = employeeProvider.employees
+                                    .cast<EmployeeEntity?>()
+                                    .firstWhere(
+                                      (e) => e?.id == selectedDriverId,
+                                      orElse: () => null,
+                                    );
+                                final driverName =
+                                    driver?.fullName ?? selectedDriverId ?? '—';
+                                final oldExpiry = existingTafweed?.expiryDate;
+                                activityMsg =
+                                    'Tafweed updated for ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}): '
+                                    'Driver "$driverName", Expiry: ${fmt(oldExpiry)} → ${fmt(selectedDate)}.';
+                              } else {
+                                // Find old expiry for the changed doc type
+                                DateTime? oldExpiry;
+                                switch (documentType) {
+                                  case 'Istimara':
+                                    oldExpiry = vehicle.registration?.expiryDate;
+                                  case 'Insurance':
+                                    oldExpiry = vehicle.insurance?.expiryDate;
+                                  case 'Fahas':
+                                    oldExpiry = vehicle.fahas?.expiryDate;
+                                  case 'Bahrain Insurance':
+                                    oldExpiry =
+                                        vehicle.bahrainInsurance?.expiryDate;
+                                }
+                                final cleared = selectedDate == null;
+                                if (cleared) {
+                                  activityMsg =
+                                      '$documentType cleared for ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}).';
+                                } else if (oldExpiry == null) {
+                                  activityMsg =
+                                      '$documentType set for ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}): '
+                                      'Expiry set to ${fmt(selectedDate)}.';
+                                } else {
+                                  activityMsg =
+                                      '$documentType updated for ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}): '
+                                      'Expiry: ${fmt(oldExpiry)} → ${fmt(selectedDate)}.';
+                                }
+                              }
+
+                              await ActivityLogger.log(
+                                ctx,
+                                title: 'Vehicle Document Updated',
+                                message: activityMsg,
+                                relatedId: vehicle.id,
+                              );
+
                               final notifProvider = ctx
                                   .read<NotificationProvider>();
-                              final employeeProvider = ctx
+                              final employeeProvider2 = ctx
                                   .read<EmployeeProvider>();
                               final vaultProvider = ctx.read<VaultProvider>();
                               await notifProvider.markAsRead(notification.id);
@@ -2036,8 +2128,8 @@ class UpdateDialogHelper {
                                 vehicles: vehicleProvider.vehicles,
                                 maintenanceTypes:
                                     vehicleProvider.maintenanceTypes,
-                                employees: employeeProvider.employees,
-                                employeeSettings: employeeProvider.settings,
+                                employees: employeeProvider2.employees,
+                                employeeSettings: employeeProvider2.settings,
                                 vehicleSettings: vehicleProvider.settings,
                                 vaultData: vaultProvider.vaultData,
                               );

@@ -13,6 +13,7 @@ import '../core/widgets/modern_app_bar.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
+import '../core/utils/activity_logger.dart';
 
 import '../features/auth/presentation/providers/auth_provider.dart';
 
@@ -605,6 +606,24 @@ class VehicleDetailScreen extends StatelessWidget {
                 color: Colors.grey[600],
               ),
             ),
+            if (record.serviceProvider != null &&
+                record.serviceProvider!.isNotEmpty) ...[
+              SizedBox(height: 2.h),
+              Row(
+                children: [
+                  Icon(Icons.storefront, size: 13.sp, color: Colors.blue.shade700),
+                  SizedBox(width: 4.w),
+                  Text(
+                    record.serviceProvider!,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: Colors.blue.shade800,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (record.isFollowUpRequired == true) ...[
               SizedBox(height: 4.h),
               Row(
@@ -789,7 +808,9 @@ class VehicleDetailScreen extends StatelessWidget {
     BuildContext context,
     _VehicleTafweedHistoryEntry entry,
   ) {
-    final bool isExpired = entry.record.expiryDate.isBefore(DateTime.now());
+    final _now = DateTime.now();
+    final today = DateTime(_now.year, _now.month, _now.day);
+    final bool isExpired = entry.record.expiryDate.isBefore(today);
 
     Color statusColor = Colors.grey;
     String statusLabel = 'Historical';
@@ -975,6 +996,26 @@ class VehicleDetailScreen extends StatelessWidget {
         tafweedHistory: updatedHistory,
       );
       await context.read<VehicleProvider>().updateVehicle(updatedVehicle);
+
+      if (context.mounted) {
+        // Look up the driver name for a descriptive log message
+        final employeeProvider = context.read<EmployeeProvider>();
+        final driver = employeeProvider.employees
+            .cast<EmployeeEntity?>()
+            .firstWhere(
+              (e) => e?.id == record.driverId,
+              orElse: () => null,
+            );
+        final driverName = driver?.fullName ?? record.driverId;
+        await ActivityLogger.log(
+          context,
+          title: 'Tafweed Cancelled',
+          message:
+              'Tafweed authorization cancelled for ${currentVehicle.make} ${currentVehicle.model} '
+              '(${currentVehicle.plateNumber}) — Driver: $driverName.',
+          relatedId: currentVehicle.id,
+        );
+      }
     }
   }
 
@@ -1061,8 +1102,10 @@ class VehicleDetailScreen extends StatelessWidget {
     VoidCallback? onDelete,
     VoidCallback? onCancel,
   }) {
+    final _now = DateTime.now();
+    final today = DateTime(_now.year, _now.month, _now.day);
     final bool isExpired =
-        expiryDate != null && expiryDate.isBefore(DateTime.now());
+        expiryDate != null && expiryDate.isBefore(today);
     final bool hasAttachment =
         attachmentUrl != null && attachmentUrl.isNotEmpty;
 

@@ -35,18 +35,6 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, UserEntity>> signInWithGoogle() async {
-    try {
-      final user = await remoteDataSource.signInWithGoogle();
-      return Right(user);
-    } on AuthenticationException catch (e) {
-      return Left(AuthenticationFailure(e.message));
-    } on ServerException catch (e) {
-      return Left(ServerFailure(e.message));
-    }
-  }
-
-  @override
   Future<Either<Failure, void>> signOut() async {
     try {
       await remoteDataSource.signOut();
@@ -54,5 +42,10 @@ class AuthRepositoryImpl implements AuthRepository {
     } on ServerException catch (e) {
       return Left(ServerFailure(e.message));
     }
+  }
+
+  @override
+  Future<void> touchLastActive() {
+    return remoteDataSource.touchLastActive();
   }
 }

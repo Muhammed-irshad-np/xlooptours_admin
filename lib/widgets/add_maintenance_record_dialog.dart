@@ -6,11 +6,14 @@ import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
+import '../features/vehicle/domain/entities/shop_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../core/utils/activity_logger.dart';
+import '../core/utils/change_diff_helper.dart';
 
 /// Special sentinel IDs for built-in extras that are not part of the
 /// Firestore-managed maintenance-type master list.
@@ -19,6 +22,7 @@ const String _kOtherId = '__other__';
 
 class _MaintenanceEntry {
   String? maintenanceTypeId;
+  String? selectedShopName;
 
   /// When [maintenanceTypeId] == [_kOtherId], the user must fill in a custom
   /// name via this controller.
@@ -40,6 +44,12 @@ class _MaintenanceEntry {
   final TextEditingController followUpDateController = TextEditingController();
   final TextEditingController followUpKmController = TextEditingController();
 
+  DateTime? targetDueDate;
+  final TextEditingController targetDueDateController =
+      TextEditingController();
+  final TextEditingController notificationDaysController =
+      TextEditingController(text: '7');
+
   void dispose() {
     customTypeController.dispose();
     dateController.dispose();
@@ -49,6 +59,8 @@ class _MaintenanceEntry {
     followUpReasonController.dispose();
     followUpDateController.dispose();
     followUpKmController.dispose();
+    targetDueDateController.dispose();
+    notificationDaysController.dispose();
   }
 }
 
@@ -79,6 +91,147 @@ class _AddMaintenanceRecordDialogState
     _entries = [
       _MaintenanceEntry()..maintenanceTypeId = widget.initialMaintenanceTypeId,
     ];
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<VehicleProvider>().fetchAllShops();
+      }
+    });
+  }
+
+  Future<void> _showQuickAddShopDialog(_MaintenanceEntry entry) async {
+    final nameController = TextEditingController();
+    final phoneController = TextEditingController();
+    final addressController = TextEditingController();
+    final notesController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final createdShop = await showDialog<ShopEntity>(
+      context: context,
+      builder: (context) {
+        bool isSaving = false;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Quick Add Shop'),
+              content: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: nameController,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Shop / Workshop Name *',
+                          hintText: 'e.g. Al-Amana Auto Repair',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.storefront),
+                        ),
+                        textCapitalization: TextCapitalization.words,
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                      ),
+                      SizedBox(height: 12.h),
+                      TextFormField(
+                        controller: phoneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Phone Number (Optional)',
+                          hintText: 'e.g. 0501234567',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.phone),
+                        ),
+                        keyboardType: TextInputType.phone,
+                        inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      ),
+                      SizedBox(height: 12.h),
+                      TextFormField(
+                        controller: addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Address / Location (Optional)',
+                          hintText: 'e.g. Industrial Area 2, Riyadh',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.location_on),
+                        ),
+                        textCapitalization: TextCapitalization.sentences,
+                      ),
+                      SizedBox(height: 12.h),
+                      TextFormField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                          labelText: 'Notes / Contact Person (Optional)',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.note),
+                        ),
+                        maxLines: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (!formKey.currentState!.validate()) return;
+                          setDialogState(() => isSaving = true);
+                          try {
+                            final newShop = ShopEntity(
+                              id: const Uuid().v4(),
+                              name: nameController.text.trim(),
+                              phone: phoneController.text.trim().isEmpty
+                                  ? null
+                                  : phoneController.text.trim(),
+                              address: addressController.text.trim().isEmpty
+                                  ? null
+                                  : addressController.text.trim(),
+                              notes: notesController.text.trim().isEmpty
+                                  ? null
+                                  : notesController.text.trim(),
+                              createdAt: DateTime.now(),
+                            );
+                            await context.read<VehicleProvider>().addShop(newShop);
+                            if (context.mounted) {
+                              Navigator.pop(context, newShop);
+                            }
+                          } catch (e) {
+                            setDialogState(() => isSaving = false);
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed to add shop: $e')),
+                              );
+                            }
+                          }
+                        },
+                  child: isSaving
+                      ? SizedBox(
+                          width: 16.w,
+                          height: 16.w,
+                          child: const CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Add & Select'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    nameController.dispose();
+    phoneController.dispose();
+    addressController.dispose();
+    notesController.dispose();
+
+    if (createdShop != null) {
+      setState(() {
+        entry.selectedShopName = createdShop.name;
+      });
+    }
   }
 
   @override
@@ -141,6 +294,27 @@ class _AddMaintenanceRecordDialogState
     }
   }
 
+  Future<void> _selectTargetDueDate(
+    BuildContext context,
+    _MaintenanceEntry entry,
+  ) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate:
+          entry.targetDueDate ?? DateTime.now().add(const Duration(days: 30)),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      setState(() {
+        entry.targetDueDate = picked;
+        entry.targetDueDateController.text = DateFormat(
+          'MMM dd, yyyy',
+        ).format(picked);
+      });
+    }
+  }
+
   Future<void> _pickFiles(_MaintenanceEntry entry) async {
     try {
       final result = await FilePicker.platform.pickFiles(
@@ -158,7 +332,7 @@ class _AddMaintenanceRecordDialogState
               name: platformFile.name,
             );
           } else if (platformFile.path != null) {
-            xFile = XFile(platformFile.path!);
+            xFile = XFile(platformFile.path!, name: platformFile.name);
           } else {
             continue;
           }
@@ -255,8 +429,35 @@ class _AddMaintenanceRecordDialogState
 
         final primaryUrl = uploadedUrls.isNotEmpty ? uploadedUrls.first : null;
 
-        final int currentOdo =
-            int.tryParse(entry.serviceKmController.text) ?? 0;
+        bool isDateTrigger = false;
+        int? typeNotificationDays;
+        if (entry.maintenanceTypeId != null &&
+            entry.maintenanceTypeId != _kCarWashId &&
+            entry.maintenanceTypeId != _kOtherId) {
+          try {
+            final matchType = provider.maintenanceTypes.firstWhere(
+              (t) => t.id == entry.maintenanceTypeId,
+            );
+            isDateTrigger = matchType.isDateTrigger;
+            typeNotificationDays = matchType.notificationDays;
+          } catch (_) {}
+        }
+
+        final int currentOdo = isDateTrigger
+            ? (widget.vehicle.currentOdometer ?? 0)
+            : (int.tryParse(entry.serviceKmController.text) ?? 0);
+
+        DateTime? computedNextDate =
+            entry.isFollowUpRequired ? entry.followUpDate : null;
+
+        int? notificationDays;
+        if (isDateTrigger) {
+          computedNextDate ??= entry.targetDueDate;
+          notificationDays =
+              int.tryParse(entry.notificationDaysController.text.trim()) ??
+                  typeNotificationDays ??
+                  7;
+        }
 
         recordsToAdd.add((
           typeId: entry.maintenanceTypeId!,
@@ -264,7 +465,7 @@ class _AddMaintenanceRecordDialogState
             date: entry.date,
             mileage: currentOdo,
             cost: double.tryParse(entry.costController.text),
-            serviceProvider: '',
+            serviceProvider: entry.selectedShopName ?? '',
             notes: entry.notesController.text,
             serviceType: typeName,
             attachmentUrl: primaryUrl,
@@ -273,12 +474,11 @@ class _AddMaintenanceRecordDialogState
             followUpReason: entry.isFollowUpRequired
                 ? entry.followUpReasonController.text.trim()
                 : null,
-            nextServiceDate: entry.isFollowUpRequired
-                ? entry.followUpDate
-                : null,
+            nextServiceDate: computedNextDate,
             nextServiceMileage: entry.isFollowUpRequired
                 ? int.tryParse(entry.followUpKmController.text)
                 : null,
+            notificationDays: notificationDays,
             isFollowUpCompleted: entry.isFollowUpRequired ? false : null,
             followUpIntervalKm: null,
             followUpTimesCount: null,
@@ -319,8 +519,7 @@ class _AddMaintenanceRecordDialogState
         await ActivityLogger.log(
           context,
           title: 'Maintenance Added',
-          message:
-              '${recordsToAdd.length} maintenance record(s) added for ${widget.vehicle.make} ${widget.vehicle.model} (${widget.vehicle.plateNumber}).',
+          message: ChangeDiffHelper.describeMaintenanceRecords(recordsToAdd, widget.vehicle),
           relatedId: widget.vehicle.id,
         );
       }
@@ -403,10 +602,15 @@ class _AddMaintenanceRecordDialogState
     final provider = context.watch<VehicleProvider>();
     final types = provider.maintenanceTypes;
 
+    final screenWidth = MediaQuery.of(context).size.width;
+    final dialogWidth = screenWidth > 1200
+        ? 1000.w
+        : (screenWidth > 800 ? 880.w : screenWidth * 0.92);
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
       child: Container(
-        width: 800.w, // Match screen size constraint or constraints
+        width: dialogWidth,
         padding: EdgeInsets.all(24.w),
         child: Form(
           key: _formKey,
@@ -432,10 +636,22 @@ class _AddMaintenanceRecordDialogState
                   itemBuilder: (context, index) {
                     final entry = _entries[index];
                     final isOther = entry.maintenanceTypeId == _kOtherId;
+                    final isDateTriggered = () {
+                      if (entry.maintenanceTypeId == null ||
+                          entry.maintenanceTypeId == _kCarWashId ||
+                          entry.maintenanceTypeId == _kOtherId) {
+                        return false;
+                      }
+                      return types.any(
+                        (t) =>
+                            t.id == entry.maintenanceTypeId && t.isDateTrigger,
+                      );
+                    }();
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // ── Row 1: Type, Shop, Date ──
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -445,7 +661,7 @@ class _AddMaintenanceRecordDialogState
                               child: DropdownButtonFormField<String>(
                                 initialValue: entry.maintenanceTypeId,
                                 decoration: InputDecoration(
-                                  labelText: 'Maintenance Type',
+                                  labelText: 'Maintenance Type *',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8.r),
                                   ),
@@ -513,7 +729,73 @@ class _AddMaintenanceRecordDialogState
                               ),
                             ),
                             SizedBox(width: 16.w),
+                            // ---------- Shop / Workshop dropdown with Quick Add ----------
                             Expanded(
+                              flex: 2,
+                              child: Consumer<VehicleProvider>(
+                                builder: (context, provider, _) {
+                                  final shops = provider.shops;
+                                  final currentShopName = entry.selectedShopName;
+                                  final bool valueInShops = shops.any((s) => s.name == currentShopName);
+
+                                  return DropdownButtonFormField<String>(
+                                    value: valueInShops ? currentShopName : null,
+                                    decoration: InputDecoration(
+                                      labelText: 'Shop / Workshop (Optional)',
+                                      prefixIcon: Icon(Icons.storefront_outlined, size: 18.sp),
+                                      suffixIcon: IconButton(
+                                        icon: Icon(Icons.add_circle_outline, color: Colors.blue, size: 20.sp),
+                                        tooltip: 'Quick Add Shop',
+                                        onPressed: () => _showQuickAddShopDialog(entry),
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8.r),
+                                      ),
+                                    ),
+                                    isExpanded: true,
+                                    items: [
+                                      ...shops.map((s) {
+                                        return DropdownMenuItem(
+                                          value: s.name,
+                                          child: Text(s.name, overflow: TextOverflow.ellipsis),
+                                        );
+                                      }),
+                                      if (shops.isNotEmpty)
+                                        DropdownMenuItem<String>(
+                                          enabled: false,
+                                          value: null,
+                                          child: Divider(height: 1, color: Colors.grey[300]),
+                                        ),
+                                      DropdownMenuItem<String>(
+                                        value: '_quick_add_new_shop_',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.add, size: 18.sp, color: Colors.blue),
+                                            SizedBox(width: 6.w),
+                                            const Text(
+                                              '+ Quick Add Shop',
+                                              style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: (value) {
+                                      if (value == '_quick_add_new_shop_') {
+                                        _showQuickAddShopDialog(entry);
+                                      } else {
+                                        setState(() {
+                                          entry.selectedShopName = value;
+                                        });
+                                      }
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 16.w),
+                            Expanded(
+                              flex: 1,
                               child: TextFormField(
                                 controller: entry.dateController,
                                 readOnly: true,
@@ -527,30 +809,40 @@ class _AddMaintenanceRecordDialogState
                                 ),
                               ),
                             ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: TextFormField(
-                                controller: entry.serviceKmController,
-                                decoration: InputDecoration(
-                                  labelText: 'Current Odometer',
-                                  suffixText: 'km',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8.r),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                        // ── Row 2: Odometer, Cost, Notes, Delete ──
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (!isDateTriggered) ...[
+                              Expanded(
+                                flex: 1,
+                                child: TextFormField(
+                                  controller: entry.serviceKmController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Current Odometer *',
+                                    suffixText: 'km',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
                                   ),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty) return 'Required';
+                                    if (int.tryParse(v) == null) return 'Invalid';
+                                    return null;
+                                  },
                                 ),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly,
-                                ],
-                                validator: (v) {
-                                  if (v == null || v.isEmpty) return 'Required';
-                                  if (int.tryParse(v) == null) return 'Invalid';
-                                  return null;
-                                },
                               ),
-                            ),
-                            SizedBox(width: 16.w),
+                              SizedBox(width: 16.w),
+                            ],
                             Expanded(
+                              flex: 1,
                               child: TextFormField(
                                 controller: entry.costController,
                                 decoration: InputDecoration(
@@ -573,10 +865,11 @@ class _AddMaintenanceRecordDialogState
                             ),
                             SizedBox(width: 16.w),
                             Expanded(
+                              flex: 2,
                               child: TextFormField(
                                 controller: entry.notesController,
                                 decoration: InputDecoration(
-                                  labelText: 'Notes',
+                                  labelText: 'Notes / Remarks (Optional)',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8.r),
                                   ),
@@ -585,13 +878,14 @@ class _AddMaintenanceRecordDialogState
                             ),
                             if (_entries.length > 1)
                               Padding(
-                                padding: EdgeInsets.only(left: 8.w, top: 4.h),
+                                padding: EdgeInsets.only(left: 12.w, top: 8.h),
                                 child: IconButton(
                                   icon: const Icon(
                                     Icons.delete_outline,
                                     color: Colors.red,
                                   ),
                                   onPressed: () => _removeEntry(index),
+                                  tooltip: 'Remove Entry',
                                 ),
                               ),
                           ],
@@ -634,6 +928,86 @@ class _AddMaintenanceRecordDialogState
                                     if (entry.maintenanceTypeId == _kOtherId &&
                                         (v == null || v.trim().isEmpty)) {
                                       return 'Please enter a type name';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+
+                        // ── Date Trigger Next Due Date selection ──
+                        if (isDateTriggered) ...[
+                          SizedBox(height: 12.h),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(width: 8.w),
+                              Icon(
+                                Icons.event_outlined,
+                                size: 20.sp,
+                                color: Colors.blue[600],
+                              ),
+                              SizedBox(width: 8.w),
+                              SizedBox(
+                                width: 320.w,
+                                child: TextFormField(
+                                  controller: entry.targetDueDateController,
+                                  readOnly: true,
+                                  onTap: () =>
+                                      _selectTargetDueDate(context, entry),
+                                  decoration: InputDecoration(
+                                    labelText: 'Next Service / Target Due Date *',
+                                    hintText:
+                                        'Select date when next service is due',
+                                    suffixIcon: const Icon(Icons.calendar_today),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.blue.withValues(
+                                      alpha: 0.03,
+                                    ),
+                                  ),
+                                  validator: (v) {
+                                    if (isDateTriggered &&
+                                        (v == null || v.isEmpty)) {
+                                      return 'Please select a Target Due Date';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ),
+                              SizedBox(width: 16.w),
+                              SizedBox(
+                                width: 220.w,
+                                child: TextFormField(
+                                  controller: entry.notificationDaysController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Alert Days Before Due Date',
+                                    hintText: 'e.g. 7',
+                                    suffixText: 'days',
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                    filled: true,
+                                    fillColor: Colors.blue.withValues(
+                                      alpha: 0.03,
+                                    ),
+                                  ),
+                                  keyboardType: TextInputType.number,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                  ],
+                                  validator: (v) {
+                                    if (isDateTriggered) {
+                                      if (v == null || v.trim().isEmpty) {
+                                        return 'Required';
+                                      }
+                                      if (int.tryParse(v.trim()) == null) {
+                                        return 'Invalid number';
+                                      }
                                     }
                                     return null;
                                   },

@@ -1,1 +1,60 @@
-{"firestore":{"database":"(default)","location":"nam5","rules":"firestore.rules","indexes":"firestore.indexes.json"},"flutter":{"platforms":{"android":{"default":{"projectId":"xloop-tours-dev","appId":"1:1014331668523:android:bafbe442b4304f0935926e","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"xloop-tours-dev","appId":"1:1014331668523:ios:9bb325c6662728a335926e","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"macos":{"default":{"projectId":"xloop-tours-dev","appId":"1:1014331668523:ios:9bb325c6662728a335926e","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"xloop-tours-dev","configurations":{"android":"1:1014331668523:android:bafbe442b4304f0935926e","ios":"1:1014331668523:ios:9bb325c6662728a335926e","macos":"1:1014331668523:ios:9bb325c6662728a335926e","web":"1:1014331668523:web:164a10d549db856335926e","windows":"1:1014331668523:web:9315df666e5810a535926e"}}}}}}
+{
+  "firestore": {
+    "database": "(default)",
+    "location": "nam5",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "xloop-tours-dev",
+          "appId": "1:1014331668523:android:bafbe442b4304f0935926e",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "xloop-tours-dev",
+          "appId": "1:1014331668523:ios:9bb325c6662728a335926e",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "macos": {
+        "default": {
+          "projectId": "xloop-tours-dev",
+          "appId": "1:1014331668523:ios:9bb325c6662728a335926e",
+          "uploadDebugSymbols": false,
+          "fileOutput": "macos/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "xloop-tours-dev",
+          "configurations": {
+            "android": "1:1014331668523:android:bafbe442b4304f0935926e",
+            "ios": "1:1014331668523:ios:9bb325c6662728a335926e",
+            "macos": "1:1014331668523:ios:9bb325c6662728a335926e",
+            "web": "1:1014331668523:web:164a10d549db856335926e",
+            "windows": "1:1014331668523:web:9315df666e5810a535926e"
+          }
+        }
+      }
+    }
+  }
+}

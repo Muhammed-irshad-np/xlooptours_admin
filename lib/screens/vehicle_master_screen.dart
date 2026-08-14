@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import '../core/widgets/modern_app_bar.dart';
 import 'vehicle_makes_screen.dart';
 import 'maintenance_type_master_screen.dart';
 import 'vehicle_expiry_alert_settings_screen.dart';
+
+import 'shop_master_screen.dart';
 
 class VehicleMasterScreen extends StatelessWidget {
   const VehicleMasterScreen({super.key});
@@ -10,6 +13,7 @@ class VehicleMasterScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: const ModernAppBar(title: 'Vehicle Masters'),
       backgroundColor: Colors.transparent,
       body: GridView.count(
         padding: EdgeInsets.all(16.w),
@@ -39,6 +43,20 @@ class VehicleMasterScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (_) => const MaintenanceTypeMasterScreen(),
+                ),
+              );
+            },
+          ),
+          _buildMenuCard(
+            context,
+            title: 'Maintenance Shops',
+            icon: Icons.storefront,
+            color: Colors.teal,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const ShopMasterScreen(),
                 ),
               );
             },
