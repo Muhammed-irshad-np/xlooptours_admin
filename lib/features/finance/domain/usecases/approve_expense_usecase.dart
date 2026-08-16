@@ -1,19 +1,24 @@
 import '../entities/expense_entity.dart';
 import '../repositories/finance_repository.dart';
 
-/// Approves a pending expense, updating its status and recording who approved it.
 class ApproveExpenseUseCase {
   final FinanceRepository repository;
 
   ApproveExpenseUseCase(this.repository);
 
-  Future<void> call(ExpenseEntity expense, String approvedBy) async {
-    final approved = expense.copyWith(
-      status: ExpenseStatus.approved,
-      approvedBy: approvedBy,
-      approvedAt: DateTime.now(),
-      updatedAt: DateTime.now(),
+  Future<ExpenseEntity> call({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String actorRole,
+    bool allowSelfApprove = false,
+  }) {
+    return repository.approveAndPostExpense(
+      expenseId: expenseId,
+      actorName: actorName,
+      actorUserId: actorUserId,
+      actorRole: actorRole,
+      allowSelfApprove: allowSelfApprove,
     );
-    return await repository.updateExpense(approved);
   }
 }

@@ -31,6 +31,27 @@ enum FundAccountType {
         return 'Other';
     }
   }
+
+  String get codePrefix {
+    switch (this) {
+      case FundAccountType.pettyCash:
+        return 'PC';
+      case FundAccountType.driverAccount:
+        return 'DRV';
+      case FundAccountType.tamkeen:
+        return 'TMK';
+      case FundAccountType.admin:
+        return 'ADM';
+      case FundAccountType.fuelCard:
+        return 'FL';
+      case FundAccountType.stcPay:
+        return 'STC';
+      case FundAccountType.bank:
+        return 'BNK';
+      case FundAccountType.other:
+        return 'ACC';
+    }
+  }
 }
 
 /// Represents a virtual fund account used for tracking money flow.
@@ -44,7 +65,17 @@ class FundAccountEntity extends Equatable {
   /// Short code for display (e.g., "PETTY ACC#001").
   final String code;
   final FundAccountType type;
-  final double currentBalance;
+
+  /// Authoritative balance in minor units (halalas). Use these for all arithmetic.
+  final int currentBalanceMinor;
+  final int cashBalanceMinor;
+  final int stcPayBalanceMinor;
+
+  /// Convenience major-unit accessors for UI display. Derived from minor units.
+  double get currentBalance => currentBalanceMinor / 100.0;
+  double get cashBalance => cashBalanceMinor / 100.0;
+  double get stcPayBalance => stcPayBalanceMinor / 100.0;
+
   final String currency;
 
   /// The coordinator or employee assigned to manage this account.
@@ -58,7 +89,9 @@ class FundAccountEntity extends Equatable {
     required this.name,
     required this.code,
     required this.type,
-    this.currentBalance = 0.0,
+    this.currentBalanceMinor = 0,
+    this.cashBalanceMinor = 0,
+    this.stcPayBalanceMinor = 0,
     required this.currency,
     this.assignedTo,
     this.assignedToId,
@@ -77,12 +110,45 @@ class FundAccountEntity extends Equatable {
     );
   }
 
+  /// Create from legacy double major-unit values (migration helper).
+  factory FundAccountEntity.fromMajor({
+    required String id,
+    required String name,
+    required String code,
+    required FundAccountType type,
+    double currentBalance = 0.0,
+    double cashBalance = 0.0,
+    double stcPayBalance = 0.0,
+    required String currency,
+    String? assignedTo,
+    String? assignedToId,
+    bool isActive = true,
+    required DateTime createdAt,
+  }) {
+    return FundAccountEntity(
+      id: id,
+      name: name,
+      code: code,
+      type: type,
+      currentBalanceMinor: (currentBalance * 100).round(),
+      cashBalanceMinor: (cashBalance * 100).round(),
+      stcPayBalanceMinor: (stcPayBalance * 100).round(),
+      currency: currency,
+      assignedTo: assignedTo,
+      assignedToId: assignedToId,
+      isActive: isActive,
+      createdAt: createdAt,
+    );
+  }
+
   FundAccountEntity copyWith({
     String? id,
     String? name,
     String? code,
     FundAccountType? type,
-    double? currentBalance,
+    int? currentBalanceMinor,
+    int? cashBalanceMinor,
+    int? stcPayBalanceMinor,
     String? currency,
     String? assignedTo,
     String? assignedToId,
@@ -96,7 +162,9 @@ class FundAccountEntity extends Equatable {
       name: name ?? this.name,
       code: code ?? this.code,
       type: type ?? this.type,
-      currentBalance: currentBalance ?? this.currentBalance,
+      currentBalanceMinor: currentBalanceMinor ?? this.currentBalanceMinor,
+      cashBalanceMinor: cashBalanceMinor ?? this.cashBalanceMinor,
+      stcPayBalanceMinor: stcPayBalanceMinor ?? this.stcPayBalanceMinor,
       currency: currency ?? this.currency,
       assignedTo:
           clearAssignedTo ? null : (assignedTo ?? this.assignedTo),
@@ -113,7 +181,9 @@ class FundAccountEntity extends Equatable {
         name,
         code,
         type,
-        currentBalance,
+        currentBalanceMinor,
+        cashBalanceMinor,
+        stcPayBalanceMinor,
         currency,
         assignedTo,
         assignedToId,

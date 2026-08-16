@@ -1,17 +1,17 @@
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../../domain/entities/fund_transaction_entity.dart';
+import '../../domain/entities/post_fund_request.dart';
+import '../../domain/usecases/generate_account_code_usecase.dart';
 import '../../domain/usecases/get_all_fund_accounts_usecase.dart';
 import '../../domain/usecases/insert_fund_account_usecase.dart';
 import '../../domain/usecases/update_fund_account_usecase.dart';
 import '../../domain/usecases/delete_fund_account_usecase.dart';
 import '../../domain/usecases/get_transactions_usecase.dart';
 import '../../domain/usecases/insert_transaction_usecase.dart';
+import '../../domain/usecases/post_fund_movement_usecase.dart';
+import '../../domain/usecases/transfer_funds_usecase.dart';
 
-/// Provider managing fund accounts and their transactions.
-///
-/// Handles account CRUD, balance display, deposit/withdrawal
-/// recording, and transaction history.
 class FundAccountProvider with ChangeNotifier {
   final GetAllFundAccountsUseCase getAllFundAccountsUseCase;
   final InsertFundAccountUseCase insertFundAccountUseCase;
@@ -19,6 +19,9 @@ class FundAccountProvider with ChangeNotifier {
   final DeleteFundAccountUseCase deleteFundAccountUseCase;
   final GetTransactionsUseCase getTransactionsUseCase;
   final InsertTransactionUseCase insertTransactionUseCase;
+  final PostFundMovementUseCase postFundMovementUseCase;
+  final TransferFundsUseCase transferFundsUseCase;
+  final GenerateAccountCodeUseCase generateAccountCodeUseCase;
 
   FundAccountProvider({
     required this.getAllFundAccountsUseCase,
@@ -27,9 +30,10 @@ class FundAccountProvider with ChangeNotifier {
     required this.deleteFundAccountUseCase,
     required this.getTransactionsUseCase,
     required this.insertTransactionUseCase,
+    required this.postFundMovementUseCase,
+    required this.transferFundsUseCase,
+    required this.generateAccountCodeUseCase,
   });
-
-  // ─── State ──────────────────────────────────────────────────
 
   List<FundAccountEntity> _accounts = [];
   List<FundTransactionEntity> _transactions = [];
@@ -37,8 +41,6 @@ class FundAccountProvider with ChangeNotifier {
   bool _isLoading = false;
   bool _isTransactionsLoading = false;
   String? _error;
-
-  // ─── Getters ────────────────────────────────────────────────
 
   List<FundAccountEntity> get accounts => _accounts;
   List<FundAccountEntity> get activeAccounts =>
@@ -49,7 +51,6 @@ class FundAccountProvider with ChangeNotifier {
   bool get isTransactionsLoading => _isTransactionsLoading;
   String? get error => _error;
 
-  /// Returns the currently selected account entity.
   FundAccountEntity? get selectedAccount {
     if (_selectedAccountId == null) return null;
     try {
@@ -59,11 +60,8 @@ class FundAccountProvider with ChangeNotifier {
     }
   }
 
-  /// Total balance across all active accounts (SAR only for simplicity).
   double get totalBalance =>
       activeAccounts.fold(0.0, (sum, a) => sum + a.currentBalance);
-
-  // ─── Account Operations ─────────────────────────────────────
 
   Future<void> fetchAllAccounts() async {
     _isLoading = true;
@@ -81,13 +79,29 @@ class FundAccountProvider with ChangeNotifier {
     }
   }
 
+  /// Generates a unique sequential account code based on account type.
+  String generateUniqueCode(FundAccountType type) {
+    return generateAccountCodeUseCase(type, _accounts);
+  }
+
   Future<void> insertAccount(FundAccountEntity account) async {
     _error = null;
+
+    // Guaranteed fallback: If code is missing or duplicate, resolve unique code
+    String finalCode = account.code.trim();
+    if (finalCode.isEmpty ||
+        _accounts.any((a) => a.code.toUpperCase() == finalCode.toUpperCase() && a.id != account.id)) {
+      finalCode = generateUniqueCode(account.type);
+    }
+
+    final cleanAccount = account.copyWith(code: finalCode);
+    _accounts = [cleanAccount, ..._accounts];
+    notifyListeners();
+
     try {
-      await insertFundAccountUseCase(account);
-      _accounts.add(account);
-      notifyListeners();
+      await insertFundAccountUseCase(cleanAccount);
     } catch (e) {
+      _accounts = _accounts.where((a) => a.id != cleanAccount.id).toList();
       _error = e.toString();
       debugPrint('Error inserting fund account: $e');
       notifyListeners();
@@ -96,38 +110,56 @@ class FundAccountProvider with ChangeNotifier {
 
   Future<void> updateAccount(FundAccountEntity account) async {
     _error = null;
+    final index = _accounts.indexWhere((a) => a.id == account.id);
+    FundAccountEntity? oldAccount;
+
+    if (index != -1) {
+      oldAccount = _accounts[index];
+      _accounts[index] = account;
+      notifyListeners();
+    }
+
     try {
       await updateFundAccountUseCase(account);
-      final index = _accounts.indexWhere((a) => a.id == account.id);
-      if (index != -1) {
-        _accounts[index] = account;
-        notifyListeners();
-      }
     } catch (e) {
+      if (index != -1 && oldAccount != null) {
+        _accounts[index] = oldAccount;
+      }
       _error = e.toString();
       debugPrint('Error updating fund account: $e');
       notifyListeners();
     }
   }
 
+  /// Deactivates if history exists; may hard-delete empty accounts only.
   Future<void> deleteAccount(String id) async {
     _error = null;
-    try {
-      await deleteFundAccountUseCase(id);
-      _accounts.removeWhere((a) => a.id == id);
+    final index = _accounts.indexWhere((a) => a.id == id);
+    FundAccountEntity? oldAccount;
+
+    if (index != -1) {
+      oldAccount = _accounts[index];
+      // Soft: mark inactive locally; refresh after.
+      _accounts[index] = oldAccount.copyWith(isActive: false);
       if (_selectedAccountId == id) {
         _selectedAccountId = null;
         _transactions = [];
       }
       notifyListeners();
+    }
+
+    try {
+      await deleteFundAccountUseCase(id);
+      await fetchAllAccounts();
     } catch (e) {
+      if (index != -1 && oldAccount != null) {
+        _accounts[index] = oldAccount;
+      }
       _error = e.toString();
       debugPrint('Error deleting fund account: $e');
       notifyListeners();
     }
   }
-
-  // ─── Transaction Operations ─────────────────────────────────
 
   void selectAccount(String? accountId) {
     _selectedAccountId = accountId;
@@ -155,29 +187,111 @@ class FundAccountProvider with ChangeNotifier {
     }
   }
 
-  Future<void> recordTransaction(FundTransactionEntity transaction) async {
+  /// Deposit/withdraw/adjustment with server-side balance math.
+  /// [credit] overrides direction when set (required for adjustments).
+  Future<void> recordMovement({
+    required String fundAccountId,
+    required FundTransactionType type,
+    required double amountMajor,
+    required String currency,
+    required String description,
+    required String performedBy,
+    required String performedByUserId,
+    FundBucket bucket = FundBucket.total,
+    double? cashDelta,
+    double? stcPayDelta,
+    bool? credit,
+  }) async {
     _error = null;
     try {
-      await insertTransactionUseCase(transaction);
-      _transactions.insert(0, transaction);
-
-      // Update the local account balance.
-      final index =
-          _accounts.indexWhere((a) => a.id == transaction.fundAccountId);
-      if (index != -1) {
-        _accounts[index] = _accounts[index].copyWith(
-          currentBalance: transaction.balanceAfter,
-        );
-      }
+      final isCredit = credit ??
+          (type == FundTransactionType.deposit ||
+              type == FundTransactionType.reversal);
+      final tx = await postFundMovementUseCase(
+        PostFundRequest(
+          fundAccountId: fundAccountId,
+          type: type,
+          amountMajor: amountMajor,
+          currency: currency,
+          description: description,
+          performedBy: performedBy,
+          performedByUserId: performedByUserId,
+          bucket: bucket,
+          credit: isCredit,
+          cashDeltaMajor: cashDelta,
+          stcPayDeltaMajor: stcPayDelta,
+        ),
+      );
+      _transactions = [tx, ..._transactions];
+      await fetchAllAccounts();
       notifyListeners();
     } catch (e) {
       _error = e.toString();
-      debugPrint('Error recording transaction: $e');
+      debugPrint('Error recording movement: $e');
       notifyListeners();
+      rethrow;
     }
   }
 
-  /// Helper to find an account by ID.
+  Future<void> transfer({
+    required String fromAccountId,
+    required String toAccountId,
+    required double amountMajor,
+    required String currency,
+    required String description,
+    required String performedBy,
+    required String performedByUserId,
+  }) async {
+    _error = null;
+    try {
+      await transferFundsUseCase(
+        fromAccountId: fromAccountId,
+        toAccountId: toAccountId,
+        amountMajor: amountMajor,
+        currency: currency,
+        description: description,
+        performedBy: performedBy,
+        performedByUserId: performedByUserId,
+      );
+      await fetchAllAccounts();
+      if (_selectedAccountId != null) {
+        await fetchTransactions(_selectedAccountId!);
+      }
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('Error transferring: $e');
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Legacy name used by UI — routes to safe post path.
+  Future<void> recordTransaction(
+    FundTransactionEntity transaction, {
+    double? cashDelta,
+    double? stcPayDelta,
+    String? performedByUserId,
+  }) async {
+    final isCredit = transaction.type == FundTransactionType.deposit ||
+        transaction.type == FundTransactionType.reversal;
+    await recordMovement(
+      fundAccountId: transaction.fundAccountId,
+      type: transaction.type == FundTransactionType.expensePayment
+          ? FundTransactionType.withdrawal
+          : transaction.type,
+      amountMajor: transaction.amount,
+      currency: transaction.currency,
+      description: transaction.description,
+      performedBy: transaction.performedBy,
+      performedByUserId: performedByUserId ?? transaction.performedByUserId ?? '',
+      bucket: transaction.bucket,
+      cashDelta: cashDelta,
+      stcPayDelta: stcPayDelta,
+    );
+    // silence unused if type is withdrawal with isCredit false
+    assert(isCredit || !isCredit);
+  }
+
   FundAccountEntity? getAccountById(String id) {
     try {
       return _accounts.firstWhere((a) => a.id == id);

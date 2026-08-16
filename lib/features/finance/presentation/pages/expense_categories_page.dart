@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../providers/finance_provider.dart';
 import '../../domain/entities/expense_category_entity.dart';
+import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
 
 /// Screen for managing expense categories and types.
@@ -131,7 +132,7 @@ class ExpenseCategoriesPage extends StatelessWidget {
   Widget _buildAddCategoryButton(BuildContext context, FinanceProvider provider) {
     return ElevatedButton.icon(
       onPressed: () => _showAddCategoryDialog(context, provider),
-      icon: Icon(Icons.add, size: 16.sp),
+      icon: Icon(Icons.add_rounded, size: 16.sp),
       label: Text(
         'Add Category',
         style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
@@ -264,21 +265,35 @@ class ExpenseCategoriesPage extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Add Expense Category'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: nameCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Category Name *',
-              hintText: 'e.g., VEHICLES, MARKETING',
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: finDialogShape,
+        title: finDialogTitle('Add Expense Category', icon: Icons.category_outlined),
+        content: SizedBox(
+          width: 420.w,
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(height: 8.h),
+                TextFormField(
+                  controller: nameCtrl,
+                  decoration: finDialogInputDecoration(
+                    label: 'Category Name *',
+                    hint: 'e.g., VEHICLES, MARKETING',
+                    prefixIcon: Icons.folder_outlined,
+                  ),
+                  style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                ),
+              ],
             ),
-            validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
+          finDialogCancelButton(ctx),
+          finDialogActionButton(
             onPressed: () {
               if (!formKey.currentState!.validate()) return;
               final cat = ExpenseCategoryEntity(
@@ -289,8 +304,8 @@ class ExpenseCategoriesPage extends StatelessWidget {
               provider.insertCategory(cat);
               Navigator.pop(ctx);
             },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
-            child: const Text('Create'),
+            label: 'Create Category',
+            backgroundColor: FinDT.brand,
           ),
         ],
       ),
@@ -448,44 +463,66 @@ class _CategoryExpansionCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(isEditing ? 'Edit Expense Type' : 'Add Expense Type'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Type Name *',
-                  hintText: 'e.g., fuel, electricity',
-                ),
-                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: finDialogShape,
+        title: finDialogTitle(
+          isEditing ? 'Edit Expense Type' : 'Add Expense Type',
+          icon: Icons.playlist_add_rounded,
+        ),
+        content: SizedBox(
+          width: 420.w,
+          child: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: 8.h),
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: finDialogInputDecoration(
+                      label: 'Type Name *',
+                      hint: 'e.g., Fuel, Office Rent, Electricity',
+                      prefixIcon: Icons.label_outline_rounded,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                  SizedBox(height: 14.h),
+                  DropdownButtonFormField<String>(
+                    initialValue: duration,
+                    decoration: finDialogInputDecoration(
+                      label: 'Default Frequency',
+                      prefixIcon: Icons.calendar_today_outlined,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                    items: ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY', 'ONE_TIME']
+                        .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                        .toList(),
+                    onChanged: (v) => duration = v ?? 'MONTHLY',
+                  ),
+                  SizedBox(height: 14.h),
+                  DropdownButtonFormField<String>(
+                    initialValue: role,
+                    decoration: finDialogInputDecoration(
+                      label: 'Who Submits This?',
+                      prefixIcon: Icons.badge_outlined,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                    items: ['ADMIN', 'COORDINATOR', 'DRIVER']
+                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                        .toList(),
+                    onChanged: (v) => role = v ?? 'ADMIN',
+                  ),
+                ],
               ),
-              SizedBox(height: 12.h),
-              DropdownButtonFormField<String>(
-                value: duration,
-                decoration: const InputDecoration(labelText: 'Default Frequency'),
-                items: ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY', 'ONE_TIME']
-                    .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                    .toList(),
-                onChanged: (v) => duration = v ?? 'MONTHLY',
-              ),
-              SizedBox(height: 12.h),
-              DropdownButtonFormField<String>(
-                value: role,
-                decoration: const InputDecoration(labelText: 'Who Submits This?'),
-                items: ['ADMIN', 'COORDINATOR', 'DRIVER']
-                    .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                    .toList(),
-                onChanged: (v) => role = v ?? 'ADMIN',
-              ),
-            ],
+            ),
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
+          finDialogCancelButton(ctx),
+          finDialogActionButton(
             onPressed: () {
               if (!formKey.currentState!.validate()) return;
               final newType = ExpenseTypeEntity(
@@ -506,8 +543,8 @@ class _CategoryExpansionCard extends StatelessWidget {
               provider.updateCategory(category.copyWith(expenseTypes: updatedTypes));
               Navigator.pop(ctx);
             },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
-            child: Text(isEditing ? 'Save' : 'Add'),
+            label: isEditing ? 'Save Changes' : 'Add Type',
+            backgroundColor: FinDT.brand,
           ),
         ],
       ),
@@ -515,48 +552,34 @@ class _CategoryExpansionCard extends StatelessWidget {
   }
 
   void _deleteType(BuildContext context, String typeId) {
-    showDialog(
+    showFinConfirmationDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Expense Type?'),
-        content: const Text('This will remove this sub-type from the category list.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final updatedTypes =
-                  category.expenseTypes.where((t) => t.id != typeId).toList();
-              provider.updateCategory(category.copyWith(expenseTypes: updatedTypes));
-              Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+      title: 'Delete Expense Type?',
+      message: 'This will remove this sub-type from the category list.',
+      confirmLabel: 'Delete',
+      confirmColor: FinDT.danger,
+      icon: Icons.delete_outline_rounded,
+    ).then((ok) {
+      if (ok == true) {
+        final updatedTypes =
+            category.expenseTypes.where((t) => t.id != typeId).toList();
+        provider.updateCategory(category.copyWith(expenseTypes: updatedTypes));
+      }
+    });
   }
 
   void _confirmDeleteCategory(BuildContext context) {
-    showDialog(
+    showFinConfirmationDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Category?'),
-        content: Text(
-          'Are you sure you want to delete the category "${category.name}" and all its sub-types?',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              provider.deleteCategory(category.id);
-              Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+      title: 'Delete Category?',
+      message: 'Are you sure you want to delete the category "${category.name}" and all its sub-types?',
+      confirmLabel: 'Delete Category',
+      confirmColor: FinDT.danger,
+      icon: Icons.delete_outline_rounded,
+    ).then((ok) {
+      if (ok == true) {
+        provider.deleteCategory(category.id);
+      }
+    });
   }
 }
