@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
@@ -334,26 +335,27 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     _assertExpensePolicy(existing, policy);
 
     if (!existing.isNonWallet && existing.fundAccountId.isNotEmpty) {
-      if (await isDayLocked(existing.fundAccountId, existing.date)) {
+      // Parallelize day lock check and single target account document fetch
+      final results = await Future.wait([
+        isDayLocked(existing.fundAccountId, existing.date),
+        _accounts.doc(existing.fundAccountId).get(),
+      ]);
+      final dayLocked = results[0] as bool;
+      final accSnap = results[1] as DocumentSnapshot<Map<String, dynamic>>;
+
+      if (dayLocked) {
         throw StateError(
           'Day ${DayLockEntity.dayKeyFrom(existing.date)} is locked '
           'for this fund account after petty cash verification.',
         );
       }
-      final accounts = await getAllFundAccounts();
-      FundAccountModel? account;
-      for (final a in accounts) {
-        if (a.id == existing.fundAccountId) {
-          account = a;
-          break;
-        }
-      }
-      if (account == null) {
+      if (!accSnap.exists || accSnap.data() == null) {
         throw StateError(
           'Fund account not found (${existing.fundAccountId}). '
           'Pick a valid wallet on the expense.',
         );
       }
+      final account = FundAccountModel.fromJson(accSnap.data()!);
       if (!account.isActive) {
         throw StateError('Fund account is inactive');
       }
@@ -529,15 +531,18 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         return ExpenseModel.fromEntity(updated);
       });
 
-      await _writeAudit(
-        action: result.isNonWallet
-            ? 'expense.approve'
-            : 'expense.approve_and_post',
-        entityType: 'expense',
-        entityId: expenseId,
-        actorUserId: actorUserId,
-        actorName: actorName,
-        detail: result.referenceNumber,
+      // Non-blocking audit log so response returns immediately to UI
+      unawaited(
+        _writeAudit(
+          action: result.isNonWallet
+              ? 'expense.approve'
+              : 'expense.approve_and_post',
+          entityType: 'expense',
+          entityId: expenseId,
+          actorUserId: actorUserId,
+          actorName: actorName,
+          detail: result.referenceNumber,
+        ),
       );
       return result;
     } catch (e) {
@@ -1426,17 +1431,33 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     return updated;
   }
 
-  // ─── Policy ─────────────────────────────────────────────────
+  // ─── Policy (with 5-minute memory cache) ───────────────────
+
+  FinancePolicyEntity? _cachedPolicy;
+  DateTime? _policyCachedAt;
+  static const _policyCacheDuration = Duration(minutes: 5);
 
   @override
   Future<FinancePolicyEntity> getFinancePolicy() async {
+    if (_cachedPolicy != null &&
+        _policyCachedAt != null &&
+        DateTime.now().difference(_policyCachedAt!) < _policyCacheDuration) {
+      return _cachedPolicy!;
+    }
     final snap = await _policyDoc.get();
-    if (!snap.exists) return const FinancePolicyEntity();
-    return FinancePolicyEntity.fromJson(snap.data());
+    if (!snap.exists) {
+      _cachedPolicy = const FinancePolicyEntity();
+    } else {
+      _cachedPolicy = FinancePolicyEntity.fromJson(snap.data());
+    }
+    _policyCachedAt = DateTime.now();
+    return _cachedPolicy!;
   }
 
   @override
   Future<void> saveFinancePolicy(FinancePolicyEntity policy) async {
+    _cachedPolicy = policy;
+    _policyCachedAt = DateTime.now();
     await _policyDoc.set(policy.toJson(), SetOptions(merge: true));
   }
 

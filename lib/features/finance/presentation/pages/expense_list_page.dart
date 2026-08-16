@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -851,7 +852,7 @@ class _ExpenseDataTable extends StatelessWidget {
         actorRole: user.role.name,
         allowSelfApprove: user.isAdmin,
       );
-      await fundProv.fetchAllAccounts();
+      unawaited(fundProv.fetchAllAccounts());
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
