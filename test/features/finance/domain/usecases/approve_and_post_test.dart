@@ -125,5 +125,22 @@ void main() {
         throwsA(isA<StateError>()),
       );
     });
+
+    test('propagates StateError when petty cash session is not open', () async {
+      repo.approveError = StateError('No petty cash session is currently open');
+      await expectLater(
+        () => useCase(
+          expenseId: 'exp-001',
+          actorName: 'Manager A',
+          actorUserId: 'mgr-001',
+          actorRole: 'manager',
+        ),
+        throwsA(isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('petty cash session'),
+        )),
+      );
+    });
   });
 }

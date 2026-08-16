@@ -6,6 +6,7 @@ import '../../domain/entities/cash_advance_entity.dart';
 import '../../domain/entities/day_lock_entity.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/finance_policy_entity.dart';
+import '../../domain/entities/fund_account_entity.dart';
 import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/entities/ledger_day_totals.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
@@ -355,6 +356,15 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       }
       if (!account.isActive) {
         throw StateError('Fund account is inactive');
+      }
+      if (account.type == FundAccountType.pettyCash) {
+        final openSession = await getOpenSession(account.id);
+        if (openSession == null) {
+          throw StateError(
+            'Cannot pay from Petty Cash account "${account.name}" because no petty cash session is currently open. '
+            'Please open a session first in the Petty Cash tab.',
+          );
+        }
       }
       final amountMinor = existing.resolvedAmountMinor;
       final amountMajor = amountMinor / 100.0;
