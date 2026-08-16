@@ -318,4 +318,8 @@ class FinanceRepositoryImpl implements FinanceRepository {
   @override
   Future<void> deleteExpenseCategory(String id) =>
       remoteDataSource.deleteExpenseCategory(id);
+
+  @override
+  Future<void> resetFinanceModuleData() =>
+      remoteDataSource.resetFinanceModuleData();
 }

@@ -116,4 +116,7 @@ abstract class FinanceRepository {
   Future<void> insertExpenseCategory(ExpenseCategoryEntity category);
   Future<void> updateExpenseCategory(ExpenseCategoryEntity category);
   Future<void> deleteExpenseCategory(String id);
+
+  /// Development-only tool: wipes test data across all finance collections.
+  Future<void> resetFinanceModuleData();
 }

@@ -495,4 +495,26 @@ class FinanceProvider with ChangeNotifier {
     if (index == -1) return [];
     return _categories[index].expenseTypes.where((t) => t.isActive).toList();
   }
+
+  Future<void> resetFinanceData() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await financeRepository.resetFinanceModuleData();
+      _expenses = [];
+      _lastCursor = null;
+      _hasMore = false;
+      notifyListeners();
+    } catch (e) {
+      _error = _readableError(e);
+      debugPrint('Error resetting finance data: $_error');
+      notifyListeners();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 }
