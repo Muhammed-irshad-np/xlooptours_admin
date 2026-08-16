@@ -1398,9 +1398,58 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     );
   }
 
+  bool get _isReceiptRequired {
+    final amt = double.tryParse(_amountController.text) ?? 0.0;
+    return amt >= 100.0;
+  }
+
   Widget _buildReceiptSection(FinanceProvider finProv) {
+    final requiresReceipt = _isReceiptRequired;
+    final isMissing = requiresReceipt && _receiptUrls.isEmpty;
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (requiresReceipt)
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+            margin: EdgeInsets.only(bottom: 12.h),
+            decoration: BoxDecoration(
+              color: isMissing
+                  ? FinDT.danger.withValues(alpha: 0.08)
+                  : FinDT.success.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(
+                color: isMissing
+                    ? FinDT.danger.withValues(alpha: 0.3)
+                    : FinDT.success.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isMissing
+                      ? Icons.error_outline_rounded
+                      : Icons.check_circle_outline_rounded,
+                  size: 16.sp,
+                  color: isMissing ? FinDT.danger : FinDT.success,
+                ),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Text(
+                    isMissing
+                        ? 'Receipt is required for expenses of 100.00 SAR or more.'
+                        : 'Receipt attached (policy requirement satisfied).',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w600,
+                      color: isMissing ? FinDT.danger : FinDT.success,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         // Existing receipts
         if (_receiptUrls.isNotEmpty) ...[
           Wrap(
@@ -1457,8 +1506,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
             style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
           ),
           style: OutlinedButton.styleFrom(
-            foregroundColor: FinDT.brand,
-            side: const BorderSide(color: FinDT.border),
+            foregroundColor: isMissing ? FinDT.danger : FinDT.brand,
+            side: BorderSide(color: isMissing ? FinDT.danger : FinDT.border),
             padding: EdgeInsets.symmetric(vertical: 12.h, horizontal: 16.w),
             minimumSize: Size(double.infinity, 44.h),
             shape: RoundedRectangleBorder(
@@ -1557,6 +1606,20 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         const SnackBar(
           content: Text('Please select a vehicle for vehicle-related expenses'),
           backgroundColor: FinDT.danger,
+        ),
+      );
+      return;
+    }
+
+    final amountVal = double.tryParse(_amountController.text) ?? 0.0;
+    if (amountVal >= 100.0 && _receiptUrls.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'A receipt or bill document is required for expenses of 100.00 SAR or more.',
+          ),
+          backgroundColor: FinDT.danger,
+          duration: Duration(seconds: 4),
         ),
       );
       return;
