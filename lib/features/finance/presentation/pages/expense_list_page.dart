@@ -774,6 +774,31 @@ class _ExpenseDataTable extends StatelessWidget {
     final user = context.read<AuthProvider>().user;
     if (user == null) return;
 
+    if (expense.amount >= 100 && expense.receiptUrls.isEmpty) {
+      final attach = await showFinConfirmationDialog(
+        context: context,
+        title: 'Receipt Required to Approve',
+        icon: Icons.receipt_long_outlined,
+        iconColor: FinDT.warning,
+        message:
+            'Company policy requires an attached receipt or bill document for any expense of 100.00 SAR or more.\n\n'
+            'Expense ${expense.referenceNumber} (${expense.amount.toStringAsFixed(2)} ${expense.currency}) has no receipt attached yet.\n\n'
+            'Would you like to edit this expense and attach the receipt now?',
+        confirmLabel: 'Edit & Attach Receipt',
+        confirmColor: FinDT.brand,
+        cancelLabel: 'Cancel',
+      );
+      if (attach == true && context.mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ExpenseFormPage(expense: expense),
+          ),
+        );
+      }
+      return;
+    }
+
     final postsMoney = !expense.isNonWallet;
     final ok = await showFinConfirmationDialog(
       context: context,
