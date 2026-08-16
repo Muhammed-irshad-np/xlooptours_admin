@@ -6,8 +6,10 @@ import 'package:provider/provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
+import '../providers/petty_cash_provider.dart';
 import '../widgets/expense_status_badge.dart';
 import '../../domain/entities/expense_entity.dart';
+import '../../domain/entities/fund_account_entity.dart';
 import '../../domain/services/finance_export_service.dart';
 import 'expense_form_page.dart';
 import '../widgets/finance_dialog_helpers.dart';
@@ -800,6 +802,30 @@ class _ExpenseDataTable extends StatelessWidget {
     }
 
     final postsMoney = !expense.isNonWallet;
+    final fundProv = context.read<FundAccountProvider>();
+    final account = fundProv.getAccountById(expense.fundAccountId);
+
+    if (postsMoney && account?.type == FundAccountType.pettyCash) {
+      final pettyProv = context.read<PettyCashProvider>();
+      final openSession = await pettyProv.getOpenSessionUseCase(account!.id);
+      if (openSession == null) {
+        if (!context.mounted) return;
+        showFinConfirmationDialog(
+          context: context,
+          title: 'Petty Cash Session Closed',
+          icon: Icons.lock_clock_outlined,
+          iconColor: FinDT.warning,
+          message:
+              'Cannot pay from "${account.name}" because no petty cash session is currently open today.\n\n'
+              'Financial Safety Rule: You must open a Petty Cash session before paying expenses out of this cash drawer.',
+          confirmLabel: 'Understood',
+          confirmColor: FinDT.brand,
+        );
+        return;
+      }
+    }
+
+    if (!context.mounted) return;
     final ok = await showFinConfirmationDialog(
       context: context,
       title: postsMoney ? 'Approve & Pay Expense?' : 'Approve Expense?',
@@ -816,7 +842,6 @@ class _ExpenseDataTable extends StatelessWidget {
     if (ok != true || !context.mounted) return;
 
     final finProv = context.read<FinanceProvider>();
-    final fundProv = context.read<FundAccountProvider>();
 
     try {
       await finProv.approveExpense(
