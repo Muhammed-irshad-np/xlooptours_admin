@@ -483,7 +483,12 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
           // set() allows full document; update() rejects null fields on web.
           txn.set(_txs.doc(ledgerId), _stripNulls(tx.toJson()));
+          final cashMinor = ((cash < 0 ? 0.0 : cash) * 100).round();
+          final stcMinor = ((stc < 0 ? 0.0 : stc) * 100).round();
           txn.update(accountRef, {
+            'currentBalanceMinor': balAfterMinor,
+            'cashBalanceMinor': cashMinor,
+            'stcPayBalanceMinor': stcMinor,
             'currentBalance': balAfter,
             'cashBalance': cash < 0 ? 0.0 : cash,
             'stcPayBalance': stc < 0 ? 0.0 : stc,
@@ -631,7 +636,12 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           auditNote: reason,
         );
         txn.set(_txs.doc(reverseId), tx.toJson());
+        final cashMinor = ((cash < 0 ? 0.0 : cash) * 100).round();
+        final stcMinor = ((stc < 0 ? 0.0 : stc) * 100).round();
         txn.update(accountRef, {
+          'currentBalanceMinor': balAfterMinor,
+          'cashBalanceMinor': cashMinor,
+          'stcPayBalanceMinor': stcMinor,
           'currentBalance': balAfter,
           'cashBalance': cash,
           'stcPayBalance': stc,
@@ -804,7 +814,12 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       );
 
       txn.set(_txs.doc(id), tx.toJson());
+      final cashMinor = ((cash < 0 ? 0.0 : cash) * 100).round();
+      final stcMinor = ((stc < 0 ? 0.0 : stc) * 100).round();
       txn.update(accountRef, {
+        'currentBalanceMinor': balAfterMinor,
+        'cashBalanceMinor': cashMinor,
+        'stcPayBalanceMinor': stcMinor,
         'currentBalance': balAfter,
         'cashBalance': cash,
         'stcPayBalance': stc,
@@ -920,12 +935,22 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
       txn.set(_txs.doc(outId), outTx.toJson());
       txn.set(_txs.doc(inId), inTx.toJson());
+      final fromCashMinor = ((fromCash < 0 ? 0.0 : fromCash) * 100).round();
+      final fromStcMinor = ((fromStc < 0 ? 0.0 : fromStc) * 100).round();
+      final toCashMinor = ((toCash < 0 ? 0.0 : toCash) * 100).round();
+      final toStcMinor = ((toStc < 0 ? 0.0 : toStc) * 100).round();
       txn.update(fromRef, {
+        'currentBalanceMinor': fromAfterM,
+        'cashBalanceMinor': fromCashMinor,
+        'stcPayBalanceMinor': fromStcMinor,
         'currentBalance': fromAfterM / 100.0,
         'cashBalance': fromCash < 0 ? 0.0 : fromCash,
         'stcPayBalance': fromStc < 0 ? 0.0 : fromStc,
       });
       txn.update(toRef, {
+        'currentBalanceMinor': toAfterM,
+        'cashBalanceMinor': toCashMinor,
+        'stcPayBalanceMinor': toStcMinor,
         'currentBalance': toAfterM / 100.0,
         'cashBalance': toCash < 0 ? 0.0 : toCash,
         'stcPayBalance': toStc < 0 ? 0.0 : toStc,

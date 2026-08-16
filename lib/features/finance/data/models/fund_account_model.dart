@@ -46,14 +46,27 @@ class FundAccountModel extends FundAccountEntity {
   }
 
   factory FundAccountModel.fromJson(Map<String, dynamic> json) {
-    // Prefer int minor fields; fall back to legacy double for old documents.
-    final currentMinor = json['currentBalanceMinor'] as int? ??
-        (((json['currentBalance'] as num?)?.toDouble() ?? 0.0) * 100).round();
-    final cashMinor = json['cashBalanceMinor'] as int? ??
-        (((json['cashBalance'] as num?)?.toDouble() ?? 0.0) * 100).round();
-    final stcMinor = json['stcPayBalanceMinor'] as int? ??
-        (((json['stcPayBalance'] as num?)?.toDouble() ?? 0.0) * 100).round();
+    // Robust parser: Handles documents where currentBalanceMinor might be 0
+    // while the legacy currentBalance has a non-zero value, or vice-versa.
+    int parseMinor(String minorKey, String majorKey) {
+      final minorVal = json[minorKey] as int?;
+      final majorVal = (json[majorKey] as num?)?.toDouble();
 
+      if (minorVal == null) {
+        return majorVal != null ? (majorVal * 100).round() : 0;
+      }
+
+      // If minor is 0 but major has funds, use major to recover the real balance
+      if (minorVal == 0 && majorVal != null && majorVal != 0) {
+        return (majorVal * 100).round();
+      }
+
+      return minorVal;
+    }
+
+    final currentMinor = parseMinor('currentBalanceMinor', 'currentBalance');
+    final cashMinor = parseMinor('cashBalanceMinor', 'cashBalance');
+    final stcMinor = parseMinor('stcPayBalanceMinor', 'stcPayBalance');
 
     return FundAccountModel(
       id: json['id'] as String,
