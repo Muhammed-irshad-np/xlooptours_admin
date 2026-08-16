@@ -711,6 +711,16 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   @override
   Future<void> deleteFundAccount(String id) async {
+    final accSnap = await _accounts.doc(id).get();
+    if (!accSnap.exists || accSnap.data() == null) return;
+    final account = FundAccountModel.fromJson(accSnap.data()!);
+
+    if (account.currentBalanceMinor > 0) {
+      throw StateError(
+        'Cannot close account "${account.name}" with an active balance of ${account.currentBalance.toStringAsFixed(2)} ${account.currency}. Please transfer or withdraw all funds first.',
+      );
+    }
+
     // Soft-delete only: deactivate. Hard delete blocked for posted history.
     final txs = await _txs.where('fundAccountId', isEqualTo: id).limit(1).get();
     if (txs.docs.isNotEmpty) {

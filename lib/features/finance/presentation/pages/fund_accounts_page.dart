@@ -1442,8 +1442,22 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
         ),
         IconButton(
           onPressed: () => _confirmDeleteAccount(context, provider, selected),
-          icon: Icon(Icons.delete_outline, size: 18.sp, color: FinDT.danger),
-          tooltip: 'Delete Account',
+          icon: Icon(
+            selected.currentBalanceMinor > 0
+                ? Icons.delete_outline
+                : (provider.transactions.isNotEmpty
+                    ? Icons.archive_outlined
+                    : Icons.delete_outline),
+            size: 18.sp,
+            color: selected.currentBalanceMinor > 0
+                ? FinDT.textMuted
+                : FinDT.danger,
+          ),
+          tooltip: selected.currentBalanceMinor > 0
+              ? 'Cannot close account with active balance'
+              : (provider.transactions.isNotEmpty
+                  ? 'Deactivate Account'
+                  : 'Delete Account'),
         ),
       ],
     );
@@ -2167,17 +2181,47 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     FundAccountProvider provider,
     FundAccountEntity account,
   ) {
+    if (account.currentBalanceMinor > 0) {
+      showFinConfirmationDialog(
+        context: context,
+        title: 'Cannot Close Active Account',
+        icon: Icons.account_balance_wallet_outlined,
+        confirmColor: FinDT.brand,
+        message:
+            'Account "${account.name}" holds an active balance of ${account.currentBalance.toStringAsFixed(2)} ${account.currency}.\n\n'
+            'Financial Safety Rule: You cannot close or delete an account with active funds. Please transfer or withdraw all funds to reach 0.00 ${account.currency} first.',
+        confirmLabel: 'Understood',
+      );
+      return;
+    }
+
+    final hasHistory = provider.transactions.isNotEmpty;
     showFinConfirmationDialog(
       context: context,
-      title: 'Delete Account?',
-      message: 'This will permanently delete "${account.name}". Historical transactions will be preserved in logs.',
-      confirmLabel: 'Delete Account',
+      title: hasHistory ? 'Deactivate Account?' : 'Delete Unused Account?',
+      message: hasHistory
+          ? 'This will deactivate "${account.name}".\n\nAll historical ledger entries, transaction receipts, and accounting audit logs are permanently locked and preserved. The account will simply be hidden from new transaction forms.'
+          : 'This unused account has zero transactions and will be deleted.',
+      confirmLabel: hasHistory ? 'Deactivate Account' : 'Delete Account',
       confirmColor: FinDT.danger,
-      icon: Icons.delete_outline_rounded,
-    ).then((ok) {
+      icon: hasHistory ? Icons.archive_outlined : Icons.delete_outline_rounded,
+    ).then((ok) async {
       if (ok == true) {
-        provider.deleteAccount(account.id);
+        await provider.deleteAccount(account.id);
+        if (context.mounted && provider.error == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                hasHistory
+                    ? 'Account "${account.name}" deactivated. Historical ledger remains safe.'
+                    : 'Account "${account.name}" deleted.',
+              ),
+              backgroundColor: FinDT.brand,
+            ),
+          );
+        }
       }
     });
   }
 }
+
