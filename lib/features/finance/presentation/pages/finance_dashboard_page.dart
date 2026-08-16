@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,6 +8,7 @@ import 'package:xloop_invoice/features/finance/presentation/pages/expense_form_p
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../widgets/expense_summary_card.dart';
+import '../widgets/finance_dialog_helpers.dart';
 import '../widgets/finance_nav_tabs.dart';
 import 'expense_list_page.dart';
 import 'fund_accounts_page.dart';
@@ -144,6 +146,65 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
     );
   }
 
+  bool get _isDevMode {
+    const env = String.fromEnvironment('ENV', defaultValue: 'prod');
+    return env == 'dev' || kDebugMode;
+  }
+
+  Future<void> _confirmResetDevData() async {
+    final confirmed = await showFinConfirmationDialog(
+      context: context,
+      title: 'Reset All Finance Test Data',
+      icon: Icons.delete_sweep_rounded,
+      iconColor: FinDT.danger,
+      message:
+          'This will PERMANENTLY wipe all test data in the DEV environment across:\n'
+          '• Expenses & receipts\n'
+          '• Fund accounts & balances\n'
+          '• Ledger transaction history\n'
+          '• Petty cash sessions & day locks\n'
+          '• Cash advances\n\n'
+          'Are you sure you want to wipe all finance test data and start fresh?',
+      confirmLabel: 'Wipe & Reset All',
+      confirmColor: FinDT.danger,
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final finProv = context.read<FinanceProvider>();
+    final fundProv = context.read<FundAccountProvider>();
+
+    try {
+      await finProv.resetFinanceData();
+      await Future.wait([
+        finProv.fetchAllExpenses(),
+        finProv.fetchCategories(),
+        fundProv.fetchAllAccounts(),
+      ]);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'All finance module test data has been successfully reset.',
+            ),
+            backgroundColor: FinDT.success,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to reset test data: $e'),
+            backgroundColor: FinDT.danger,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildHeader() {
     final now = DateTime.now();
     final dateStr = DateFormat('EEEE, MMMM d, y').format(now);
@@ -175,6 +236,16 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
             ],
           ),
         ),
+        if (_isDevMode) ...[
+          _buildActionButton(
+            icon: Icons.delete_sweep_rounded,
+            label: 'Reset Dev Data',
+            isPrimary: false,
+            isDanger: true,
+            onTap: _confirmResetDevData,
+          ),
+          SizedBox(width: 10.w),
+        ],
         _buildActionButton(
           icon: Icons.add_rounded,
           label: 'New Expense',
@@ -196,9 +267,25 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
     required String label,
     required VoidCallback onTap,
     bool isPrimary = true,
+    bool isDanger = false,
   }) {
+    final bgColor = isDanger
+        ? const Color(0xFFFEF2F2)
+        : isPrimary
+            ? FinDT.brand
+            : Colors.white;
+    final fgColor = isDanger
+        ? FinDT.danger
+        : isPrimary
+            ? Colors.white
+            : FinDT.textPrimary;
+    final borderColor = isDanger
+        ? const Color(0xFFFECACA)
+        : isPrimary
+            ? null
+            : FinDT.border;
     return Material(
-      color: isPrimary ? FinDT.brand : Colors.white,
+      color: bgColor,
       borderRadius: BorderRadius.circular(12.r),
       elevation: isPrimary ? 0 : 0,
       child: InkWell(
@@ -208,7 +295,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
           padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12.r),
-            border: isPrimary ? null : Border.all(color: FinDT.border),
+            border: borderColor != null ? Border.all(color: borderColor) : null,
             boxShadow: isPrimary
                 ? [
                     BoxShadow(
@@ -225,7 +312,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
               Icon(
                 icon,
                 size: 16.sp,
-                color: isPrimary ? Colors.white : FinDT.textSecondary,
+                color: fgColor,
               ),
               SizedBox(width: 6.w),
               Text(
@@ -233,7 +320,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
                 style: GoogleFonts.inter(
                   fontSize: 12.sp,
                   fontWeight: FontWeight.w600,
-                  color: isPrimary ? Colors.white : FinDT.textPrimary,
+                  color: fgColor,
                 ),
               ),
             ],

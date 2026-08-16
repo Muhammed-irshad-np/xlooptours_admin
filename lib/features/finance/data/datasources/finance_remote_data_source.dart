@@ -131,6 +131,9 @@ abstract class FinanceRemoteDataSource {
   Future<void> insertExpenseCategory(ExpenseCategoryModel category);
   Future<void> updateExpenseCategory(ExpenseCategoryModel category);
   Future<void> deleteExpenseCategory(String id);
+
+  /// Development-only tool: wipes test data across all finance collections.
+  Future<void> resetFinanceModuleData();
 }
 
 class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
@@ -1588,6 +1591,36 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         (expense.employeeId == null || expense.employeeId!.isEmpty)) {
       throw StateError('Employee is required for salary expenses');
     }
+  }
+
+  @override
+  Future<void> resetFinanceModuleData() async {
+    final collections = [
+      _expenses,
+      _txs,
+      _accounts,
+      _advances,
+      _dayLocks,
+      firestore.collection('petty_cash_sessions'),
+      firestore.collection('finance_audits'),
+    ];
+
+    for (final col in collections) {
+      final snap = await col.get();
+      for (var i = 0; i < snap.docs.length; i += 400) {
+        final chunk = snap.docs.sublist(
+          i,
+          i + 400 > snap.docs.length ? snap.docs.length : i + 400,
+        );
+        final batch = firestore.batch();
+        for (final doc in chunk) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
+    }
+    _cachedPolicy = null;
+    _policyCachedAt = null;
   }
 
   Future<void> _writeAudit({

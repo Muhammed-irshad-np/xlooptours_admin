@@ -230,4 +230,7 @@ class FakeFinanceRepository implements FinanceRepository {
 
   @override
   Future<void> deleteExpenseCategory(String id) async {}
+
+  @override
+  Future<void> resetFinanceModuleData() async {}
 }
