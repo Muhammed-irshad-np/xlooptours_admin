@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../domain/entities/cash_advance_entity.dart';
 import '../../domain/entities/expense_entity.dart';
@@ -24,6 +25,18 @@ class FinanceRepositoryImpl implements FinanceRepository {
   @override
   Future<List<ExpenseEntity>> getAllExpenses() async {
     return List.from(await remoteDataSource.getAllExpenses());
+  }
+
+  @override
+  Future<(List<ExpenseEntity>, DocumentSnapshot?)> getExpensesPage({
+    DocumentSnapshot? cursor,
+    int pageSize = 150,
+  }) async {
+    final (models, lastDoc) = await remoteDataSource.getExpensesPage(
+      cursor: cursor,
+      pageSize: pageSize,
+    );
+    return (List<ExpenseEntity>.from(models), lastDoc);
   }
 
   @override

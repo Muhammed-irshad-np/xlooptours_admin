@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/expense_category_entity.dart';
+import '../../domain/repositories/finance_repository.dart';
 import '../../domain/usecases/get_all_expenses_usecase.dart';
 import '../../domain/usecases/get_expenses_by_date_range_usecase.dart';
 import '../../domain/usecases/get_expenses_by_account_usecase.dart';
@@ -35,6 +37,8 @@ class FinanceProvider with ChangeNotifier {
   final InsertExpenseCategoryUseCase insertExpenseCategoryUseCase;
   final UpdateExpenseCategoryUseCase updateExpenseCategoryUseCase;
   final DeleteExpenseCategoryUseCase deleteExpenseCategoryUseCase;
+  /// Direct repository access for paginated expense fetching.
+  final FinanceRepository financeRepository;
 
   FinanceProvider({
     required this.getAllExpensesUseCase,
@@ -52,13 +56,17 @@ class FinanceProvider with ChangeNotifier {
     required this.insertExpenseCategoryUseCase,
     required this.updateExpenseCategoryUseCase,
     required this.deleteExpenseCategoryUseCase,
+    required this.financeRepository,
   });
 
   List<ExpenseEntity> _expenses = [];
   List<ExpenseCategoryEntity> _categories = [];
   bool _isLoading = false;
+  bool _isLoadingMore = false;
   bool _isCategoriesLoading = false;
   String? _error;
+  DocumentSnapshot? _lastCursor;
+  bool _hasMore = true;
 
   ExpenseStatus? _statusFilter;
   String? _categoryFilter;
@@ -70,8 +78,11 @@ class FinanceProvider with ChangeNotifier {
   List<ExpenseEntity> get expenses => _expenses;
   List<ExpenseCategoryEntity> get categories => _categories;
   bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
   bool get isCategoriesLoading => _isCategoriesLoading;
   String? get error => _error;
+  /// Whether more pages are available to load.
+  bool get hasMore => _hasMore;
   ExpenseStatus? get statusFilter => _statusFilter;
   String? get categoryFilter => _categoryFilter;
   String? get accountFilter => _accountFilter;
@@ -112,21 +123,53 @@ class FinanceProvider with ChangeNotifier {
   int get pendingCount =>
       _expenses.where((e) => e.status == ExpenseStatus.pending).length;
 
-  double get totalFilteredAmount =>
-      filteredExpenses.fold(0.0, (sum, e) => sum + e.amount);
+  /// Total in halala (minor units) — no float drift.
+  int get totalFilteredAmountMinor =>
+      filteredExpenses.fold(0, (acc, e) => acc + e.resolvedAmountMinor);
+
+
+  /// Major-unit convenience for UI display.
+  double get totalFilteredAmount => totalFilteredAmountMinor / 100.0;
 
   Future<void> fetchAllExpenses() async {
     _isLoading = true;
     _error = null;
+    _lastCursor = null;
+    _hasMore = true;
     notifyListeners();
 
     try {
-      _expenses = await getAllExpensesUseCase();
+      final (page, cursor) = await financeRepository.getExpensesPage();
+      _expenses = page;
+      _lastCursor = cursor;
+      _hasMore = cursor != null;
     } catch (e) {
       _error = e.toString();
       debugPrint('Error fetching expenses: $e');
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Appends the next page of expenses to the existing list.
+  Future<void> fetchNextPage() async {
+    if (_isLoadingMore || !_hasMore) return;
+    _isLoadingMore = true;
+    notifyListeners();
+
+    try {
+      final (page, cursor) = await financeRepository.getExpensesPage(
+        cursor: _lastCursor,
+      );
+      _expenses = [..._expenses, ...page];
+      _lastCursor = cursor;
+      _hasMore = cursor != null && page.isNotEmpty;
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('Error fetching next page: $e');
+    } finally {
+      _isLoadingMore = false;
       notifyListeners();
     }
   }

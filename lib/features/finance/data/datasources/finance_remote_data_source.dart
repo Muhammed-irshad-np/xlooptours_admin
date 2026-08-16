@@ -20,6 +20,12 @@ import '../models/expense_category_model.dart';
 abstract class FinanceRemoteDataSource {
   // Expenses
   Future<List<ExpenseModel>> getAllExpenses();
+  /// Paginated fetch. Pass [cursor] from the previous page's last doc.
+  /// Returns at most [pageSize] results (default 150).
+  Future<(List<ExpenseModel>, DocumentSnapshot?)> getExpensesPage({
+    DocumentSnapshot? cursor,
+    int pageSize = 150,
+  });
   Future<List<ExpenseModel>> getExpensesByDateRange(DateTime start, DateTime end);
   Future<List<ExpenseModel>> getExpensesByAccount(String fundAccountId);
   Future<ExpenseModel?> getExpenseById(String id);
@@ -156,8 +162,28 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   @override
   Future<List<ExpenseModel>> getAllExpenses() async {
+    // Unbounded fetch — use getExpensesPage() for large datasets.
     final snapshot = await _expenses.orderBy('date', descending: true).get();
     return snapshot.docs.map((d) => ExpenseModel.fromJson(d.data())).toList();
+  }
+
+  @override
+  Future<(List<ExpenseModel>, DocumentSnapshot?)> getExpensesPage({
+    DocumentSnapshot? cursor,
+    int pageSize = 150,
+  }) async {
+    Query<Map<String, dynamic>> q = _expenses
+        .orderBy('date', descending: true)
+        .limit(pageSize);
+    if (cursor != null) {
+      q = q.startAfterDocument(cursor);
+    }
+    final snapshot = await q.get();
+    final docs = snapshot.docs
+        .map((d) => ExpenseModel.fromJson(d.data()))
+        .toList();
+    final lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+    return (docs, lastDoc);
   }
 
   @override
@@ -332,8 +358,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       }
       final amountMinor = existing.resolvedAmountMinor;
       final amountMajor = amountMinor / 100.0;
-      final balAfterMinor =
-          (account.currentBalance * 100).round() - amountMinor;
+      final balAfterMinor = account.currentBalanceMinor - amountMinor;
       if (balAfterMinor < 0) {
         throw StateError(
           'Insufficient fund balance '
@@ -407,7 +432,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
           final amountMinor = expense.resolvedAmountMinor;
           final amountMajor = amountMinor / 100.0;
-          final balBeforeMinor = (account.currentBalance * 100).round();
+          final balBeforeMinor = account.currentBalanceMinor;
           final balAfterMinor = balBeforeMinor - amountMinor;
           if (balAfterMinor < 0) {
             throw Exception('Insufficient fund balance');
@@ -571,7 +596,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         final account = FundAccountModel.fromJson(accSnap.data()!);
         final amountMinor = expense.resolvedAmountMinor;
         final amountMajor = amountMinor / 100.0;
-        final balBeforeMinor = (account.currentBalance * 100).round();
+        final balBeforeMinor = account.currentBalanceMinor;
         final balAfterMinor = balBeforeMinor + amountMinor;
         final balBefore = balBeforeMinor / 100.0;
         final balAfter = balAfterMinor / 100.0;
@@ -658,10 +683,14 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   @override
   Future<void> updateFundAccount(FundAccountModel account) async {
     // Do not allow clients to overwrite balances via this path.
+    // Both legacy double fields and new int minor fields are stripped.
     final data = account.toJson();
     data.remove('currentBalance');
     data.remove('cashBalance');
     data.remove('stcPayBalance');
+    data.remove('currentBalanceMinor');
+    data.remove('cashBalanceMinor');
+    data.remove('stcPayBalanceMinor');
     await _accounts.doc(account.id).update(data);
   }
 
@@ -719,7 +748,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
       final amountMinor = (request.amountMajor * 100).round();
       final amountMajor = amountMinor / 100.0;
-      final balBeforeMinor = (account.currentBalance * 100).round();
+      final balBeforeMinor = account.currentBalanceMinor;
       final deltaMinor = request.credit ? amountMinor : -amountMinor;
       final balAfterMinor = balBeforeMinor + deltaMinor;
       if (balAfterMinor < 0) {
@@ -822,8 +851,8 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
       final amountMinor = (amountMajor * 100).round();
       final amount = amountMinor / 100.0;
-      final fromBeforeM = (from.currentBalance * 100).round();
-      final toBeforeM = (to.currentBalance * 100).round();
+      final fromBeforeM = from.currentBalanceMinor;
+      final toBeforeM = to.currentBalanceMinor;
       if (fromBeforeM < amountMinor) {
         throw StateError('Insufficient balance on source account');
       }
@@ -937,14 +966,60 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   @override
   Future<void> openPettyCashSession(PettyCashSessionModel session) async {
+    // Guard: only one open session per account
     final open = await getOpenSession(session.fundAccountId);
     if (open != null) {
       throw StateError('An open session already exists for this account');
     }
-    await firestore
-        .collection('petty_cash_sessions')
-        .doc(session.id)
-        .set(session.toJson());
+
+    // Snapshot live balances from the ledger inside a transaction so the
+    // opening balance cannot be tampered with by the client.
+    await firestore.runTransaction((txn) async {
+      final sessionRef = firestore
+          .collection('petty_cash_sessions')
+          .doc(session.id);
+
+      // Re-check for open session inside the transaction (race guard).
+      final existing = await firestore
+          .collection('petty_cash_sessions')
+          .where('fundAccountId', isEqualTo: session.fundAccountId)
+          .get();
+      for (final doc in existing.docs) {
+        final s = PettyCashSessionModel.fromJson(doc.data());
+        if (s.status == PettyCashSessionStatus.open) {
+          throw StateError('An open session already exists (concurrent open)');
+        }
+      }
+
+      final accSnap = await txn.get(_accounts.doc(session.fundAccountId));
+      if (!accSnap.exists || accSnap.data() == null) {
+        throw StateError('Fund account not found');
+      }
+      final account = FundAccountModel.fromJson(accSnap.data()!);
+      if (!account.isActive) {
+        throw StateError('Fund account is inactive');
+      }
+
+      // Override client-supplied opening balances with the authoritative
+      // ledger snapshot. This ensures expectedClosingBalance is grounded
+      // in actual money, not whatever the user typed.
+      final snapshotted = PettyCashSessionModel.fromEntity(
+        session.copyWith(
+          openingCashBalance: account.cashBalance,
+          openingStcPayBalance: account.stcPayBalance,
+        ),
+      );
+
+      txn.set(sessionRef, snapshotted.toJson());
+    });
+
+    await _writeAudit(
+      action: 'petty_cash.open',
+      entityType: 'petty_cash_session',
+      entityId: session.id,
+      actorName: session.openedBy,
+      detail: 'fundAccount=${session.fundAccountId}',
+    );
   }
 
   @override

@@ -1,15 +1,21 @@
 import '../../domain/entities/fund_account_entity.dart';
 
 /// Data model for [FundAccountEntity] with Firestore serialization.
+///
+/// Storage strategy:
+///   - Writes: always store `currentBalanceMinor` (int) as the authoritative field
+///     PLUS `currentBalance` (double) for backward compat with old app versions.
+///   - Reads: prefer `currentBalanceMinor` when present; fall back to
+///     `(currentBalance * 100).round()` for documents written before migration.
 class FundAccountModel extends FundAccountEntity {
   const FundAccountModel({
     required super.id,
     required super.name,
     required super.code,
     required super.type,
-    super.currentBalance = 0.0,
-    super.cashBalance = 0.0,
-    super.stcPayBalance = 0.0,
+    super.currentBalanceMinor = 0,
+    super.cashBalanceMinor = 0,
+    super.stcPayBalanceMinor = 0,
     required super.currency,
     super.assignedTo,
     super.assignedToId,
@@ -23,6 +29,11 @@ class FundAccountModel extends FundAccountEntity {
       'name': name,
       'code': code,
       'type': type.name,
+      // Authoritative integer fields
+      'currentBalanceMinor': currentBalanceMinor,
+      'cashBalanceMinor': cashBalanceMinor,
+      'stcPayBalanceMinor': stcPayBalanceMinor,
+      // Legacy double fields kept so older app versions can still read balance
       'currentBalance': currentBalance,
       'cashBalance': cashBalance,
       'stcPayBalance': stcPayBalance,
@@ -35,14 +46,23 @@ class FundAccountModel extends FundAccountEntity {
   }
 
   factory FundAccountModel.fromJson(Map<String, dynamic> json) {
+    // Prefer int minor fields; fall back to legacy double for old documents.
+    final currentMinor = json['currentBalanceMinor'] as int? ??
+        (((json['currentBalance'] as num?)?.toDouble() ?? 0.0) * 100).round();
+    final cashMinor = json['cashBalanceMinor'] as int? ??
+        (((json['cashBalance'] as num?)?.toDouble() ?? 0.0) * 100).round();
+    final stcMinor = json['stcPayBalanceMinor'] as int? ??
+        (((json['stcPayBalance'] as num?)?.toDouble() ?? 0.0) * 100).round();
+
+
     return FundAccountModel(
       id: json['id'] as String,
       name: json['name'] as String? ?? '',
       code: json['code'] as String? ?? '',
       type: _parseType(json['type'] as String?),
-      currentBalance: (json['currentBalance'] as num?)?.toDouble() ?? 0.0,
-      cashBalance: (json['cashBalance'] as num?)?.toDouble() ?? 0.0,
-      stcPayBalance: (json['stcPayBalance'] as num?)?.toDouble() ?? 0.0,
+      currentBalanceMinor: currentMinor,
+      cashBalanceMinor: cashMinor,
+      stcPayBalanceMinor: stcMinor,
       currency: json['currency'] as String? ?? 'SAR',
       assignedTo: json['assignedTo'] as String?,
       assignedToId: json['assignedToId'] as String?,
@@ -59,9 +79,9 @@ class FundAccountModel extends FundAccountEntity {
       name: entity.name,
       code: entity.code,
       type: entity.type,
-      currentBalance: entity.currentBalance,
-      cashBalance: entity.cashBalance,
-      stcPayBalance: entity.stcPayBalance,
+      currentBalanceMinor: entity.currentBalanceMinor,
+      cashBalanceMinor: entity.cashBalanceMinor,
+      stcPayBalanceMinor: entity.stcPayBalanceMinor,
       currency: entity.currency,
       assignedTo: entity.assignedTo,
       assignedToId: entity.assignedToId,
@@ -78,3 +98,4 @@ class FundAccountModel extends FundAccountEntity {
     );
   }
 }
+

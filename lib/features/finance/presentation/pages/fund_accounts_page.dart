@@ -1930,9 +1930,9 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                   type: selectedType,
                   currency: currency,
                   assignedTo: assignedName,
-                  currentBalance: isEditing ? account.currentBalance : 0.0,
-                  cashBalance: isEditing ? account.cashBalance : 0.0,
-                  stcPayBalance: isEditing ? account.stcPayBalance : 0.0,
+                  currentBalanceMinor: isEditing ? account.currentBalanceMinor : 0,
+                  cashBalanceMinor: isEditing ? account.cashBalanceMinor : 0,
+                  stcPayBalanceMinor: isEditing ? account.stcPayBalanceMinor : 0,
                   createdAt: isEditing ? account.createdAt : DateTime.now(),
                 );
 

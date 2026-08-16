@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
 import '../entities/cash_advance_entity.dart';
 import '../entities/expense_entity.dart';
@@ -11,6 +12,15 @@ import '../entities/post_fund_request.dart';
 
 abstract class FinanceRepository {
   Future<List<ExpenseEntity>> getAllExpenses();
+
+  /// Paginated fetch. Returns a tuple of [expenses, lastDocCursor].
+  /// Pass the cursor from the previous call to get the next page.
+  /// Returns an empty list when no more pages are available.
+  Future<(List<ExpenseEntity>, DocumentSnapshot?)> getExpensesPage({
+    DocumentSnapshot? cursor,
+    int pageSize = 150,
+  });
+
   Future<List<ExpenseEntity>> getExpensesByDateRange(
     DateTime start,
     DateTime end,

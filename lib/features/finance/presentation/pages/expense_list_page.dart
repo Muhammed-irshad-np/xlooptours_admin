@@ -452,8 +452,50 @@ class _ExpenseDataTable extends StatelessWidget {
             )
           else if (expenses.isEmpty)
             _buildEmpty()
-          else
+          else ...[
             _buildTable(context, expenses, formatter),
+            if (provider.hasMore) ...[
+              Divider(height: 1, color: FinDT.borderLight),
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 14.h, horizontal: 20.w),
+                child: Center(
+                  child: provider.isLoadingMore
+                      ? SizedBox(
+                          height: 22.h,
+                          width: 22.h,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: FinDT.brand,
+                          ),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: () => provider.fetchNextPage(),
+                          icon: Icon(Icons.arrow_downward_rounded, size: 15.sp),
+                          label: Text(
+                            'Load More Expenses',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: FinDT.brand,
+                            side: BorderSide(
+                              color: FinDT.brand.withValues(alpha: 0.35),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8.r),
+                            ),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 10.h,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ],
         ],
       ),
     );

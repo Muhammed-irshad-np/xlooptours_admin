@@ -554,6 +554,7 @@ Future<void> init() async {
       insertExpenseCategoryUseCase: sl(),
       updateExpenseCategoryUseCase: sl(),
       deleteExpenseCategoryUseCase: sl(),
+      financeRepository: sl(),
     ),
   );
   sl.registerFactory(
