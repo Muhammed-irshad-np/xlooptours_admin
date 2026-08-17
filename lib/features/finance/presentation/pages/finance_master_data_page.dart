@@ -757,35 +757,32 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
     int linkedAccountsCount,
   ) async {
     if (linkedAccountsCount > 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Cannot delete "${type.name}". $linkedAccountsCount active account(s) are currently assigned to this type.',
-          ),
-          backgroundColor: FinDT.danger,
-        ),
+      showFinConfirmationDialog(
+        context: context,
+        title: 'Cannot Delete Account Type',
+        icon: Icons.lock_outline_rounded,
+        iconColor: FinDT.danger,
+        confirmColor: FinDT.brand,
+        confirmLabel: 'Understood',
+        message:
+            'Cannot delete "${type.name}". There are currently $linkedAccountsCount active account(s) assigned to this virtual account type.',
+        highlightNote:
+            'Reassign or close all linked accounts before deleting this account type.',
       );
       return;
     }
 
-    final confirm = await showDialog<bool>(
+    final confirm = await showFinConfirmationDialog(
       context: context,
-      builder: (c) => AlertDialog(
-        shape: finDialogShape,
-        title: Text('Delete Account Type?'),
-        content: Text('Are you sure you want to delete "${type.name}" (${type.codePrefix})?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(c, true),
-            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Account Type?',
+      message:
+          'Are you sure you want to delete "${type.name}" (${type.codePrefix}) from system master records?',
+      highlightNote:
+          'This action is irreversible. The code prefix will no longer be available for auto-generating new ledgers.',
+      confirmLabel: 'Delete Account Type',
+      confirmColor: FinDT.danger,
+      icon: Icons.delete_outline_rounded,
+      iconColor: FinDT.danger,
     );
 
     if (confirm == true) {
@@ -1517,7 +1514,7 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
           ),
           SizedBox(width: 6.w),
           InkWell(
-            onTap: () => _removeType(type.id),
+            onTap: () => _confirmDeleteType(context, type),
             child: Icon(Icons.close, size: 14.sp, color: FinDT.textSecondary),
           ),
         ],
@@ -1619,22 +1616,37 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
     widget.provider.updateCategory(updatedCat);
   }
 
-  Future<void> _confirmDeleteCategory(BuildContext context) async {
-    final confirm = await showDialog<bool>(
+  void _confirmDeleteType(BuildContext context, ExpenseTypeEntity type) {
+    showFinConfirmationDialog(
       context: context,
-      builder: (c) => AlertDialog(
-        shape: finDialogShape,
-        title: Text('Delete Category?'),
-        content: Text('Are you sure you want to delete category "${widget.category.name}"?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () => Navigator.pop(c, true),
-            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Expense Type?',
+      message:
+          'Are you sure you want to remove "${type.name}" from category "${widget.category.name}"?',
+      highlightNote:
+          'Existing expense vouchers tagged with this type will remain in the transaction history.',
+      confirmLabel: 'Delete Type',
+      confirmColor: FinDT.danger,
+      icon: Icons.delete_outline_rounded,
+      iconColor: FinDT.danger,
+    ).then((ok) {
+      if (ok == true) {
+        _removeType(type.id);
+      }
+    });
+  }
+
+  Future<void> _confirmDeleteCategory(BuildContext context) async {
+    final confirm = await showFinConfirmationDialog(
+      context: context,
+      title: 'Delete Category?',
+      message:
+          'Are you sure you want to delete the category "${widget.category.name}" and all its ${widget.category.expenseTypes.length} configured sub-types?',
+      highlightNote:
+          'Historical expenses already filed under this category will retain their ledger records and audit trail.',
+      confirmLabel: 'Delete Category',
+      confirmColor: FinDT.danger,
+      icon: Icons.delete_outline_rounded,
+      iconColor: FinDT.danger,
     );
 
     if (confirm == true) {
