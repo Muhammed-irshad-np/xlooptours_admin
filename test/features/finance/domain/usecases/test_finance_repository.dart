@@ -89,7 +89,9 @@ class FakeFinanceRepository implements FinanceRepository {
   }
 
   @override
-  Future<FundTransactionEntity> postFundMovement(PostFundRequest request) async {
+  Future<FundTransactionEntity> postFundMovement(
+    PostFundRequest request,
+  ) async {
     if (fundMovementError != null) throw fundMovementError!;
     return fundMovementResult!;
   }
@@ -121,10 +123,15 @@ class FakeFinanceRepository implements FinanceRepository {
   }) async => (<ExpenseEntity>[], null);
 
   @override
-  Future<List<ExpenseEntity>> getExpensesByDateRange(DateTime start, DateTime end) async => [];
+  Future<List<ExpenseEntity>> getExpensesByDateRange(
+    DateTime start,
+    DateTime end,
+  ) async => [];
 
   @override
-  Future<List<ExpenseEntity>> getExpensesByAccount(String fundAccountId) async => [];
+  Future<List<ExpenseEntity>> getExpensesByAccount(
+    String fundAccountId,
+  ) async => [];
 
   @override
   Future<void> insertExpense(ExpenseEntity expense) async {}
@@ -162,19 +169,28 @@ class FakeFinanceRepository implements FinanceRepository {
   Future<void> deleteFundAccount(String id) async {}
 
   @override
-  Future<List<FundTransactionEntity>> getTransactionsForAccount(String accountId) async => [];
+  Future<List<FundTransactionEntity>> getTransactionsForAccount(
+    String accountId,
+  ) async => [];
 
   @override
-  Future<List<PettyCashSessionEntity>> getPettyCashSessions(String accountId) async => [];
+  Future<List<PettyCashSessionEntity>> getPettyCashSessions(
+    String accountId,
+  ) async => [];
 
   @override
-  Future<PettyCashSessionEntity?> getOpenSession(String accountId) async => null;
+  Future<PettyCashSessionEntity?> getOpenSession(String accountId) async =>
+      null;
 
   @override
   Future<String> uploadClosingSheet(XFile file, String sessionId) async => '';
 
   @override
-  Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt}) async {
+  Future<LedgerDayTotals> getLedgerDayTotals(
+    String accountId,
+    DateTime day, {
+    DateTime? sessionOpenedAt,
+  }) async {
     return const LedgerDayTotals(
       cashDeposits: 0,
       stcPayDeposits: 0,
@@ -187,10 +203,13 @@ class FakeFinanceRepository implements FinanceRepository {
   Future<bool> isDayLocked(String fundAccountId, DateTime day) async => false;
 
   @override
-  Future<List<CashAdvanceEntity>> getCashAdvances({String? fundAccountId}) async => [];
+  Future<List<CashAdvanceEntity>> getCashAdvances({
+    String? fundAccountId,
+  }) async => [];
 
   @override
-  Future<CashAdvanceEntity> issueCashAdvance(CashAdvanceEntity advance) async => advance;
+  Future<CashAdvanceEntity> issueCashAdvance(CashAdvanceEntity advance) async =>
+      advance;
 
   @override
   Future<CashAdvanceEntity> settleCashAdvance({

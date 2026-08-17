@@ -100,10 +100,7 @@ Widget finDialogTitle(String title, {IconData? icon, Color? iconColor}) {
 Widget finDialogCancelButton(BuildContext context, {String label = 'Cancel', VoidCallback? onPressed}) {
   return TextButton(
     onPressed: onPressed ?? () {
-      final nav = Navigator.of(context, rootNavigator: true);
-      if (nav.canPop()) {
-        nav.pop(false);
-      }
+      Navigator.of(context).pop(false);
     },
     child: Text(
       label,
