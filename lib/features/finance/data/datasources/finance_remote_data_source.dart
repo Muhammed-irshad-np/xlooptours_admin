@@ -478,8 +478,16 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
               throw Exception('Insufficient STC Pay balance');
             }
             stc -= amountMajor;
+          } else {
+            // FundBucket.total: deduct from cash first, then remainder from STC Pay
+            if (cash >= amountMajor) {
+              cash -= amountMajor;
+            } else {
+              final rem = amountMajor - cash;
+              cash = 0;
+              stc = (stc - rem).clamp(0.0, double.infinity);
+            }
           }
-          // FundBucket.total: only currentBalance moves (non-split wallets).
 
           ledgerId = _uuid.v4();
           final balBefore = balBeforeMinor / 100.0;
@@ -818,6 +826,27 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       } else if (request.bucket == FundBucket.stcPay) {
         stc += request.credit ? amountMajor : -amountMajor;
         if (stc < -1e-9) throw StateError('Insufficient STC Pay balance');
+      }
+
+      // If bucket is FundBucket.total and neither cashDelta nor stcPayDelta was explicitly set:
+      if (request.cashDeltaMajor == null &&
+          request.stcPayDeltaMajor == null &&
+          (request.bucket == FundBucket.total ||
+              (request.bucket != FundBucket.cash &&
+                  request.bucket != FundBucket.stcPay))) {
+        if (request.credit) {
+          // Default incoming money to cash bucket
+          cash += amountMajor;
+        } else {
+          // Outgoing money: deduct from cash first, then remainder from STC
+          if (cash >= amountMajor) {
+            cash -= amountMajor;
+          } else {
+            final remainder = amountMajor - cash;
+            cash = 0;
+            stc = (stc - remainder).clamp(0.0, double.infinity);
+          }
+        }
       }
 
       if (cash < 0) cash = 0;

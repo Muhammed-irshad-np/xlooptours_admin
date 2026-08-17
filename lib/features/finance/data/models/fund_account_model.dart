@@ -68,9 +68,21 @@ class FundAccountModel extends FundAccountEntity {
       return minorVal;
     }
 
-    final currentMinor = parseMinor('currentBalanceMinor', 'currentBalance');
-    final cashMinor = parseMinor('cashBalanceMinor', 'cashBalance');
-    final stcMinor = parseMinor('stcPayBalanceMinor', 'stcPayBalance');
+    var currentMinor = parseMinor('currentBalanceMinor', 'currentBalance');
+    var cashMinor = parseMinor('cashBalanceMinor', 'cashBalance');
+    var stcMinor = parseMinor('stcPayBalanceMinor', 'stcPayBalance');
+
+    // Self-healing: Ensure cash and STC balances stay bounded by currentBalance
+    if (stcMinor == 0 && cashMinor > currentMinor) {
+      cashMinor = currentMinor;
+    } else if (cashMinor + stcMinor > currentMinor && currentMinor >= 0) {
+      if (cashMinor >= currentMinor) {
+        cashMinor = currentMinor;
+        stcMinor = 0;
+      } else {
+        stcMinor = currentMinor - cashMinor;
+      }
+    }
 
     final parsedType = _parseType(json['type'] as String?);
     final rawTypeId = json['accountTypeId'] as String? ?? json['type'] as String?;
