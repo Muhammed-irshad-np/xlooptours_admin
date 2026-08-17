@@ -10,7 +10,6 @@ import '../providers/fund_account_provider.dart';
 import '../providers/petty_cash_provider.dart';
 import '../widgets/expense_status_badge.dart';
 import '../../domain/entities/expense_entity.dart';
-import '../../domain/entities/fund_account_entity.dart';
 import '../../domain/services/finance_export_service.dart';
 import 'expense_form_page.dart';
 import '../widgets/finance_dialog_helpers.dart';
@@ -806,7 +805,7 @@ class _ExpenseDataTable extends StatelessWidget {
     final fundProv = context.read<FundAccountProvider>();
     final account = fundProv.getAccountById(expense.fundAccountId);
 
-    if (postsMoney && account?.type == FundAccountType.pettyCash) {
+    if (postsMoney && account?.isPettyCash == true) {
       final pettyProv = context.read<PettyCashProvider>();
       final openSession = await pettyProv.getOpenSessionUseCase(account!.id);
       if (openSession == null) {

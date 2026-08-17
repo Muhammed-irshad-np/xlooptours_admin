@@ -61,6 +61,7 @@ class PettyCashProvider with ChangeNotifier {
         _previewTotals = await financeRepository.getLedgerDayTotals(
           accountId,
           _currentSession!.date,
+          sessionOpenedAt: _currentSession!.createdAt,
         );
       } else {
         _previewTotals = null;
@@ -86,6 +87,7 @@ class PettyCashProvider with ChangeNotifier {
       _previewTotals = await financeRepository.getLedgerDayTotals(
         session.fundAccountId,
         session.date,
+        sessionOpenedAt: session.createdAt,
       );
     } catch (e) {
       _error = e.toString();
@@ -166,6 +168,7 @@ class PettyCashProvider with ChangeNotifier {
     _previewTotals = await financeRepository.getLedgerDayTotals(
       _currentSession!.fundAccountId,
       _currentSession!.date,
+      sessionOpenedAt: _currentSession!.createdAt,
     );
     notifyListeners();
   }
