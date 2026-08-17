@@ -709,7 +709,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
   Widget _buildAccountDropdown(FundAccountProvider accProv) {
     final selectedAcc = accProv.getAccountById(_selectedAccountId ?? '');
-    final isPettyCash = selectedAcc?.type == FundAccountType.pettyCash;
+    final isPettyCash = selectedAcc?.isPettyCash ?? false;
     final currencyFormat = NumberFormat('#,##0.00', 'en_US');
 
     return Column(
@@ -742,7 +742,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           Text(
-                            '${a.code} • ${a.type.displayName}',
+                            '${a.code} • ${a.typeDisplayName}',
                             style: GoogleFonts.inter(
                               fontSize: 10.sp,
                               color: FinDT.textSecondary,
@@ -996,7 +996,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     FundAccountEntity account,
     NumberFormat currencyFormat,
   ) {
-    final isPettyCash = account.type == FundAccountType.pettyCash;
+    final isPettyCash = account.isPettyCash;
     final enteredAmount = double.tryParse(_amountController.text) ?? 0.0;
     final relevantBalance = isPettyCash
         ? (_paymentMethod == 'cash'

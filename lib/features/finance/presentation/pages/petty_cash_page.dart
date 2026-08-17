@@ -31,7 +31,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final accProv = context.read<FundAccountProvider>();
       final pettyAccounts = accProv.activeAccounts
-          .where((a) => a.type == FundAccountType.pettyCash)
+          .where((a) => a.isPettyCash)
           .toList();
 
       if (pettyAccounts.isNotEmpty) {
@@ -45,7 +45,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
   Widget build(BuildContext context) {
     final accProv = context.watch<FundAccountProvider>();
     final pettyAccounts = accProv.activeAccounts
-        .where((a) => a.type == FundAccountType.pettyCash)
+        .where((a) => a.isPettyCash)
         .toList();
 
     return Consumer<PettyCashProvider>(
@@ -509,51 +509,229 @@ class _PettyCashPageState extends State<PettyCashPage> {
               );
             }),
           ] else ...[
-            Container(
-              padding: EdgeInsets.all(20.w),
-              decoration: BoxDecoration(
-                color: FinDT.bgPage,
-                borderRadius: BorderRadius.circular(12.r),
-                border: Border.all(color: FinDT.border),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Ready to start today\'s transactions?',
-                          style: GoogleFonts.inter(fontSize: 13.sp, fontWeight: FontWeight.w700, color: FinDT.textPrimary),
-                        ),
-                        SizedBox(height: 3.h),
-                        Text(
-                          'Open the daily session to record physical cash in drawer and digital STC balance.',
-                          style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.textSecondary),
-                        ),
-                      ],
+            Builder(builder: (_) {
+              final now = DateTime.now();
+              final todayDate = DateTime(now.year, now.month, now.day);
+              final todaySession = provider.sessions.where((s) {
+                final sDate = DateTime(s.date.year, s.date.month, s.date.day);
+                return sDate == todayDate;
+              }).firstOrNull;
+
+              if (todaySession != null &&
+                  todaySession.status == PettyCashSessionStatus.verified) {
+                return Container(
+                  padding: EdgeInsets.all(18.w),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF16A34A).withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(
+                      color: const Color(0xFF16A34A).withValues(alpha: 0.3),
                     ),
                   ),
-                  ElevatedButton.icon(
-                    onPressed: () => _showOpenSessionDialog(context, provider),
-                    icon: Icon(Icons.storefront_outlined, size: 16.sp),
-                    label: Text(
-                      'Open Daily Session',
-                      style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(10.w),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF16A34A).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Icon(
+                          Icons.verified_user_rounded,
+                          color: const Color(0xFF16A34A),
+                          size: 22.sp,
+                        ),
+                      ),
+                      SizedBox(width: 14.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Today\'s Register is Verified & Locked',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: FinDT.textPrimary,
+                                  ),
+                                ),
+                                SizedBox(width: 8.w),
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 8.w,
+                                    vertical: 2.h,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF16A34A).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6.r),
+                                  ),
+                                  child: Text(
+                                    'LOCKED',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.sp,
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFF16A34A),
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 3.h),
+                            Text(
+                              'The register for today (${DateFormat('dd MMMM yyyy').format(todaySession.date)}) was verified by ${todaySession.verifiedBy ?? 'Admin'} and day is locked. A new session can be opened tomorrow.',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.sp,
+                                color: FinDT.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              if (todaySession != null &&
+                  todaySession.status == PettyCashSessionStatus.closed) {
+                return Container(
+                  padding: EdgeInsets.all(18.w),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD97706).withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(
+                      color: const Color(0xFFD97706).withValues(alpha: 0.3),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: FinDT.brand,
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(10.w),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD97706).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                        child: Icon(
+                          Icons.lock_clock_outlined,
+                          color: const Color(0xFFD97706),
+                          size: 22.sp,
+                        ),
+                      ),
+                      SizedBox(width: 14.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(
+                                  'Today\'s Register is Closed (Pending Verification)',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: FinDT.textPrimary,
+                                  ),
+                                ),
+                                SizedBox(width: 8.w),
+                                Container(
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 8.w,
+                                    vertical: 2.h,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFD97706).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(6.r),
+                                  ),
+                                  child: Text(
+                                    'PENDING AUDIT',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.sp,
+                                      fontWeight: FontWeight.w800,
+                                      color: const Color(0xFFD97706),
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 3.h),
+                            Text(
+                              'Closed by ${todaySession.closedBy ?? 'Coordinator'} with declared closing balance of ${formatter.format(todaySession.closingBalance)} SAR. Please review and verify the session in the list below to lock the day.',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.sp,
+                                color: FinDT.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
+              return Container(
+                padding: EdgeInsets.all(20.w),
+                decoration: BoxDecoration(
+                  color: FinDT.bgPage,
+                  borderRadius: BorderRadius.circular(12.r),
+                  border: Border.all(color: FinDT.border),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Ready to start today\'s transactions?',
+                            style: GoogleFonts.inter(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w700,
+                              color: FinDT.textPrimary,
+                            ),
+                          ),
+                          SizedBox(height: 3.h),
+                          Text(
+                            'Open the daily session to record physical cash in drawer and digital STC balance.',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.sp,
+                              color: FinDT.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
+                    ElevatedButton.icon(
+                      onPressed: () => _showOpenSessionDialog(context, provider),
+                      icon: Icon(Icons.storefront_outlined, size: 16.sp),
+                      label: Text(
+                        'Open Daily Session',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: FinDT.brand,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 20.w,
+                          vertical: 12.h,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10.r),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
           ],
         ],
       ),
@@ -970,8 +1148,23 @@ class _PettyCashPageState extends State<PettyCashPage> {
                 createdAt: DateTime.now(),
               );
 
-              provider.openSession(session);
-              if (ctx.mounted) Navigator.pop(ctx);
+              try {
+                await provider.openSession(session);
+                if (ctx.mounted) Navigator.pop(ctx);
+              } catch (e) {
+                if (ctx.mounted) {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(e
+                          .toString()
+                          .replaceAll('Exception: ', '')
+                          .replaceAll('StateError: ', '')),
+                      backgroundColor: const Color(0xFFDC2626),
+                    ),
+                  );
+                }
+              }
             },
             label: 'Open Session',
             backgroundColor: FinDT.brand,
@@ -1020,8 +1213,18 @@ class _PettyCashPageState extends State<PettyCashPage> {
     PettyCashSessionEntity session,
   ) {
     final formKey = GlobalKey<FormState>();
-    final cashCtrl = TextEditingController(text: session.expectedCashClosing.toStringAsFixed(2));
-    final digitalCtrl = TextEditingController(text: session.expectedStcPayClosing.toStringAsFixed(2));
+    // Compute expected closing from live ledger totals (not the stale session
+    // entity whose deposit/expense fields are still 0 at open time).
+    final live = provider.previewTotals;
+    final liveCashDep = live?.cashDeposits ?? session.cashDeposits;
+    final liveStcDep = live?.stcPayDeposits ?? session.stcPayDeposits;
+    final liveCashExp = live?.cashExpenses ?? session.cashExpenses;
+    final liveStcExp = live?.stcPayExpenses ?? session.stcPayExpenses;
+    final expectedCash = session.openingCashBalance + liveCashDep - liveCashExp;
+    final expectedStc = session.openingStcPayBalance + liveStcDep - liveStcExp;
+    final expectedTotal = expectedCash + expectedStc;
+    final cashCtrl = TextEditingController(text: expectedCash.toStringAsFixed(2));
+    final digitalCtrl = TextEditingController(text: expectedStc.toStringAsFixed(2));
     String? closingSheetUrl;
 
     showDialog(
@@ -1060,11 +1263,11 @@ class _PettyCashPageState extends State<PettyCashPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                'Cash: ${session.expectedCashClosing.toStringAsFixed(2)} SAR',
+                                'Cash: ${expectedCash.toStringAsFixed(2)} SAR',
                                 style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w700, color: FinDT.textPrimary),
                               ),
                               Text(
-                                'STC Pay: ${session.expectedStcPayClosing.toStringAsFixed(2)} SAR',
+                                'STC Pay: ${expectedStc.toStringAsFixed(2)} SAR',
                                 style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w700, color: const Color(0xFF6D28D9)),
                               ),
                             ],
@@ -1078,7 +1281,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
                                 style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
                               ),
                               Text(
-                                '${session.expectedClosingBalance.toStringAsFixed(2)} SAR',
+                                '${expectedTotal.toStringAsFixed(2)} SAR',
                                 style: GoogleFonts.inter(fontSize: 13.sp, fontWeight: FontWeight.w700, color: FinDT.brand),
                               ),
                             ],

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/expense_category_entity.dart';
+import '../../domain/entities/finance_policy_entity.dart';
 import '../../domain/repositories/finance_repository.dart';
 import '../../domain/usecases/get_all_expenses_usecase.dart';
 import '../../domain/usecases/get_expenses_by_date_range_usecase.dart';
@@ -61,9 +62,11 @@ class FinanceProvider with ChangeNotifier {
 
   List<ExpenseEntity> _expenses = [];
   List<ExpenseCategoryEntity> _categories = [];
+  FinancePolicyEntity? _policy;
   bool _isLoading = false;
   bool _isLoadingMore = false;
   bool _isCategoriesLoading = false;
+  bool _isPolicyLoading = false;
   String? _error;
   DocumentSnapshot? _lastCursor;
   bool _hasMore = true;
@@ -77,9 +80,11 @@ class FinanceProvider with ChangeNotifier {
 
   List<ExpenseEntity> get expenses => _expenses;
   List<ExpenseCategoryEntity> get categories => _categories;
+  FinancePolicyEntity get policy => _policy ?? const FinancePolicyEntity();
   bool get isLoading => _isLoading;
   bool get isLoadingMore => _isLoadingMore;
   bool get isCategoriesLoading => _isCategoriesLoading;
+  bool get isPolicyLoading => _isPolicyLoading;
   String? get error => _error;
   /// Whether more pages are available to load.
   bool get hasMore => _hasMore;
@@ -494,6 +499,40 @@ class FinanceProvider with ChangeNotifier {
     final index = _categories.indexWhere((c) => c.name == categoryName);
     if (index == -1) return [];
     return _categories[index].expenseTypes.where((t) => t.isActive).toList();
+  }
+
+  Future<void> fetchFinancePolicy() async {
+    _isPolicyLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _policy = await financeRepository.getFinancePolicy();
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('Error fetching finance policy: $e');
+    } finally {
+      _isPolicyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> saveFinancePolicy(FinancePolicyEntity policy) async {
+    _isPolicyLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await financeRepository.saveFinancePolicy(policy);
+      _policy = policy;
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('Error saving finance policy: $e');
+      rethrow;
+    } finally {
+      _isPolicyLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> resetFinanceData() async {

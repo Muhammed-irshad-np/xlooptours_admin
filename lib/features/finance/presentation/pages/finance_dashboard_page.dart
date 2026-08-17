@@ -14,7 +14,7 @@ import 'expense_list_page.dart';
 import 'fund_accounts_page.dart';
 import 'petty_cash_page.dart';
 import 'cash_advances_page.dart';
-import 'expense_categories_page.dart';
+import 'finance_master_data_page.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
 
@@ -82,7 +82,9 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
     await Future.wait([
       financeProvider.fetchAllExpenses(),
       financeProvider.fetchCategories(),
+      financeProvider.fetchFinancePolicy(),
       accountProvider.fetchAllAccounts(),
+      accountProvider.fetchAccountTypes(),
     ]);
 
     if (mounted) {
@@ -343,7 +345,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
       case 4:
         return const CashAdvancesPage(key: ValueKey('advances'));
       case 5:
-        return const ExpenseCategoriesPage(key: ValueKey('categories'));
+        return const FinanceMasterDataPage(key: ValueKey('master_data'));
       default:
         return const SizedBox.shrink();
     }

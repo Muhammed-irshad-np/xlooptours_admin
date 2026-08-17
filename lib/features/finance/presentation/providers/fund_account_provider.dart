@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/fund_account_entity.dart';
+import '../../domain/entities/fund_account_type_entity.dart';
 import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/entities/post_fund_request.dart';
 import '../../domain/usecases/generate_account_code_usecase.dart';
@@ -11,6 +12,10 @@ import '../../domain/usecases/get_transactions_usecase.dart';
 import '../../domain/usecases/insert_transaction_usecase.dart';
 import '../../domain/usecases/post_fund_movement_usecase.dart';
 import '../../domain/usecases/transfer_funds_usecase.dart';
+import '../../domain/usecases/get_fund_account_types_usecase.dart';
+import '../../domain/usecases/insert_fund_account_type_usecase.dart';
+import '../../domain/usecases/update_fund_account_type_usecase.dart';
+import '../../domain/usecases/delete_fund_account_type_usecase.dart';
 
 class FundAccountProvider with ChangeNotifier {
   final GetAllFundAccountsUseCase getAllFundAccountsUseCase;
@@ -22,6 +27,10 @@ class FundAccountProvider with ChangeNotifier {
   final PostFundMovementUseCase postFundMovementUseCase;
   final TransferFundsUseCase transferFundsUseCase;
   final GenerateAccountCodeUseCase generateAccountCodeUseCase;
+  final GetFundAccountTypesUseCase getFundAccountTypesUseCase;
+  final InsertFundAccountTypeUseCase insertFundAccountTypeUseCase;
+  final UpdateFundAccountTypeUseCase updateFundAccountTypeUseCase;
+  final DeleteFundAccountTypeUseCase deleteFundAccountTypeUseCase;
 
   FundAccountProvider({
     required this.getAllFundAccountsUseCase,
@@ -33,21 +42,31 @@ class FundAccountProvider with ChangeNotifier {
     required this.postFundMovementUseCase,
     required this.transferFundsUseCase,
     required this.generateAccountCodeUseCase,
+    required this.getFundAccountTypesUseCase,
+    required this.insertFundAccountTypeUseCase,
+    required this.updateFundAccountTypeUseCase,
+    required this.deleteFundAccountTypeUseCase,
   });
 
   List<FundAccountEntity> _accounts = [];
+  List<FundAccountTypeEntity> _accountTypes = FundAccountTypeEntity.defaultTypes;
   List<FundTransactionEntity> _transactions = [];
   String? _selectedAccountId;
   bool _isLoading = false;
+  bool _isAccountTypesLoading = false;
   bool _isTransactionsLoading = false;
   String? _error;
 
   List<FundAccountEntity> get accounts => _accounts;
   List<FundAccountEntity> get activeAccounts =>
       _accounts.where((a) => a.isActive).toList();
+  List<FundAccountTypeEntity> get accountTypes =>
+      _accountTypes.where((t) => t.isActive).toList();
+  List<FundAccountTypeEntity> get allAccountTypes => _accountTypes;
   List<FundTransactionEntity> get transactions => _transactions;
   String? get selectedAccountId => _selectedAccountId;
   bool get isLoading => _isLoading;
+  bool get isAccountTypesLoading => _isAccountTypesLoading;
   bool get isTransactionsLoading => _isTransactionsLoading;
   String? get error => _error;
 
@@ -69,7 +88,19 @@ class FundAccountProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      _accounts = await getAllFundAccountsUseCase();
+      final results = await Future.wait([
+        getAllFundAccountsUseCase(),
+        getFundAccountTypesUseCase().catchError((e) {
+          debugPrint('Error fetching account types: $e');
+          return FundAccountTypeEntity.defaultTypes;
+        }),
+      ]);
+
+      _accounts = results[0] as List<FundAccountEntity>;
+      final types = results[1] as List<FundAccountTypeEntity>;
+      if (types.isNotEmpty) {
+        _accountTypes = types;
+      }
     } catch (e) {
       _error = e.toString();
       debugPrint('Error fetching fund accounts: $e');
@@ -79,9 +110,92 @@ class FundAccountProvider with ChangeNotifier {
     }
   }
 
-  /// Generates a unique sequential account code based on account type.
-  String generateUniqueCode(FundAccountType type) {
-    return generateAccountCodeUseCase(type, _accounts);
+  // ─── Account Types Management ────────────────────────────────
+
+  Future<void> fetchAccountTypes() async {
+    _isAccountTypesLoading = true;
+    notifyListeners();
+
+    try {
+      final types = await getFundAccountTypesUseCase();
+      if (types.isNotEmpty) {
+        _accountTypes = types;
+      }
+    } catch (e) {
+      debugPrint('Error loading account types: $e');
+    } finally {
+      _isAccountTypesLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> insertAccountType(FundAccountTypeEntity type) async {
+    _error = null;
+    _accountTypes = [..._accountTypes, type];
+    notifyListeners();
+
+    try {
+      await insertFundAccountTypeUseCase(type);
+    } catch (e) {
+      _accountTypes = _accountTypes.where((t) => t.id != type.id).toList();
+      _error = e.toString();
+      debugPrint('Error inserting account type: $e');
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> updateAccountType(FundAccountTypeEntity type) async {
+    _error = null;
+    final index = _accountTypes.indexWhere((t) => t.id == type.id);
+    FundAccountTypeEntity? oldType;
+
+    if (index != -1) {
+      oldType = _accountTypes[index];
+      _accountTypes[index] = type;
+      notifyListeners();
+    }
+
+    try {
+      await updateFundAccountTypeUseCase(type);
+    } catch (e) {
+      if (index != -1 && oldType != null) {
+        _accountTypes[index] = oldType;
+      }
+      _error = e.toString();
+      debugPrint('Error updating account type: $e');
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> deleteAccountType(String id) async {
+    _error = null;
+    final index = _accountTypes.indexWhere((t) => t.id == id);
+    FundAccountTypeEntity? oldType;
+
+    if (index != -1) {
+      oldType = _accountTypes[index];
+      _accountTypes = _accountTypes.where((t) => t.id != id).toList();
+      notifyListeners();
+    }
+
+    try {
+      await deleteFundAccountTypeUseCase(id);
+    } catch (e) {
+      if (index != -1 && oldType != null) {
+        _accountTypes = [..._accountTypes, oldType];
+      }
+      _error = e.toString();
+      debugPrint('Error deleting account type: $e');
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Generates a unique sequential account code based on account type or prefix.
+  String generateUniqueCode(dynamic typeOrPrefix) {
+    return generateAccountCodeUseCase(typeOrPrefix, _accounts);
   }
 
   Future<void> insertAccount(FundAccountEntity account) async {
@@ -91,7 +205,7 @@ class FundAccountProvider with ChangeNotifier {
     String finalCode = account.code.trim();
     if (finalCode.isEmpty ||
         _accounts.any((a) => a.code.toUpperCase() == finalCode.toUpperCase() && a.id != account.id)) {
-      finalCode = generateUniqueCode(account.type);
+      finalCode = generateUniqueCode(account.accountTypeId ?? account.type);
     }
 
     final cleanAccount = account.copyWith(code: finalCode);

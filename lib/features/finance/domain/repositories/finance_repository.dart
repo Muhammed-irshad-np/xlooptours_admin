@@ -5,6 +5,7 @@ import '../entities/expense_entity.dart';
 import '../entities/expense_category_entity.dart';
 import '../entities/finance_policy_entity.dart';
 import '../entities/fund_account_entity.dart';
+import '../entities/fund_account_type_entity.dart';
 import '../entities/fund_transaction_entity.dart';
 import '../entities/ledger_day_totals.dart';
 import '../entities/petty_cash_session_entity.dart';
@@ -89,7 +90,7 @@ abstract class FinanceRepository {
     required String? verifiedByUserId,
   });
   Future<String> uploadClosingSheet(XFile file, String sessionId);
-  Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day);
+  Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt});
   Future<bool> isDayLocked(String fundAccountId, DateTime day);
 
   Future<List<CashAdvanceEntity>> getCashAdvances({String? fundAccountId});
@@ -116,6 +117,11 @@ abstract class FinanceRepository {
   Future<void> insertExpenseCategory(ExpenseCategoryEntity category);
   Future<void> updateExpenseCategory(ExpenseCategoryEntity category);
   Future<void> deleteExpenseCategory(String id);
+
+  Future<List<FundAccountTypeEntity>> getFundAccountTypes();
+  Future<void> insertFundAccountType(FundAccountTypeEntity type);
+  Future<void> updateFundAccountType(FundAccountTypeEntity type);
+  Future<void> deleteFundAccountType(String id);
 
   /// Development-only tool: wipes test data across all finance collections.
   Future<void> resetFinanceModuleData();

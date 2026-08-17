@@ -19,7 +19,7 @@ class FundAccountCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = _accountColors(account.type);
+    final colors = _accountColors(account);
     final formatter = NumberFormat('#,##0.00', 'en_US');
 
     return MouseRegion(
@@ -148,7 +148,7 @@ class FundAccountCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(12.r),
                           ),
                           child: Text(
-                            account.type.displayName,
+                            account.typeDisplayName,
                             style: GoogleFonts.inter(
                               fontSize: 9.sp,
                               fontWeight: FontWeight.w600,
@@ -212,7 +212,7 @@ class FundAccountCard extends StatelessWidget {
                         ),
 
                         // If Petty Cash, show dual split breakdown
-                        if (account.type == FundAccountType.pettyCash)
+                        if (account.isPettyCash)
                           Container(
                             padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 5.h),
                             decoration: BoxDecoration(
@@ -265,39 +265,50 @@ class FundAccountCard extends StatelessWidget {
                               ],
                             ),
                           ),
-
-                        // Coordinator info or spacer
-                        if (account.assignedTo != null && account.assignedTo!.isNotEmpty)
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 8.r,
-                                backgroundColor: const Color(0xFFE5E7EB),
-                                child: Text(
-                                  account.assignedTo![0].toUpperCase(),
-                                  style: GoogleFonts.inter(
-                                    fontSize: 8.sp,
-                                    fontWeight: FontWeight.w700,
-                                    color: const Color(0xFF4B5563),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 5.w),
-                              Expanded(
-                                child: Text(
-                                  account.assignedTo!,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 10.sp,
-                                    fontWeight: FontWeight.w500,
-                                    color: const Color(0xFF6B7280),
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
                       ],
                     ),
+                  ),
+                ),
+
+                // Card Footer: Coordinator Assigned Info
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFAFAFA),
+                    border: Border(
+                      top: BorderSide(color: Color(0xFFF3F4F6)),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.person_outline_rounded,
+                        size: 13.sp,
+                        color: const Color(0xFF9CA3AF),
+                      ),
+                      SizedBox(width: 5.w),
+                      Expanded(
+                        child: Text(
+                          (account.assignedTo != null && account.assignedTo!.isNotEmpty)
+                              ? account.assignedTo!
+                              : 'Unassigned',
+                          style: GoogleFonts.inter(
+                            fontSize: 10.sp,
+                            fontWeight: FontWeight.w500,
+                            color: (account.assignedTo != null && account.assignedTo!.isNotEmpty)
+                                ? const Color(0xFF4B5563)
+                                : const Color(0xFF9CA3AF),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 14.sp,
+                        color: isSelected ? colors.primary : const Color(0xFFD1D5DB),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -308,8 +319,53 @@ class FundAccountCard extends StatelessWidget {
     );
   }
 
-  _AccountColors _accountColors(FundAccountType type) {
-    switch (type) {
+  _AccountColors _accountColors(FundAccountEntity account) {
+    if (account.isPettyCash) {
+      return _AccountColors(
+        primary: const Color(0xFF16A34A),
+        icon: Icons.account_balance_wallet_outlined,
+      );
+    }
+    if (account.isBank) {
+      return _AccountColors(
+        primary: const Color(0xFF0F766E),
+        icon: Icons.account_balance_outlined,
+      );
+    }
+    if (account.isStcPay) {
+      return _AccountColors(
+        primary: const Color(0xFF6D28D9),
+        icon: Icons.phone_android_outlined,
+      );
+    }
+
+    final lowerName = (account.accountTypeName ?? account.type.name).toLowerCase();
+    if (lowerName.contains('driver')) {
+      return _AccountColors(
+        primary: const Color(0xFF2563EB),
+        icon: Icons.drive_eta_outlined,
+      );
+    }
+    if (lowerName.contains('tamkeen')) {
+      return _AccountColors(
+        primary: const Color(0xFF7C3AED),
+        icon: Icons.business_center_outlined,
+      );
+    }
+    if (lowerName.contains('fuel')) {
+      return _AccountColors(
+        primary: const Color(0xFFEA580C),
+        icon: Icons.local_gas_station_outlined,
+      );
+    }
+    if (lowerName.contains('admin')) {
+      return _AccountColors(
+        primary: const Color(0xFF0891B2),
+        icon: Icons.admin_panel_settings_outlined,
+      );
+    }
+
+    switch (account.type) {
       case FundAccountType.pettyCash:
         return _AccountColors(
           primary: const Color(0xFF16A34A),
@@ -347,8 +403,8 @@ class FundAccountCard extends StatelessWidget {
         );
       case FundAccountType.other:
         return _AccountColors(
-          primary: const Color(0xFF6B7280),
-          icon: Icons.folder_outlined,
+          primary: const Color(0xFF4F46E5),
+          icon: Icons.account_balance_wallet_outlined,
         );
     }
   }

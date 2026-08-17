@@ -17,6 +17,6 @@ class SaveFinancePolicyUseCase {
 class GetLedgerDayTotalsUseCase {
   final FinanceRepository repository;
   GetLedgerDayTotalsUseCase(this.repository);
-  Future call(String accountId, DateTime day) =>
-      repository.getLedgerDayTotals(accountId, day);
+  Future call(String accountId, DateTime day, {DateTime? sessionOpenedAt}) =>
+      repository.getLedgerDayTotals(accountId, day, sessionOpenedAt: sessionOpenedAt);
 }

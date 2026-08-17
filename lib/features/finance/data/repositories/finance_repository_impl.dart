@@ -5,6 +5,7 @@ import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/expense_category_entity.dart';
 import '../../domain/entities/finance_policy_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
+import '../../domain/entities/fund_account_type_entity.dart';
 import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/entities/ledger_day_totals.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
@@ -14,6 +15,7 @@ import '../datasources/finance_remote_data_source.dart';
 import '../models/cash_advance_model.dart';
 import '../models/expense_model.dart';
 import '../models/fund_account_model.dart';
+import '../models/fund_account_type_model.dart';
 import '../models/petty_cash_session_model.dart';
 import '../models/expense_category_model.dart';
 
@@ -233,8 +235,8 @@ class FinanceRepositoryImpl implements FinanceRepository {
       remoteDataSource.uploadClosingSheet(file, sessionId);
 
   @override
-  Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day) =>
-      remoteDataSource.getLedgerDayTotals(accountId, day);
+  Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt}) =>
+      remoteDataSource.getLedgerDayTotals(accountId, day, sessionOpenedAt: sessionOpenedAt);
 
   @override
   Future<bool> isDayLocked(String fundAccountId, DateTime day) =>
@@ -318,6 +320,29 @@ class FinanceRepositoryImpl implements FinanceRepository {
   @override
   Future<void> deleteExpenseCategory(String id) =>
       remoteDataSource.deleteExpenseCategory(id);
+
+  @override
+  Future<List<FundAccountTypeEntity>> getFundAccountTypes() async {
+    return List.from(await remoteDataSource.getFundAccountTypes());
+  }
+
+  @override
+  Future<void> insertFundAccountType(FundAccountTypeEntity type) async {
+    await remoteDataSource.insertFundAccountType(
+      FundAccountTypeModel.fromEntity(type),
+    );
+  }
+
+  @override
+  Future<void> updateFundAccountType(FundAccountTypeEntity type) async {
+    await remoteDataSource.updateFundAccountType(
+      FundAccountTypeModel.fromEntity(type),
+    );
+  }
+
+  @override
+  Future<void> deleteFundAccountType(String id) =>
+      remoteDataSource.deleteFundAccountType(id);
 
   @override
   Future<void> resetFinanceModuleData() =>

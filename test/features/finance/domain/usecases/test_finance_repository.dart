@@ -6,6 +6,7 @@ import 'package:xloop_invoice/features/finance/domain/entities/expense_entity.da
 import 'package:xloop_invoice/features/finance/domain/entities/expense_category_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/finance_policy_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/fund_account_entity.dart';
+import 'package:xloop_invoice/features/finance/domain/entities/fund_account_type_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/fund_transaction_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/ledger_day_totals.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/petty_cash_session_entity.dart';
@@ -173,7 +174,7 @@ class FakeFinanceRepository implements FinanceRepository {
   Future<String> uploadClosingSheet(XFile file, String sessionId) async => '';
 
   @override
-  Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day) async {
+  Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt}) async {
     return const LedgerDayTotals(
       cashDeposits: 0,
       stcPayDeposits: 0,
@@ -230,6 +231,19 @@ class FakeFinanceRepository implements FinanceRepository {
 
   @override
   Future<void> deleteExpenseCategory(String id) async {}
+
+  @override
+  Future<List<FundAccountTypeEntity>> getFundAccountTypes() async =>
+      FundAccountTypeEntity.defaultTypes;
+
+  @override
+  Future<void> insertFundAccountType(FundAccountTypeEntity type) async {}
+
+  @override
+  Future<void> updateFundAccountType(FundAccountTypeEntity type) async {}
+
+  @override
+  Future<void> deleteFundAccountType(String id) async {}
 
   @override
   Future<void> resetFinanceModuleData() async {}

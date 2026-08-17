@@ -13,6 +13,8 @@ class FundAccountModel extends FundAccountEntity {
     required super.name,
     required super.code,
     required super.type,
+    super.accountTypeId,
+    super.accountTypeName,
     super.currentBalanceMinor = 0,
     super.cashBalanceMinor = 0,
     super.stcPayBalanceMinor = 0,
@@ -29,6 +31,8 @@ class FundAccountModel extends FundAccountEntity {
       'name': name,
       'code': code,
       'type': type.name,
+      'accountTypeId': accountTypeId ?? type.name,
+      'accountTypeName': accountTypeName ?? typeDisplayName,
       // Authoritative integer fields
       'currentBalanceMinor': currentBalanceMinor,
       'cashBalanceMinor': cashBalanceMinor,
@@ -68,11 +72,17 @@ class FundAccountModel extends FundAccountEntity {
     final cashMinor = parseMinor('cashBalanceMinor', 'cashBalance');
     final stcMinor = parseMinor('stcPayBalanceMinor', 'stcPayBalance');
 
+    final parsedType = _parseType(json['type'] as String?);
+    final rawTypeId = json['accountTypeId'] as String? ?? json['type'] as String?;
+    final rawTypeName = json['accountTypeName'] as String?;
+
     return FundAccountModel(
       id: json['id'] as String,
       name: json['name'] as String? ?? '',
       code: json['code'] as String? ?? '',
-      type: _parseType(json['type'] as String?),
+      type: parsedType,
+      accountTypeId: rawTypeId,
+      accountTypeName: rawTypeName ?? parsedType.displayName,
       currentBalanceMinor: currentMinor,
       cashBalanceMinor: cashMinor,
       stcPayBalanceMinor: stcMinor,
@@ -92,6 +102,8 @@ class FundAccountModel extends FundAccountEntity {
       name: entity.name,
       code: entity.code,
       type: entity.type,
+      accountTypeId: entity.accountTypeId,
+      accountTypeName: entity.accountTypeName,
       currentBalanceMinor: entity.currentBalanceMinor,
       cashBalanceMinor: entity.cashBalanceMinor,
       stcPayBalanceMinor: entity.stcPayBalanceMinor,

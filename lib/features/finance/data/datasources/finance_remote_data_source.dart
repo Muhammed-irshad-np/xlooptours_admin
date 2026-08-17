@@ -18,6 +18,8 @@ import '../models/fund_account_model.dart';
 import '../models/fund_transaction_model.dart';
 import '../models/petty_cash_session_model.dart';
 import '../models/expense_category_model.dart';
+import '../../domain/entities/fund_account_type_entity.dart';
+import '../models/fund_account_type_model.dart';
 
 abstract class FinanceRemoteDataSource {
   // Expenses
@@ -97,7 +99,7 @@ abstract class FinanceRemoteDataSource {
     required String? verifiedByUserId,
   });
   Future<String> uploadClosingSheet(XFile file, String sessionId);
-  Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day);
+  Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt});
   Future<bool> isDayLocked(String fundAccountId, DateTime day);
 
   // Advances
@@ -131,6 +133,12 @@ abstract class FinanceRemoteDataSource {
   Future<void> insertExpenseCategory(ExpenseCategoryModel category);
   Future<void> updateExpenseCategory(ExpenseCategoryModel category);
   Future<void> deleteExpenseCategory(String id);
+
+  // Account Types
+  Future<List<FundAccountTypeModel>> getFundAccountTypes();
+  Future<void> insertFundAccountType(FundAccountTypeModel type);
+  Future<void> updateFundAccountType(FundAccountTypeModel type);
+  Future<void> deleteFundAccountType(String id);
 
   /// Development-only tool: wipes test data across all finance collections.
   Future<void> resetFinanceModuleData();
@@ -1019,28 +1027,57 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
   @override
   Future<void> openPettyCashSession(PettyCashSessionModel session) async {
-    // Guard: only one open session per account
-    final open = await getOpenSession(session.fundAccountId);
-    if (open != null) {
-      throw StateError('An open session already exists for this account');
+    // Guard 1: check if day is already locked
+    final locked = await isDayLocked(session.fundAccountId, session.date);
+    if (locked) {
+      throw StateError(
+          'This account has already been verified and locked for this date. Cannot open a new session.');
+    }
+
+    // Guard 2: check if any session already exists for this calendar day
+    final allSessions = await getPettyCashSessions(session.fundAccountId);
+    final targetDay =
+        DateTime(session.date.year, session.date.month, session.date.day);
+    for (final s in allSessions) {
+      final sDay = DateTime(s.date.year, s.date.month, s.date.day);
+      if (sDay == targetDay) {
+        if (s.status == PettyCashSessionStatus.verified) {
+          throw StateError(
+              'Today\'s session has already been verified and locked.');
+        }
+        if (s.status == PettyCashSessionStatus.closed) {
+          throw StateError(
+              'Today\'s session has already been closed. A daily register can only be opened once per day.');
+        }
+        if (s.status == PettyCashSessionStatus.open) {
+          throw StateError('An open session already exists for this account');
+        }
+      }
     }
 
     // Snapshot live balances from the ledger inside a transaction so the
     // opening balance cannot be tampered with by the client.
     await firestore.runTransaction((txn) async {
+      final lockId = DayLockEntity.lockId(session.fundAccountId, session.date);
+      final lockSnap = await txn.get(_dayLocks.doc(lockId));
+      if (lockSnap.exists) {
+        throw StateError('Day is already locked for this account');
+      }
+
       final sessionRef = firestore
           .collection('petty_cash_sessions')
           .doc(session.id);
 
-      // Re-check for open session inside the transaction (race guard).
+      // Re-check for sessions for this day inside the transaction (race guard).
       final existing = await firestore
           .collection('petty_cash_sessions')
           .where('fundAccountId', isEqualTo: session.fundAccountId)
           .get();
       for (final doc in existing.docs) {
         final s = PettyCashSessionModel.fromJson(doc.data());
-        if (s.status == PettyCashSessionStatus.open) {
-          throw StateError('An open session already exists (concurrent open)');
+        final sDay = DateTime(s.date.year, s.date.month, s.date.day);
+        if (sDay == targetDay) {
+          throw StateError('A session already exists for this date');
         }
       }
 
@@ -1084,8 +1121,11 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     if (session.status != PettyCashSessionStatus.open) {
       throw StateError('Only open sessions can be closed');
     }
-    final totals =
-        await getLedgerDayTotals(session.fundAccountId, session.date);
+    final totals = await getLedgerDayTotals(
+      session.fundAccountId,
+      session.date,
+      sessionOpenedAt: session.createdAt,
+    );
     final closed = session.copyWith(
       cashDeposits: totals.cashDeposits,
       stcPayDeposits: totals.stcPayDeposits,
@@ -1173,8 +1213,9 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   @override
   Future<LedgerDayTotals> getLedgerDayTotals(
     String accountId,
-    DateTime day,
-  ) async {
+    DateTime day, {
+    DateTime? sessionOpenedAt,
+  }) async {
     final start = DateTime(day.year, day.month, day.day);
     final end = start.add(const Duration(days: 1));
     // Fetch account txs and filter in memory (avoids composite index issues).
@@ -1183,8 +1224,22 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     for (final tx in all) {
       if (tx.isReversed) continue;
       if (tx.date.isBefore(start) || !tx.date.isBefore(end)) continue;
+      // If sessionOpenedAt is provided, only count transactions created
+      // AFTER the session was opened. Pre-session transactions are already
+      // captured in the session's opening balance snapshot.
+      if (sessionOpenedAt != null && tx.createdAt.isBefore(sessionOpenedAt)) {
+        continue;
+      }
+
+      // Reversals (e.g. voided expense payments) are skipped entirely.
+      // The original transaction is already excluded via isReversed=true,
+      // so skipping the reversal too means the voided pair cancels out
+      // cleanly — as if the transaction never happened.
+      if (tx.type == FundTransactionType.reversal) {
+        continue;
+      }
+
       final isIn = tx.type == FundTransactionType.deposit ||
-          tx.type == FundTransactionType.reversal ||
           (tx.type == FundTransactionType.transfer &&
               tx.balanceAfter > tx.balanceBefore);
       final isOut = tx.type == FundTransactionType.withdrawal ||
@@ -1504,6 +1559,72 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   @override
   Future<void> deleteExpenseCategory(String id) async {
     await firestore.collection('expense_categories').doc(id).delete();
+  }
+
+  // ─── Account Types ──────────────────────────────────────────
+
+  @override
+  Future<List<FundAccountTypeModel>> getFundAccountTypes() async {
+    final snapshot = await firestore
+        .collection('fund_account_types')
+        .orderBy('createdAt')
+        .get();
+
+    if (snapshot.docs.isEmpty) {
+      // Auto-seed default types (Bank, Petty Cash, STC Pay)
+      final defaults = FundAccountTypeEntity.defaultTypes
+          .map((e) => FundAccountTypeModel.fromEntity(e))
+          .toList();
+      for (final d in defaults) {
+        await firestore
+            .collection('fund_account_types')
+            .doc(d.id)
+            .set(d.toJson());
+      }
+      return defaults;
+    }
+
+    final loaded = snapshot.docs
+        .map((d) => FundAccountTypeModel.fromJson(d.data()))
+        .toList();
+
+    // Ensure all system default types exist if not present in collection
+    final loadedIds = loaded.map((e) => e.id).toSet();
+    final missingDefaults = FundAccountTypeEntity.defaultTypes
+        .where((d) => !loadedIds.contains(d.id))
+        .map((e) => FundAccountTypeModel.fromEntity(e))
+        .toList();
+
+    for (final d in missingDefaults) {
+      await firestore
+          .collection('fund_account_types')
+          .doc(d.id)
+          .set(d.toJson());
+      loaded.add(d);
+    }
+
+    return loaded;
+  }
+
+  @override
+  Future<void> insertFundAccountType(FundAccountTypeModel type) async {
+    await firestore
+        .collection('fund_account_types')
+        .doc(type.id)
+        .set(type.toJson());
+  }
+
+  @override
+  Future<void> updateFundAccountType(FundAccountTypeModel type) async {
+    await firestore
+        .collection('fund_account_types')
+        .doc(type.id)
+        .update(type.toJson());
+  }
+
+  @override
+  Future<void> deleteFundAccountType(String id) async {
+    await firestore.collection('fund_account_types').doc(id).delete();
   }
 
   // ─── Helpers ────────────────────────────────────────────────

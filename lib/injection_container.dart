@@ -156,6 +156,10 @@ import 'features/finance/domain/usecases/get_expense_categories_usecase.dart';
 import 'features/finance/domain/usecases/insert_expense_category_usecase.dart';
 import 'features/finance/domain/usecases/update_expense_category_usecase.dart';
 import 'features/finance/domain/usecases/delete_expense_category_usecase.dart';
+import 'features/finance/domain/usecases/get_fund_account_types_usecase.dart';
+import 'features/finance/domain/usecases/insert_fund_account_type_usecase.dart';
+import 'features/finance/domain/usecases/update_fund_account_type_usecase.dart';
+import 'features/finance/domain/usecases/delete_fund_account_type_usecase.dart';
 import 'features/finance/presentation/providers/finance_provider.dart';
 import 'features/finance/presentation/providers/fund_account_provider.dart';
 import 'features/finance/presentation/providers/petty_cash_provider.dart';
@@ -568,6 +572,10 @@ Future<void> init() async {
       postFundMovementUseCase: sl(),
       transferFundsUseCase: sl(),
       generateAccountCodeUseCase: sl(),
+      getFundAccountTypesUseCase: sl(),
+      insertFundAccountTypeUseCase: sl(),
+      updateFundAccountTypeUseCase: sl(),
+      deleteFundAccountTypeUseCase: sl(),
     ),
   );
   sl.registerFactory(
@@ -634,6 +642,12 @@ Future<void> init() async {
   sl.registerLazySingleton(() => InsertExpenseCategoryUseCase(sl()));
   sl.registerLazySingleton(() => UpdateExpenseCategoryUseCase(sl()));
   sl.registerLazySingleton(() => DeleteExpenseCategoryUseCase(sl()));
+
+  // UseCases - Fund Account Types
+  sl.registerLazySingleton(() => GetFundAccountTypesUseCase(sl()));
+  sl.registerLazySingleton(() => InsertFundAccountTypeUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateFundAccountTypeUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteFundAccountTypeUseCase(sl()));
 
   // Repositories
   sl.registerLazySingleton<FinanceRepository>(

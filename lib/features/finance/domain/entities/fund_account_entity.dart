@@ -62,9 +62,41 @@ class FundAccountEntity extends Equatable {
   final String id;
   final String name;
 
-  /// Short code for display (e.g., "PETTY ACC#001").
+  /// Short code for display (e.g., "PETTY ACC#001", "DRV-001").
   final String code;
   final FundAccountType type;
+
+  /// Dynamic account type ID (e.g., 'bank', 'pettyCash', 'stcPay', or custom type ID).
+  final String? accountTypeId;
+
+  /// Display name of the account type (e.g., 'Bank', 'Petty Cash', 'STC Pay', 'Driver Account').
+  final String? accountTypeName;
+
+  /// Display name for the account type. Prefers dynamic [accountTypeName], then enum [type.displayName].
+  String get typeDisplayName {
+    if (accountTypeName != null && accountTypeName!.trim().isNotEmpty) {
+      return accountTypeName!.trim();
+    }
+    return type.displayName;
+  }
+
+  /// Convenience checks for standard system types
+  bool get isPettyCash =>
+      type == FundAccountType.pettyCash ||
+      accountTypeId == 'pettyCash' ||
+      accountTypeId == 'petty_cash' ||
+      (accountTypeName?.toLowerCase() == 'petty cash');
+
+  bool get isBank =>
+      type == FundAccountType.bank ||
+      accountTypeId == 'bank' ||
+      (accountTypeName?.toLowerCase() == 'bank');
+
+  bool get isStcPay =>
+      type == FundAccountType.stcPay ||
+      accountTypeId == 'stcPay' ||
+      accountTypeId == 'stc_pay' ||
+      (accountTypeName?.toLowerCase() == 'stc pay');
 
   /// Authoritative balance in minor units (halalas). Use these for all arithmetic.
   final int currentBalanceMinor;
@@ -89,6 +121,8 @@ class FundAccountEntity extends Equatable {
     required this.name,
     required this.code,
     required this.type,
+    this.accountTypeId,
+    this.accountTypeName,
     this.currentBalanceMinor = 0,
     this.cashBalanceMinor = 0,
     this.stcPayBalanceMinor = 0,
@@ -105,6 +139,8 @@ class FundAccountEntity extends Equatable {
       name: '',
       code: '',
       type: FundAccountType.pettyCash,
+      accountTypeId: 'pettyCash',
+      accountTypeName: 'Petty Cash',
       currency: 'SAR',
       createdAt: DateTime.now(),
     );
@@ -116,6 +152,8 @@ class FundAccountEntity extends Equatable {
     required String name,
     required String code,
     required FundAccountType type,
+    String? accountTypeId,
+    String? accountTypeName,
     double currentBalance = 0.0,
     double cashBalance = 0.0,
     double stcPayBalance = 0.0,
@@ -130,6 +168,8 @@ class FundAccountEntity extends Equatable {
       name: name,
       code: code,
       type: type,
+      accountTypeId: accountTypeId,
+      accountTypeName: accountTypeName,
       currentBalanceMinor: (currentBalance * 100).round(),
       cashBalanceMinor: (cashBalance * 100).round(),
       stcPayBalanceMinor: (stcPayBalance * 100).round(),
@@ -146,6 +186,8 @@ class FundAccountEntity extends Equatable {
     String? name,
     String? code,
     FundAccountType? type,
+    String? accountTypeId,
+    String? accountTypeName,
     int? currentBalanceMinor,
     int? cashBalanceMinor,
     int? stcPayBalanceMinor,
@@ -162,6 +204,8 @@ class FundAccountEntity extends Equatable {
       name: name ?? this.name,
       code: code ?? this.code,
       type: type ?? this.type,
+      accountTypeId: accountTypeId ?? this.accountTypeId,
+      accountTypeName: accountTypeName ?? this.accountTypeName,
       currentBalanceMinor: currentBalanceMinor ?? this.currentBalanceMinor,
       cashBalanceMinor: cashBalanceMinor ?? this.cashBalanceMinor,
       stcPayBalanceMinor: stcPayBalanceMinor ?? this.stcPayBalanceMinor,
@@ -181,6 +225,8 @@ class FundAccountEntity extends Equatable {
         name,
         code,
         type,
+        accountTypeId,
+        accountTypeName,
         currentBalanceMinor,
         cashBalanceMinor,
         stcPayBalanceMinor,
