@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:xloop_invoice/features/finance/presentation/pages/expense_form_page.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
+import '../providers/cash_advance_provider.dart';
 import '../widgets/expense_summary_card.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import '../widgets/finance_nav_tabs.dart';
@@ -78,6 +79,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
   Future<void> _loadData() async {
     final financeProvider = context.read<FinanceProvider>();
     final accountProvider = context.read<FundAccountProvider>();
+    final advanceProvider = context.read<CashAdvanceProvider>();
 
     await Future.wait([
       financeProvider.fetchAllExpenses(),
@@ -85,6 +87,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
       financeProvider.fetchFinancePolicy(),
       accountProvider.fetchAllAccounts(),
       accountProvider.fetchAccountTypes(),
+      advanceProvider.load(),
     ]);
 
     if (mounted) {
