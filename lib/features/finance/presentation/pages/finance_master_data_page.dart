@@ -908,14 +908,13 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
                 createdAt: typeToEdit?.createdAt ?? DateTime.now(),
               );
 
+              Navigator.of(ctx).pop(newType);
+
               try {
                 if (isEditing) {
                   await provider.updateAccountType(newType);
                 } else {
                   await provider.insertAccountType(newType);
-                }
-                if (context.mounted) {
-                  Navigator.pop(ctx, newType);
                 }
               } catch (e) {
                 if (context.mounted) {
@@ -1315,10 +1314,11 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
                   blockSelfApprove: blockSelf,
                 );
 
+                Navigator.of(ctx).pop();
+
                 try {
                   await provider.saveFinancePolicy(updatedPolicy);
                   if (context.mounted) {
-                    Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Finance policy updated successfully'),

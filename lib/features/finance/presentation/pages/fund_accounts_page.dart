@@ -2501,14 +2501,13 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                 createdAt: typeToEdit?.createdAt ?? DateTime.now(),
               );
 
+              Navigator.of(ctx).pop(newType);
+
               try {
                 if (isEditing) {
                   await provider.updateAccountType(newType);
                 } else {
                   await provider.insertAccountType(newType);
-                }
-                if (context.mounted) {
-                  Navigator.pop(ctx, newType);
                 }
               } catch (e) {
                 if (context.mounted) {

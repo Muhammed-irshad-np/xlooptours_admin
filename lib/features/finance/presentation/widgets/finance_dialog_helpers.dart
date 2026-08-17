@@ -99,7 +99,12 @@ Widget finDialogTitle(String title, {IconData? icon, Color? iconColor}) {
 /// Standard cancel button for dialogs.
 Widget finDialogCancelButton(BuildContext context, {String label = 'Cancel', VoidCallback? onPressed}) {
   return TextButton(
-    onPressed: onPressed ?? () => Navigator.pop(context, false),
+    onPressed: onPressed ?? () {
+      final nav = Navigator.of(context, rootNavigator: true);
+      if (nav.canPop()) {
+        nav.pop(false);
+      }
+    },
     child: Text(
       label,
       style: GoogleFonts.inter(
