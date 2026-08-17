@@ -503,8 +503,11 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
                 name: nameCtrl.text.trim().toUpperCase(),
                 createdAt: DateTime.now(),
               );
+              FocusManager.instance.primaryFocus?.unfocus();
+              if (Navigator.of(ctx).canPop()) {
+                Navigator.of(ctx).pop();
+              }
               provider.insertCategory(cat);
-              Navigator.pop(ctx);
             },
             style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
             child: const Text('Create Category'),
@@ -908,7 +911,10 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
                 createdAt: typeToEdit?.createdAt ?? DateTime.now(),
               );
 
-              Navigator.of(ctx).pop(newType);
+              FocusManager.instance.primaryFocus?.unfocus();
+              if (Navigator.of(ctx).canPop()) {
+                Navigator.of(ctx).pop(newType);
+              }
 
               try {
                 if (isEditing) {
@@ -1601,8 +1607,11 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
                 final updatedCat = widget.category.copyWith(
                   expenseTypes: [...widget.category.expenseTypes, newType],
                 );
+                FocusManager.instance.primaryFocus?.unfocus();
+                if (Navigator.of(ctx).canPop()) {
+                  Navigator.of(ctx).pop();
+                }
                 widget.provider.updateCategory(updatedCat);
-                Navigator.pop(ctx);
               },
               style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
               child: const Text('Add Type'),

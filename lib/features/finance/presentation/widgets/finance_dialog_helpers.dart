@@ -99,8 +99,20 @@ Widget finDialogTitle(String title, {IconData? icon, Color? iconColor}) {
 /// Standard cancel button for dialogs.
 Widget finDialogCancelButton(BuildContext context, {String label = 'Cancel', VoidCallback? onPressed}) {
   return TextButton(
-    onPressed: onPressed ?? () {
-      Navigator.of(context).pop(false);
+    onPressed: () {
+      if (onPressed != null) {
+        onPressed();
+        return;
+      }
+      FocusManager.instance.primaryFocus?.unfocus();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          final nav = Navigator.of(context);
+          if (nav.canPop()) {
+            nav.pop(false);
+          }
+        }
+      });
     },
     child: Text(
       label,
