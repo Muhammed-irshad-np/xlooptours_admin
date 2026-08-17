@@ -336,7 +336,17 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         actorUserId.isNotEmpty) {
       throw StateError('Cannot approve your own expense');
     }
-    if (!policy.canApproveAmount(actorRole, existing.amount)) {
+    if (policy.multiLevelApprovalEnabled && policy.approvalChain.isNotEmpty) {
+      final stage = policy.stageForAmount(existing.amount);
+      if (stage != null &&
+          !stage.isUserAuthorized(actorRole.toLowerCase(), actorUserId) &&
+          !allowSelfApprove) {
+        throw StateError(
+          'Approval for ${existing.amount} SAR requires "${stage.name}". Your account is not authorized for this stage.',
+        );
+      }
+    } else if (!policy.canApproveAmount(actorRole, existing.amount) &&
+        !allowSelfApprove) {
       final limit = policy.limitForRole(actorRole);
       throw StateError(
         'Amount ${existing.amount} exceeds your approval limit'

@@ -9,8 +9,10 @@ import 'package:image_picker/image_picker.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/petty_cash_provider.dart';
 import '../providers/fund_account_provider.dart';
+import '../providers/finance_provider.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
+import '../../domain/services/finance_permission_service.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
 
@@ -481,30 +483,42 @@ class _PettyCashPageState extends State<PettyCashPage> {
                   ),
                   SizedBox(height: 20.h),
 
-                  // Close Session Action Bar
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () => _showCloseSessionDialog(context, provider, session),
-                          icon: Icon(Icons.lock_clock_outlined, size: 18.sp),
-                          label: Text(
-                            'Close Daily Session & Declare Cash Count',
-                            style: GoogleFonts.inter(fontSize: 13.sp, fontWeight: FontWeight.w700),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: FinDT.brand,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            padding: EdgeInsets.symmetric(vertical: 14.h),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10.r),
+                  // Close Session Action Bar (permission-gated)
+                  Builder(builder: (_) {
+                    final user = context.read<AuthProvider>().user;
+                    final selectedAcc = context.read<FundAccountProvider>().getAccountById(_selectedAccountId ?? '');
+                    final policy = context.read<FinanceProvider>().policy;
+                    final canClose = selectedAcc != null &&
+                        FinancePermissionService.canCloseSession(
+                          user: user,
+                          account: selectedAcc,
+                          policy: policy,
+                        );
+                    if (!canClose) return const SizedBox.shrink();
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _showCloseSessionDialog(context, provider, session),
+                            icon: Icon(Icons.lock_clock_outlined, size: 18.sp),
+                            label: Text(
+                              'Close Daily Session & Declare Cash Count',
+                              style: GoogleFonts.inter(fontSize: 13.sp, fontWeight: FontWeight.w700),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: FinDT.brand,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              padding: EdgeInsets.symmetric(vertical: 14.h),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10.r),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    );
+                  }),
                 ],
               );
             }),
@@ -673,6 +687,16 @@ class _PettyCashPageState extends State<PettyCashPage> {
                 );
               }
 
+              final user = context.read<AuthProvider>().user;
+              final selectedAcc = context.read<FundAccountProvider>().getAccountById(_selectedAccountId ?? '');
+              final policy = context.read<FinanceProvider>().policy;
+              final canOpen = selectedAcc != null &&
+                  FinancePermissionService.canOpenSession(
+                    user: user,
+                    account: selectedAcc,
+                    policy: policy,
+                  );
+
               return Container(
                 padding: EdgeInsets.all(20.w),
                 decoration: BoxDecoration(
@@ -687,7 +711,9 @@ class _PettyCashPageState extends State<PettyCashPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Ready to start today\'s transactions?',
+                            canOpen
+                                ? 'Ready to start today\'s transactions?'
+                                : 'Session Not Opened Yet',
                             style: GoogleFonts.inter(
                               fontSize: 13.sp,
                               fontWeight: FontWeight.w700,
@@ -696,7 +722,11 @@ class _PettyCashPageState extends State<PettyCashPage> {
                           ),
                           SizedBox(height: 3.h),
                           Text(
-                            'Open the daily session to record physical cash in drawer and digital STC balance.',
+                            canOpen
+                                ? 'Open the daily session to record physical cash in drawer and digital STC balance.'
+                                : (selectedAcc?.assignedTo != null && selectedAcc!.assignedTo!.isNotEmpty
+                                    ? 'Assigned to ${selectedAcc.assignedTo}. Only assigned coordinator or admin can open the daily session.'
+                                    : 'Only authorized personnel or admin can open the daily session for this account.'),
                             style: GoogleFonts.inter(
                               fontSize: 11.sp,
                               color: FinDT.textSecondary,
@@ -705,29 +735,30 @@ class _PettyCashPageState extends State<PettyCashPage> {
                         ],
                       ),
                     ),
-                    ElevatedButton.icon(
-                      onPressed: () => _showOpenSessionDialog(context, provider),
-                      icon: Icon(Icons.storefront_outlined, size: 16.sp),
-                      label: Text(
-                        'Open Daily Session',
-                        style: GoogleFonts.inter(
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.w600,
+                    if (canOpen)
+                      ElevatedButton.icon(
+                        onPressed: () => _showOpenSessionDialog(context, provider),
+                        icon: Icon(Icons.storefront_outlined, size: 16.sp),
+                        label: Text(
+                          'Open Daily Session',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: FinDT.brand,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 20.w,
+                            vertical: 12.h,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
                         ),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: FinDT.brand,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 20.w,
-                          vertical: 12.h,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10.r),
-                        ),
-                      ),
-                    ),
                   ],
                 ),
               );
@@ -1026,23 +1057,34 @@ class _PettyCashPageState extends State<PettyCashPage> {
                             ),
                           ),
                           if (isClosed) ...[
-                            SizedBox(height: 8.h),
-                            ElevatedButton(
-                              onPressed: () => _confirmVerifySession(context, provider, session),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF16A34A),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8.r),
+                            Builder(builder: (_) {
+                              final user = context.read<AuthProvider>().user;
+                              final policy = context.read<FinanceProvider>().policy;
+                              final canVerify = FinancePermissionService.canVerifySession(
+                                user: user,
+                                policy: policy,
+                              );
+                              if (!canVerify) return const SizedBox.shrink();
+                              return Padding(
+                                padding: EdgeInsets.only(top: 8.h),
+                                child: ElevatedButton(
+                                  onPressed: () => _confirmVerifySession(context, provider, session),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF16A34A),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 8.h),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8.r),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Verify & Lock Day',
+                                    style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w600),
+                                  ),
                                 ),
-                              ),
-                              child: Text(
-                                'Verify & Lock Day',
-                                style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w600),
-                              ),
-                            ),
+                              );
+                            }),
                           ],
                         ],
                       ),

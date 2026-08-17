@@ -68,7 +68,7 @@ void main() async {
     // Catch asynchronous errors
     debugPrint('Async Error: $error');
     debugPrint('Stacktrace: $stack');
-    return true; // Prevent default error handling
+    return true; // Prevent default error handlings
   };
 
   ErrorWidget.builder = (FlutterErrorDetails details) {

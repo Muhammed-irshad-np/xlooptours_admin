@@ -1611,15 +1611,16 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       return;
     }
 
+    final policy = finProv.policy;
     final amountVal = double.tryParse(_amountController.text) ?? 0.0;
-    if (amountVal >= 100.0 && _receiptUrls.isEmpty) {
+    if (amountVal >= policy.receiptRequiredAbove && _receiptUrls.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'A receipt or bill document is required for expenses of 100.00 SAR or more.',
+            'A receipt or bill document is required for expenses of ${policy.receiptRequiredAbove.toStringAsFixed(2)} SAR or more.',
           ),
           backgroundColor: FinDT.danger,
-          duration: Duration(seconds: 4),
+          duration: const Duration(seconds: 4),
         ),
       );
       return;
