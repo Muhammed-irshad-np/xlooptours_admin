@@ -82,12 +82,13 @@ class PettyCashProvider with ChangeNotifier {
 
     try {
       await openPettyCashSessionUseCase(session);
-      _currentSession = session;
-      _sessions.insert(0, session);
+      _currentSession =
+          await getOpenSessionUseCase(session.fundAccountId) ?? session;
+      _sessions = await getPettyCashSessionsUseCase(session.fundAccountId);
       _previewTotals = await financeRepository.getLedgerDayTotals(
         session.fundAccountId,
         session.date,
-        sessionOpenedAt: session.createdAt,
+        sessionOpenedAt: _currentSession?.createdAt ?? session.createdAt,
       );
     } catch (e) {
       _error = e.toString();

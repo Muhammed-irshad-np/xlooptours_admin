@@ -720,8 +720,7 @@ class _AdminLayoutState extends State<AdminLayout> {
       label: 'Finance',
       icon: Icons.payments_outlined,
       activeIcon: Icons.payments,
-      // Admin-only module until a dedicated finance permission exists
-      requiredPermission: AppPermission.viewAnalytics,
+      requiredPermission: AppPermission.manageFinance,
       subItems: [
         _SubNavItem(
           label: 'Overview',
