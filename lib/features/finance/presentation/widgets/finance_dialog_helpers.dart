@@ -142,7 +142,7 @@ class _FinDialogCancelButtonState extends State<_FinDialogCancelButton> {
       return;
     }
 
-    finSafePop(context, false);
+    finSafePop(context);
   }
 
   @override
