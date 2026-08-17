@@ -2501,10 +2501,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                 createdAt: typeToEdit?.createdAt ?? DateTime.now(),
               );
 
-              FocusManager.instance.primaryFocus?.unfocus();
-              if (Navigator.of(ctx).canPop()) {
-                Navigator.of(ctx).pop(newType);
-              }
+              finSafePop(ctx, newType);
 
               try {
                 if (isEditing) {
