@@ -488,23 +488,6 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
       mainAxisSize: MainAxisSize.min,
       children: [
         OutlinedButton.icon(
-          onPressed: () => _showAccountTypesManagementDialog(context, provider),
-          icon: Icon(Icons.category_outlined, size: 16.sp),
-          label: Text(
-            'Account Types',
-            style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: FinDT.textPrimary,
-            side: const BorderSide(color: FinDT.border),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10.r),
-            ),
-            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 11.h),
-          ),
-        ),
-        SizedBox(width: 8.w),
-        OutlinedButton.icon(
           onPressed: () => _showTransferDialog(context, provider),
           icon: Icon(Icons.swap_horiz_rounded, size: 16.sp),
           label: Text(
@@ -1794,99 +1777,59 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                     ),
                     SizedBox(height: 14.h),
 
-                    // Account Type Dropdown with quick + New Type action
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: DropdownButtonFormField<String>(
-                            key: ValueKey(selectedType.id),
-                            initialValue: provider.accountTypes.any((t) => t.id == selectedType.id)
-                                ? selectedType.id
-                                : (provider.accountTypes.isNotEmpty ? provider.accountTypes.first.id : null),
-                            decoration: _dialogInputDecoration(
-                              label: 'Account Type *',
-                              prefixIcon: Icons.category_outlined,
-                            ),
-                            style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                            items: provider.accountTypes
-                                .map(
-                                  (t) => DropdownMenuItem(
-                                    value: t.id,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(t.name),
-                                        SizedBox(width: 6.w),
-                                        Container(
-                                          padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.h),
-                                          decoration: BoxDecoration(
-                                            color: FinDT.brand.withValues(alpha: 0.08),
-                                            borderRadius: BorderRadius.circular(4.r),
-                                          ),
-                                          child: Text(
-                                            t.codePrefix,
-                                            style: GoogleFonts.inter(
-                                              fontSize: 9.sp,
-                                              fontWeight: FontWeight.w700,
-                                              color: FinDT.brand,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                    // Account Type Dropdown
+                    DropdownButtonFormField<String>(
+                      key: ValueKey(selectedType.id),
+                      initialValue: provider.accountTypes.any((t) => t.id == selectedType.id)
+                          ? selectedType.id
+                          : (provider.accountTypes.isNotEmpty ? provider.accountTypes.first.id : null),
+                      decoration: _dialogInputDecoration(
+                        label: 'Account Type *',
+                        prefixIcon: Icons.category_outlined,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      items: provider.accountTypes
+                          .map(
+                            (t) => DropdownMenuItem(
+                              value: t.id,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(t.name),
+                                  SizedBox(width: 6.w),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.h),
+                                    decoration: BoxDecoration(
+                                      color: FinDT.brand.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(4.r),
+                                    ),
+                                    child: Text(
+                                      t.codePrefix,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 9.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: FinDT.brand,
+                                      ),
                                     ),
                                   ),
-                                )
-                                .toList(),
-                            onChanged: (val) {
-                              if (val == null) return;
-                              final found = provider.accountTypes.firstWhere(
-                                (t) => t.id == val,
-                                orElse: () => selectedType,
-                              );
-                              setStateDialog(() {
-                                selectedType = found;
-                                if (!isEditing) {
-                                  codeCtrl.text = provider.generateUniqueCode(found);
-                                }
-                              });
-                            },
-                          ),
-                        ),
-                        SizedBox(width: 8.w),
-                        Padding(
-                          padding: EdgeInsets.only(top: 2.h),
-                          child: Tooltip(
-                            message: 'Create New Account Type',
-                            child: OutlinedButton.icon(
-                              onPressed: () async {
-                                final created = await _showAccountTypeEditDialog(context, provider);
-                                if (created != null) {
-                                  setStateDialog(() {
-                                    selectedType = created;
-                                    if (!isEditing) {
-                                      codeCtrl.text = provider.generateUniqueCode(created);
-                                    }
-                                  });
-                                }
-                              },
-                              icon: Icon(Icons.add_rounded, size: 14.sp),
-                              label: Text(
-                                '+ Type',
-                                style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w600),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: FinDT.brand,
-                                side: BorderSide(color: FinDT.brand.withValues(alpha: 0.4)),
-                                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 14.h),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10.r),
-                                ),
+                                ],
                               ),
                             ),
-                          ),
-                        ),
-                      ],
+                          )
+                          .toList(),
+                      onChanged: (val) {
+                        if (val == null) return;
+                        final found = provider.accountTypes.firstWhere(
+                          (t) => t.id == val,
+                          orElse: () => selectedType,
+                        );
+                        setStateDialog(() {
+                          selectedType = found;
+                          if (!isEditing) {
+                            codeCtrl.text = provider.generateUniqueCode(found);
+                          }
+                        });
+                      },
                     ),
                     SizedBox(height: 14.h),
                     TextFormField(
@@ -2126,413 +2069,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     );
   }
 
-  /// Dialog to manage virtual account types (list, add, edit, delete).
-  void _showAccountTypesManagementDialog(
-    BuildContext context,
-    FundAccountProvider provider,
-  ) {
-    showDialog(
-      context: context,
-      builder: (ctx) => Consumer<FundAccountProvider>(
-        builder: (ctx, prov, _) {
-          final types = prov.accountTypes;
-          return AlertDialog(
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.transparent,
-            shape: finDialogShape,
-            title: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                finDialogTitle(
-                  'Virtual Account Types',
-                  icon: Icons.category_outlined,
-                  iconColor: FinDT.brand,
-                ),
-                ElevatedButton.icon(
-                  onPressed: () => _showAccountTypeEditDialog(context, prov),
-                  icon: Icon(Icons.add_rounded, size: 15.sp),
-                  label: Text(
-                    'New Type',
-                    style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w600),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: FinDT.brand,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8.r),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            content: SizedBox(
-              width: 520.w,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(10.w),
-                    decoration: BoxDecoration(
-                      color: FinDT.bgPage,
-                      borderRadius: BorderRadius.circular(8.r),
-                      border: Border.all(color: FinDT.border),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline_rounded, size: 16.sp, color: FinDT.brand),
-                        SizedBox(width: 8.w),
-                        Expanded(
-                          child: Text(
-                            'Default types (Bank, Petty Cash, STC Pay) are permanent. You can create custom types (e.g. Driver Accounts, Fuel Cards) as needed.',
-                            style: GoogleFonts.inter(
-                              fontSize: 11.sp,
-                              color: FinDT.textSecondary,
-                              height: 1.3,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 14.h),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: 380.h),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: types.length,
-                      separatorBuilder: (_, __) => SizedBox(height: 8.h),
-                      itemBuilder: (ctx, index) {
-                        final type = types[index];
-                        final linkedAccountsCount = prov.accounts
-                            .where((a) =>
-                                a.accountTypeId == type.id ||
-                                a.typeDisplayName.toLowerCase() ==
-                                    type.name.toLowerCase())
-                            .length;
 
-                        return Container(
-                          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10.r),
-                            border: Border.all(color: FinDT.border),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-                                decoration: BoxDecoration(
-                                  color: FinDT.brand.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(6.r),
-                                ),
-                                child: Text(
-                                  type.codePrefix,
-                                  style: GoogleFonts.inter(
-                                    fontSize: 11.sp,
-                                    fontWeight: FontWeight.w700,
-                                    color: FinDT.brand,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 12.w),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Text(
-                                          type.name,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 13.sp,
-                                            fontWeight: FontWeight.w700,
-                                            color: FinDT.textPrimary,
-                                          ),
-                                        ),
-                                        SizedBox(width: 8.w),
-                                        if (type.isSystemDefault)
-                                          Container(
-                                            padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFE0E7FF),
-                                              borderRadius: BorderRadius.circular(4.r),
-                                            ),
-                                            child: Text(
-                                              'Default',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 9.sp,
-                                                fontWeight: FontWeight.w600,
-                                                color: const Color(0xFF4338CA),
-                                              ),
-                                            ),
-                                          )
-                                        else
-                                          Container(
-                                            padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                                            decoration: BoxDecoration(
-                                              color: FinDT.bgPage,
-                                              borderRadius: BorderRadius.circular(4.r),
-                                            ),
-                                            child: Text(
-                                              'Custom',
-                                              style: GoogleFonts.inter(
-                                                fontSize: 9.sp,
-                                                fontWeight: FontWeight.w500,
-                                                color: FinDT.textSecondary,
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                    if (type.description != null && type.description!.isNotEmpty) ...[
-                                      SizedBox(height: 2.h),
-                                      Text(
-                                        type.description!,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 11.sp,
-                                          color: FinDT.textSecondary,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                              Text(
-                                '$linkedAccountsCount acc',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11.sp,
-                                  color: FinDT.textMuted,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              SizedBox(width: 8.w),
-                              if (!type.isSystemDefault) ...[
-                                IconButton(
-                                  icon: Icon(Icons.edit_outlined, size: 16.sp, color: FinDT.textSecondary),
-                                  tooltip: 'Edit Type',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () => _showAccountTypeEditDialog(
-                                    context,
-                                    prov,
-                                    typeToEdit: type,
-                                  ),
-                                ),
-                                SizedBox(width: 8.w),
-                                IconButton(
-                                  icon: Icon(Icons.delete_outline_rounded, size: 16.sp, color: FinDT.danger),
-                                  tooltip: 'Delete Type',
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  onPressed: () async {
-                                    if (linkedAccountsCount > 0) {
-                                      showFinConfirmationDialog(
-                                        context: context,
-                                        title: 'Cannot Delete Account Type',
-                                        icon: Icons.lock_outline_rounded,
-                                        iconColor: FinDT.danger,
-                                        confirmColor: FinDT.brand,
-                                        confirmLabel: 'Understood',
-                                        message:
-                                            'Cannot delete "${type.name}". $linkedAccountsCount active account(s) are using this type.',
-                                        highlightNote:
-                                            'Reassign or close all linked accounts before deleting this account type.',
-                                      );
-                                      return;
-                                    }
-                                    final confirm = await showFinConfirmationDialog(
-                                      context: context,
-                                      title: 'Delete Account Type?',
-                                      message:
-                                          'Are you sure you want to delete "${type.name}" (${type.codePrefix})?',
-                                      highlightNote:
-                                          'This action is irreversible and permanently removes this custom account type.',
-                                      confirmLabel: 'Delete Account Type',
-                                      confirmColor: FinDT.danger,
-                                      icon: Icons.delete_outline_rounded,
-                                      iconColor: FinDT.danger,
-                                    );
-                                    if (confirm == true) {
-                                      await prov.deleteAccountType(type.id);
-                                    }
-                                  },
-                                ),
-                              ],
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              finDialogCancelButton(ctx, label: 'Close'),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  /// Dialog to create or edit a single virtual account type. Returns the created/edited entity on success.
-  Future<FundAccountTypeEntity?> _showAccountTypeEditDialog(
-    BuildContext context,
-    FundAccountProvider provider, {
-    FundAccountTypeEntity? typeToEdit,
-  }) async {
-    final formKey = GlobalKey<FormState>();
-    final isEditing = typeToEdit != null;
-    final nameCtrl = TextEditingController(text: typeToEdit?.name);
-    final prefixCtrl = TextEditingController(text: typeToEdit?.codePrefix);
-    final descCtrl = TextEditingController(text: typeToEdit?.description);
-
-    return showDialog<FundAccountTypeEntity?>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: finDialogShape,
-        title: finDialogTitle(
-          isEditing ? 'Edit Account Type' : 'New Account Type',
-          icon: Icons.category_outlined,
-        ),
-        content: SizedBox(
-          width: 380.w,
-          child: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(height: 8.h),
-                  TextFormField(
-                    controller: nameCtrl,
-                    decoration: _dialogInputDecoration(
-                      label: 'Account Type Name *',
-                      hint: 'e.g. Driver Account, Fuel Card',
-                      prefixIcon: Icons.edit_outlined,
-                    ),
-                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                    onChanged: (val) {
-                      if (!isEditing && prefixCtrl.text.trim().isEmpty && val.trim().isNotEmpty) {
-                        final words = val.trim().split(RegExp(r'\s+'));
-                        String autoPrefix = '';
-                        if (words.length == 1) {
-                          autoPrefix = val.trim().substring(0, val.trim().length.clamp(0, 3)).toUpperCase();
-                        } else {
-                          autoPrefix = words.take(3).map((w) => w[0]).join().toUpperCase();
-                        }
-                        prefixCtrl.text = autoPrefix;
-                      }
-                    },
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Name required';
-                      final exists = provider.accountTypes.any((t) =>
-                          t.name.toLowerCase() == v.trim().toLowerCase() &&
-                          t.id != typeToEdit?.id);
-                      if (exists) return 'An account type with this name already exists';
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 14.h),
-                  TextFormField(
-                    controller: prefixCtrl,
-                    textCapitalization: TextCapitalization.characters,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-                      LengthLimitingTextInputFormatter(6),
-                    ],
-                    decoration: _dialogInputDecoration(
-                      label: 'Code Prefix * (e.g. DRV, PC, BNK)',
-                      hint: 'e.g. DRV',
-                      prefixIcon: Icons.qr_code_rounded,
-                    ),
-                    style: GoogleFonts.inter(
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.0,
-                      color: FinDT.textPrimary,
-                    ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Code prefix required';
-                      if (v.trim().length < 2) return 'At least 2 characters';
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 14.h),
-                  TextFormField(
-                    controller: descCtrl,
-                    maxLines: 2,
-                    decoration: _dialogInputDecoration(
-                      label: 'Description (Optional)',
-                      hint: 'e.g. Float allocated to active operational drivers',
-                      prefixIcon: Icons.description_outlined,
-                    ),
-                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        actions: [
-          finDialogCancelButton(ctx),
-          FilledButton(
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              final newType = FundAccountTypeEntity(
-                id: isEditing ? typeToEdit.id : const Uuid().v4(),
-                name: nameCtrl.text.trim(),
-                codePrefix: prefixCtrl.text.trim().toUpperCase(),
-                description: descCtrl.text.trim().isNotEmpty ? descCtrl.text.trim() : null,
-                isSystemDefault: typeToEdit?.isSystemDefault ?? false,
-                isActive: true,
-                createdAt: typeToEdit?.createdAt ?? DateTime.now(),
-              );
-
-              finSafePop(ctx, newType);
-
-              try {
-                if (isEditing) {
-                  await provider.updateAccountType(newType);
-                } else {
-                  await provider.insertAccountType(newType);
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error saving account type: $e'),
-                      backgroundColor: FinDT.danger,
-                    ),
-                  );
-                }
-              }
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: FinDT.brand,
-              padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 11.h),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10.r),
-              ),
-            ),
-            child: Text(
-              isEditing ? 'Save Changes' : 'Create Type',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   void _showTransactionDialog(
     BuildContext context,
