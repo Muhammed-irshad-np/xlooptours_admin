@@ -311,7 +311,7 @@ Future<bool?> showFinConfirmationDialog({
       actions: [
         finDialogCancelButton(ctx, label: cancelLabel),
         finDialogActionButton(
-          onPressed: () => Navigator.pop(ctx, true),
+          onPressed: () => finSafePop(ctx, true),
           label: confirmLabel,
           backgroundColor: confirmColor,
         ),

@@ -2332,34 +2332,31 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                                   constraints: const BoxConstraints(),
                                   onPressed: () async {
                                     if (linkedAccountsCount > 0) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text(
+                                      showFinConfirmationDialog(
+                                        context: context,
+                                        title: 'Cannot Delete Account Type',
+                                        icon: Icons.lock_outline_rounded,
+                                        iconColor: FinDT.danger,
+                                        confirmColor: FinDT.brand,
+                                        confirmLabel: 'Understood',
+                                        message:
                                             'Cannot delete "${type.name}". $linkedAccountsCount active account(s) are using this type.',
-                                          ),
-                                          backgroundColor: FinDT.danger,
-                                        ),
+                                        highlightNote:
+                                            'Reassign or close all linked accounts before deleting this account type.',
                                       );
                                       return;
                                     }
-                                    final confirm = await showDialog<bool>(
+                                    final confirm = await showFinConfirmationDialog(
                                       context: context,
-                                      builder: (c) => AlertDialog(
-                                        shape: finDialogShape,
-                                        title: Text('Delete Account Type?'),
-                                        content: Text('Are you sure you want to delete "${type.name}"?'),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () => Navigator.pop(c, false),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          FilledButton(
-                                            onPressed: () => Navigator.pop(c, true),
-                                            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-                                            child: const Text('Delete'),
-                                          ),
-                                        ],
-                                      ),
+                                      title: 'Delete Account Type?',
+                                      message:
+                                          'Are you sure you want to delete "${type.name}" (${type.codePrefix})?',
+                                      highlightNote:
+                                          'This action is irreversible and permanently removes this custom account type.',
+                                      confirmLabel: 'Delete Account Type',
+                                      confirmColor: FinDT.danger,
+                                      icon: Icons.delete_outline_rounded,
+                                      iconColor: FinDT.danger,
                                     );
                                     if (confirm == true) {
                                       await prov.deleteAccountType(type.id);
