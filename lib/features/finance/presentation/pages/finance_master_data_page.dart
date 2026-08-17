@@ -503,10 +503,7 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
                 name: nameCtrl.text.trim().toUpperCase(),
                 createdAt: DateTime.now(),
               );
-              FocusManager.instance.primaryFocus?.unfocus();
-              if (Navigator.of(ctx).canPop()) {
-                Navigator.of(ctx).pop();
-              }
+              finSafePop(ctx);
               provider.insertCategory(cat);
             },
             style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
@@ -911,10 +908,7 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
                 createdAt: typeToEdit?.createdAt ?? DateTime.now(),
               );
 
-              FocusManager.instance.primaryFocus?.unfocus();
-              if (Navigator.of(ctx).canPop()) {
-                Navigator.of(ctx).pop(newType);
-              }
+              finSafePop(ctx, newType);
 
               try {
                 if (isEditing) {
@@ -1320,7 +1314,7 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
                   blockSelfApprove: blockSelf,
                 );
 
-                Navigator.of(ctx).pop();
+                finSafePop(ctx);
 
                 try {
                   await provider.saveFinancePolicy(updatedPolicy);
@@ -1607,10 +1601,7 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
                 final updatedCat = widget.category.copyWith(
                   expenseTypes: [...widget.category.expenseTypes, newType],
                 );
-                FocusManager.instance.primaryFocus?.unfocus();
-                if (Navigator.of(ctx).canPop()) {
-                  Navigator.of(ctx).pop();
-                }
+                finSafePop(ctx);
                 widget.provider.updateCategory(updatedCat);
               },
               style: FilledButton.styleFrom(backgroundColor: FinDT.brand),

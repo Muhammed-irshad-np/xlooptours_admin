@@ -96,33 +96,69 @@ Widget finDialogTitle(String title, {IconData? icon, Color? iconColor}) {
   );
 }
 
-/// Standard cancel button for dialogs.
+/// Safely dismisses a dialog or route without risk of concurrent pops or _debugLocked assertion errors.
+void finSafePop(BuildContext context, [dynamic result]) {
+  try {
+    FocusManager.instance.primaryFocus?.unfocus();
+    final route = ModalRoute.of(context);
+    if (route != null && route.isCurrent && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(result);
+    }
+  } catch (e) {
+    debugPrint('finSafePop suppressed error: $e');
+  }
+}
+
+/// Standard cancel button for dialogs with debouncing and safe pop guards.
 Widget finDialogCancelButton(BuildContext context, {String label = 'Cancel', VoidCallback? onPressed}) {
-  return TextButton(
-    onPressed: () {
-      if (onPressed != null) {
-        onPressed();
-        return;
-      }
-      FocusManager.instance.primaryFocus?.unfocus();
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          final nav = Navigator.of(context);
-          if (nav.canPop()) {
-            nav.pop(false);
-          }
-        }
-      });
-    },
-    child: Text(
-      label,
-      style: GoogleFonts.inter(
-        fontSize: 13.sp,
-        fontWeight: FontWeight.w600,
-        color: FinDT.textSecondary,
-      ),
-    ),
+  return _FinDialogCancelButton(
+    label: label,
+    onPressed: onPressed,
   );
+}
+
+class _FinDialogCancelButton extends StatefulWidget {
+  final String label;
+  final VoidCallback? onPressed;
+
+  const _FinDialogCancelButton({
+    required this.label,
+    this.onPressed,
+  });
+
+  @override
+  State<_FinDialogCancelButton> createState() => _FinDialogCancelButtonState();
+}
+
+class _FinDialogCancelButtonState extends State<_FinDialogCancelButton> {
+  bool _isDismissed = false;
+
+  void _handleCancel() {
+    if (_isDismissed) return;
+    _isDismissed = true;
+
+    if (widget.onPressed != null) {
+      widget.onPressed!();
+      return;
+    }
+
+    finSafePop(context, false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: _isDismissed ? null : _handleCancel,
+      child: Text(
+        widget.label,
+        style: GoogleFonts.inter(
+          fontSize: 13.sp,
+          fontWeight: FontWeight.w600,
+          color: FinDT.textSecondary,
+        ),
+      ),
+    );
+  }
 }
 
 /// Standard action / confirm button for dialogs.
