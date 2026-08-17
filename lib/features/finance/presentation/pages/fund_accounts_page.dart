@@ -7,11 +7,13 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/fund_transaction_entity.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../widgets/fund_account_card.dart';
 import '../widgets/currency_display.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../../domain/entities/fund_account_type_entity.dart';
+import '../../domain/services/finance_permission_service.dart';
 import '../../../../features/employee/presentation/providers/employee_provider.dart';
 import '../../../../features/employee/domain/entities/employee_entity.dart';
 import '../widgets/finance_dialog_helpers.dart';
@@ -484,44 +486,51 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     BuildContext context,
     FundAccountProvider provider,
   ) {
+    final user = context.read<AuthProvider>().user;
+    final policy = context.read<FinanceProvider>().policy;
+    final canTransfer = FinancePermissionService.canTransferFunds(user: user, policy: policy);
+    final canManageAccounts = FinancePermissionService.canManageAccounts(user: user, policy: policy);
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        OutlinedButton.icon(
-          onPressed: () => _showTransferDialog(context, provider),
-          icon: Icon(Icons.swap_horiz_rounded, size: 16.sp),
-          label: Text(
-            'Transfer',
-            style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
-          ),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: FinDT.textPrimary,
-            side: const BorderSide(color: FinDT.border),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10.r),
+        if (canTransfer)
+          OutlinedButton.icon(
+            onPressed: () => _showTransferDialog(context, provider),
+            icon: Icon(Icons.swap_horiz_rounded, size: 16.sp),
+            label: Text(
+              'Transfer',
+              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
             ),
-            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 11.h),
-          ),
-        ),
-        SizedBox(width: 8.w),
-        ElevatedButton.icon(
-          onPressed: () => _showAccountFormDialog(context, provider),
-          icon: Icon(Icons.add_rounded, size: 16.sp),
-          label: Text(
-            'Add Account',
-            style:
-                GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
-          ),
-          style: ElevatedButton.styleFrom(
-            foregroundColor: Colors.white,
-            backgroundColor: FinDT.brand,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10.r),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: FinDT.textPrimary,
+              side: const BorderSide(color: FinDT.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 11.h),
             ),
-            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 11.h),
           ),
-        ),
+        if (canTransfer && canManageAccounts) SizedBox(width: 8.w),
+        if (canManageAccounts)
+          ElevatedButton.icon(
+            onPressed: () => _showAccountFormDialog(context, provider),
+            icon: Icon(Icons.add_rounded, size: 16.sp),
+            label: Text(
+              'Add Account',
+              style:
+                  GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
+            ),
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: FinDT.brand,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 11.h),
+            ),
+          ),
       ],
     );
   }
@@ -1191,42 +1200,53 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
           ),
 
           // ── Quick Actions Bar ─────────────────────────────────
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 18.w),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _buildTransactionActionBtn(
-                    context: context,
-                    provider: provider,
-                    account: selected,
-                    isDeposit: true,
+          Builder(builder: (context) {
+            final user = context.read<AuthProvider>().user;
+            final policy = context.read<FinanceProvider>().policy;
+            final canMove = FinancePermissionService.canMoveFunds(
+              user: user,
+              account: selected,
+              policy: policy,
+            );
+            if (!canMove) return const SizedBox.shrink();
+
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: 18.w),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildTransactionActionBtn(
+                      context: context,
+                      provider: provider,
+                      account: selected,
+                      isDeposit: true,
+                    ),
                   ),
-                ),
-                SizedBox(width: 8.w),
-                Expanded(
-                  child: _buildTransactionActionBtn(
-                    context: context,
-                    provider: provider,
-                    account: selected,
-                    isDeposit: false,
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: _buildTransactionActionBtn(
+                      context: context,
+                      provider: provider,
+                      account: selected,
+                      isDeposit: false,
+                    ),
                   ),
-                ),
-                SizedBox(width: 8.w),
-                OutlinedButton.icon(
-                  onPressed: () => _showAdjustmentDialog(context, provider, selected),
-                  icon: Icon(Icons.tune_rounded, size: 15.sp),
-                  label: Text('Adjust', style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600)),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: FinDT.warning,
-                    side: BorderSide(color: FinDT.warning.withValues(alpha: 0.5)),
-                    padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                  SizedBox(width: 8.w),
+                  OutlinedButton.icon(
+                    onPressed: () => _showAdjustmentDialog(context, provider, selected),
+                    icon: Icon(Icons.tune_rounded, size: 15.sp),
+                    label: Text('Adjust', style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: FinDT.warning,
+                      side: BorderSide(color: FinDT.warning.withValues(alpha: 0.5)),
+                      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    ),
                   ),
-                ),
-              ],
-            ),
-          ),
+                ],
+              ),
+            );
+          }),
           SizedBox(height: 16.h),
           Divider(height: 1, color: FinDT.borderLight),
 
@@ -1462,6 +1482,11 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     FundAccountProvider provider,
     FundAccountEntity selected,
   ) {
+    final user = context.read<AuthProvider>().user;
+    final policy = context.read<FinanceProvider>().policy;
+    final canManageAccounts = FinancePermissionService.canManageAccounts(user: user, policy: policy);
+    if (!canManageAccounts) return const SizedBox.shrink();
+
     return Row(
       children: [
         IconButton(

@@ -11,6 +11,7 @@ import '../providers/petty_cash_provider.dart';
 import '../widgets/expense_status_badge.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/services/finance_export_service.dart';
+import '../../domain/services/finance_permission_service.dart';
 import 'expense_form_page.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
@@ -504,6 +505,11 @@ class _ExpenseDataTable extends StatelessWidget {
   }
 
   Widget _buildAddButton(BuildContext context) {
+    final auth = context.read<AuthProvider>().user;
+    final policy = context.read<FinanceProvider>().policy;
+    final canSubmit = FinancePermissionService.canSubmitExpense(user: auth, policy: policy);
+    if (!canSubmit) return const SizedBox.shrink();
+
     return Material(
       color: FinDT.brand,
       borderRadius: BorderRadius.circular(10.r),
@@ -692,8 +698,16 @@ class _ExpenseDataTable extends StatelessWidget {
 
   Widget _buildActions(BuildContext context, ExpenseEntity expense) {
     final auth = context.read<AuthProvider>().user;
-    final canApprove = auth?.canApproveExpense ?? false;
-    final canReverse = auth?.canReverseMoney ?? false;
+    final policy = context.read<FinanceProvider>().policy;
+    final canApprove = FinancePermissionService.canApproveExpense(
+      user: auth,
+      policy: policy,
+      amount: expense.amount,
+    );
+    final canReverse = FinancePermissionService.canVoidExpense(
+      user: auth,
+      policy: policy,
+    );
 
     return Row(
       mainAxisSize: MainAxisSize.min,
