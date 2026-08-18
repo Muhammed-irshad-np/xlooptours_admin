@@ -742,31 +742,31 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                 ),
                 IconButton(
                   onPressed: () async {
-                    final ok = await showFinConfirmationDialog(
+                    await showFinConfirmationDialog(
                       context: context,
                       title: 'Delete Approval Stage?',
                       message:
                           'Are you sure you want to remove "${stage.name}" from the approval chain?',
                       confirmLabel: 'Delete',
                       confirmColor: FinDT.danger,
+                      onConfirm: () async {
+                        final updatedList = policy.approvalChain
+                            .where((s) => s.order != stage.order)
+                            .toList();
+                        // Re-index
+                        final reindexed = List.generate(
+                          updatedList.length,
+                          (i) => updatedList[i].copyWith(order: i),
+                        );
+                        final updated =
+                            policy.copyWith(approvalChain: reindexed);
+                        await _savePolicy(
+                          finProv,
+                          updated,
+                          'Approval stage deleted',
+                        );
+                      },
                     );
-                    if (ok == true) {
-                      final updatedList = policy.approvalChain
-                          .where((s) => s.order != stage.order)
-                          .toList();
-                      // Re-index
-                      final reindexed = List.generate(
-                        updatedList.length,
-                        (i) => updatedList[i].copyWith(order: i),
-                      );
-                      final updated =
-                          policy.copyWith(approvalChain: reindexed);
-                      await _savePolicy(
-                        finProv,
-                        updated,
-                        'Approval stage deleted',
-                      );
-                    }
                   },
                   icon: Icon(Icons.delete_outline,
                       size: 16.sp, color: FinDT.danger),
@@ -1391,6 +1391,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
     final selectedRoles = List<String>.from(config.allowedRoles);
     final selectedUserIds = List<String>.from(config.allowedUserIds);
     final selectedUserNames = List<String>.from(config.allowedUserNames);
+    bool isSaving = false;
 
     // Build role list including standard roles
     final standardRoleIds = [
@@ -1409,6 +1410,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: Colors.white,
@@ -1481,7 +1483,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                                 : FinDT.border,
                           ),
                         ),
-                        onSelected: (val) {
+                        onSelected: isSaving ? null : (val) {
                           setDialogState(() {
                             if (val) {
                               selectedRoles.add(roleId);
@@ -1510,7 +1512,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                         ),
                       ),
                       TextButton.icon(
-                        onPressed: () => _openUserSearchPickerDialog(
+                        onPressed: isSaving ? null : () => _openUserSearchPickerDialog(
                           ctx: ctx,
                           allUsers: allUsers,
                           alreadySelectedIds: selectedUserIds,
@@ -1572,7 +1574,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                               .withValues(alpha: 0.1),
                           deleteIcon:
                               Icon(Icons.close_rounded, size: 14.sp),
-                          onDeleted: () {
+                          onDeleted: isSaving ? null : () {
                             setDialogState(() {
                               selectedUserIds.removeAt(i);
                               if (selectedUserNames.length > i) {
@@ -1595,19 +1597,30 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
             ),
           ),
           actions: [
-            finDialogCancelButton(ctx),
-            FilledButton(
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSaving ? () {} : null,
+            ),
+            finDialogActionButton(
               onPressed: () async {
-                finSafePop(ctx);
+                setDialogState(() => isSaving = true);
                 final updatedConfig = WorkflowPermissionConfig(
                   allowedRoles: selectedRoles,
                   allowedUserIds: selectedUserIds,
                   allowedUserNames: selectedUserNames,
                 );
-                await onSave(updatedConfig);
+                try {
+                  await onSave(updatedConfig);
+                  if (ctx.mounted) finSafePop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isSaving = false);
+                  }
+                }
               },
-              style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
-              child: const Text('Save Permission'),
+              label: 'Save Permission',
+              backgroundColor: FinDT.brand,
+              isLoading: isSaving,
             ),
           ],
         ),
@@ -1742,6 +1755,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
     final amountCtrl = TextEditingController(
         text: existingStage?.maxAmount?.toString() ?? '');
     bool isUnlimited = existingStage?.maxAmount == null;
+    bool isSaving = false;
 
     final selectedRoles = List<String>.from(existingStage?.approverRoles ?? []);
     final selectedUserIds =
@@ -1762,6 +1776,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: Colors.white,
@@ -1835,7 +1850,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                                 : FinDT.textPrimary,
                           ),
                           selectedColor: FinDT.brand.withValues(alpha: 0.12),
-                          onSelected: (val) {
+                          onSelected: isSaving ? null : (val) {
                             setDialogState(() {
                               isUnlimited = val;
                               if (isUnlimited) amountCtrl.clear();
@@ -1873,7 +1888,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                             color: isSel ? FinDT.brand : FinDT.textPrimary,
                           ),
                           selectedColor: FinDT.brand.withValues(alpha: 0.12),
-                          onSelected: (v) {
+                          onSelected: isSaving ? null : (v) {
                             setDialogState(() {
                               if (v) {
                                 selectedRoles.add(r);
@@ -1900,7 +1915,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                           ),
                         ),
                         TextButton.icon(
-                          onPressed: () => _openUserSearchPickerDialog(
+                          onPressed: isSaving ? null : () => _openUserSearchPickerDialog(
                             ctx: ctx,
                             allUsers: userMgmt.users,
                             alreadySelectedIds: selectedUserIds,
@@ -1926,7 +1941,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                           return Chip(
                             label: Text(selectedUserNames[i]),
                             labelStyle: GoogleFonts.inter(fontSize: 10.sp),
-                            onDeleted: () {
+                            onDeleted: isSaving ? null : () {
                               setDialogState(() {
                                 selectedUserIds.removeAt(i);
                                 selectedUserNames.removeAt(i);
@@ -1941,12 +1956,14 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
             ),
           ),
           actions: [
-            finDialogCancelButton(ctx),
-            FilledButton(
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSaving ? () {} : null,
+            ),
+            finDialogActionButton(
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
-                finSafePop(ctx);
-
+                
                 final maxAmt = isUnlimited
                     ? null
                     : double.tryParse(amountCtrl.text.trim());
@@ -1974,16 +1991,26 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
 
                 final updatedPolicy =
                     policy.copyWith(approvalChain: updatedChain);
-                await _savePolicy(
-                  finProv,
-                  updatedPolicy,
-                  existingStage == null
-                      ? 'Approval stage added'
-                      : 'Approval stage updated',
-                );
+                
+                setDialogState(() => isSaving = true);
+                try {
+                  await _savePolicy(
+                    finProv,
+                    updatedPolicy,
+                    existingStage == null
+                        ? 'Approval stage added'
+                        : 'Approval stage updated',
+                  );
+                  if (ctx.mounted) finSafePop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isSaving = false);
+                  }
+                }
               },
-              style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
-              child: const Text('Save Stage'),
+              label: 'Save Stage',
+              backgroundColor: FinDT.brand,
+              isLoading: isSaving,
             ),
           ],
         ),
@@ -2001,76 +2028,92 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
         text: policy.limitForRole('manager')?.toString() ?? '5000');
     final financeCtrl = TextEditingController(
         text: policy.limitForRole('finance')?.toString() ?? '50000');
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: finDialogShape,
-        title: finDialogTitle('Edit Role Approval Limits',
-            icon: Icons.payments_outlined),
-        content: SizedBox(
-          width: 420.w,
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: managerCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                  ],
-                  decoration: finDialogInputDecoration(
-                    label: 'Manager Approval Limit (SAR) *',
-                    prefixIcon: Icons.payments_outlined,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: finDialogShape,
+          title: finDialogTitle('Edit Role Approval Limits',
+              icon: Icons.payments_outlined),
+          content: SizedBox(
+            width: 420.w,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: managerCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                    ],
+                    decoration: finDialogInputDecoration(
+                      label: 'Manager Approval Limit (SAR) *',
+                      prefixIcon: Icons.payments_outlined,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Required' : null,
                   ),
-                  style: GoogleFonts.inter(fontSize: 12.sp),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Required' : null,
-                ),
-                SizedBox(height: 12.h),
-                TextFormField(
-                  controller: financeCtrl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                  ],
-                  decoration: finDialogInputDecoration(
-                    label: 'Finance Role Approval Limit (SAR) *',
-                    prefixIcon: Icons.account_balance_outlined,
+                  SizedBox(height: 12.h),
+                  TextFormField(
+                    controller: financeCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                    ],
+                    decoration: finDialogInputDecoration(
+                      label: 'Finance Role Approval Limit (SAR) *',
+                      prefixIcon: Icons.account_balance_outlined,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Required' : null,
                   ),
-                  style: GoogleFonts.inter(fontSize: 12.sp),
-                  validator: (v) =>
-                      (v == null || v.isEmpty) ? 'Required' : null,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+          actions: [
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSaving ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                
+                final updated = policy.copyWith(
+                  approvalLimits: {
+                    ...policy.approvalLimits,
+                    'manager': double.tryParse(managerCtrl.text) ?? 5000,
+                    'finance': double.tryParse(financeCtrl.text) ?? 50000,
+                  },
+                );
+                
+                setDialogState(() => isSaving = true);
+                try {
+                  await _savePolicy(finProv, updated, 'Approval limits updated');
+                  if (ctx.mounted) finSafePop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isSaving = false);
+                  }
+                }
+              },
+              label: 'Save Limits',
+              backgroundColor: FinDT.brand,
+              isLoading: isSaving,
+            ),
+          ],
         ),
-        actions: [
-          finDialogCancelButton(ctx),
-          FilledButton(
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              finSafePop(ctx);
-
-              final updated = policy.copyWith(
-                approvalLimits: {
-                  ...policy.approvalLimits,
-                  'manager': double.tryParse(managerCtrl.text) ?? 5000,
-                  'finance': double.tryParse(financeCtrl.text) ?? 50000,
-                },
-              );
-              await _savePolicy(finProv, updated, 'Approval limits updated');
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
-            child: const Text('Save Limits'),
-          ),
-        ],
       ),
     );
   }
@@ -2086,9 +2129,11 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
     bool requireFuel = policy.requireVehicleForFuel;
     bool requireSalary = policy.requireEmployeeForSalary;
     bool blockSelf = policy.blockSelfApprove;
+    bool isSaving = false;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: Colors.white,
@@ -2128,7 +2173,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                       contentPadding: EdgeInsets.zero,
                       value: requireFuel,
                       activeTrackColor: FinDT.brand,
-                      onChanged: (v) => setDialogState(() => requireFuel = v),
+                      onChanged: isSaving ? null : (v) => setDialogState(() => requireFuel = v),
                     ),
                     SwitchListTile(
                       title: Text('Require Employee Tagging on Payroll',
@@ -2137,7 +2182,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                       contentPadding: EdgeInsets.zero,
                       value: requireSalary,
                       activeTrackColor: FinDT.brand,
-                      onChanged: (v) => setDialogState(() => requireSalary = v),
+                      onChanged: isSaving ? null : (v) => setDialogState(() => requireSalary = v),
                     ),
                     SwitchListTile(
                       title: Text('Block Self-Approval on Expenses',
@@ -2154,11 +2199,13 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
             ),
           ),
           actions: [
-            finDialogCancelButton(ctx),
-            FilledButton(
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSaving ? () {} : null,
+            ),
+            finDialogActionButton(
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
-                finSafePop(ctx);
 
                 final updated = policy.copyWith(
                   receiptRequiredAbove:
@@ -2167,11 +2214,21 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                   requireEmployeeForSalary: requireSalary,
                   blockSelfApprove: blockSelf,
                 );
-                await _savePolicy(
-                    finProv, updated, 'Compliance rules updated');
+
+                setDialogState(() => isSaving = true);
+                try {
+                  await _savePolicy(
+                      finProv, updated, 'Compliance rules updated');
+                  if (ctx.mounted) finSafePop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isSaving = false);
+                  }
+                }
               },
-              style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
-              child: const Text('Save Settings'),
+              label: 'Save Settings',
+              backgroundColor: FinDT.brand,
+              isLoading: isSaving,
             ),
           ],
         ),
@@ -2183,19 +2240,19 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
     BuildContext context,
     FinanceProvider finProv,
   ) async {
-    final ok = await showFinConfirmationDialog(
+    await showFinConfirmationDialog(
       context: context,
       title: 'Reset Finance Policy to Defaults?',
       message:
           'This will reset all workflow permissions, approval stages, and limits to standard company defaults.',
       confirmLabel: 'Reset to Defaults',
       confirmColor: FinDT.danger,
+      onConfirm: () async {
+        const defaultPolicy = FinancePolicyEntity();
+        await _savePolicy(
+            finProv, defaultPolicy, 'Policy reset to standard defaults');
+      },
     );
-    if (ok == true) {
-      const defaultPolicy = FinancePolicyEntity();
-      await _savePolicy(
-          finProv, defaultPolicy, 'Policy reset to standard defaults');
-    }
   }
 
   Future<void> _savePolicy(

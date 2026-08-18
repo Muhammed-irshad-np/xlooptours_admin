@@ -127,6 +127,24 @@ void main() {
       );
     });
 
+    test('completes without error on petty cash split bucket transfer', () async {
+      final useCase = TransferFundsUseCase(repo);
+      await expectLater(
+        useCase(
+          fromAccountId: 'petty-001',
+          toAccountId: 'petty-002',
+          amountMajor: 250,
+          currency: 'SAR',
+          description: 'Petty cash physical to STC transfer',
+          performedBy: 'Finance A',
+          performedByUserId: 'fin-001',
+          fromBucket: FundBucket.cash,
+          toBucket: FundBucket.stcPay,
+        ),
+        completes,
+      );
+    });
+
     test('propagates ArgumentError on same-account transfer', () async {
       final useCase = TransferFundsUseCase(repo);
       repo.transferError = ArgumentError('Cannot transfer to the same account');

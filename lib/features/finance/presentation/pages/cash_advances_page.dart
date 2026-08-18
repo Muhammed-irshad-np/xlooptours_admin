@@ -1015,11 +1015,12 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
 
     // Default to first account
     accountId = accounts.first.id;
+    bool isIssuing = false;
 
     await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) {
+        builder: (ctx, setInnerState) {
           final selectedAccount = accounts.firstWhere(
             (a) => a.id == accountId,
             orElse: () => accounts.first,
@@ -1063,7 +1064,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                               ),
                             )
                             .toList(),
-                        onChanged: (v) => setLocal(() => accountId = v),
+                        onChanged: isIssuing ? null : (v) => setInnerState(() => accountId = v),
                         validator: (v) => v == null ? 'Required' : null,
                       ),
                       SizedBox(height: 14.h),
@@ -1086,7 +1087,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                               ),
                             )
                             .toList(),
-                        onChanged: (v) => setLocal(() => employee = v),
+                        onChanged: isIssuing ? null : (v) => setInnerState(() => employee = v),
                         validator: (v) => v == null ? 'Required' : null,
                       ),
                       SizedBox(height: 14.h),
@@ -1103,7 +1104,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                         decoration: finDialogInputDecoration(
                           label: 'Advance Amount *',
                           hint: '0.00',
-                          prefixIcon: Icons.attach_money_rounded,
+                          prefixIcon: Icons.payments_outlined,
                           suffixText: selectedAccount.currency,
                         ),
                         style: GoogleFonts.inter(
@@ -1143,7 +1144,10 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
               ),
             ),
             actions: [
-              finDialogCancelButton(ctx),
+              finDialogCancelButton(
+                ctx,
+                onPressed: isIssuing ? () {} : null,
+              ),
               finDialogActionButton(
                 onPressed: () async {
                   if (!formKey.currentState!.validate()) return;
@@ -1170,11 +1174,12 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                   final advProv = context.read<CashAdvanceProvider>();
                   final fundProv = context.read<FundAccountProvider>();
 
-                  finSafePop(ctx);
+                  setInnerState(() => isIssuing = true);
 
                   try {
                     await advProv.issue(advance);
                     await fundProv.fetchAllAccounts();
+                    if (ctx.mounted) finSafePop(ctx);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
@@ -1186,7 +1191,8 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                       );
                     }
                   } catch (e) {
-                    if (context.mounted) {
+                    if (ctx.mounted) {
+                      setInnerState(() => isIssuing = false);
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
                           content: Text('Failed to issue advance: $e'),
@@ -1198,6 +1204,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                 },
                 label: 'Issue Advance',
                 backgroundColor: FinDT.brand,
+                isLoading: isIssuing,
               ),
             ],
           );
@@ -1284,9 +1291,11 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
       text: advance.outstanding.toStringAsFixed(2),
     );
     var returnToFund = true;
+    bool isSettling = false;
 
-    final ok = await showDialog<bool>(
+    showDialog<bool>(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
           backgroundColor: Colors.white,
@@ -1338,7 +1347,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Current Outstanding:',
+                              'Outstanding Float:',
                               style: GoogleFonts.inter(
                                 fontSize: 12.sp,
                                 color: FinDT.textSecondary,
@@ -1347,9 +1356,9 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                             Text(
                               '${advance.outstanding.toStringAsFixed(2)} ${advance.currency}',
                               style: GoogleFonts.inter(
-                                fontSize: 13.sp,
+                                fontSize: 12.sp,
                                 fontWeight: FontWeight.w700,
-                                color: FinDT.warning,
+                                color: FinDT.brand,
                               ),
                             ),
                           ],
@@ -1414,8 +1423,9 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                       ),
                       activeColor: FinDT.brand,
                       value: returnToFund,
-                      onChanged: (v) =>
-                          setLocal(() => returnToFund = v ?? true),
+                      onChanged: isSettling
+                          ? null
+                          : (v) => setLocal(() => returnToFund = v ?? true),
                       controlAffinity: ListTileControlAffinity.leading,
                     ),
                   ),
@@ -1424,55 +1434,58 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
             ),
           ),
           actions: [
-            finDialogCancelButton(ctx),
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSettling ? () {} : null,
+            ),
             finDialogActionButton(
-              onPressed: () {
+              onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
-                finSafePop(ctx, true);
+                final amount = double.tryParse(ctrl.text) ?? 0;
+                final user = context.read<AuthProvider>().user;
+                final advProv = context.read<CashAdvanceProvider>();
+                final fundProv = context.read<FundAccountProvider>();
+
+                setLocal(() => isSettling = true);
+                try {
+                  await advProv.settle(
+                    advanceId: advance.id,
+                    amount: amount,
+                    actorName: user?.actorLabel ?? 'Admin',
+                    actorUserId: user?.id ?? '',
+                    returnToFund: returnToFund,
+                  );
+                  await fundProv.fetchAllAccounts();
+                  if (ctx.mounted) finSafePop(ctx, true);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Successfully settled ${amount.toStringAsFixed(2)} ${advance.currency} for ${advance.employeeName}',
+                        ),
+                        backgroundColor: FinDT.success,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setLocal(() => isSettling = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to settle advance: $e'),
+                        backgroundColor: FinDT.danger,
+                      ),
+                    );
+                  }
+                }
               },
               label: 'Confirm Settlement',
               backgroundColor: FinDT.brand,
+              isLoading: isSettling,
             ),
           ],
         ),
       ),
     );
-
-    if (ok != true || !context.mounted) return;
-
-    final amount = double.tryParse(ctrl.text) ?? 0;
-    final user = context.read<AuthProvider>().user;
-    final advProv = context.read<CashAdvanceProvider>();
-    final fundProv = context.read<FundAccountProvider>();
-
-    try {
-      await advProv.settle(
-        advanceId: advance.id,
-        amount: amount,
-        actorName: user?.actorLabel ?? 'Admin',
-        actorUserId: user?.id ?? '',
-        returnToFund: returnToFund,
-      );
-      await fundProv.fetchAllAccounts();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Successfully settled ${amount.toStringAsFixed(2)} ${advance.currency} for ${advance.employeeName}',
-            ),
-            backgroundColor: FinDT.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to settle advance: $e'),
-            backgroundColor: FinDT.danger,
-          ),
-        );
-      }
-    }
   }
 }

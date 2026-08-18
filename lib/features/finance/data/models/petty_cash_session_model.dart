@@ -62,9 +62,7 @@ class PettyCashSessionModel extends PettyCashSessionEntity {
     return PettyCashSessionModel(
       id: json['id'] as String,
       fundAccountId: json['fundAccountId'] as String? ?? '',
-      date: json['date'] != null
-          ? DateTime.parse(json['date'] as String)
-          : DateTime.now(),
+      date: _parseDateTime(json['date']) ?? DateTime.now(),
       openedBy: json['openedBy'] as String?,
       closedBy: json['closedBy'] as String?,
       openingCashBalance: (json['openingCashBalance'] as num?)?.toDouble() ?? legacyOpening,
@@ -81,15 +79,24 @@ class PettyCashSessionModel extends PettyCashSessionEntity {
       closingSheetUrl: json['closingSheetUrl'] as String?,
       status: _parseStatus(json['status'] as String?),
       verifiedBy: json['verifiedBy'] as String?,
-      verifiedAt: json['verifiedAt'] != null
-          ? DateTime.parse(json['verifiedAt'] as String)
-          : null,
+      verifiedAt: _parseDateTime(json['verifiedAt']),
       discrepancy: (json['discrepancy'] as num?)?.toDouble(),
       notes: json['notes'] as String?,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : DateTime.now(),
+      createdAt: _parseDateTime(json['createdAt']) ?? DateTime.now(),
     );
+  }
+
+  static DateTime? _parseDateTime(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    if (val is String) return DateTime.tryParse(val);
+    try {
+      final dynamic d = val;
+      if (d.toDate != null) {
+        return (d.toDate() as DateTime);
+      }
+    } catch (_) {}
+    return null;
   }
 
   factory PettyCashSessionModel.fromEntity(PettyCashSessionEntity entity) {

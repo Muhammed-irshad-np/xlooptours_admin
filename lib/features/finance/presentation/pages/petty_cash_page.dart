@@ -1107,111 +1107,118 @@ class _PettyCashPageState extends State<PettyCashPage> {
     final currentStc = selectedAcc?.stcPayBalance ?? 0.0;
     final currentTotal = selectedAcc?.currentBalance ?? (currentCash + currentStc);
     final formatter = NumberFormat('#,##0.00', 'en');
+    bool isSubmitting = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: finDialogShape,
-        title: finDialogTitle('Open Daily Session', icon: Icons.storefront_outlined),
-        content: SizedBox(
-          width: 440.w,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Info banner
-              Container(
-                padding: EdgeInsets.all(12.w),
-                decoration: BoxDecoration(
-                  color: FinDT.brand.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(color: FinDT.brand.withValues(alpha: 0.25)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline_rounded, size: 16.sp, color: FinDT.brand),
-                    SizedBox(width: 8.w),
-                    Expanded(
-                      child: Text(
-                        'Opening balances are automatically snapshotted from the live ledger. You cannot edit them.',
-                        style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.brand),
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle('Open Daily Session', icon: Icons.storefront_outlined),
+          content: SizedBox(
+            width: 440.w,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Info banner
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: FinDT.brand.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(color: FinDT.brand.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, size: 16.sp, color: FinDT.brand),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          'Opening balances are automatically snapshotted from the live ledger. You cannot edit them.',
+                          style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.brand),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              SizedBox(height: 16.h),
+                SizedBox(height: 16.h),
 
-              // Read-only balance display
-              _balanceSnapshotRow('Cash Balance', currentCash, Icons.payments_outlined, formatter),
-              SizedBox(height: 10.h),
-              _balanceSnapshotRow('STC Pay Balance', currentStc, Icons.phone_android_outlined, formatter),
-              SizedBox(height: 14.h),
+                // Read-only balance display
+                _balanceSnapshotRow('Cash Balance', currentCash, Icons.payments_outlined, formatter),
+                SizedBox(height: 10.h),
+                _balanceSnapshotRow('STC Pay Balance', currentStc, Icons.phone_android_outlined, formatter),
+                SizedBox(height: 14.h),
 
-              // Total
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
-                decoration: BoxDecoration(
-                  color: FinDT.brand.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10.r),
+                // Total
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                  decoration: BoxDecoration(
+                    color: FinDT.brand.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10.r),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Total Opening Balance:',
+                        style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
+                      ),
+                      Text(
+                        '${formatter.format(currentTotal)} SAR',
+                        style: GoogleFonts.inter(fontSize: 14.sp, fontWeight: FontWeight.w700, color: FinDT.brand),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Total Opening Balance:',
-                      style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
-                    ),
-                    Text(
-                      '${formatter.format(currentTotal)} SAR',
-                      style: GoogleFonts.inter(fontSize: 14.sp, fontWeight: FontWeight.w700, color: FinDT.brand),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        actions: [
-          finDialogCancelButton(ctx),
-          finDialogActionButton(
-            onPressed: () async {
-              final session = PettyCashSessionEntity(
-                id: const Uuid().v4(),
-                fundAccountId: _selectedAccountId!,
-                date: DateTime.now(),
-                openedBy: context.read<AuthProvider>().user?.actorLabel ?? 'Unknown',
-                // Opening balances will be overwritten server-side from live account snapshot.
-                // Values here are informational only.
-                openingCashBalance: currentCash,
-                openingStcPayBalance: currentStc,
-                createdAt: DateTime.now(),
-              );
+          actions: [
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSubmitting ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
+                setDialogState(() => isSubmitting = true);
+                final session = PettyCashSessionEntity(
+                  id: const Uuid().v4(),
+                  fundAccountId: _selectedAccountId!,
+                  date: DateTime.now(),
+                  openedBy: context.read<AuthProvider>().user?.actorLabel ?? 'Unknown',
+                  openingCashBalance: currentCash,
+                  openingStcPayBalance: currentStc,
+                  createdAt: DateTime.now(),
+                );
 
-              try {
-                await provider.openSession(session);
-                if (ctx.mounted) Navigator.pop(ctx);
-              } catch (e) {
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(e
-                          .toString()
-                          .replaceAll('Exception: ', '')
-                          .replaceAll('StateError: ', '')),
-                      backgroundColor: const Color(0xFFDC2626),
-                    ),
-                  );
+                try {
+                  await provider.openSession(session);
+                  if (ctx.mounted) Navigator.pop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isSubmitting = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(e
+                            .toString()
+                            .replaceAll('Exception: ', '')
+                            .replaceAll('StateError: ', '')),
+                        backgroundColor: const Color(0xFFDC2626),
+                      ),
+                    );
+                  }
                 }
-              }
-            },
-            label: 'Open Session',
-            backgroundColor: FinDT.brand,
-          ),
-        ],
+              },
+              label: 'Open Session',
+              backgroundColor: FinDT.brand,
+              isLoading: isSubmitting,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1255,8 +1262,6 @@ class _PettyCashPageState extends State<PettyCashPage> {
     PettyCashSessionEntity session,
   ) {
     final formKey = GlobalKey<FormState>();
-    // Compute expected closing from live ledger totals (not the stale session
-    // entity whose deposit/expense fields are still 0 at open time).
     final live = provider.previewTotals;
     final liveCashDep = live?.cashDeposits ?? session.cashDeposits;
     final liveStcDep = live?.stcPayDeposits ?? session.stcPayDeposits;
@@ -1268,15 +1273,17 @@ class _PettyCashPageState extends State<PettyCashPage> {
     final cashCtrl = TextEditingController(text: expectedCash.toStringAsFixed(2));
     final digitalCtrl = TextEditingController(text: expectedStc.toStringAsFixed(2));
     String? closingSheetUrl;
+    bool isSubmitting = false;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setStateDialog) => AlertDialog(
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
           shape: finDialogShape,
-          title: finDialogTitle('Close Daily Session', icon: Icons.lock_clock_outlined),
+          title: finDialogTitle('Close Daily Register', icon: Icons.lock_clock_outlined),
           content: SizedBox(
             width: 440.w,
             child: SingleChildScrollView(
@@ -1364,7 +1371,6 @@ class _PettyCashPageState extends State<PettyCashPage> {
                       validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                     ),
                     SizedBox(height: 16.h),
-                    // Closing Sheet Upload
                     if (closingSheetUrl != null)
                       Container(
                         padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
@@ -1421,9 +1427,12 @@ class _PettyCashPageState extends State<PettyCashPage> {
             ),
           ),
           actions: [
-            finDialogCancelButton(ctx),
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSubmitting ? () {} : null,
+            ),
             finDialogActionButton(
-              onPressed: () {
+              onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
                 final cash = double.parse(cashCtrl.text);
                 final digital = double.parse(digitalCtrl.text);
@@ -1438,33 +1447,36 @@ class _PettyCashPageState extends State<PettyCashPage> {
                   closedBy: user?.actorLabel ?? 'Unknown',
                 );
 
-                Navigator.pop(ctx);
-                provider
-                    .closeSession(
-                  session: closed,
-                  closedBy: user?.actorLabel ?? 'Unknown',
-                  closedByUserId: user?.id,
-                )
-                    .then((_) {
+                setStateDialog(() => isSubmitting = true);
+                try {
+                  await provider.closeSession(
+                    session: closed,
+                    closedBy: user?.actorLabel ?? 'Unknown',
+                    closedByUserId: user?.id,
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text(
                           'Session closed using ledger totals for the day',
                         ),
+                        backgroundColor: FinDT.success,
                       ),
                     );
                   }
-                }).catchError((e) {
-                  if (context.mounted) {
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setStateDialog(() => isSubmitting = false);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
                     );
                   }
-                });
+                }
               },
               label: 'Close Session',
               backgroundColor: FinDT.brand,
+              isLoading: isSubmitting,
             ),
           ],
         ),
@@ -1478,7 +1490,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
     PettyCashSessionEntity session,
   ) async {
     final user = context.read<AuthProvider>().user;
-    final ok = await showFinConfirmationDialog(
+    await showFinConfirmationDialog(
       context: context,
       title: 'Verify & Lock Day?',
       message: 'Confirm closing ${session.closingBalance.toStringAsFixed(2)} SAR (discrepancy: ${session.discrepancy?.toStringAsFixed(2) ?? "0.00"}).',
@@ -1486,28 +1498,21 @@ class _PettyCashPageState extends State<PettyCashPage> {
       confirmLabel: 'Verify & Lock',
       confirmColor: FinDT.success,
       icon: Icons.verified_user_outlined,
+      onConfirm: () async {
+        await provider.verifySession(
+          sessionId: session.id,
+          verifiedBy: user?.actorLabel ?? 'Unknown',
+          verifiedByUserId: user?.id,
+        );
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Day verified and locked'),
+              backgroundColor: FinDT.success,
+            ),
+          );
+        }
+      },
     );
-    if (ok != true || !context.mounted) return;
-    try {
-      await provider.verifySession(
-        sessionId: session.id,
-        verifiedBy: user?.actorLabel ?? 'Unknown',
-        verifiedByUserId: user?.id,
-      );
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Day verified and locked'),
-            backgroundColor: FinDT.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
-        );
-      }
-    }
   }
 }

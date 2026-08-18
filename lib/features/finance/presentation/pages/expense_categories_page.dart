@@ -261,53 +261,68 @@ class ExpenseCategoriesPage extends StatelessWidget {
   void _showAddCategoryDialog(BuildContext context, FinanceProvider provider) {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController();
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: finDialogShape,
-        title: finDialogTitle('Add Expense Category', icon: Icons.category_outlined),
-        content: SizedBox(
-          width: 420.w,
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(height: 8.h),
-                TextFormField(
-                  controller: nameCtrl,
-                  decoration: finDialogInputDecoration(
-                    label: 'Category Name *',
-                    hint: 'e.g., VEHICLES, MARKETING',
-                    prefixIcon: Icons.folder_outlined,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle('Add Expense Category', icon: Icons.category_outlined),
+          content: SizedBox(
+            width: 420.w,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: 8.h),
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: finDialogInputDecoration(
+                      label: 'Category Name *',
+                      hint: 'e.g., VEHICLES, MARKETING',
+                      prefixIcon: Icons.folder_outlined,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
-                  style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+          actions: [
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSaving ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final cat = ExpenseCategoryEntity(
+                  id: const Uuid().v4(),
+                  name: nameCtrl.text.toUpperCase().trim(),
+                  createdAt: DateTime.now(),
+                );
+                setDialogState(() => isSaving = true);
+                try {
+                  await provider.insertCategory(cat);
+                  if (ctx.mounted) finSafePop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isSaving = false);
+                  }
+                }
+              },
+              label: 'Create Category',
+              backgroundColor: FinDT.brand,
+              isLoading: isSaving,
+            ),
+          ],
         ),
-        actions: [
-          finDialogCancelButton(ctx),
-          finDialogActionButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              final cat = ExpenseCategoryEntity(
-                id: const Uuid().v4(),
-                name: nameCtrl.text.toUpperCase().trim(),
-                createdAt: DateTime.now(),
-              );
-              provider.insertCategory(cat);
-              Navigator.pop(ctx);
-            },
-            label: 'Create Category',
-            backgroundColor: FinDT.brand,
-          ),
-        ],
       ),
     );
   }
@@ -459,94 +474,109 @@ class _CategoryExpansionCard extends StatelessWidget {
     final nameCtrl = TextEditingController(text: type?.name);
     String duration = type?.defaultDuration ?? 'MONTHLY';
     String role = type?.submittedByRole ?? 'ADMIN';
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: finDialogShape,
-        title: finDialogTitle(
-          isEditing ? 'Edit Expense Type' : 'Add Expense Type',
-          icon: Icons.playlist_add_rounded,
-        ),
-        content: SizedBox(
-          width: 420.w,
-          child: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(height: 8.h),
-                  TextFormField(
-                    controller: nameCtrl,
-                    decoration: finDialogInputDecoration(
-                      label: 'Type Name *',
-                      hint: 'e.g., Fuel, Office Rent, Electricity',
-                      prefixIcon: Icons.label_outline_rounded,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle(
+            isEditing ? 'Edit Expense Type' : 'Add Expense Type',
+            icon: Icons.playlist_add_rounded,
+          ),
+          content: SizedBox(
+            width: 420.w,
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(height: 8.h),
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: finDialogInputDecoration(
+                        label: 'Type Name *',
+                        hint: 'e.g., Fuel, Office Rent, Electricity',
+                        prefixIcon: Icons.label_outline_rounded,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                     ),
-                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                  ),
-                  SizedBox(height: 14.h),
-                  DropdownButtonFormField<String>(
-                    initialValue: duration,
-                    decoration: finDialogInputDecoration(
-                      label: 'Default Frequency',
-                      prefixIcon: Icons.calendar_today_outlined,
+                    SizedBox(height: 14.h),
+                    DropdownButtonFormField<String>(
+                      initialValue: duration,
+                      decoration: finDialogInputDecoration(
+                        label: 'Default Frequency',
+                        prefixIcon: Icons.calendar_today_outlined,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      items: ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY', 'ONE_TIME']
+                          .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                          .toList(),
+                      onChanged: isSaving ? null : (v) => setDialogState(() => duration = v ?? 'MONTHLY'),
                     ),
-                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                    items: ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY', 'ONE_TIME']
-                        .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                        .toList(),
-                    onChanged: (v) => duration = v ?? 'MONTHLY',
-                  ),
-                  SizedBox(height: 14.h),
-                  DropdownButtonFormField<String>(
-                    initialValue: role,
-                    decoration: finDialogInputDecoration(
-                      label: 'Who Submits This?',
-                      prefixIcon: Icons.badge_outlined,
+                    SizedBox(height: 14.h),
+                    DropdownButtonFormField<String>(
+                      initialValue: role,
+                      decoration: finDialogInputDecoration(
+                        label: 'Who Submits This?',
+                        prefixIcon: Icons.badge_outlined,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      items: ['ADMIN', 'COORDINATOR', 'DRIVER']
+                          .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                          .toList(),
+                      onChanged: isSaving ? null : (v) => setDialogState(() => role = v ?? 'ADMIN'),
                     ),
-                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                    items: ['ADMIN', 'COORDINATOR', 'DRIVER']
-                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                        .toList(),
-                    onChanged: (v) => role = v ?? 'ADMIN',
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
+          actions: [
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSaving ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final newType = ExpenseTypeEntity(
+                  id: isEditing ? type.id : const Uuid().v4(),
+                  name: nameCtrl.text.trim(),
+                  defaultDuration: duration,
+                  submittedByRole: role,
+                );
+
+                final updatedTypes = List<ExpenseTypeEntity>.from(category.expenseTypes);
+                if (isEditing) {
+                  final idx = updatedTypes.indexWhere((t) => t.id == type.id);
+                  if (idx != -1) updatedTypes[idx] = newType;
+                } else {
+                  updatedTypes.add(newType);
+                }
+
+                setDialogState(() => isSaving = true);
+                try {
+                  await provider.updateCategory(category.copyWith(expenseTypes: updatedTypes));
+                  if (ctx.mounted) finSafePop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isSaving = false);
+                  }
+                }
+              },
+              label: isEditing ? 'Save Changes' : 'Add Type',
+              backgroundColor: FinDT.brand,
+              isLoading: isSaving,
+            ),
+          ],
         ),
-        actions: [
-          finDialogCancelButton(ctx),
-          finDialogActionButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              final newType = ExpenseTypeEntity(
-                id: isEditing ? type.id : const Uuid().v4(),
-                name: nameCtrl.text.trim(),
-                defaultDuration: duration,
-                submittedByRole: role,
-              );
-
-              final updatedTypes = List<ExpenseTypeEntity>.from(category.expenseTypes);
-              if (isEditing) {
-                final idx = updatedTypes.indexWhere((t) => t.id == type.id);
-                if (idx != -1) updatedTypes[idx] = newType;
-              } else {
-                updatedTypes.add(newType);
-              }
-
-              provider.updateCategory(category.copyWith(expenseTypes: updatedTypes));
-              Navigator.pop(ctx);
-            },
-            label: isEditing ? 'Save Changes' : 'Add Type',
-            backgroundColor: FinDT.brand,
-          ),
-        ],
       ),
     );
   }
@@ -559,13 +589,12 @@ class _CategoryExpansionCard extends StatelessWidget {
       confirmLabel: 'Delete',
       confirmColor: FinDT.danger,
       icon: Icons.delete_outline_rounded,
-    ).then((ok) {
-      if (ok == true) {
+      onConfirm: () async {
         final updatedTypes =
             category.expenseTypes.where((t) => t.id != typeId).toList();
-        provider.updateCategory(category.copyWith(expenseTypes: updatedTypes));
-      }
-    });
+        await provider.updateCategory(category.copyWith(expenseTypes: updatedTypes));
+      },
+    );
   }
 
   void _confirmDeleteCategory(BuildContext context) {
@@ -576,10 +605,9 @@ class _CategoryExpansionCard extends StatelessWidget {
       confirmLabel: 'Delete Category',
       confirmColor: FinDT.danger,
       icon: Icons.delete_outline_rounded,
-    ).then((ok) {
-      if (ok == true) {
-        provider.deleteCategory(category.id);
-      }
-    });
+      onConfirm: () async {
+        await provider.deleteCategory(category.id);
+      },
+    );
   }
 }

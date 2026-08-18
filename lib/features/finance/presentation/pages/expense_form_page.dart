@@ -847,145 +847,159 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         ],
         if (isPettyCash && selectedAcc != null) ...[
           SizedBox(height: 14.h),
-          _FieldWrapper(
-            label: 'Payment Method (Petty Cash Bucket) *',
-            child: Row(
-              children: [
-                Expanded(
-                  child: InkWell(
-                    onTap: () => setState(() => _paymentMethod = 'cash'),
-                    borderRadius: BorderRadius.circular(10.r),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: EdgeInsets.symmetric(
-                          vertical: 10.h, horizontal: 12.w),
-                      decoration: BoxDecoration(
-                        color: _paymentMethod == 'cash'
-                            ? FinDT.brand.withValues(alpha: 0.1)
-                            : FinDT.bgPage,
+          Builder(
+            builder: (context) {
+              final enteredAmount =
+                  double.tryParse(_amountController.text) ?? 0.0;
+              final isCashSelected = _paymentMethod == 'cash';
+              final cashRemaining = selectedAcc.cashBalance - enteredAmount;
+              final stcRemaining = selectedAcc.stcPayBalance - enteredAmount;
+
+              return _FieldWrapper(
+                label: 'Payment Method (Petty Cash Bucket) *',
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _paymentMethod = 'cash'),
                         borderRadius: BorderRadius.circular(10.r),
-                        border: Border.all(
-                          color: _paymentMethod == 'cash'
-                              ? FinDT.brand
-                              : FinDT.border,
-                          width: _paymentMethod == 'cash' ? 1.5 : 1,
-                        ),
-                      ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: EdgeInsets.symmetric(
+                              vertical: 10.h, horizontal: 12.w),
+                          decoration: BoxDecoration(
+                            color: isCashSelected
+                                ? FinDT.brand.withValues(alpha: 0.1)
+                                : FinDT.bgPage,
+                            borderRadius: BorderRadius.circular(10.r),
+                            border: Border.all(
+                              color: isCashSelected
+                                  ? FinDT.brand
+                                  : FinDT.border,
+                              width: isCashSelected ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.payments_outlined,
-                                size: 15.sp,
-                                color: _paymentMethod == 'cash'
-                                    ? FinDT.brand
-                                    : FinDT.textSecondary,
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.payments_outlined,
+                                    size: 15.sp,
+                                    color: isCashSelected
+                                        ? FinDT.brand
+                                        : FinDT.textSecondary,
+                                  ),
+                                  SizedBox(width: 6.w),
+                                  Text(
+                                    'Physical Cash',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.sp,
+                                      fontWeight: isCashSelected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: isCashSelected
+                                          ? FinDT.brand
+                                          : FinDT.textPrimary,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              SizedBox(width: 6.w),
+                              SizedBox(height: 3.h),
                               Text(
-                                'Physical Cash',
+                                (isCashSelected && enteredAmount > 0)
+                                    ? 'Avail: ${currencyFormat.format(selectedAcc.cashBalance)} → ${currencyFormat.format(cashRemaining)}'
+                                    : 'Avail: ${selectedAcc.currency} ${currencyFormat.format(selectedAcc.cashBalance)}',
                                 style: GoogleFonts.inter(
-                                  fontSize: 12.sp,
-                                  fontWeight: _paymentMethod == 'cash'
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: _paymentMethod == 'cash'
-                                      ? FinDT.brand
-                                      : FinDT.textPrimary,
+                                  fontSize: 10.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: selectedAcc.cashBalance >= 0
+                                      ? (isCashSelected
+                                          ? FinDT.brand
+                                          : FinDT.textSecondary)
+                                      : FinDT.danger,
                                 ),
                               ),
                             ],
                           ),
-                          SizedBox(height: 3.h),
-                          Text(
-                            'Avail: ${selectedAcc.currency} ${currencyFormat.format(selectedAcc.cashBalance)}',
-                            style: GoogleFonts.inter(
-                              fontSize: 10.sp,
-                              fontWeight: FontWeight.w600,
-                              color: selectedAcc.cashBalance >= 0
-                                  ? (_paymentMethod == 'cash'
-                                      ? FinDT.brand
-                                      : FinDT.textSecondary)
-                                  : FinDT.danger,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: InkWell(
-                    onTap: () => setState(() => _paymentMethod = 'stcPay'),
-                    borderRadius: BorderRadius.circular(10.r),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: EdgeInsets.symmetric(
-                          vertical: 10.h, horizontal: 12.w),
-                      decoration: BoxDecoration(
-                        color: _paymentMethod == 'stcPay'
-                            ? const Color(0xFF6D28D9).withValues(alpha: 0.1)
-                            : FinDT.bgPage,
-                        borderRadius: BorderRadius.circular(10.r),
-                        border: Border.all(
-                          color: _paymentMethod == 'stcPay'
-                              ? const Color(0xFF6D28D9)
-                              : FinDT.border,
-                          width: _paymentMethod == 'stcPay' ? 1.5 : 1,
                         ),
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _paymentMethod = 'stcPay'),
+                        borderRadius: BorderRadius.circular(10.r),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: EdgeInsets.symmetric(
+                              vertical: 10.h, horizontal: 12.w),
+                          decoration: BoxDecoration(
+                            color: !isCashSelected
+                                ? const Color(0xFF6D28D9).withValues(alpha: 0.1)
+                                : FinDT.bgPage,
+                            borderRadius: BorderRadius.circular(10.r),
+                            border: Border.all(
+                              color: !isCashSelected
+                                  ? const Color(0xFF6D28D9)
+                                  : FinDT.border,
+                              width: !isCashSelected ? 1.5 : 1,
+                            ),
+                          ),
+                          child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.phone_android_outlined,
-                                size: 15.sp,
-                                color: _paymentMethod == 'stcPay'
-                                    ? const Color(0xFF6D28D9)
-                                    : FinDT.textSecondary,
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.phone_android_outlined,
+                                    size: 15.sp,
+                                    color: !isCashSelected
+                                        ? const Color(0xFF6D28D9)
+                                        : FinDT.textSecondary,
+                                  ),
+                                  SizedBox(width: 6.w),
+                                  Text(
+                                    'STC Pay',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.sp,
+                                      fontWeight: !isCashSelected
+                                          ? FontWeight.w700
+                                          : FontWeight.w500,
+                                      color: !isCashSelected
+                                          ? const Color(0xFF6D28D9)
+                                          : FinDT.textPrimary,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              SizedBox(width: 6.w),
+                              SizedBox(height: 3.h),
                               Text(
-                                'STC Pay',
+                                (!isCashSelected && enteredAmount > 0)
+                                    ? 'Avail: ${currencyFormat.format(selectedAcc.stcPayBalance)} → ${currencyFormat.format(stcRemaining)}'
+                                    : 'Avail: ${selectedAcc.currency} ${currencyFormat.format(selectedAcc.stcPayBalance)}',
                                 style: GoogleFonts.inter(
-                                  fontSize: 12.sp,
-                                  fontWeight: _paymentMethod == 'stcPay'
-                                      ? FontWeight.w700
-                                      : FontWeight.w500,
-                                  color: _paymentMethod == 'stcPay'
-                                      ? const Color(0xFF6D28D9)
-                                      : FinDT.textPrimary,
+                                  fontSize: 10.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: selectedAcc.stcPayBalance >= 0
+                                      ? (!isCashSelected
+                                          ? const Color(0xFF6D28D9)
+                                          : FinDT.textSecondary)
+                                      : FinDT.danger,
                                 ),
                               ),
                             ],
                           ),
-                          SizedBox(height: 3.h),
-                          Text(
-                            'Avail: ${selectedAcc.currency} ${currencyFormat.format(selectedAcc.stcPayBalance)}',
-                            style: GoogleFonts.inter(
-                              fontSize: 10.sp,
-                              fontWeight: FontWeight.w600,
-                              color: selectedAcc.stcPayBalance >= 0
-                                  ? (_paymentMethod == 'stcPay'
-                                      ? const Color(0xFF6D28D9)
-                                      : FinDT.textSecondary)
-                                  : FinDT.danger,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           ),
         ],
       ],
@@ -998,13 +1012,13 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   ) {
     final isPettyCash = account.isPettyCash;
     final enteredAmount = double.tryParse(_amountController.text) ?? 0.0;
+    final isCashSelected = _paymentMethod == 'cash';
     final relevantBalance = isPettyCash
-        ? (_paymentMethod == 'cash'
-            ? account.cashBalance
-            : account.stcPayBalance)
+        ? (isCashSelected ? account.cashBalance : account.stcPayBalance)
         : account.currentBalance;
     final isOverBalance = enteredAmount > 0 && enteredAmount > relevantBalance;
     final remaining = relevantBalance - enteredAmount;
+    final totalRemaining = account.currentBalance - enteredAmount;
 
     return Container(
       width: double.infinity,
@@ -1068,67 +1082,110 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
             Row(
               children: [
                 Expanded(
-                  child: Row(
-                    children: [
-                      Icon(Icons.payments_outlined,
-                          size: 13.sp, color: FinDT.brand),
-                      SizedBox(width: 4.w),
-                      Text(
-                        'Cash: ',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.sp,
-                          color: FinDT.textSecondary,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 4.h),
+                    decoration: BoxDecoration(
+                      color: isCashSelected
+                          ? FinDT.brand.withValues(alpha: 0.08)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(6.r),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.payments_outlined,
+                          size: 13.sp,
+                          color: isCashSelected ? FinDT.brand : FinDT.textSecondary,
                         ),
-                      ),
-                      Flexible(
-                        child: Text(
-                          '${account.currency} ${currencyFormat.format(account.cashBalance)}',
+                        SizedBox(width: 4.w),
+                        Text(
+                          'Cash: ',
                           style: GoogleFonts.inter(
                             fontSize: 11.sp,
-                            fontWeight: FontWeight.w700,
-                            color: account.cashBalance >= 0
-                                ? FinDT.textPrimary
-                                : FinDT.danger,
+                            fontWeight:
+                                isCashSelected ? FontWeight.w700 : FontWeight.w500,
+                            color:
+                                isCashSelected ? FinDT.brand : FinDT.textSecondary,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                        Flexible(
+                          child: Text(
+                            (isCashSelected && enteredAmount > 0)
+                                ? '${account.currency} ${currencyFormat.format(account.cashBalance)} → ${currencyFormat.format(remaining)}'
+                                : '${account.currency} ${currencyFormat.format(account.cashBalance)}',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.sp,
+                              fontWeight: FontWeight.w700,
+                              color: (isCashSelected && enteredAmount > 0)
+                                  ? (remaining >= 0 ? FinDT.brand : FinDT.danger)
+                                  : (account.cashBalance >= 0
+                                      ? FinDT.textPrimary
+                                      : FinDT.danger),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 Container(
-                  height: 12.h,
+                  height: 14.h,
                   width: 1,
                   color: FinDT.border,
                 ),
-                SizedBox(width: 10.w),
+                SizedBox(width: 8.w),
                 Expanded(
-                  child: Row(
-                    children: [
-                      Icon(Icons.phone_android_outlined,
-                          size: 13.sp, color: const Color(0xFF6D28D9)),
-                      SizedBox(width: 4.w),
-                      Text(
-                        'STC Pay: ',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.sp,
-                          color: FinDT.textSecondary,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 4.h),
+                    decoration: BoxDecoration(
+                      color: !isCashSelected
+                          ? const Color(0xFF6D28D9).withValues(alpha: 0.08)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(6.r),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.phone_android_outlined,
+                          size: 13.sp,
+                          color: !isCashSelected
+                              ? const Color(0xFF6D28D9)
+                              : FinDT.textSecondary,
                         ),
-                      ),
-                      Flexible(
-                        child: Text(
-                          '${account.currency} ${currencyFormat.format(account.stcPayBalance)}',
+                        SizedBox(width: 4.w),
+                        Text(
+                          'STC Pay: ',
                           style: GoogleFonts.inter(
                             fontSize: 11.sp,
-                            fontWeight: FontWeight.w700,
-                            color: account.stcPayBalance >= 0
-                                ? FinDT.textPrimary
-                                : FinDT.danger,
+                            fontWeight:
+                                !isCashSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: !isCashSelected
+                                ? const Color(0xFF6D28D9)
+                                : FinDT.textSecondary,
                           ),
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
+                        Flexible(
+                          child: Text(
+                            (!isCashSelected && enteredAmount > 0)
+                                ? '${account.currency} ${currencyFormat.format(account.stcPayBalance)} → ${currencyFormat.format(remaining)}'
+                                : '${account.currency} ${currencyFormat.format(account.stcPayBalance)}',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.sp,
+                              fontWeight: FontWeight.w700,
+                              color: (!isCashSelected && enteredAmount > 0)
+                                  ? (remaining >= 0
+                                      ? const Color(0xFF6D28D9)
+                                      : FinDT.danger)
+                                  : (account.stcPayBalance >= 0
+                                      ? FinDT.textPrimary
+                                      : FinDT.danger),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -1144,6 +1201,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
             ),
             SizedBox(height: 8.h),
             Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Icon(
                   isOverBalance
@@ -1154,19 +1212,55 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                 ),
                 SizedBox(width: 6.w),
                 Expanded(
-                  child: Text(
-                    isOverBalance
-                        ? 'Expense amount (${currencyFormat.format(enteredAmount)}) exceeds ${isPettyCash ? (_paymentMethod == "cash" ? "Physical Cash" : "STC Pay") : "available"} balance (${currencyFormat.format(relevantBalance)})'
-                        : 'Projected balance after expense: ${account.currency} ${currencyFormat.format(remaining)}',
-                    style: GoogleFonts.inter(
-                      fontSize: 11.sp,
-                      fontWeight:
-                          isOverBalance ? FontWeight.w600 : FontWeight.w500,
-                      color: isOverBalance
-                          ? FinDT.danger
-                          : const Color(0xFF166534),
-                    ),
-                  ),
+                  child: isOverBalance
+                      ? Text(
+                          'Expense amount (${currencyFormat.format(enteredAmount)}) exceeds ${isPettyCash ? (isCashSelected ? "Physical Cash" : "STC Pay") : "available"} balance (${currencyFormat.format(relevantBalance)})',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w600,
+                            color: FinDT.danger,
+                          ),
+                        )
+                      : (isPettyCash
+                          ? RichText(
+                              text: TextSpan(
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.sp,
+                                  color: const Color(0xFF166534),
+                                ),
+                                children: [
+                                  TextSpan(
+                                    text:
+                                        'Projected ${isCashSelected ? "Physical Cash" : "STC Pay"}: ',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w500),
+                                  ),
+                                  TextSpan(
+                                    text:
+                                        '${account.currency} ${currencyFormat.format(remaining)}',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700),
+                                  ),
+                                  TextSpan(
+                                    text:
+                                        '  •  Total Remaining: ${account.currency} ${currencyFormat.format(totalRemaining)}',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF166534)
+                                          .withValues(alpha: 0.85),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Text(
+                              'Projected balance after expense: ${account.currency} ${currencyFormat.format(remaining)}',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.sp,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF166534),
+                              ),
+                            )),
                 ),
               ],
             ),

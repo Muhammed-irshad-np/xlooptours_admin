@@ -101,6 +101,9 @@ class FundAccountProvider with ChangeNotifier {
       if (types.isNotEmpty) {
         _accountTypes = types;
       }
+      if (_selectedAccountId != null) {
+        await fetchTransactions(_selectedAccountId!);
+      }
     } catch (e) {
       _error = e.toString();
       debugPrint('Error fetching fund accounts: $e');
@@ -355,6 +358,8 @@ class FundAccountProvider with ChangeNotifier {
     required String description,
     required String performedBy,
     required String performedByUserId,
+    FundBucket fromBucket = FundBucket.total,
+    FundBucket toBucket = FundBucket.total,
   }) async {
     _error = null;
     try {
@@ -366,6 +371,8 @@ class FundAccountProvider with ChangeNotifier {
         description: description,
         performedBy: performedBy,
         performedByUserId: performedByUserId,
+        fromBucket: fromBucket,
+        toBucket: toBucket,
       );
       await fetchAllAccounts();
       if (_selectedAccountId != null) {

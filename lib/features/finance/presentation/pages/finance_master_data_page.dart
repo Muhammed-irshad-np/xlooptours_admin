@@ -456,60 +456,79 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
   void _showAddCategoryDialog(BuildContext context, FinanceProvider provider) {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController();
+    bool isCreating = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: finDialogShape,
-        title: finDialogTitle('New Expense Category', icon: Icons.category_outlined),
-        content: SizedBox(
-          width: 380.w,
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(height: 8.h),
-                TextFormField(
-                  controller: nameCtrl,
-                  decoration: finDialogInputDecoration(
-                    label: 'Category Name *',
-                    hint: 'e.g. MARKETING, IT INFRASTRUCTURE',
-                    prefixIcon: Icons.edit_outlined,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle('New Expense Category', icon: Icons.category_outlined),
+          content: SizedBox(
+            width: 380.w,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: 8.h),
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: finDialogInputDecoration(
+                      label: 'Category Name *',
+                      hint: 'e.g. MARKETING, IT INFRASTRUCTURE',
+                      prefixIcon: Icons.edit_outlined,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Required';
+                      if (provider.categories.any(
+                          (c) => c.name.toUpperCase() == v.trim().toUpperCase())) {
+                        return 'Category already exists';
+                      }
+                      return null;
+                    },
                   ),
-                  style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) return 'Required';
-                    if (provider.categories.any(
-                        (c) => c.name.toUpperCase() == v.trim().toUpperCase())) {
-                      return 'Category already exists';
-                    }
-                    return null;
-                  },
-                ),
-              ],
+                ],
+              ),
             ),
           ),
+          actions: [
+            finDialogCancelButton(
+              ctx,
+              onPressed: isCreating ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final cat = ExpenseCategoryEntity(
+                  id: const Uuid().v4(),
+                  name: nameCtrl.text.trim().toUpperCase(),
+                  createdAt: DateTime.now(),
+                );
+
+                setDialogState(() => isCreating = true);
+                try {
+                  await provider.insertCategory(cat);
+                  if (ctx.mounted) finSafePop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isCreating = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
+                    );
+                  }
+                }
+              },
+              label: 'Create Category',
+              backgroundColor: FinDT.brand,
+              isLoading: isCreating,
+            ),
+          ],
         ),
-        actions: [
-          finDialogCancelButton(ctx),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              final cat = ExpenseCategoryEntity(
-                id: const Uuid().v4(),
-                name: nameCtrl.text.trim().toUpperCase(),
-                createdAt: DateTime.now(),
-              );
-              finSafePop(ctx);
-              provider.insertCategory(cat);
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
-            child: const Text('Create Category'),
-          ),
-        ],
       ),
     );
   }
@@ -800,143 +819,143 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
     final nameCtrl = TextEditingController(text: typeToEdit?.name);
     final prefixCtrl = TextEditingController(text: typeToEdit?.codePrefix);
     final descCtrl = TextEditingController(text: typeToEdit?.description);
+    bool isSaving = false;
 
     return showDialog<FundAccountTypeEntity?>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: finDialogShape,
-        title: finDialogTitle(
-          isEditing ? 'Edit Account Type' : 'New Account Type',
-          icon: Icons.category_outlined,
-        ),
-        content: SizedBox(
-          width: 380.w,
-          child: SingleChildScrollView(
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  SizedBox(height: 8.h),
-                  TextFormField(
-                    controller: nameCtrl,
-                    decoration: finDialogInputDecoration(
-                      label: 'Account Type Name *',
-                      hint: 'e.g. Driver Account, Fuel Card',
-                      prefixIcon: Icons.edit_outlined,
-                    ),
-                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                    onChanged: (val) {
-                      if (!isEditing && prefixCtrl.text.trim().isEmpty && val.trim().isNotEmpty) {
-                        final words = val.trim().split(RegExp(r'\s+'));
-                        String autoPrefix = '';
-                        if (words.length == 1) {
-                          autoPrefix = val.trim().substring(0, val.trim().length.clamp(0, 3)).toUpperCase();
-                        } else {
-                          autoPrefix = words.take(3).map((w) => w[0]).join().toUpperCase();
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle(
+            isEditing ? 'Edit Account Type' : 'New Account Type',
+            icon: Icons.category_outlined,
+          ),
+          content: SizedBox(
+            width: 380.w,
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(height: 8.h),
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: finDialogInputDecoration(
+                        label: 'Account Type Name *',
+                        hint: 'e.g. Driver Account, Fuel Card',
+                        prefixIcon: Icons.edit_outlined,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      onChanged: (val) {
+                        if (!isEditing && prefixCtrl.text.trim().isEmpty && val.trim().isNotEmpty) {
+                          final words = val.trim().split(RegExp(r'\s+'));
+                          String autoPrefix = '';
+                          if (words.length == 1) {
+                            autoPrefix = val.trim().substring(0, val.trim().length.clamp(0, 3)).toUpperCase();
+                          } else {
+                            autoPrefix = words.take(3).map((w) => w[0]).join().toUpperCase();
+                          }
+                          prefixCtrl.text = autoPrefix;
                         }
-                        prefixCtrl.text = autoPrefix;
-                      }
-                    },
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Name required';
-                      final exists = provider.accountTypes.any((t) =>
-                          t.name.toLowerCase() == v.trim().toLowerCase() &&
-                          t.id != typeToEdit?.id);
-                      if (exists) return 'An account type with this name already exists';
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 14.h),
-                  TextFormField(
-                    controller: prefixCtrl,
-                    textCapitalization: TextCapitalization.characters,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
-                      LengthLimitingTextInputFormatter(6),
-                    ],
-                    decoration: finDialogInputDecoration(
-                      label: 'Code Prefix * (e.g. DRV, PC, BNK)',
-                      hint: 'e.g. DRV',
-                      prefixIcon: Icons.qr_code_rounded,
+                      },
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Name required';
+                        final exists = provider.accountTypes.any((t) =>
+                            t.name.toLowerCase() == v.trim().toLowerCase() &&
+                            t.id != typeToEdit?.id);
+                        if (exists) return 'An account type with this name already exists';
+                        return null;
+                      },
                     ),
-                    style: GoogleFonts.inter(
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 1.0,
-                      color: FinDT.textPrimary,
+                    SizedBox(height: 14.h),
+                    TextFormField(
+                      controller: prefixCtrl,
+                      textCapitalization: TextCapitalization.characters,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9]')),
+                        LengthLimitingTextInputFormatter(6),
+                      ],
+                      decoration: finDialogInputDecoration(
+                        label: 'Code Prefix * (e.g. DRV, PC, BNK)',
+                        hint: 'e.g. DRV',
+                        prefixIcon: Icons.qr_code_rounded,
+                      ),
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.0,
+                        color: FinDT.textPrimary,
+                      ),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return 'Code prefix required';
+                        if (v.trim().length < 2) return 'At least 2 characters';
+                        return null;
+                      },
                     ),
-                    validator: (v) {
-                      if (v == null || v.trim().isEmpty) return 'Code prefix required';
-                      if (v.trim().length < 2) return 'At least 2 characters';
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 14.h),
-                  TextFormField(
-                    controller: descCtrl,
-                    maxLines: 2,
-                    decoration: finDialogInputDecoration(
-                      label: 'Description (Optional)',
-                      hint: 'e.g. Float allocated to active operational drivers',
-                      prefixIcon: Icons.description_outlined,
+                    SizedBox(height: 14.h),
+                    TextFormField(
+                      controller: descCtrl,
+                      maxLines: 2,
+                      decoration: finDialogInputDecoration(
+                        label: 'Description (Optional)',
+                        hint: 'e.g. Float allocated to active operational drivers',
+                        prefixIcon: Icons.description_outlined,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
                     ),
-                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        actions: [
-          finDialogCancelButton(ctx),
-          FilledButton(
-            onPressed: () async {
-              if (!formKey.currentState!.validate()) return;
-              final newType = FundAccountTypeEntity(
-                id: isEditing ? typeToEdit.id : const Uuid().v4(),
-                name: nameCtrl.text.trim(),
-                codePrefix: prefixCtrl.text.trim().toUpperCase(),
-                description: descCtrl.text.trim().isNotEmpty ? descCtrl.text.trim() : null,
-                isSystemDefault: typeToEdit?.isSystemDefault ?? false,
-                isActive: true,
-                createdAt: typeToEdit?.createdAt ?? DateTime.now(),
-              );
+          actions: [
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSaving ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final newType = FundAccountTypeEntity(
+                  id: isEditing ? typeToEdit.id : const Uuid().v4(),
+                  name: nameCtrl.text.trim(),
+                  codePrefix: prefixCtrl.text.trim().toUpperCase(),
+                  description: descCtrl.text.trim().isNotEmpty ? descCtrl.text.trim() : null,
+                  isSystemDefault: typeToEdit?.isSystemDefault ?? false,
+                  isActive: true,
+                  createdAt: typeToEdit?.createdAt ?? DateTime.now(),
+                );
 
-              finSafePop(ctx, newType);
-
-              try {
-                if (isEditing) {
-                  await provider.updateAccountType(newType);
-                } else {
-                  await provider.insertAccountType(newType);
+                setDialogState(() => isSaving = true);
+                try {
+                  if (isEditing) {
+                    await provider.updateAccountType(newType);
+                  } else {
+                    await provider.insertAccountType(newType);
+                  }
+                  if (ctx.mounted) finSafePop(ctx, newType);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isSaving = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error saving account type: $e'),
+                        backgroundColor: FinDT.danger,
+                      ),
+                    );
+                  }
                 }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Error saving account type: $e'),
-                      backgroundColor: FinDT.danger,
-                    ),
-                  );
-                }
-              }
-            },
-            style: FilledButton.styleFrom(
+              },
+              label: isEditing ? 'Save Changes' : 'Create Type',
               backgroundColor: FinDT.brand,
-              padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 11.h),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10.r),
-              ),
+              isLoading: isSaving,
             ),
-            child: Text(
-              isEditing ? 'Save Changes' : 'Create Type',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1128,9 +1147,11 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
     final nameCtrl = TextEditingController();
     String duration = 'MONTHLY';
     String role = 'ADMIN';
+    bool isAdding = false;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
           backgroundColor: Colors.white,
@@ -1186,9 +1207,12 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
             ),
           ),
           actions: [
-            finDialogCancelButton(ctx),
-            FilledButton(
-              onPressed: () {
+            finDialogCancelButton(
+              ctx,
+              onPressed: isAdding ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
                 final newType = ExpenseTypeEntity(
                   id: const Uuid().v4(),
@@ -1199,11 +1223,22 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
                 final updatedCat = widget.category.copyWith(
                   expenseTypes: [...widget.category.expenseTypes, newType],
                 );
-                finSafePop(ctx);
-                widget.provider.updateCategory(updatedCat);
+                setDialogState(() => isAdding = true);
+                try {
+                  await widget.provider.updateCategory(updatedCat);
+                  if (ctx.mounted) finSafePop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isAdding = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
+                    );
+                  }
+                }
               },
-              style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
-              child: const Text('Add Type'),
+              label: 'Add Type',
+              backgroundColor: FinDT.brand,
+              isLoading: isAdding,
             ),
           ],
         ),
@@ -1229,15 +1264,14 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
       confirmColor: FinDT.danger,
       icon: Icons.delete_outline_rounded,
       iconColor: FinDT.danger,
-    ).then((ok) {
-      if (ok == true) {
+      onConfirm: () async {
         _removeType(type.id);
-      }
-    });
+      },
+    );
   }
 
   Future<void> _confirmDeleteCategory(BuildContext context) async {
-    final confirm = await showFinConfirmationDialog(
+    await showFinConfirmationDialog(
       context: context,
       title: 'Delete Category?',
       message:
@@ -1248,10 +1282,9 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
       confirmColor: FinDT.danger,
       icon: Icons.delete_outline_rounded,
       iconColor: FinDT.danger,
+      onConfirm: () async {
+        await widget.provider.deleteCategory(widget.category.id);
+      },
     );
-
-    if (confirm == true) {
-      widget.provider.deleteCategory(widget.category.id);
-    }
   }
 }
