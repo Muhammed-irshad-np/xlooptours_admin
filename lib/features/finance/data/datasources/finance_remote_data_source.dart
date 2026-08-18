@@ -954,17 +954,42 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       double toCash = to.cashBalance;
       double toStc = to.stcPayBalance;
 
-      if (fromBucket == FundBucket.cash) {
-        if (fromCash + 1e-9 < amount) throw StateError('Insufficient cash');
-        fromCash -= amount;
-      } else if (fromBucket == FundBucket.stcPay) {
-        if (fromStc + 1e-9 < amount) throw StateError('Insufficient STC');
-        fromStc -= amount;
+      if (from.isPettyCash) {
+        if (fromBucket == FundBucket.cash) {
+          if (fromCash + 1e-9 < amount) throw StateError('Insufficient Physical Cash balance on source account');
+          fromCash -= amount;
+        } else if (fromBucket == FundBucket.stcPay) {
+          if (fromStc + 1e-9 < amount) throw StateError('Insufficient STC Pay balance on source account');
+          fromStc -= amount;
+        } else {
+          if (fromCash >= amount) {
+            fromCash -= amount;
+          } else if (fromStc >= amount) {
+            fromStc -= amount;
+          } else {
+            fromCash = (fromCash - amount).clamp(0.0, double.infinity);
+          }
+        }
+      } else {
+        if (fromBucket == FundBucket.cash) {
+          fromCash -= amount;
+        } else if (fromBucket == FundBucket.stcPay) {
+          fromStc -= amount;
+        }
       }
-      if (toBucket == FundBucket.cash) {
-        toCash += amount;
-      } else if (toBucket == FundBucket.stcPay) {
-        toStc += amount;
+
+      if (to.isPettyCash) {
+        if (toBucket == FundBucket.stcPay) {
+          toStc += amount;
+        } else {
+          toCash += amount;
+        }
+      } else {
+        if (toBucket == FundBucket.cash) {
+          toCash += amount;
+        } else if (toBucket == FundBucket.stcPay) {
+          toStc += amount;
+        }
       }
 
       final now = DateTime.now();

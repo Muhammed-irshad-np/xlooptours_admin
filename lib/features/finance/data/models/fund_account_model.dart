@@ -102,10 +102,21 @@ class FundAccountModel extends FundAccountEntity {
       assignedTo: json['assignedTo'] as String?,
       assignedToId: json['assignedToId'] as String?,
       isActive: json['isActive'] as bool? ?? true,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : DateTime.now(),
+      createdAt: _parseDateTime(json['createdAt']) ?? DateTime.now(),
     );
+  }
+
+  static DateTime? _parseDateTime(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    if (val is String) return DateTime.tryParse(val);
+    try {
+      final dynamic d = val;
+      if (d.toDate != null) {
+        return (d.toDate() as DateTime);
+      }
+    } catch (_) {}
+    return null;
   }
 
   factory FundAccountModel.fromEntity(FundAccountEntity entity) {

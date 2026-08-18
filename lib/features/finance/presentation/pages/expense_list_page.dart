@@ -840,7 +840,7 @@ class _ExpenseDataTable extends StatelessWidget {
     }
 
     if (!context.mounted) return;
-    final ok = await showFinConfirmationDialog(
+    await showFinConfirmationDialog(
       context: context,
       title: postsMoney ? 'Approve & Pay Expense?' : 'Approve Expense?',
       message: postsMoney
@@ -852,44 +852,44 @@ class _ExpenseDataTable extends StatelessWidget {
       confirmLabel: postsMoney ? 'Approve & Pay' : 'Approve',
       confirmColor: FinDT.success,
       icon: Icons.check_circle_outline_rounded,
+      onConfirm: () async {
+        final finProv = context.read<FinanceProvider>();
+        try {
+          await finProv.approveExpense(
+            expenseId: expense.id,
+            actorName: user.actorLabel,
+            actorUserId: user.id,
+            actorRole: user.role.name,
+            allowSelfApprove: user.isAdmin,
+          );
+          await fundProv.fetchAllAccounts();
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  postsMoney
+                      ? 'Approved and paid from wallet'
+                      : 'Expense approved',
+                ),
+                backgroundColor: FinDT.success,
+              ),
+            );
+          }
+        } catch (e) {
+          if (context.mounted) {
+            final msg = _friendlyError(e);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(msg),
+                backgroundColor: FinDT.danger,
+                duration: const Duration(seconds: 6),
+              ),
+            );
+          }
+          rethrow;
+        }
+      },
     );
-    if (ok != true || !context.mounted) return;
-
-    final finProv = context.read<FinanceProvider>();
-
-    try {
-      await finProv.approveExpense(
-        expenseId: expense.id,
-        actorName: user.actorLabel,
-        actorUserId: user.id,
-        actorRole: user.role.name,
-        allowSelfApprove: user.isAdmin,
-      );
-      unawaited(fundProv.fetchAllAccounts());
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              postsMoney
-                  ? 'Approved and paid from wallet'
-                  : 'Expense approved',
-            ),
-            backgroundColor: FinDT.success,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        final msg = _friendlyError(e);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(msg),
-            backgroundColor: FinDT.danger,
-            duration: const Duration(seconds: 6),
-          ),
-        );
-      }
-    }
   }
 
   String _friendlyError(Object e) {
@@ -911,70 +911,81 @@ class _ExpenseDataTable extends StatelessWidget {
     final user = context.read<AuthProvider>().user;
     if (user == null) return;
     final controller = TextEditingController();
+    bool isRejecting = false;
 
-    final ok = await showDialog<bool>(
+    showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: finDialogShape,
-        title: finDialogTitle('Reject Expense?', icon: Icons.cancel_outlined, iconColor: FinDT.danger),
-        content: SizedBox(
-          width: 420.w,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Reject expense ${expense.referenceNumber} (${expense.expenseType} - ${expense.amount} ${expense.currency})?',
-                style: GoogleFonts.inter(fontSize: 13.sp, color: FinDT.textSecondary, height: 1.4),
-              ),
-              SizedBox(height: 14.h),
-              TextField(
-                controller: controller,
-                maxLines: 2,
-                decoration: finDialogInputDecoration(
-                  label: 'Rejection Reason *',
-                  hint: 'Explain why this expense is being rejected...',
-                  prefixIcon: Icons.edit_note_rounded,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle('Reject Expense?', icon: Icons.cancel_outlined, iconColor: FinDT.danger),
+          content: SizedBox(
+            width: 420.w,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Reject expense ${expense.referenceNumber} (${expense.expenseType} - ${expense.amount} ${expense.currency})?',
+                  style: GoogleFonts.inter(fontSize: 13.sp, color: FinDT.textSecondary, height: 1.4),
                 ),
-                style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-              ),
-            ],
+                SizedBox(height: 14.h),
+                TextField(
+                  controller: controller,
+                  maxLines: 2,
+                  decoration: finDialogInputDecoration(
+                    label: 'Rejection Reason *',
+                    hint: 'Explain why this expense is being rejected...',
+                    prefixIcon: Icons.edit_note_rounded,
+                  ),
+                  style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                ),
+              ],
+            ),
           ),
+          actions: [
+            finDialogCancelButton(
+              ctx,
+              onPressed: isRejecting ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
+                if (controller.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Rejection reason is required')),
+                  );
+                  return;
+                }
+
+                setDialogState(() => isRejecting = true);
+                try {
+                  await context.read<FinanceProvider>().rejectExpense(
+                        expenseId: expense.id,
+                        actorName: user.actorLabel,
+                        actorUserId: user.id,
+                        reason: controller.text.trim(),
+                      );
+                  if (ctx.mounted) Navigator.pop(ctx, true);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isRejecting = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
+                    );
+                  }
+                }
+              },
+              label: 'Reject Expense',
+              backgroundColor: FinDT.danger,
+              isLoading: isRejecting,
+            ),
+          ],
         ),
-        actions: [
-          finDialogCancelButton(ctx),
-          finDialogActionButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            label: 'Reject Expense',
-            backgroundColor: FinDT.danger,
-          ),
-        ],
       ),
     );
-    if (ok != true || !context.mounted) return;
-    if (controller.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Rejection reason is required')),
-      );
-      return;
-    }
-
-    try {
-      await context.read<FinanceProvider>().rejectExpense(
-            expenseId: expense.id,
-            actorName: user.actorLabel,
-            actorUserId: user.id,
-            reason: controller.text.trim(),
-          );
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
-        );
-      }
-    }
   }
 
   Future<void> _confirmVoid(
@@ -984,81 +995,92 @@ class _ExpenseDataTable extends StatelessWidget {
     final user = context.read<AuthProvider>().user;
     if (user == null) return;
     final controller = TextEditingController();
+    bool isVoiding = false;
 
-    final ok = await showDialog<bool>(
+    showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: finDialogShape,
-        title: finDialogTitle('Void Paid Expense?', icon: Icons.restart_alt_rounded, iconColor: const Color(0xFF7C3AED)),
-        content: SizedBox(
-          width: 420.w,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: EdgeInsets.all(12.w),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.25)),
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle('Void Paid Expense?', icon: Icons.restart_alt_rounded, iconColor: const Color(0xFF7C3AED)),
+          content: SizedBox(
+            width: 420.w,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.25)),
+                  ),
+                  child: Text(
+                    'This reverses the wallet payment for ${expense.referenceNumber} (${expense.amount} ${expense.currency}) and keeps full audit history.',
+                    style: GoogleFonts.inter(fontSize: 12.sp, color: const Color(0xFF7C3AED), height: 1.4),
+                  ),
                 ),
-                child: Text(
-                  'This reverses the wallet payment for ${expense.referenceNumber} (${expense.amount} ${expense.currency}) and keeps full audit history.',
-                  style: GoogleFonts.inter(fontSize: 12.sp, color: const Color(0xFF7C3AED), height: 1.4),
+                SizedBox(height: 14.h),
+                TextField(
+                  controller: controller,
+                  maxLines: 2,
+                  decoration: finDialogInputDecoration(
+                    label: 'Void Reason *',
+                    hint: 'Explain why this payment is being voided...',
+                    prefixIcon: Icons.edit_note_rounded,
+                  ),
+                  style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
                 ),
-              ),
-              SizedBox(height: 14.h),
-              TextField(
-                controller: controller,
-                maxLines: 2,
-                decoration: finDialogInputDecoration(
-                  label: 'Void Reason *',
-                  hint: 'Explain why this payment is being voided...',
-                  prefixIcon: Icons.edit_note_rounded,
-                ),
-                style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-              ),
-            ],
+              ],
+            ),
           ),
+          actions: [
+            finDialogCancelButton(
+              ctx,
+              onPressed: isVoiding ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
+                if (controller.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Void reason is required')),
+                  );
+                  return;
+                }
+
+                setDialogState(() => isVoiding = true);
+                try {
+                  await context.read<FinanceProvider>().voidExpense(
+                        expenseId: expense.id,
+                        actorName: user.actorLabel,
+                        actorUserId: user.id,
+                        reason: controller.text.trim(),
+                      );
+                  if (context.mounted) {
+                    await context.read<FundAccountProvider>().fetchAllAccounts();
+                  }
+                  if (ctx.mounted) Navigator.pop(ctx, true);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isVoiding = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
+                    );
+                  }
+                }
+              },
+              label: 'Void & Reverse',
+              backgroundColor: const Color(0xFF7C3AED),
+              isLoading: isVoiding,
+            ),
+          ],
         ),
-        actions: [
-          finDialogCancelButton(ctx),
-          finDialogActionButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            label: 'Void & Reverse',
-            backgroundColor: const Color(0xFF7C3AED),
-          ),
-        ],
       ),
     );
-    if (ok != true || !context.mounted) return;
-    if (controller.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Void reason is required')),
-      );
-      return;
-    }
-
-    try {
-      await context.read<FinanceProvider>().voidExpense(
-            expenseId: expense.id,
-            actorName: user.actorLabel,
-            actorUserId: user.id,
-            reason: controller.text.trim(),
-          );
-      if (context.mounted) {
-        await context.read<FundAccountProvider>().fetchAllAccounts();
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
-        );
-      }
-    }
   }
 
   Future<void> _confirmDelete(
@@ -1074,24 +1096,21 @@ class _ExpenseDataTable extends StatelessWidget {
       return;
     }
 
-    final ok = await showFinConfirmationDialog(
+    await showFinConfirmationDialog(
       context: context,
       title: 'Delete Draft Expense?',
       message: 'Delete ${expense.referenceNumber}? Only draft and pending expenses can be deleted before payment.',
       confirmLabel: 'Delete Expense',
       confirmColor: FinDT.danger,
       icon: Icons.delete_outline_rounded,
+      onConfirm: () async {
+        await context.read<FinanceProvider>().deleteExpense(expense.id);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Expense deleted')),
+          );
+        }
+      },
     );
-    if (ok != true || !context.mounted) return;
-
-    try {
-      await context.read<FinanceProvider>().deleteExpense(expense.id);
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
-        );
-      }
-    }
   }
 }

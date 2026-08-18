@@ -102,13 +102,9 @@ class ExpenseModel extends ExpenseEntity {
     return ExpenseModel(
       id: json['id'] as String,
       referenceNumber: json['referenceNumber'] as String? ?? '',
-      date: DateTime.parse(json['date'] as String),
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'] as String)
-          : null,
+      date: _parseDateTime(json['date']) ?? DateTime.now(),
+      createdAt: _parseDateTime(json['createdAt']) ?? DateTime.now(),
+      updatedAt: _parseDateTime(json['updatedAt']),
       submittedBy: json['submittedBy'] as String? ?? '',
       submittedByRole: json['submittedByRole'] as String? ?? '',
       submittedByUserId: json['submittedByUserId'] as String?,
@@ -140,25 +136,32 @@ class ExpenseModel extends ExpenseEntity {
       country: json['country'] as String?,
       approvedBy: json['approvedBy'] as String?,
       approvedByUserId: json['approvedByUserId'] as String?,
-      approvedAt: json['approvedAt'] != null
-          ? DateTime.parse(json['approvedAt'] as String)
-          : null,
+      approvedAt: _parseDateTime(json['approvedAt']),
       rejectionReason: json['rejectionReason'] as String?,
       ledgerEntryId: json['ledgerEntryId'] as String?,
       paidBy: json['paidBy'] as String?,
       paidByUserId: json['paidByUserId'] as String?,
-      paidAt: json['paidAt'] != null
-          ? DateTime.parse(json['paidAt'] as String)
-          : null,
+      paidAt: _parseDateTime(json['paidAt']),
       voidedBy: json['voidedBy'] as String?,
       voidedByUserId: json['voidedByUserId'] as String?,
-      voidedAt: json['voidedAt'] != null
-          ? DateTime.parse(json['voidedAt'] as String)
-          : null,
+      voidedAt: _parseDateTime(json['voidedAt']),
       voidReason: json['voidReason'] as String?,
       reverseLedgerEntryId: json['reverseLedgerEntryId'] as String?,
       notes: json['notes'] as String?,
     );
+  }
+
+  static DateTime? _parseDateTime(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    if (val is String) return DateTime.tryParse(val);
+    try {
+      final dynamic d = val;
+      if (d.toDate != null) {
+        return (d.toDate() as DateTime);
+      }
+    } catch (_) {}
+    return null;
   }
 
   factory ExpenseModel.fromEntity(ExpenseEntity entity) {

@@ -349,7 +349,14 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
           elevation: 0,
         ),
         child: _isSaving
-            ? const CircularProgressIndicator(color: Colors.white)
+            ? SizedBox(
+                width: 18.w,
+                height: 18.h,
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: Colors.white,
+                ),
+              )
             : Text(
                 'Submit Expense',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13.sp),

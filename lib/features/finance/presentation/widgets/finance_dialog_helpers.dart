@@ -175,6 +175,8 @@ Widget finDialogActionButton({
     style: FilledButton.styleFrom(
       backgroundColor: backgroundColor,
       foregroundColor: foregroundColor,
+      disabledBackgroundColor: backgroundColor.withValues(alpha: 0.7),
+      disabledForegroundColor: foregroundColor.withValues(alpha: 0.9),
       padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10.r),
@@ -183,15 +185,16 @@ Widget finDialogActionButton({
     ),
     child: isLoading
         ? SizedBox(
-            width: 16.w,
-            height: 16.h,
-            child: const CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Colors.white,
+            width: 18.w,
+            height: 18.h,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.2,
+              valueColor: AlwaysStoppedAnimation<Color>(foregroundColor),
             ),
           )
         : Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
                 Icon(icon, size: 16.sp, color: foregroundColor),
@@ -221,101 +224,126 @@ Future<bool?> showFinConfirmationDialog({
   IconData icon = Icons.help_outline_rounded,
   Color? iconColor,
   Widget? customContent,
+  Future<void> Function()? onConfirm,
 }) {
   final effectiveIconColor = iconColor ?? confirmColor;
+  bool isActionLoading = false;
 
   return showDialog<bool>(
     context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: Colors.white,
-      surfaceTintColor: Colors.transparent,
-      shape: finDialogShape,
-      title: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(8.w),
-            decoration: BoxDecoration(
-              color: effectiveIconColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(10.r),
+    barrierDismissible: false,
+    builder: (ctx) => StatefulBuilder(
+      builder: (ctx, setDialogState) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: finDialogShape,
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                color: effectiveIconColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Icon(icon, size: 20.sp, color: effectiveIconColor),
             ),
-            child: Icon(icon, size: 20.sp, color: effectiveIconColor),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: Text(
-              title,
-              style: GoogleFonts.inter(
-                fontSize: 17.sp,
-                fontWeight: FontWeight.w700,
-                color: FinDT.textPrimary,
+            SizedBox(width: 12.w),
+            Expanded(
+              child: Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 17.sp,
+                  fontWeight: FontWeight.w700,
+                  color: FinDT.textPrimary,
+                ),
               ),
             ),
+          ],
+        ),
+        content: SizedBox(
+          width: 420.w,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                message,
+                style: GoogleFonts.inter(
+                  fontSize: 13.sp,
+                  color: FinDT.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              if (highlightNote != null) ...[
+                SizedBox(height: 12.h),
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: effectiveIconColor.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(
+                      color: effectiveIconColor.withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline_rounded,
+                        size: 18.sp,
+                        color: effectiveIconColor,
+                      ),
+                      SizedBox(width: 10.w),
+                      Expanded(
+                        child: Text(
+                          highlightNote,
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: effectiveIconColor,
+                            fontWeight: FontWeight.w500,
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              if (customContent != null) ...[
+                SizedBox(height: 12.h),
+                customContent,
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          finDialogCancelButton(
+            ctx,
+            label: cancelLabel,
+            onPressed: isActionLoading ? () {} : null,
+          ),
+          finDialogActionButton(
+            onPressed: () async {
+              if (onConfirm != null) {
+                setDialogState(() => isActionLoading = true);
+                try {
+                  await onConfirm();
+                  if (ctx.mounted) finSafePop(ctx, true);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isActionLoading = false);
+                  }
+                  rethrow;
+                }
+              } else {
+                finSafePop(ctx, true);
+              }
+            },
+            label: confirmLabel,
+            backgroundColor: confirmColor,
+            isLoading: isActionLoading,
           ),
         ],
       ),
-      content: SizedBox(
-        width: 420.w,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              message,
-              style: GoogleFonts.inter(
-                fontSize: 13.sp,
-                color: FinDT.textSecondary,
-                height: 1.5,
-              ),
-            ),
-            if (highlightNote != null) ...[
-              SizedBox(height: 12.h),
-              Container(
-                padding: EdgeInsets.all(12.w),
-                decoration: BoxDecoration(
-                  color: effectiveIconColor.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10.r),
-                  border: Border.all(
-                    color: effectiveIconColor.withValues(alpha: 0.25),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline_rounded,
-                      size: 18.sp,
-                      color: effectiveIconColor,
-                    ),
-                    SizedBox(width: 10.w),
-                    Expanded(
-                      child: Text(
-                        highlightNote,
-                        style: GoogleFonts.inter(
-                          fontSize: 12.sp,
-                          color: effectiveIconColor,
-                          fontWeight: FontWeight.w500,
-                          height: 1.3,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            if (customContent != null) ...[
-              SizedBox(height: 12.h),
-              customContent,
-            ],
-          ],
-        ),
-      ),
-      actions: [
-        finDialogCancelButton(ctx, label: cancelLabel),
-        finDialogActionButton(
-          onPressed: () => finSafePop(ctx, true),
-          label: confirmLabel,
-          backgroundColor: confirmColor,
-        ),
-      ],
     ),
   );
 }

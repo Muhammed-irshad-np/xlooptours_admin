@@ -66,18 +66,27 @@ class FundTransactionModel extends FundTransactionEntity {
       reversesTransactionId: json['reversesTransactionId'] as String?,
       performedBy: json['performedBy'] as String? ?? '',
       performedByUserId: json['performedByUserId'] as String?,
-      date: json['date'] != null
-          ? DateTime.parse(json['date'] as String)
-          : DateTime.now(),
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : DateTime.now(),
+      date: _parseDateTime(json['date']),
+      createdAt: _parseDateTime(json['createdAt']),
       balanceBefore: (json['balanceBefore'] as num?)?.toDouble() ?? 0.0,
       balanceAfter: (json['balanceAfter'] as num?)?.toDouble() ?? 0.0,
       bucket: _parseBucket(json['bucket'] as String?),
       isReversed: json['isReversed'] as bool? ?? false,
       auditNote: json['auditNote'] as String?,
     );
+  }
+
+  static DateTime _parseDateTime(dynamic val) {
+    if (val == null) return DateTime.now();
+    if (val is DateTime) return val;
+    if (val is String) return DateTime.tryParse(val) ?? DateTime.now();
+    try {
+      final dynamic d = val;
+      if (d.toDate != null) {
+        return (d.toDate() as DateTime);
+      }
+    } catch (_) {}
+    return DateTime.now();
   }
 
   factory FundTransactionModel.fromEntity(FundTransactionEntity entity) {
