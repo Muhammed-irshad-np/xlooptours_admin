@@ -128,10 +128,15 @@ class FinanceProvider with ChangeNotifier {
   int get pendingCount =>
       _expenses.where((e) => e.status == ExpenseStatus.pending).length;
 
-  /// Total in halala (minor units) — no float drift.
-  int get totalFilteredAmountMinor =>
-      filteredExpenses.fold(0, (acc, e) => acc + e.resolvedAmountMinor);
-
+  /// Total in halala (minor units) — excludes voided/rejected unless specifically filtered.
+  int get totalFilteredAmountMinor {
+    final list = _statusFilter == null
+        ? filteredExpenses.where((e) =>
+            e.status != ExpenseStatus.voided &&
+            e.status != ExpenseStatus.rejected)
+        : filteredExpenses;
+    return list.fold(0, (acc, e) => acc + e.resolvedAmountMinor);
+  }
 
   /// Major-unit convenience for UI display.
   double get totalFilteredAmount => totalFilteredAmountMinor / 100.0;

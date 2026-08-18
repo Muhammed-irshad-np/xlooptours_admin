@@ -617,15 +617,40 @@ class _ExpenseDataTable extends StatelessWidget {
           ],
           rows: expenses.map((expense) {
             final accountName = _resolveAccountName(expense);
+            final isVoidedOrRejected = expense.status == ExpenseStatus.voided ||
+                expense.status == ExpenseStatus.rejected;
             return DataRow(
               cells: [
                 DataCell(
-                  Text(
-                    expense.referenceNumber,
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w600,
-                      color: FinDT.brand,
-                      fontSize: 12.sp,
+                  InkWell(
+                    onTap: () =>
+                        _showExpenseLifecycleTimeline(context, expense),
+                    borderRadius: BorderRadius.circular(4.r),
+                    child: Padding(
+                      padding:
+                          EdgeInsets.symmetric(vertical: 4.h, horizontal: 2.w),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            expense.referenceNumber,
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w700,
+                              color: FinDT.brand,
+                              fontSize: 12.sp,
+                              decoration: TextDecoration.underline,
+                              decorationColor:
+                                  FinDT.brand.withValues(alpha: 0.4),
+                            ),
+                          ),
+                          SizedBox(width: 4.w),
+                          Icon(
+                            Icons.info_outline_rounded,
+                            size: 13.sp,
+                            color: FinDT.brand.withValues(alpha: 0.6),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -683,7 +708,18 @@ class _ExpenseDataTable extends StatelessWidget {
                 DataCell(
                   Text(
                     '${formatter.format(expense.amount)} ${expense.currency}',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12.sp,
+                      color: isVoidedOrRejected
+                          ? FinDT.textMuted
+                          : FinDT.textPrimary,
+                      decoration: isVoidedOrRejected
+                          ? TextDecoration.lineThrough
+                          : null,
+                      decorationColor:
+                          isVoidedOrRejected ? FinDT.textMuted : null,
+                    ),
                   ),
                 ),
                 DataCell(ExpenseStatusBadge(status: expense.status)),
@@ -693,6 +729,363 @@ class _ExpenseDataTable extends StatelessWidget {
           }).toList(),
         ),
       ),
+    );
+  }
+
+  void _showExpenseLifecycleTimeline(
+    BuildContext context,
+    ExpenseEntity expense,
+  ) {
+    final formatter = NumberFormat('#,##0.00');
+    final isVoided = expense.status == ExpenseStatus.voided;
+    final isRejected = expense.status == ExpenseStatus.rejected;
+    final accountName = _resolveAccountName(expense);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: finDialogShape,
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                color: FinDT.brand.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Icon(
+                Icons.receipt_long_rounded,
+                color: FinDT.brand,
+                size: 20.sp,
+              ),
+            ),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Expense ${expense.referenceNumber}',
+                    style: GoogleFonts.inter(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w700,
+                      color: FinDT.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    '${expense.expenseCategory} • ${expense.expenseType}',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      color: FinDT.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ExpenseStatusBadge(status: expense.status),
+          ],
+        ),
+        content: SizedBox(
+          width: 480.w,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top overview card
+                Container(
+                  padding: EdgeInsets.all(14.w),
+                  decoration: BoxDecoration(
+                    color: FinDT.bgPage,
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: FinDT.border),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Amount',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w500,
+                              color: FinDT.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            '${formatter.format(expense.amount)} ${expense.currency}',
+                            style: GoogleFonts.inter(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w800,
+                              color: (isVoided || isRejected)
+                                  ? FinDT.textMuted
+                                  : FinDT.textPrimary,
+                              decoration: (isVoided || isRejected)
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Divider(height: 16.h, color: FinDT.border),
+                      _detailRow('Payment Method',
+                          expense.paymentMethod.toUpperCase()),
+                      SizedBox(height: 6.h),
+                      _detailRow('Fund Account', accountName),
+                      if (expense.employeeName != null &&
+                          expense.employeeName!.isNotEmpty) ...[
+                        SizedBox(height: 6.h),
+                        _detailRow('Employee', expense.employeeName!),
+                      ],
+                      if (expense.vehicleName != null &&
+                          expense.vehicleName!.isNotEmpty) ...[
+                        SizedBox(height: 6.h),
+                        _detailRow(
+                          'Vehicle',
+                          '${expense.vehicleName!}${expense.mileageKm != null ? " (${expense.mileageKm} km)" : ""}',
+                        ),
+                      ],
+                      if (expense.description != null &&
+                          expense.description!.isNotEmpty) ...[
+                        SizedBox(height: 6.h),
+                        _detailRow('Description', expense.description!),
+                      ],
+                    ],
+                  ),
+                ),
+                SizedBox(height: 18.h),
+
+                // Lifecycle & Audit Trail Header
+                Text(
+                  'LIFECYCLE & AUDIT TRAIL',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                    color: FinDT.textSecondary,
+                  ),
+                ),
+                SizedBox(height: 12.h),
+
+                // Timeline events
+                _buildTimelineItem(
+                  icon: Icons.edit_note_rounded,
+                  iconColor: FinDT.brand,
+                  title: 'Expense Submitted',
+                  timestamp: DateFormat('dd MMM yyyy, hh:mm a')
+                      .format(expense.createdAt),
+                  subtitle:
+                      'Submitted by ${expense.submittedBy} (${expense.submittedByRole.toUpperCase()})',
+                  isFirst: true,
+                  isLast: expense.status == ExpenseStatus.draft ||
+                      expense.status == ExpenseStatus.pending,
+                ),
+
+                if (expense.approvedAt != null ||
+                    expense.paidAt != null ||
+                    expense.status == ExpenseStatus.paid ||
+                    expense.status == ExpenseStatus.voided) ...[
+                  _buildTimelineItem(
+                    icon: Icons.check_circle_outline_rounded,
+                    iconColor: FinDT.success,
+                    title: 'Approved & Paid',
+                    timestamp: DateFormat('dd MMM yyyy, hh:mm a').format(
+                      expense.paidAt ?? expense.approvedAt ?? expense.date,
+                    ),
+                    subtitle:
+                        'Paid by ${expense.paidBy ?? expense.approvedBy ?? "Admin"} from $accountName',
+                    extraNote: expense.ledgerEntryId != null
+                        ? 'Ledger Entry: ${expense.ledgerEntryId}'
+                        : null,
+                    isLast: !isVoided,
+                  ),
+                ],
+
+                if (isVoided) ...[
+                  _buildTimelineItem(
+                    icon: Icons.undo_rounded,
+                    iconColor: const Color(0xFF7C3AED),
+                    title: 'Payment Voided & Reversed',
+                    timestamp: expense.voidedAt != null
+                        ? DateFormat('dd MMM yyyy, hh:mm a')
+                            .format(expense.voidedAt!)
+                        : 'Recorded',
+                    subtitle: 'Voided by ${expense.voidedBy ?? "Admin"}',
+                    extraNote: expense.voidReason != null
+                        ? 'Reason: "${expense.voidReason}"\nFunds refunded (+${formatter.format(expense.amount)} ${expense.currency}) to $accountName.'
+                        : 'Funds refunded to $accountName.',
+                    isAlert: true,
+                    alertColor: const Color(0xFF7C3AED),
+                    isLast: true,
+                  ),
+                ],
+
+                if (isRejected) ...[
+                  _buildTimelineItem(
+                    icon: Icons.cancel_outlined,
+                    iconColor: FinDT.danger,
+                    title: 'Expense Rejected',
+                    timestamp: expense.updatedAt != null
+                        ? DateFormat('dd MMM yyyy, hh:mm a')
+                            .format(expense.updatedAt!)
+                        : 'Recorded',
+                    subtitle:
+                        'Rejected by ${expense.approvedBy ?? "Admin"}',
+                    extraNote: expense.rejectionReason != null
+                        ? 'Reason: "${expense.rejectionReason}"'
+                        : null,
+                    isAlert: true,
+                    alertColor: FinDT.danger,
+                    isLast: true,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          finDialogCancelButton(
+            ctx,
+            onPressed: () => Navigator.pop(ctx),
+            label: 'Close',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11.sp,
+            color: FinDT.textSecondary,
+          ),
+        ),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: GoogleFonts.inter(
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w600,
+              color: FinDT.textPrimary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimelineItem({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String timestamp,
+    required String subtitle,
+    String? extraNote,
+    bool isFirst = false,
+    bool isLast = false,
+    bool isAlert = false,
+    Color? alertColor,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              padding: EdgeInsets.all(6.w),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 14.sp, color: iconColor),
+            ),
+            if (!isLast)
+              Container(
+                width: 2.w,
+                height: 38.h,
+                color: FinDT.border,
+              ),
+          ],
+        ),
+        SizedBox(width: 12.w),
+        Expanded(
+          child: Padding(
+            padding: EdgeInsets.only(bottom: isLast ? 0 : 12.h),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w700,
+                        color: FinDT.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      timestamp,
+                      style: GoogleFonts.inter(
+                        fontSize: 10.sp,
+                        color: FinDT.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    color: FinDT.textSecondary,
+                  ),
+                ),
+                if (extraNote != null) ...[
+                  SizedBox(height: 6.h),
+                  Container(
+                    width: double.infinity,
+                    padding: EdgeInsets.all(8.w),
+                    decoration: BoxDecoration(
+                      color: isAlert && alertColor != null
+                          ? alertColor.withValues(alpha: 0.08)
+                          : FinDT.bgPage,
+                      borderRadius: BorderRadius.circular(6.r),
+                      border: Border.all(
+                        color: isAlert && alertColor != null
+                            ? alertColor.withValues(alpha: 0.25)
+                            : FinDT.border,
+                      ),
+                    ),
+                    child: Text(
+                      extraNote,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        color: isAlert && alertColor != null
+                            ? alertColor
+                            : FinDT.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
