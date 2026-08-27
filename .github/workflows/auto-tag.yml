@@ -1,0 +1,52 @@
+name: Auto Version Bump and Tag
+
+on:
+  push:
+    branches:
+      - development
+      - main
+
+jobs:
+  bump-version:
+    # Prevent infinite loops from version bump commits
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Set up Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: Install cider
+        run: dart pub global activate cider
+
+      - name: Bump Patch Version
+        run: |
+          export PATH="$PATH":"$HOME/.pub-cache/bin"
+
+          # Bump the patch version (1.0.0 -> 1.0.1 -> 1.0.2 ...)
+          cider bump patch
+
+          NEW_VERSION=$(cider version)
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "Bumped version to $NEW_VERSION"
+
+      - name: Commit and Tag
+        run: |
+          git add pubspec.yaml
+          git commit -m "chore: bump version to v${{ env.NEW_VERSION }} [skip ci]"
+          git tag "v${{ env.NEW_VERSION }}"
+          git push origin HEAD:${{ github.ref }}
+          git push origin "v${{ env.NEW_VERSION }}"
