@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -80,12 +81,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
             )
           : draft;
       _loadInvoice(migratedDraft);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Draft restored'),
-          duration: Duration(seconds: 2),
-        ),
-      );
+      AppSnackBar.showInfo(context, 'Draft restored');
     } else {
       _resetForm();
     }
@@ -159,9 +155,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
     await _storageService.clearInvoiceDraft();
     _resetForm();
     if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Form cleared')));
+      AppSnackBar.showInfo(context, 'Form cleared');
     }
   }
 
@@ -241,24 +235,18 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
 
   void _previewInvoice() async {
     if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields')),
-      );
+      AppSnackBar.showInfo(context, 'Please fill all required fields');
       return;
     }
 
     if (_selectedCompany.value == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a company')));
+      AppSnackBar.showInfo(context, 'Please select a company');
       return;
     }
 
     final validItems = _getActiveLineItems();
     if (validItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one line item')),
-      );
+      AppSnackBar.showInfo(context, 'Please add at least one line item');
       return;
     }
 
@@ -285,24 +273,18 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
 
   void _generatePDF() async {
     if (!_formKey.currentState!.validate()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all required fields')),
-      );
+      AppSnackBar.showInfo(context, 'Please fill all required fields');
       return;
     }
 
     if (_selectedCompany.value == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a company')));
+      AppSnackBar.showInfo(context, 'Please select a company');
       return;
     }
 
     final validItems = _getActiveLineItems();
     if (validItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one line item')),
-      );
+      AppSnackBar.showInfo(context, 'Please add at least one line item');
       return;
     }
 
@@ -356,9 +338,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error generating invoice: $e')));
+        AppSnackBar.showError(context, 'Error generating invoice: $e');
       }
     }
   }

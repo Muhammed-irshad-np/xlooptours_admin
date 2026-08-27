@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -42,12 +43,7 @@ class _RoleFormDialogState extends State<RoleFormDialog> {
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedPermissions.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select at least one permission'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppSnackBar.showWarning(context, 'Please select at least one permission');
       return;
     }
 
@@ -92,22 +88,10 @@ class _RoleFormDialogState extends State<RoleFormDialog> {
         );
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(widget.roleToEdit != null
-                  ? 'Role updated successfully'
-                  : 'Role created successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          AppSnackBar.showSuccess(context, widget.roleToEdit != null ? 'Role updated successfully' : 'Role created successfully');
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(provider.errorMessage ?? 'An error occurred'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, provider.errorMessage ?? 'An error occurred');
       }
     }
   }

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -352,9 +353,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     } catch (e) {
       debugPrint('Error picking image: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+        AppSnackBar.showError(context, 'Error picking image: $e');
       }
     }
   }
@@ -599,15 +598,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
       if (mounted) {
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Employee saved successfully')),
-        );
+        AppSnackBar.showSuccess(context, 'Employee saved successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving employee: $e')));
+        AppSnackBar.showError(context, 'Error saving employee: $e');
       }
     } finally {
       if (mounted) {

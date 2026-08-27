@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -126,16 +127,12 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
         _communicationRating == 0 ||
         _punctualityRating == 0 ||
         _vehicleConditionRating == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please provide all service ratings.')),
-      );
+      AppSnackBar.showInfo(context, 'Please provide all service ratings.');
       return;
     }
 
     if (_dateOfTrip == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select the date of your trip.')),
-      );
+      AppSnackBar.showInfo(context, 'Please select the date of your trip.');
       return;
     }
 

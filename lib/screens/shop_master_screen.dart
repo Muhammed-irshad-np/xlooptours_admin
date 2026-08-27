@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:uuid/uuid.dart';
@@ -52,9 +53,7 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error deleting shop: $e')));
+        AppSnackBar.showError(context, 'Error deleting shop: $e');
       }
     }
   }
@@ -391,9 +390,7 @@ class _AddEditShopDialogState extends State<_AddEditShopDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving shop: $e')));
+        AppSnackBar.showError(context, 'Error saving shop: $e');
         setState(() {
           _isSaving = false;
         });

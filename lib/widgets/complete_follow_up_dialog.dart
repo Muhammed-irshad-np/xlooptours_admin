@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
@@ -137,7 +138,6 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
     if (!_formKey.currentState!.validate()) return;
 
     final navigator = Navigator.of(context);
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final notifProvider = context.read<NotificationProvider>();
     final provider = context.read<VehicleProvider>();
     final authProvider = context.read<AuthProvider>();
@@ -247,17 +247,11 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
 
       if (mounted) {
         navigator.pop(true);
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(
-            content: Text('Follow-up completion logged successfully'),
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Follow-up completion logged successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save completion: $e')),
-        );
+        AppSnackBar.showError(context, 'Failed to save completion: $e');
       }
     } finally {
       if (mounted) {

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -368,9 +369,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
 
       if (_selectedImage.value != null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Uploading image... Please wait.')),
-          );
+          AppSnackBar.showInfo(context, 'Uploading image... Please wait.');
         }
         debugPrint('VehicleFormScreen: Uploading image...');
         imageUrl = await ImageService.instance.uploadVehicleImage(
@@ -385,11 +384,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
         debugPrint('VehicleFormScreen: Image upload finished. URL: $imageUrl');
 
         if (imageUrl == null && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Image upload failed. Saving without new image.'),
-            ),
-          );
+          AppSnackBar.showError(context, 'Image upload failed. Saving without new image.');
         }
         if (mounted) {
           _isUploadingImage.value = false;
@@ -400,9 +395,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       String? registrationUrl = _isthimaraAttachmentUrl.value;
       if (_isthimaraAttachment.value != null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Uploading Isthimara...')),
-          );
+          AppSnackBar.showInfo(context, 'Uploading Isthimara...');
         }
         final url = await _uploadIsthimara(
           _isthimaraAttachment.value!,
@@ -417,9 +410,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       String? bahrainInsuranceUrl = _bahrainInsuranceAttachmentUrl.value;
       if (_bahrainInsuranceAttachment.value != null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Uploading Bahrain Insurance...')),
-          );
+          AppSnackBar.showInfo(context, 'Uploading Bahrain Insurance...');
         }
         final url = await _uploadBahrainInsurance(
           _bahrainInsuranceAttachment.value!,
@@ -434,9 +425,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       String? insuranceUrl = _insuranceAttachmentUrl.value;
       if (_insuranceAttachment.value != null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Uploading Insurance...')),
-          );
+          AppSnackBar.showInfo(context, 'Uploading Insurance...');
         }
         final url = await _uploadInsurance(
           _insuranceAttachment.value!,
@@ -451,9 +440,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       String? fahasUrl = _fahasAttachmentUrl.value;
       if (_fahasAttachment.value != null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Uploading Fahas...')),
-          );
+          AppSnackBar.showInfo(context, 'Uploading Fahas...');
         }
         final url = await _uploadFahas(
           _fahasAttachment.value!,
@@ -599,10 +586,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
 
       debugPrint('VehicleFormScreen: Saving vehicle data to Firestore...');
       if (mounted) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Saving vehicle details...')),
-        );
+        AppSnackBar.showInfo(context, 'Saving vehicle details...');
       }
 
       if (!mounted) return;
@@ -643,9 +627,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     } catch (e) {
       debugPrint('Error saving vehicle: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving vehicle: $e')));
+        AppSnackBar.showError(context, 'Error saving vehicle: $e');
       }
     } finally {
       debugPrint('VehicleFormScreen: _isLoading = false');

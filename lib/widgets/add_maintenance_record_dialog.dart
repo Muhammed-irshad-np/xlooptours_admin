@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
@@ -201,9 +202,7 @@ class _AddMaintenanceRecordDialogState
                           } catch (e) {
                             setDialogState(() => isSaving = false);
                             if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Failed to add shop: $e')),
-                              );
+                              AppSnackBar.showError(context, 'Failed to add shop: $e');
                             }
                           }
                         },
@@ -375,22 +374,12 @@ class _AddMaintenanceRecordDialogState
     // Validate type selection
     for (final entry in _entries) {
       if (entry.maintenanceTypeId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please select a maintenance type for all entries.'),
-          ),
-        );
+        AppSnackBar.showWarning(context, 'Please select a maintenance type for all entries.');
         return;
       }
       if (entry.maintenanceTypeId == _kOtherId &&
           entry.customTypeController.text.trim().isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Please enter a name for the custom maintenance type.',
-            ),
-          ),
-        );
+        AppSnackBar.showWarning(context, 'Please enter a name for the custom maintenance type.');
         return;
       }
     }
@@ -526,17 +515,11 @@ class _AddMaintenanceRecordDialogState
 
       if (mounted) {
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Maintenance record(s) added successfully'),
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Maintenance record(s) added successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to save records: $e')));
+        AppSnackBar.showError(context, 'Failed to save records: $e');
       }
     } finally {
       if (mounted) {

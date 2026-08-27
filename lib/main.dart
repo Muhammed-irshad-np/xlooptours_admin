@@ -333,6 +333,12 @@ class _MyAppState extends State<MyApp> {
               ),
               useMaterial3: true,
               textTheme: GoogleFonts.merriweatherTextTheme(),
+              snackBarTheme: SnackBarThemeData(
+                behavior: SnackBarBehavior.floating,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
             ),
           );
         },

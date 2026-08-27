@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:intl/intl.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
@@ -1048,15 +1049,11 @@ class VehicleDetailScreen extends StatelessWidget {
       try {
         await context.read<VehicleProvider>().deleteTafweed(vehicle, record);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Tafweed deleted successfully')),
-          );
+          AppSnackBar.showSuccess(context, 'Tafweed deleted successfully');
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete Tafweed: $e')),
-          );
+          AppSnackBar.showError(context, 'Failed to delete Tafweed: $e');
         }
       }
     }

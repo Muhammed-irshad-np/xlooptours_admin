@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -154,7 +155,6 @@ class ExpenseCategoriesPage extends StatelessWidget {
     BuildContext context,
     FinanceProvider provider,
   ) async {
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
     final defaults = [
       ExpenseCategoryEntity(
         id: const Uuid().v4(),
@@ -252,9 +252,8 @@ class ExpenseCategoriesPage extends StatelessWidget {
     }
 
     await provider.fetchCategories();
-    scaffoldMessenger.showSnackBar(
-      const SnackBar(content: Text('Standard categories pre-seeded successfully!')),
-    );
+    if (!context.mounted) return;
+    AppSnackBar.showSuccess(context, 'Standard categories pre-seeded successfully!');
   }
 
   void _showAddCategoryDialog(BuildContext context, FinanceProvider provider) {

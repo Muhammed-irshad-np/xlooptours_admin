@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:flutter/services.dart';
@@ -225,12 +226,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
       } catch (e) {
         debugPrint('Error saving customer: $e');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error saving customer: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppSnackBar.showError(context, 'Error saving customer: $e');
         }
       } finally {
         if (mounted) {

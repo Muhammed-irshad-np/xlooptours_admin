@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -84,9 +85,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     } catch (e) {
       if (mounted) {
         _isLoading.value = false;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading employees: $e')));
+        AppSnackBar.showError(context, 'Error loading employees: $e');
       }
     }
   }
@@ -155,9 +154,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
 
   Future<void> _deleteEmployee(EmployeeEntity employee) async {
     if (!_isAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only admins can delete employees.')),
-      );
+      AppSnackBar.showWarning(context, 'Only admins can delete employees.');
       return;
     }
     final confirmed = await showDialog<bool>(

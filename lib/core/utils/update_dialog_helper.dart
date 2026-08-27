@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
@@ -676,7 +677,6 @@ class UpdateDialogHelper {
                               final vehicleProvider = ctx
                                   .read<VehicleProvider>();
                               final vaultProvider = ctx.read<VaultProvider>();
-                              final messenger = ScaffoldMessenger.of(ctx);
                               final navigator = Navigator.of(ctx);
 
                               await notifProvider.markAsRead(notification.id);
@@ -693,30 +693,24 @@ class UpdateDialogHelper {
                               await ActivityLogger.log(
                                 ctx,
                                 title: 'Employee Document Updated',
-                                message: ChangeDiffHelper.describeEmployeeDocumentUpdate(
-                                  employeeName: employee.fullName,
-                                  documentType: documentType,
-                                  newExpiryDate: selectedDate,
-                                ),
+                                message:
+                                    ChangeDiffHelper.describeEmployeeDocumentUpdate(
+                                      employeeName: employee.fullName,
+                                      documentType: documentType,
+                                      newExpiryDate: selectedDate,
+                                    ),
                                 relatedId: employee.id,
                               );
 
                               navigator.pop();
-                              messenger.showSnackBar(
-                                const SnackBar(
-                                  content: Text('Updated successfully'),
-                                ),
-                              );
+                              if (ctx.mounted) {
+                                AppSnackBar.showSuccess(ctx, 'Updated successfully');
+                              }
                             }
                           } catch (e) {
                             setState(() => isSaving = false);
                             if (ctx.mounted) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                SnackBar(
-                                  content: Text('Error: $e'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
+                              AppSnackBar.showError(ctx, 'Error: $e');
                             }
                           }
                         },
@@ -780,7 +774,9 @@ class UpdateDialogHelper {
         return StatefulBuilder(
           builder: (context, setState) {
             final shops = context.watch<VehicleProvider>().shops;
-            final bool valueInShops = shops.any((s) => s.name == selectedShopName);
+            final bool valueInShops = shops.any(
+              (s) => s.name == selectedShopName,
+            );
 
             return AlertDialog(
               title: Text('Update $category'),
@@ -808,7 +804,10 @@ class UpdateDialogHelper {
                         ...shops.map((s) {
                           return DropdownMenuItem(
                             value: s.name,
-                            child: Text(s.name, overflow: TextOverflow.ellipsis),
+                            child: Text(
+                              s.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           );
                         }),
                       ],
@@ -1022,17 +1021,14 @@ class UpdateDialogHelper {
                 ElevatedButton(
                   onPressed: () async {
                     if (selectedDate == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Please select a date')),
-                      );
+                      AppSnackBar.showWarning(context, 'Please select a date');
                       return;
                     }
                     if (mileageController.text.isEmpty ||
                         int.tryParse(mileageController.text) == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Please enter a valid mileage'),
-                        ),
+                      AppSnackBar.showWarning(
+                        context,
+                        'Please enter a valid mileage',
                       );
                       return;
                     }
@@ -1198,7 +1194,6 @@ class UpdateDialogHelper {
                           .read<NotificationProvider>();
                       final employeeProvider = context.read<EmployeeProvider>();
                       final vaultProvider = context.read<VaultProvider>();
-                      final messenger = ScaffoldMessenger.of(context);
                       final navigator = Navigator.of(context);
 
                       await notificationProvider.markAsRead(notification.id);
@@ -1212,9 +1207,9 @@ class UpdateDialogHelper {
                       );
 
                       navigator.pop();
-                      messenger.showSnackBar(
-                        const SnackBar(content: Text('Updated successfully')),
-                      );
+                      if (context.mounted) {
+                        AppSnackBar.showSuccess(context, 'Updated successfully');
+                      }
                     }
                   },
                   child: const Text('Mark Completed'),
@@ -1382,20 +1377,14 @@ class UpdateDialogHelper {
                                 vaultData: vaultProvider.vaultData,
                               );
                               Navigator.pop(ctx);
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Updated successfully'),
-                                ),
+                              AppSnackBar.showSuccess(
+                                ctx,
+                                'Updated successfully',
                               );
                             }
                           } catch (e) {
                             setState(() => isSaving = false);
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(
-                                content: Text('Error: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
+                            AppSnackBar.showError(ctx, 'Error: $e');
                           }
                         },
                   child: isSaving
@@ -1676,23 +1665,15 @@ class UpdateDialogHelper {
                                         );
                                         if (!ctx.mounted) return;
                                         Navigator.pop(ctx);
-                                        ScaffoldMessenger.of(ctx).showSnackBar(
-                                          const SnackBar(
-                                            content: Text(
-                                              'Authorization cancelled successfully',
-                                            ),
-                                          ),
+                                        AppSnackBar.showSuccess(
+                                          ctx,
+                                          'Authorization cancelled successfully',
                                         );
                                       }
                                     } catch (e) {
                                       setState(() => isSaving = false);
                                       if (!ctx.mounted) return;
-                                      ScaffoldMessenger.of(ctx).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Error: $e'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
+                                      AppSnackBar.showError(ctx, 'Error: $e');
                                     }
                                   },
                             icon: Icon(
@@ -1889,23 +1870,17 @@ class UpdateDialogHelper {
                                 break;
                               case 'Tafweed':
                                 if (selectedDriverId == null) {
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Please select an authorized driver',
-                                      ),
-                                    ),
+                                  AppSnackBar.showWarning(
+                                    ctx,
+                                    'Please select an authorized driver',
                                   );
                                   setState(() => isSaving = false);
                                   return;
                                 }
                                 if (selectedDate == null) {
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    const SnackBar(
-                                      content: Text(
-                                        'Please select an expiry date',
-                                      ),
-                                    ),
+                                  AppSnackBar.showWarning(
+                                    ctx,
+                                    'Please select an expiry date',
                                   );
                                   setState(() => isSaving = false);
                                   return;
@@ -2087,7 +2062,8 @@ class UpdateDialogHelper {
                                 DateTime? oldExpiry;
                                 switch (documentType) {
                                   case 'Istimara':
-                                    oldExpiry = vehicle.registration?.expiryDate;
+                                    oldExpiry =
+                                        vehicle.registration?.expiryDate;
                                   case 'Insurance':
                                     oldExpiry = vehicle.insurance?.expiryDate;
                                   case 'Fahas':
@@ -2135,21 +2111,15 @@ class UpdateDialogHelper {
                               );
                               if (!ctx.mounted) return;
                               Navigator.pop(ctx);
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Updated successfully'),
-                                ),
+                              AppSnackBar.showSuccess(
+                                ctx,
+                                'Updated successfully',
                               );
                             }
                           } catch (e) {
                             setState(() => isSaving = false);
                             if (!ctx.mounted) return;
-                            ScaffoldMessenger.of(ctx).showSnackBar(
-                              SnackBar(
-                                content: Text('Error: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
+                            AppSnackBar.showError(ctx, 'Error: $e');
                           }
                         },
                   child: isSaving

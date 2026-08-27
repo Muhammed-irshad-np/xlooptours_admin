@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -66,9 +67,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   Future<void> _deleteVehicle(String id) async {
     final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
     if (!isAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only admins can delete vehicles.')),
-      );
+      AppSnackBar.showWarning(context, 'Only admins can delete vehicles.');
       return;
     }
     final confirmed = await showDialog<bool>(

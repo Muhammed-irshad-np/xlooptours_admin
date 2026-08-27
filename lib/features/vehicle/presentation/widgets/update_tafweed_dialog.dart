@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.dart';
@@ -39,18 +40,12 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
 
   Future<void> _saveTafweed() async {
     if (_selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select an expiry date for Tafweed'),
-        ),
-      );
+      AppSnackBar.showWarning(context, 'Please select an expiry date for Tafweed');
       return;
     }
 
     if (_selectedDriverId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an authorized driver')),
-      );
+      AppSnackBar.showWarning(context, 'Please select an authorized driver');
       return;
     }
 
@@ -163,15 +158,11 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tafweed updated successfully')),
-        );
+        AppSnackBar.showInfo(context, 'Tafweed updated successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to update Tafweed: $e')));
+        AppSnackBar.showError(context, 'Failed to update Tafweed: $e');
       }
     } finally {
       if (mounted) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -50,9 +51,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   Future<void> _deleteCustomer(CustomerEntity customer) async {
     final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
     if (!isAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only admins can delete customers.')),
-      );
+      AppSnackBar.showWarning(context, 'Only admins can delete customers.');
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -87,9 +86,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
           await context.read<CustomerProvider>().deleteCustomer(customer.id);
         } catch (e) {
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error deleting customer: $e')),
-            );
+            AppSnackBar.showError(context, 'Error deleting customer: $e');
           }
         }
       }
@@ -110,9 +107,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   Future<void> _recordFeedback(CustomerEntity customer) async {
     final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
     if (!isAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only admins can record feedback.')),
-      );
+      AppSnackBar.showWarning(context, 'Only admins can record feedback.');
       return;
     }
     showDialog(
@@ -142,9 +137,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error updating status: $e')));
+        AppSnackBar.showError(context, 'Error updating status: $e');
       }
     }
   }
@@ -751,12 +744,7 @@ class _RecordFeedbackDialogState extends State<_RecordFeedbackDialog> {
   Future<void> _copyToClipboard(String url) async {
     await Clipboard.setData(ClipboardData(text: url));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Feedback link copied to clipboard!'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    AppSnackBar.showSuccess(context, 'Feedback link copied to clipboard!');
   }
 
   @override

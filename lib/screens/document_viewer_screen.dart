@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
@@ -281,13 +282,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       // Also show snackbar with correct filename hint.
       await _openInBrowser();
       if (mounted && ext.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Save the file as: $filename'),
-            duration: const Duration(seconds: 6),
-            backgroundColor: Colors.blue.shade700,
-          ),
-        );
+        AppSnackBar.showInfo(context, 'Save the file as: $filename');
       }
       return;
     }
@@ -315,12 +310,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       debugPrint('DocumentViewer: download failed: $e');
       if (mounted) {
         setState(() => _downloading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Download failed: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Download failed: $e');
       }
     }
   }
@@ -329,9 +319,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     final uri = Uri.parse(widget.attachmentUrl);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open document link')),
-        );
+        AppSnackBar.showError(context, 'Could not open document link');
       }
     }
   }
@@ -516,13 +504,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         debugPrint(
             'PDF Load Failed: ${details.error} - ${details.description}');
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to load PDF: ${details.error}'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 5),
-            ),
-          );
+          AppSnackBar.showError(context, 'Failed to load PDF: ${details.error}');
         }
       },
     );
