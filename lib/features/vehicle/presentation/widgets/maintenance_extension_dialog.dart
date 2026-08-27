@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -133,23 +134,11 @@ class _MaintenanceExtensionDialogState extends State<MaintenanceExtensionDialog>
 
       if (mounted) {
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Successfully extended ${widget.alert.category} alert ($extMessage).',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Successfully extended ${widget.alert.category} alert ($extMessage).');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to extend maintenance: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to extend maintenance: $e');
       }
     } finally {
       if (mounted) {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -36,9 +37,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
   Future<void> _deleteCompany(CompanyEntity company) async {
     final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
     if (!isAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only admins can delete companies.')),
-      );
+      AppSnackBar.showWarning(context, 'Only admins can delete companies.');
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -68,9 +67,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
       );
       if (!success && mounted) {
         final error = context.read<CompanyProvider>().errorMessage;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete company: $error')),
-        );
+        AppSnackBar.showError(context, 'Failed to delete company: $error');
       }
     }
   }
@@ -103,9 +100,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
       await context.read<CompanyProvider>().updateCompany(updatedCompany);
       final error = context.read<CompanyProvider>().errorMessage;
       if (error != null && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update status: $error')),
-        );
+        AppSnackBar.showError(context, 'Failed to update status: $error');
       }
     }
   }
@@ -339,13 +334,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
 
                             await Clipboard.setData(ClipboardData(text: link));
                             if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    'Registration link copied to clipboard!',
-                                  ),
-                                ),
-                              );
+                              AppSnackBar.showSuccess(context, 'Registration link copied to clipboard!');
                             }
                           }
                         },

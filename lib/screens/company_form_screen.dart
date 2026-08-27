@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:provider/provider.dart';
 import '../features/company/domain/entities/company_entity.dart';
 import '../features/company/presentation/providers/company_provider.dart';
@@ -156,22 +157,12 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
           Navigator.pop(context, company);
         } else if (mounted && !success) {
           final error = context.read<CompanyProvider>().errorMessage;
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to save: $error'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppSnackBar.showError(context, 'Failed to save: $error');
         }
       } catch (e) {
         debugPrint('Error saving company: $e');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error saving company: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          AppSnackBar.showError(context, 'Error saving company: $e');
         }
       } finally {
         if (mounted) {
@@ -189,9 +180,7 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
           ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
         _newCaseCodeController.clear();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Case code already exists')),
-        );
+        AppSnackBar.showWarning(context, 'Case code already exists');
       }
     }
   }

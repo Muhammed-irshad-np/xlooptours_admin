@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -13,12 +14,7 @@ class ShareHelper {
     String? resolvedMime, // Optional: pass already-detected MIME to skip re-detection
   }) async {
     try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Preparing document to share...'),
-          duration: Duration(seconds: 1),
-        ),
-      );
+      AppSnackBar.showInfo(context, 'Preparing document to share...');
 
       final response = await http.get(Uri.parse(url));
 
@@ -67,14 +63,7 @@ class ShareHelper {
       );
     } catch (e) {
       debugPrint('Share error: $e');
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to prepare document for sharing.'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      AppSnackBar.showError(context, 'Failed to prepare document for sharing.');
     }
   }
 

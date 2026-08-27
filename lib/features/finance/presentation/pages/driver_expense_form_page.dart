@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -327,9 +328,7 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
       setState(() => _receiptUrl = url);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload: $e')),
-        );
+        AppSnackBar.showError(context, 'Failed to upload: $e');
       }
     } finally {
       setState(() => _uploadingReceipt = false);
@@ -368,9 +367,7 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
   Future<void> _submitForm(FinanceProvider provider) async {
     if (!_formKey.currentState!.validate()) return;
     if (_receiptUrl == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please upload a photo of the receipt.')),
-      );
+      AppSnackBar.showInfo(context, 'Please upload a photo of the receipt.');
       return;
     }
 
@@ -416,9 +413,7 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        AppSnackBar.showError(context, 'Error: $e');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

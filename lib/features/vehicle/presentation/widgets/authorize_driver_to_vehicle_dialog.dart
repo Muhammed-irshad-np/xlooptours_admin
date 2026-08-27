@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_documents.dart';
@@ -39,18 +40,12 @@ class _AuthorizeDriverToVehicleDialogState
 
   Future<void> _saveTafweed() async {
     if (_expiryDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select an expiry date for Tafweed'),
-        ),
-      );
+      AppSnackBar.showWarning(context, 'Please select an expiry date for Tafweed');
       return;
     }
 
     if (_selectedEmployeeId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select an employee')),
-      );
+      AppSnackBar.showWarning(context, 'Please select an employee');
       return;
     }
 
@@ -65,11 +60,7 @@ class _AuthorizeDriverToVehicleDialogState
       if (widget.vehicle.tafweeds != null &&
           widget.vehicle.tafweeds!.isNotEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please cancel the active authorization first.'),
-            ),
-          );
+          AppSnackBar.showWarning(context, 'Please cancel the active authorization first.');
           Navigator.pop(context);
         }
         return;
@@ -162,15 +153,11 @@ class _AuthorizeDriverToVehicleDialogState
 
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Vehicle authorized successfully')),
-        );
+        AppSnackBar.showInfo(context, 'Vehicle authorized successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to authorize vehicle: $e')),
-        );
+        AppSnackBar.showError(context, 'Failed to authorize vehicle: $e');
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

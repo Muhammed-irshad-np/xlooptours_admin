@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -106,16 +107,12 @@ class _EmployeeExpiryAlertSettingsScreenState extends State<EmployeeExpiryAlertS
             message: 'Employee expiry alert settings have been updated.',
             relatedId: 'employee_settings',
           );
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Alert settings updated successfully')),
-          );
+          AppSnackBar.showSuccess(context, 'Alert settings updated successfully');
           Navigator.pop(context);
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to update settings: $e')),
-          );
+          AppSnackBar.showError(context, 'Failed to update settings: $e');
         }
       }
     }

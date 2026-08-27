@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
+import '../core/utils/app_snack_bar.dart';
 import '../features/invoice/domain/entities/invoice_entity.dart';
 import '../services/pdf_service.dart';
 import '../widgets/responsive_layout.dart';
@@ -50,16 +51,12 @@ class PDFPreviewScreen extends StatelessWidget {
       html.Url.revokeObjectUrl(url);
 
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('PDF downloaded: $fileName')));
+        AppSnackBar.showSuccess(context, 'PDF downloaded: $fileName');
       }
     } catch (e) {
       debugPrint('Error saving PDF on web: $e');
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving PDF: $e')));
+        AppSnackBar.showError(context, 'Error saving PDF: $e');
       }
     }
   }
@@ -75,16 +72,12 @@ class PDFPreviewScreen extends StatelessWidget {
       await file.writeAsBytes(pdfBytes);
 
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('PDF saved to: ${file.path}')));
+        AppSnackBar.showSuccess(context, 'PDF saved to: ${file.path}');
       }
     } catch (e) {
       debugPrint('Error saving PDF: $e');
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving PDF: $e')));
+        AppSnackBar.showError(context, 'Error saving PDF: $e');
       }
     }
   }
@@ -115,16 +108,12 @@ class PDFPreviewScreen extends StatelessWidget {
       html.Url.revokeObjectUrl(url);
 
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('PDF downloaded: $fileName')));
+        AppSnackBar.showSuccess(context, 'PDF downloaded: $fileName');
       }
     } catch (e) {
       debugPrint('Error sharing PDF on web: $e');
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error sharing PDF: $e')));
+        AppSnackBar.showError(context, 'Error sharing PDF: $e');
       }
     }
   }
@@ -147,9 +136,7 @@ class PDFPreviewScreen extends StatelessWidget {
     } catch (e) {
       debugPrint('Error sharing PDF: $e');
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error sharing PDF: $e')));
+        AppSnackBar.showError(context, 'Error sharing PDF: $e');
       }
     }
   }

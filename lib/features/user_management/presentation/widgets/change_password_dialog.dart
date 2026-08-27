@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -53,22 +54,10 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
       );
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Password updated for ${widget.user.displayName.isNotEmpty ? widget.user.displayName : widget.user.email}',
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
+        AppSnackBar.showSuccess(context, 'Password updated for ${widget.user.displayName.isNotEmpty ? widget.user.displayName : widget.user.email}');
       }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(provider.errorMessage ?? 'Failed to change password'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      AppSnackBar.showError(context, provider.errorMessage ?? 'Failed to change password');
     }
   }
 

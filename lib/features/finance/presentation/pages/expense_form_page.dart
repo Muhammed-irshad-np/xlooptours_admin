@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1684,9 +1685,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       setState(() => _receiptUrls.add(url));
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to upload: $e')),
-        );
+        AppSnackBar.showError(context, 'Failed to upload: $e');
       }
     }
   }
@@ -1788,24 +1787,12 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _isEditing ? 'Expense updated!' : 'Expense saved!',
-            ),
-            backgroundColor: FinDT.success,
-          ),
-        );
+        AppSnackBar.showInfo(context, _isEditing ? 'Expense updated!' : 'Expense saved!',);
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: FinDT.danger,
-          ),
-        );
+        AppSnackBar.showError(context, 'Error: $e');
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

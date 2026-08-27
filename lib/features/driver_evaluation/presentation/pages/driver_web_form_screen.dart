@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:provider/provider.dart';
 import 'package:xloop_invoice/features/driver_evaluation/presentation/providers/driver_form_provider.dart';
 import 'package:intl/intl.dart';
@@ -516,9 +517,7 @@ class _DriverWebFormScreenState extends State<DriverWebFormScreen> {
       final fullBody = provider.mediaUploads['full_body']?.url;
       final shoes = provider.mediaUploads['shoes']?.url;
       if (fullBody == null || shoes == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please upload both appearance photos before continuing.')),
-        );
+        AppSnackBar.showInfo(context, 'Please upload both appearance photos before continuing.');
       } else {
         setState(() {
           _currentStep = 2;

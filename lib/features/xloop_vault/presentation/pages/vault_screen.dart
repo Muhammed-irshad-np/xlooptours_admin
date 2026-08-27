@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -1183,9 +1184,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not download file')),
-        );
+        AppSnackBar.showInfo(context, 'Could not download file');
       }
     }
   }
@@ -1204,42 +1203,32 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
         final fileSize = await xFile.length();
         if (fileSize > 5 * 1024 * 1024) { // 5MB limit
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('File size must be less than 5MB')),
-            );
+            AppSnackBar.showInfo(context, 'File size must be less than 5MB');
           }
           return;
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Uploading document...')),
-          );
+          AppSnackBar.showInfo(context, 'Uploading document...');
         }
 
         final uploadedDoc = await provider.uploadDocument(xFile, folderName);
         if (uploadedDoc != null) {
           onUpload(uploadedDoc);
           if (mounted) {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('✅ Upload successful')),
-            );
+            
+            AppSnackBar.showInfo(context, '✅ Upload successful');
           }
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(provider.errorMessage ?? 'Upload failed')),
-            );
+            
+            AppSnackBar.showError(context, provider.errorMessage ?? 'Upload failed');
           }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking file: $e')),
-        );
+        AppSnackBar.showError(context, 'Error picking file: $e');
       }
     }
   }
@@ -1324,9 +1313,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                     message: 'VAT filing for bill ${filing.billNumber} has been deleted.',
                     relatedId: 'vault',
                   );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('VAT filing deleted successfully')),
-                  );
+                  AppSnackBar.showInfo(context, 'VAT filing deleted successfully');
                 }
               }
             },
