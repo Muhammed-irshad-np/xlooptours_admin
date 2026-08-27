@@ -1170,10 +1170,9 @@ class _Sidebar extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.hasData) {
             final version = snapshot.data!.version;
-            final build = snapshot.data!.buildNumber;
             return Center(
               child: Text(
-                'v$version+$build',
+                'v$version',
                 style: GoogleFonts.notoSans(
                   fontSize: 10.sp,
                   color: Colors.white,
