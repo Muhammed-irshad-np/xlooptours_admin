@@ -21,8 +21,6 @@ import '../../features/xloop_vault/presentation/providers/vault_provider.dart';
 import '../../features/xloop_vault/domain/entities/vault_data.dart';
 import '../../features/vehicle/presentation/widgets/maintenance_extension_dialog.dart';
 import '../../features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
-import 'package:uuid/uuid.dart';
-import '../../features/vehicle/domain/entities/shop_entity.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../injection_container.dart';
 import '../utils/activity_logger.dart';
@@ -913,11 +911,7 @@ class UpdateDialogHelper {
                               onTap: () async {
                                 final picked = await showDatePicker(
                                   context: context,
-                                  initialDate:
-                                      followUpDate ??
-                                      DateTime.now().add(
-                                        const Duration(days: 30),
-                                      ),
+                                  initialDate: followUpDate ?? DateTime.now(),
                                   firstDate: DateTime(2000),
                                   lastDate: DateTime(2100),
                                 );
