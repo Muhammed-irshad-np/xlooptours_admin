@@ -33,6 +33,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   String _searchQuery = '';
   late TabController _tabController;
   bool _isAdmin = false;
+  bool _isSuperAdmin = false;
 
   final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(true);
   final ValueNotifier<bool> _showInactive = ValueNotifier<bool>(false);
@@ -45,6 +46,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   void initState() {
     super.initState();
     _isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    _isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
     _tabs.addAll([
       'All',
       'Management',
@@ -153,8 +155,8 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   }
 
   Future<void> _deleteEmployee(EmployeeEntity employee) async {
-    if (!_isAdmin) {
-      AppSnackBar.showWarning(context, 'Only admins can delete employees.');
+    if (!_isSuperAdmin) {
+      AppSnackBar.showWarning(context, 'Only Super Admins can delete employees.');
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -557,7 +559,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                             ],
                           ),
                         ),
-                        if (_isAdmin)
+                        if (_isSuperAdmin)
                           const PopupMenuItem(
                             value: 'delete',
                             child: Row(

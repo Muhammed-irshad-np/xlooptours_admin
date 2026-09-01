@@ -8,6 +8,7 @@ import '../widgets/expense_status_badge.dart';
 import '../../domain/entities/expense_entity.dart';
 import 'expense_form_page.dart';
 import 'finance_dashboard_page.dart';
+import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 
 /// Expense list page with filtering, search, and data table.
 class ExpenseListPage extends StatelessWidget {
@@ -526,6 +527,7 @@ class _ExpenseDataTable extends StatelessWidget {
   }
 
   Widget _buildActions(BuildContext context, ExpenseEntity expense) {
+    final isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -557,12 +559,13 @@ class _ExpenseDataTable extends StatelessWidget {
           ),
         ),
         SizedBox(width: 4.w),
-        _actionIcon(
-          icon: Icons.delete_outline,
-          color: FinDT.danger,
-          tooltip: 'Delete',
-          onTap: () => _confirmDelete(context, expense),
-        ),
+        if (isSuperAdmin)
+          _actionIcon(
+            icon: Icons.delete_outline,
+            color: FinDT.danger,
+            tooltip: 'Delete',
+            onTap: () => _confirmDelete(context, expense),
+          ),
       ],
     );
   }

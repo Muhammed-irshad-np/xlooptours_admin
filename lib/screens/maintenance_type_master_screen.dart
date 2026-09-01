@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../features/vehicle/domain/entities/maintenance_type_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 
 class MaintenanceTypeMasterScreen extends StatefulWidget {
   const MaintenanceTypeMasterScreen({super.key});
@@ -86,6 +87,7 @@ class _MaintenanceTypeMasterScreenState
 
   @override
   Widget build(BuildContext context) {
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     return Scaffold(
       appBar: const ModernAppBar(title: 'Maintenance Types'),
       body: AnimatedBuilder(
@@ -139,9 +141,10 @@ class _MaintenanceTypeMasterScreenState
                         onPressed: () => _showAddEditDialog(type: type),
                         tooltip: 'Edit',
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () async {
+                      if (isSuperAdmin)
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () async {
                           final confirm = await showDialog<bool>(
                             context: context,
                             builder: (c) => AlertDialog(

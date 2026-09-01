@@ -312,7 +312,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
 
   Widget _buildAuthorizedVehiclesCard(BuildContext context) {
     final vehicles = context.watch<VehicleProvider>().vehicles;
-    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     final authorizedVehicles = vehicles.where((v) {
       if (v.tafweeds == null) return false;
       return v.tafweeds!.any((t) => t.driverId == employee.id);
@@ -429,7 +429,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      if (employeeTafweed != null && isAdmin)
+                      if (employeeTafweed != null && isSuperAdmin)
                         IconButton(
                           icon: Icon(
                             Icons.delete_outline,

@@ -13,6 +13,7 @@ import '../../domain/entities/fund_account_entity.dart';
 import '../../../../features/employee/presentation/providers/employee_provider.dart';
 import '../../../../features/employee/domain/entities/employee_entity.dart';
 import 'finance_dashboard_page.dart';
+import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 
 /// Screen for managing virtual fund accounts and viewing transaction history.
 class FundAccountsPage extends StatefulWidget {
@@ -492,6 +493,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     FundAccountProvider provider,
     FundAccountEntity selected,
   ) {
+    final isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
     return Row(
       children: [
         IconButton(
@@ -504,11 +506,12 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
           ),
           tooltip: 'Edit Account',
         ),
-        IconButton(
-          onPressed: () => _confirmDeleteAccount(context, provider, selected),
-          icon: Icon(Icons.delete_outline, size: 18.sp, color: FinDT.danger),
-          tooltip: 'Delete Account',
-        ),
+        if (isSuperAdmin)
+          IconButton(
+            onPressed: () => _confirmDeleteAccount(context, provider, selected),
+            icon: Icon(Icons.delete_outline, size: 18.sp, color: FinDT.danger),
+            tooltip: 'Delete Account',
+          ),
       ],
     );
   }
