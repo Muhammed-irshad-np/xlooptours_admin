@@ -49,9 +49,9 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   }
 
   Future<void> _deleteCustomer(CustomerEntity customer) async {
-    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
-    if (!isAdmin) {
-      AppSnackBar.showWarning(context, 'Only admins can delete customers.');
+    final isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
+    if (!isSuperAdmin) {
+      AppSnackBar.showWarning(context, 'Only Super Admins can delete customers.');
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -302,6 +302,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
   Widget _buildCustomerCard(CustomerEntity customer) {
     bool isActive = customer.status == 'ACTIVE';
+    final isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
     final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
 
     return Card(
@@ -411,7 +412,7 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
                                         ],
                                       ),
                                     ),
-                                    if (isAdmin)
+                                    if (isSuperAdmin)
                                       const PopupMenuItem(
                                         value: 'delete',
                                         child: Row(

@@ -8,6 +8,7 @@ import '../providers/finance_provider.dart';
 import '../../domain/entities/expense_category_entity.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
+import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 
 /// Screen for managing expense categories and types.
 class ExpenseCategoriesPage extends StatelessWidget {
@@ -342,6 +343,7 @@ class _CategoryExpansionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -387,7 +389,7 @@ class _CategoryExpansionCard extends StatelessWidget {
           ],
         ),
         tilePadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-        trailing: _buildActions(context),
+        trailing: _buildActions(context, isSuperAdmin),
         children: [
           Divider(height: 1, color: FinDT.borderLight),
           if (category.expenseTypes.isEmpty)
@@ -424,10 +426,11 @@ class _CategoryExpansionCard extends StatelessWidget {
                         onPressed: () => _showTypeFormDialog(context, type: type),
                         icon: Icon(Icons.edit_outlined, size: 16.sp, color: FinDT.textSecondary),
                       ),
-                      IconButton(
-                        onPressed: () => _deleteType(context, type.id),
-                        icon: Icon(Icons.delete_outline, size: 16.sp, color: FinDT.danger),
-                      ),
+                      if (isSuperAdmin)
+                        IconButton(
+                          onPressed: () => _deleteType(context, type.id),
+                          icon: Icon(Icons.delete_outline, size: 16.sp, color: FinDT.danger),
+                        ),
                     ],
                   ),
                 );
@@ -453,7 +456,8 @@ class _CategoryExpansionCard extends StatelessWidget {
     );
   }
 
-  Widget _buildActions(BuildContext context) {
+  Widget _buildActions(BuildContext context, bool isSuperAdmin) {
+    if (!isSuperAdmin) return const SizedBox.shrink();
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [

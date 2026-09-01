@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../features/vehicle/domain/entities/vehicle_make_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 
 class VehicleMakesScreen extends StatefulWidget {
   const VehicleMakesScreen({super.key});
@@ -81,6 +82,7 @@ class _VehicleMakesScreenState extends State<VehicleMakesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     return Scaffold(
       appBar: const ModernAppBar(title: 'Vehicle Makes & Models'),
       body: AnimatedBuilder(
@@ -200,9 +202,10 @@ class _VehicleMakesScreenState extends State<VehicleMakesScreen> {
                               onPressed: () => _showAddEditDialog(make: make),
                               tooltip: 'Edit',
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () async {
+                            if (isSuperAdmin)
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () async {
                                 final confirm = await showDialog<bool>(
                                   context: context,
                                   builder: (c) => AlertDialog(

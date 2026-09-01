@@ -65,9 +65,9 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   }
 
   Future<void> _deleteVehicle(String id) async {
-    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
-    if (!isAdmin) {
-      AppSnackBar.showWarning(context, 'Only admins can delete vehicles.');
+    final isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
+    if (!isSuperAdmin) {
+      AppSnackBar.showWarning(context, 'Only Super Admins can delete vehicles.');
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -100,7 +100,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     final vehicleProvider = context.watch<VehicleProvider>();
     final isLoading = vehicleProvider.isLoading;
     final vehicles = vehicleProvider.vehicles;
-    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -291,7 +291,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                                     ],
                                   ),
                                 ),
-                                if (isAdmin)
+                                if (isSuperAdmin)
                                   const PopupMenuItem(
                                     value: 'delete',
                                     child: Row(

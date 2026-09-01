@@ -1091,6 +1091,7 @@ class _ExpenseDataTable extends StatelessWidget {
 
   Widget _buildActions(BuildContext context, ExpenseEntity expense) {
     final auth = context.read<AuthProvider>().user;
+    final isSuperAdmin = auth?.isSuperAdmin ?? false;
     final policy = context.read<FinanceProvider>().policy;
     final canApprove = FinancePermissionService.canApproveExpense(
       user: auth,
@@ -1144,7 +1145,7 @@ class _ExpenseDataTable extends StatelessWidget {
               ),
             ),
           ),
-        if (expense.status.canHardDelete) ...[
+        if (expense.status.canHardDelete && isSuperAdmin) ...[
           SizedBox(width: 4.w),
           _actionIcon(
             icon: Icons.delete_outline,

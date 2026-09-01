@@ -29,7 +29,7 @@ class _VehicleMaintenanceHistoryScreenState
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     return Consumer<VehicleProvider>(
       builder: (context, vehicleProvider, child) {
         final matches = vehicleProvider.vehicles.where(
@@ -84,7 +84,7 @@ class _VehicleMaintenanceHistoryScreenState
           body: Column(
             children: [
               _buildFilterBar(availableShops.toList()),
-              if (isAdmin)
+              if (isSuperAdmin)
                 _buildCostSummaryCard(totalCost, filteredHistory.length),
               Expanded(
                 child: filteredHistory.isEmpty
@@ -105,7 +105,7 @@ class _VehicleMaintenanceHistoryScreenState
                             context,
                             currentVehicle,
                             record,
-                            isAdmin: isAdmin,
+                            isAdmin: isSuperAdmin,
                           );
                         },
                       ),

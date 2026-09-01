@@ -103,7 +103,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     final currencyFormat = NumberFormat.currency(
       symbol: 'SR ',
       decimalDigits: 2,
@@ -296,7 +296,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     NumberFormat currencyFormat,
     DateFormat dateFormat,
   ) {
-    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
@@ -342,7 +342,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                     ],
                   ),
                 ),
-                if (isAdmin)
+                if (isSuperAdmin)
                   const PopupMenuItem<String>(
                     value: 'delete',
                     child: Row(

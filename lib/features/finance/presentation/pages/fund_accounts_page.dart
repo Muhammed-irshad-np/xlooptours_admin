@@ -1953,6 +1953,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     FundAccountEntity selected,
   ) {
     final user = context.read<AuthProvider>().user;
+    final isSuperAdmin = user?.isSuperAdmin ?? false;
     final policy = context.read<FinanceProvider>().policy;
     final canManageAccounts = FinancePermissionService.canManageAccounts(user: user, policy: policy);
     if (!canManageAccounts) return const SizedBox.shrink();
@@ -1969,25 +1970,26 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
           ),
           tooltip: 'Edit Account',
         ),
-        IconButton(
-          onPressed: () => _confirmDeleteAccount(context, provider, selected),
-          icon: Icon(
-            selected.currentBalanceMinor > 0
-                ? Icons.delete_outline
+        if (isSuperAdmin)
+          IconButton(
+            onPressed: () => _confirmDeleteAccount(context, provider, selected),
+            icon: Icon(
+              selected.currentBalanceMinor > 0
+                  ? Icons.delete_outline
+                  : (provider.transactions.isNotEmpty
+                      ? Icons.archive_outlined
+                      : Icons.delete_outline),
+              size: 18.sp,
+              color: selected.currentBalanceMinor > 0
+                  ? FinDT.textMuted
+                  : FinDT.danger,
+            ),
+            tooltip: selected.currentBalanceMinor > 0
+                ? 'Cannot close account with active balance'
                 : (provider.transactions.isNotEmpty
-                    ? Icons.archive_outlined
-                    : Icons.delete_outline),
-            size: 18.sp,
-            color: selected.currentBalanceMinor > 0
-                ? FinDT.textMuted
-                : FinDT.danger,
+                    ? 'Deactivate Account'
+                    : 'Delete Account'),
           ),
-          tooltip: selected.currentBalanceMinor > 0
-              ? 'Cannot close account with active balance'
-              : (provider.transactions.isNotEmpty
-                  ? 'Deactivate Account'
-                  : 'Delete Account'),
-        ),
       ],
     );
   }

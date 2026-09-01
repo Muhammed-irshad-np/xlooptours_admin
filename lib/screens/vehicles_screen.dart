@@ -144,7 +144,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   Widget build(BuildContext context) {
     final vehicleProvider = context.watch<VehicleProvider>();
     final isLoading = vehicleProvider.isLoading;
-    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     final vehicles = vehicleProvider.vehicles;
 
     final filteredVehicles = vehicles.where((v) {
@@ -154,7 +154,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     }).toList();
 
     return DefaultTabController(
-      length: isAdmin ? 3 : 2,
+      length: context.watch<AuthProvider>().user?.isAdmin == true ? 3 : 2,
       child: Scaffold(
         appBar: ModernAppBar(
           title: 'Fleet Management',
@@ -217,7 +217,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
             tabs: [
               const Tab(text: 'Fleet List'),
               const Tab(text: 'Maintenance History'),
-              if (isAdmin) const Tab(text: 'Vehicle Master'),
+              if (context.watch<AuthProvider>().user?.isAdmin == true) const Tab(text: 'Vehicle Master'),
             ],
           ),
         ),
@@ -277,7 +277,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
             const AllVehiclesMaintenanceHistoryScreen(),
 
             // Tab 3: Vehicle Master (Admin Only)
-            if (isAdmin) const VehicleMasterScreen(),
+            if (context.watch<AuthProvider>().user?.isAdmin == true) const VehicleMasterScreen(),
           ],
         ),
       ),
@@ -285,7 +285,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   }
 
   Widget _buildVehicleCard(VehicleEntity vehicle, EmployeeEntity? driver) {
-    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
     return Card(
       child: ListTile(
         leading: Container(
@@ -421,7 +421,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
                     ],
                   ),
                 ),
-                if (isAdmin)
+                if (isSuperAdmin)
                   const PopupMenuItem(
                     value: 'delete',
                     child: Row(

@@ -118,7 +118,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Companies'),
@@ -200,7 +200,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
               itemCount: filteredCompanies.length,
               padding: const EdgeInsets.all(8),
               itemBuilder: (context, index) =>
-                  _buildCompanyCard(filteredCompanies[index], isAdmin),
+                  _buildCompanyCard(filteredCompanies[index], isSuperAdmin),
             ),
             desktop: GridView.builder(
               padding: const EdgeInsets.all(16),
@@ -212,7 +212,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
               ),
               itemCount: filteredCompanies.length,
               itemBuilder: (context, index) =>
-                  _buildCompanyCard(filteredCompanies[index], isAdmin),
+                  _buildCompanyCard(filteredCompanies[index], isSuperAdmin),
             ),
           );
         },
@@ -220,7 +220,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
     );
   }
 
-  Widget _buildCompanyCard(CompanyEntity company, bool isAdmin) {
+  Widget _buildCompanyCard(CompanyEntity company, bool isSuperAdmin) {
     bool isActive = company.status == 'ACTIVE';
 
     return Card(
@@ -359,7 +359,7 @@ class _CompaniesScreenState extends State<CompaniesScreen> {
                               ],
                             ),
                           ),
-                          if (isAdmin)
+                          if (isSuperAdmin)
                             const PopupMenuItem(
                               value: 'delete',
                               child: Row(

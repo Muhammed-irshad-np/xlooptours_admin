@@ -132,6 +132,7 @@ class _AllVehiclesMaintenanceHistoryScreenState
   @override
   Widget build(BuildContext context) {
     final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
 
     return Consumer<VehicleProvider>(
       builder: (context, vehicleProvider, _) {
@@ -305,7 +306,7 @@ class _AllVehiclesMaintenanceHistoryScreenState
                             context,
                             item.vehicle,
                             item.record,
-                            isAdmin: isAdmin,
+                            isAdmin: isSuperAdmin,
                           );
                         },
                       ),
