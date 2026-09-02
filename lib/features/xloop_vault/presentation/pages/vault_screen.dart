@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -16,6 +17,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../screens/document_viewer_screen.dart';
 import '../../../../core/utils/share_helper.dart';
+import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 
 class VaultScreen extends StatefulWidget {
   const VaultScreen({super.key});
@@ -161,6 +163,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
   Widget _buildCompanyDetailsTab(VaultProvider provider) {
     final data = provider.vaultData;
     if (data == null) return const SizedBox.shrink();
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
 
     return SingleChildScrollView(
       padding: EdgeInsets.all(24.r),
@@ -171,14 +174,14 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
               title: 'Commercial License',
               icon: Icons.business_center_outlined,
               accentColor: const Color(0xFF0F172A),
-              child: _buildLicenseContent(data.license, provider),
+              child: _buildLicenseContent(data.license, provider, isSuperAdmin: isSuperAdmin),
             ),
             SizedBox(height: 24.h),
             _buildVaultSection(
               title: 'VAT Certificate',
               icon: Icons.receipt_long_outlined,
               accentColor: const Color(0xFF0F172A),
-              child: _buildVatCertContent(data.vatCertificate, provider),
+              child: _buildVatCertContent(data.vatCertificate, provider, isSuperAdmin: isSuperAdmin),
             ),
           ],
         ),
@@ -190,7 +193,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                 title: 'Commercial License',
                 icon: Icons.business_center_outlined,
                 accentColor: const Color(0xFF0F172A),
-                child: _buildLicenseContent(data.license, provider),
+                child: _buildLicenseContent(data.license, provider, isSuperAdmin: isSuperAdmin),
               ),
             ),
             SizedBox(width: 24.w),
@@ -199,7 +202,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                 title: 'VAT Certificate',
                 icon: Icons.receipt_long_outlined,
                 accentColor: const Color(0xFF0F172A),
-                child: _buildVatCertContent(data.vatCertificate, provider),
+                child: _buildVatCertContent(data.vatCertificate, provider, isSuperAdmin: isSuperAdmin),
               ),
             ),
           ],
@@ -272,7 +275,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildLicenseContent(CommercialLicense license, VaultProvider provider) {
+  Widget _buildLicenseContent(CommercialLicense license, VaultProvider provider, {bool isSuperAdmin = false}) {
     return Column(
       children: [
         _buildInfoRow(
@@ -305,12 +308,13 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
           () => _updateLicense(provider, document: null),
           provider,
           'license',
+          isSuperAdmin: isSuperAdmin,
         ),
       ],
     );
   }
 
-  Widget _buildVatCertContent(VatCertificate cert, VaultProvider provider) {
+  Widget _buildVatCertContent(VatCertificate cert, VaultProvider provider, {bool isSuperAdmin = false}) {
     return Column(
       children: [
         _buildInfoRow(
@@ -335,6 +339,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
           () => _updateVatCert(provider, document: null),
           provider,
           'vat_cert',
+          isSuperAdmin: isSuperAdmin,
         ),
       ],
     );
@@ -403,7 +408,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildDocumentSection(String label, VaultDocument? doc, Function(VaultDocument) onUpload, VoidCallback onDelete, VaultProvider provider, String folderName) {
+  Widget _buildDocumentSection(String label, VaultDocument? doc, Function(VaultDocument) onUpload, VoidCallback onDelete, VaultProvider provider, String folderName, {bool isSuperAdmin = false}) {
     final bool hasDoc = doc != null && doc.url.isNotEmpty;
     return StateWithHover(
       builder: (context, isHovered) {
@@ -480,15 +485,16 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                       tooltip: 'Download Document',
                     ),
                   ),
-                  Semantics(
-                    button: true,
-                    label: 'Delete $label',
-                    child: IconButton(
-                      icon: Icon(Icons.delete_outline, size: 20.sp, color: const Color(0xFFF43F5E)),
-                      onPressed: onDelete,
-                      tooltip: 'Delete Document',
+                  if (isSuperAdmin)
+                    Semantics(
+                      button: true,
+                      label: 'Delete $label',
+                      child: IconButton(
+                        icon: Icon(Icons.delete_outline, size: 20.sp, color: const Color(0xFFF43F5E)),
+                        onPressed: onDelete,
+                        tooltip: 'Delete Document',
+                      ),
                     ),
-                  ),
                 ],
                 Semantics(
                   button: true,
@@ -687,12 +693,15 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                                         onPressed: () => _showAddFilingDialog(context, filing: filing),
                                       ),
                                     ),
-                                    Semantics(
+                                Semantics(
                                       button: true,
                                       label: 'Delete VAT filing',
-                                      child: IconButton(
-                                        icon: Icon(Icons.delete_outline, color: const Color(0xFFF43F5E), size: 20.sp),
-                                        onPressed: () => _confirmDeleteVatFiling(context, provider, filing),
+                                      child: Visibility(
+                                        visible: context.read<AuthProvider>().user?.isSuperAdmin ?? false,
+                                        child: IconButton(
+                                          icon: Icon(Icons.delete_outline, color: const Color(0xFFF43F5E), size: 20.sp),
+                                          onPressed: () => _confirmDeleteVatFiling(context, provider, filing),
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -1183,9 +1192,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not download file')),
-        );
+        AppSnackBar.showInfo(context, 'Could not download file');
       }
     }
   }
@@ -1204,42 +1211,32 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
         final fileSize = await xFile.length();
         if (fileSize > 5 * 1024 * 1024) { // 5MB limit
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('File size must be less than 5MB')),
-            );
+            AppSnackBar.showInfo(context, 'File size must be less than 5MB');
           }
           return;
         }
 
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Uploading document...')),
-          );
+          AppSnackBar.showInfo(context, 'Uploading document...');
         }
 
         final uploadedDoc = await provider.uploadDocument(xFile, folderName);
         if (uploadedDoc != null) {
           onUpload(uploadedDoc);
           if (mounted) {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('✅ Upload successful')),
-            );
+            
+            AppSnackBar.showInfo(context, '✅ Upload successful');
           }
         } else {
           if (mounted) {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(provider.errorMessage ?? 'Upload failed')),
-            );
+            
+            AppSnackBar.showError(context, provider.errorMessage ?? 'Upload failed');
           }
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking file: $e')),
-        );
+        AppSnackBar.showError(context, 'Error picking file: $e');
       }
     }
   }
@@ -1324,9 +1321,7 @@ class _VaultScreenState extends State<VaultScreen> with SingleTickerProviderStat
                     message: 'VAT filing for bill ${filing.billNumber} has been deleted.',
                     relatedId: 'vault',
                   );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('VAT filing deleted successfully')),
-                  );
+                  AppSnackBar.showInfo(context, 'VAT filing deleted successfully');
                 }
               }
             },

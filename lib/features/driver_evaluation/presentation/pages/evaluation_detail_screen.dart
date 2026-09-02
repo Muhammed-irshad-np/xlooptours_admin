@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -361,9 +362,7 @@ class _EvaluationDetailScreenState extends State<EvaluationDetailScreen> {
                           scoresData,
                         );
                         if (success && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Evaluation submitted successfully!')),
-                          );
+                          AppSnackBar.showInfo(context, 'Evaluation submitted successfully!');
                           Navigator.pop(context);
                         }
                       },

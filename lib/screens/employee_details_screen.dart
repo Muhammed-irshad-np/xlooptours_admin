@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
@@ -311,7 +312,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
 
   Widget _buildAuthorizedVehiclesCard(BuildContext context) {
     final vehicles = context.watch<VehicleProvider>().vehicles;
-    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     final authorizedVehicles = vehicles.where((v) {
       if (v.tafweeds == null) return false;
       return v.tafweeds!.any((t) => t.driverId == employee.id);
@@ -428,7 +429,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      if (employeeTafweed != null && isAdmin)
+                      if (employeeTafweed != null && isSuperAdmin)
                         IconButton(
                           icon: Icon(
                             Icons.delete_outline,
@@ -488,15 +489,11 @@ class EmployeeDetailsScreen extends StatelessWidget {
             message: 'Tafweed authorization for vehicle ${vehicle.plateNumber} has been removed from employee ${employee.fullName}.',
             relatedId: employee.id,
           );
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Tafweed deleted successfully')),
-          );
+          AppSnackBar.showSuccess(context, 'Tafweed deleted successfully');
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete Tafweed: $e')),
-          );
+          AppSnackBar.showError(context, 'Failed to delete Tafweed: $e');
         }
       }
     }

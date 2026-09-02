@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -14,8 +15,6 @@ import '../features/employee/domain/entities/employee_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../widgets/custom_date_picker.dart';
-import '../features/vehicle/domain/entities/vehicle_entity.dart';
-import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
@@ -332,7 +331,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
           ? (_joinDate.value ?? DateTime.now())
           : (_birthDate.value ?? DateTime(1990)),
       firstDate: DateTime(1950),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      lastDate: DateTime(2100),
     );
     if (picked != null) {
       if (isJoinDate) {
@@ -352,9 +351,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     } catch (e) {
       debugPrint('Error picking image: $e');
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+        AppSnackBar.showError(context, 'Error picking image: $e');
       }
     }
   }
@@ -599,15 +596,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
       if (mounted) {
         Navigator.pop(context, true);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Employee saved successfully')),
-        );
+        AppSnackBar.showSuccess(context, 'Employee saved successfully');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving employee: $e')));
+        AppSnackBar.showError(context, 'Error saving employee: $e');
       }
     } finally {
       if (mounted) {
@@ -995,17 +988,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     onTap: () async {
                                       final picked = await showDatePicker(
                                         context: context,
-                                        initialDate:
-                                            date ??
-                                            DateTime.now().add(
-                                              const Duration(days: 365),
-                                            ),
-                                        firstDate: DateTime.now().subtract(
-                                          const Duration(days: 365 * 5),
-                                        ),
-                                        lastDate: DateTime.now().add(
-                                          const Duration(days: 365 * 10),
-                                        ),
+                                        initialDate: date ?? DateTime.now(),
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2100),
                                       );
                                       if (picked != null) {
                                         _iqamaExpiryDate.value = picked;
@@ -1062,17 +1047,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     onTap: () async {
                                       final picked = await showDatePicker(
                                         context: context,
-                                        initialDate:
-                                            date ??
-                                            DateTime.now().add(
-                                              const Duration(days: 365),
-                                            ),
-                                        firstDate: DateTime.now().subtract(
-                                          const Duration(days: 365 * 5),
-                                        ),
-                                        lastDate: DateTime.now().add(
-                                          const Duration(days: 365 * 10),
-                                        ),
+                                        initialDate: date ?? DateTime.now(),
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2100),
                                       );
                                       if (picked != null) {
                                         _bahrainResidenceExpiryDate.value =
@@ -1127,17 +1104,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     onTap: () async {
                                       final picked = await showDatePicker(
                                         context: context,
-                                        initialDate:
-                                            date ??
-                                            DateTime.now().add(
-                                              const Duration(days: 365),
-                                            ),
-                                        firstDate: DateTime.now().subtract(
-                                          const Duration(days: 365 * 5),
-                                        ),
-                                        lastDate: DateTime.now().add(
-                                          const Duration(days: 365 * 10),
-                                        ),
+                                        initialDate: date ?? DateTime.now(),
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2100),
                                       );
                                       if (picked != null) {
                                         _healthInsuranceExpiryDate.value =
@@ -1196,17 +1165,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     onTap: () async {
                                       final picked = await showDatePicker(
                                         context: context,
-                                        initialDate:
-                                            date ??
-                                            DateTime.now().add(
-                                              const Duration(days: 365),
-                                            ),
-                                        firstDate: DateTime.now().subtract(
-                                          const Duration(days: 365 * 5),
-                                        ),
-                                        lastDate: DateTime.now().add(
-                                          const Duration(days: 365 * 10),
-                                        ),
+                                        initialDate: date ?? DateTime.now(),
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2100),
                                       );
                                       if (picked != null) {
                                         _passportExpiryDate.value = picked;
@@ -1279,17 +1240,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     onTap: () async {
                                       final picked = await showDatePicker(
                                         context: context,
-                                        initialDate:
-                                            date ??
-                                            DateTime.now().add(
-                                              const Duration(days: 365),
-                                            ),
-                                        firstDate: DateTime.now().subtract(
-                                          const Duration(days: 365 * 5),
-                                        ),
-                                        lastDate: DateTime.now().add(
-                                          const Duration(days: 365 * 10),
-                                        ),
+                                        initialDate: date ?? DateTime.now(),
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2100),
                                       );
                                       if (picked != null) {
                                         _saudiVisaExpiryDate.value = picked;
@@ -1380,17 +1333,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     onTap: () async {
                                       final picked = await showDatePicker(
                                         context: context,
-                                        initialDate:
-                                            date ??
-                                            DateTime.now().add(
-                                              const Duration(days: 365),
-                                            ),
-                                        firstDate: DateTime.now().subtract(
-                                          const Duration(days: 365 * 5),
-                                        ),
-                                        lastDate: DateTime.now().add(
-                                          const Duration(days: 365 * 10),
-                                        ),
+                                        initialDate: date ?? DateTime.now(),
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2100),
                                       );
                                       if (picked != null) {
                                         _bahrainVisaExpiryDate.value = picked;
@@ -1481,17 +1426,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     onTap: () async {
                                       final picked = await showDatePicker(
                                         context: context,
-                                        initialDate:
-                                            date ??
-                                            DateTime.now().add(
-                                              const Duration(days: 365),
-                                            ),
-                                        firstDate: DateTime.now().subtract(
-                                          const Duration(days: 365 * 5),
-                                        ),
-                                        lastDate: DateTime.now().add(
-                                          const Duration(days: 365 * 10),
-                                        ),
+                                        initialDate: date ?? DateTime.now(),
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2100),
                                       );
                                       if (picked != null) {
                                         _dubaiVisaExpiryDate.value = picked;
@@ -1582,17 +1519,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     onTap: () async {
                                       final picked = await showDatePicker(
                                         context: context,
-                                        initialDate:
-                                            date ??
-                                            DateTime.now().add(
-                                              const Duration(days: 365),
-                                            ),
-                                        firstDate: DateTime.now().subtract(
-                                          const Duration(days: 365 * 5),
-                                        ),
-                                        lastDate: DateTime.now().add(
-                                          const Duration(days: 365 * 10),
-                                        ),
+                                        initialDate: date ?? DateTime.now(),
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2100),
                                       );
                                       if (picked != null) {
                                         _qatarVisaExpiryDate.value = picked;
@@ -1683,17 +1612,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                     onTap: () async {
                                       final picked = await showDatePicker(
                                         context: context,
-                                        initialDate:
-                                            date ??
-                                            DateTime.now().add(
-                                              const Duration(days: 365),
-                                            ),
-                                        firstDate: DateTime.now().subtract(
-                                          const Duration(days: 365 * 5),
-                                        ),
-                                        lastDate: DateTime.now().add(
-                                          const Duration(days: 365 * 10),
-                                        ),
+                                        initialDate: date ?? DateTime.now(),
+                                        firstDate: DateTime(2000),
+                                        lastDate: DateTime(2100),
                                       );
                                       if (picked != null) {
                                         _licenseExpiryDate.value = picked;
@@ -2199,15 +2120,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                       onTap: () async {
                         final picked = await showDatePicker(
                           context: context,
-                          initialDate:
-                              date ??
-                              DateTime.now().add(const Duration(days: 30)),
-                          firstDate: DateTime.now().subtract(
-                            const Duration(days: 365),
-                          ),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 365 * 2),
-                          ),
+                          initialDate: date ?? DateTime.now(),
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime(2100),
                         );
                         if (picked != null) {
                           entry.rechargeExpiry.value = picked;

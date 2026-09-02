@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -817,14 +818,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 ),
                 onPressed: () {
                   if (user.uid.contains('@')) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'This user has no Auth account id. Cannot change login email.',
-                        ),
-                        backgroundColor: Colors.orange,
-                      ),
-                    );
+                    AppSnackBar.showWarning(context, 'This user has no Auth account id. Cannot change login email.');
                     return;
                   }
                   showDialog(
@@ -844,14 +838,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 ),
                 onPressed: () {
                   if (user.uid.contains('@')) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text(
-                          'This user has no Auth account id. Recreate user to set a password.',
-                        ),
-                        backgroundColor: Colors.orange,
-                      ),
-                    );
+                    AppSnackBar.showWarning(context, 'This user has no Auth account id. Cannot change password.');
                     return;
                   }
                   showDialog(
@@ -1031,14 +1018,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                       final ok = await provider.removeRole(role.id);
                       if (context.mounted) {
                         if (!ok) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                provider.errorMessage ?? 'Failed to delete role',
-                              ),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
+                          AppSnackBar.showError(context, provider.errorMessage ?? 'An error occurred');
                         } else {
                           await ActivityLogger.log(
                             context,

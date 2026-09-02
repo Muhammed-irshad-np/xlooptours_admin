@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -215,24 +216,10 @@ class _UserFormDialogState extends State<UserFormDialog> {
         );
         if (mounted) {
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                widget.userToEdit != null
-                    ? 'User updated successfully'
-                    : 'User created successfully',
-              ),
-              backgroundColor: Colors.green,
-            ),
-          );
+          AppSnackBar.showSuccess(context, widget.userToEdit != null ? 'User updated successfully' : 'User created successfully');
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(provider.errorMessage ?? 'An error occurred'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        AppSnackBar.showError(context, provider.errorMessage ?? 'An error occurred');
       }
     }
   }
@@ -546,12 +533,7 @@ class _LoginEmailFixSectionState extends State<_LoginEmailFixSection> {
   Future<void> _save() async {
     final email = _controller.text.trim().toLowerCase();
     if (email.isEmpty || !email.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Enter a valid login email'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      AppSnackBar.showWarning(context, 'Enter a valid login email');
       return;
     }
     setState(() => _saving = true);
@@ -562,17 +544,12 @@ class _LoginEmailFixSectionState extends State<_LoginEmailFixSection> {
     if (!mounted) return;
     setState(() => _saving = false);
     final provider = context.read<UserManagementProvider>();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? 'Login email updated in User Management'
-              : (provider.errorMessage ?? 'Failed to update'),
-        ),
-        backgroundColor: ok ? Colors.green : Colors.red,
-      ),
-    );
-    if (ok) setState(() => _expanded = false);
+    if (ok) {
+      AppSnackBar.showSuccess(context, 'Login email updated in User Management');
+      setState(() => _expanded = false);
+    } else {
+      AppSnackBar.showError(context, provider.errorMessage ?? 'Failed to update');
+    }
   }
 
   @override

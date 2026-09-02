@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:uuid/uuid.dart';
@@ -7,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../features/vehicle/domain/entities/shop_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 
 class ShopMasterScreen extends StatefulWidget {
   const ShopMasterScreen({super.key});
@@ -52,9 +54,7 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error deleting shop: $e')));
+        AppSnackBar.showError(context, 'Error deleting shop: $e');
       }
     }
   }
@@ -86,6 +86,7 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     return Scaffold(
       appBar: const ModernAppBar(title: 'Maintenance Shops Master'),
       floatingActionButton: FloatingActionButton.extended(
@@ -277,9 +278,10 @@ class _ShopMasterScreenState extends State<ShopMasterScreen> {
                               onPressed: () => _showAddEditDialog(shop: shop),
                               tooltip: 'Edit',
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () async {
+                            if (isSuperAdmin)
+                              IconButton(
+                                icon: const Icon(Icons.delete, color: Colors.red),
+                                onPressed: () async {
                                 final confirm = await showDialog<bool>(
                                   context: context,
                                   builder: (c) => AlertDialog(
@@ -391,9 +393,7 @@ class _AddEditShopDialogState extends State<_AddEditShopDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error saving shop: $e')));
+        AppSnackBar.showError(context, 'Error saving shop: $e');
         setState(() {
           _isSaving = false;
         });

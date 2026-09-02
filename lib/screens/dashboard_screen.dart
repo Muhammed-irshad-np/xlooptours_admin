@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -594,12 +595,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
                 await Clipboard.setData(ClipboardData(text: feedbackUrl));
                 if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Feedback link copied to clipboard!'),
-                    backgroundColor: _DT.success,
-                  ),
-                );
+                AppSnackBar.showSuccess(context, 'Feedback link copied to clipboard!');
               },
             ),
           ],
@@ -781,19 +777,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           }
           if (ctx.mounted) Navigator.pop(ctx);
           if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                behavior: SnackBarBehavior.floating,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                ),
-                backgroundColor: _DT.success,
-                content: Text(
-                  'Odometer updated successfully',
-                  style: GoogleFonts.inter(color: Colors.white),
-                ),
-              ),
-            );
+            AppSnackBar.showSuccess(context, 'Odometer updated successfully');
           }
         },
       ),
@@ -2323,9 +2307,7 @@ class _CelebrationsSection extends StatelessWidget {
         "Hi ${emp.fullName}, wishing you a very Happy Birthday from all of us at Xloop! Have a fantastic day ahead! 🎂🎉";
     String phone = emp.phoneNumber.replaceAll(RegExp(r'\D'), '');
     if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid phone number for WhatsApp')),
-      );
+      AppSnackBar.showInfo(context, 'Invalid phone number for WhatsApp');
       return;
     }
     if (emp.countryCode != null && emp.countryCode!.isNotEmpty) {
@@ -2338,9 +2320,7 @@ class _CelebrationsSection extends StatelessWidget {
         'https://wa.me/$phone?text=${Uri.encodeComponent(greeting)}';
     final uri = Uri.parse(whatsappUrl);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not launch WhatsApp')),
-      );
+      AppSnackBar.showInfo(context, 'Could not launch WhatsApp');
     }
   }
 
@@ -2356,19 +2336,13 @@ class _CelebrationsSection extends StatelessWidget {
     }
     final uri = Uri(scheme: 'tel', path: phone);
     if (!await launchUrl(uri)) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Could not initiate call')));
+      AppSnackBar.showInfo(context, 'Could not initiate call');
     }
   }
 
   Future<void> _launchEmail(EmployeeEntity emp, BuildContext context) async {
     if (emp.email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No email address provided for this employee'),
-        ),
-      );
+      AppSnackBar.showInfo(context, 'No email address provided for this employee');
       return;
     }
     final subject = Uri.encodeComponent(
@@ -2380,9 +2354,7 @@ class _CelebrationsSection extends StatelessWidget {
     final emailUrl = 'mailto:${emp.email}?subject=$subject&body=$body';
     final uri = Uri.parse(emailUrl);
     if (!await launchUrl(uri)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not launch email client')),
-      );
+      AppSnackBar.showInfo(context, 'Could not launch email client');
     }
   }
 

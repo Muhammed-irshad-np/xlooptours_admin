@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'dart:math' as math;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -356,9 +357,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
       _registrationSuccess.value = true;
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error registering: $e')));
+      AppSnackBar.showError(context, 'Error registering: $e');
     } finally {
       _isSubmitting.value = false;
     }

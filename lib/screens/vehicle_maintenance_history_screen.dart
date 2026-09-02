@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -28,7 +29,7 @@ class _VehicleMaintenanceHistoryScreenState
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     return Consumer<VehicleProvider>(
       builder: (context, vehicleProvider, child) {
         final matches = vehicleProvider.vehicles.where(
@@ -83,7 +84,7 @@ class _VehicleMaintenanceHistoryScreenState
           body: Column(
             children: [
               _buildFilterBar(availableShops.toList()),
-              if (isAdmin)
+              if (isSuperAdmin)
                 _buildCostSummaryCard(totalCost, filteredHistory.length),
               Expanded(
                 child: filteredHistory.isEmpty
@@ -104,7 +105,7 @@ class _VehicleMaintenanceHistoryScreenState
                             context,
                             currentVehicle,
                             record,
-                            isAdmin: isAdmin,
+                            isAdmin: isSuperAdmin,
                           );
                         },
                       ),
@@ -731,7 +732,6 @@ class _VehicleMaintenanceHistoryScreenState
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
-              final messenger = ScaffoldMessenger.of(context);
               try {
                 await context.read<VehicleProvider>().deleteMaintenanceRecord(
                   currentVehicle,
@@ -744,20 +744,18 @@ class _VehicleMaintenanceHistoryScreenState
                     message: 'Deleted maintenance record (${record.serviceType}) for vehicle ${currentVehicle.make} ${currentVehicle.model} (${currentVehicle.plateNumber}).',
                     relatedId: currentVehicle.id,
                   );
+                  AppSnackBar.showSuccess(
+                    context,
+                    'Maintenance record deleted successfully',
+                  );
                 }
-                messenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Maintenance record deleted successfully'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
               } catch (e) {
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text('Failed to delete maintenance record: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                if (mounted) {
+                  AppSnackBar.showError(
+                    context,
+                    'Failed to delete maintenance record: $e',
+                  );
+                }
               }
             },
             child: const Text('DELETE', style: TextStyle(color: Colors.red)),

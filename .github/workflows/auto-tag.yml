@@ -1,4 +1,4 @@
-name: Auto Tag Release
+name: Auto Version Bump and Tag
 
 on:
   push:
@@ -7,39 +7,46 @@ on:
       - main
 
 jobs:
-  auto-tag:
+  bump-version:
+    # Prevent infinite loops from version bump commits
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Required to push tags to the repository
+      contents: write
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # We need the full history to count commits properly
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate and Push Tag
+      - name: Configure Git
         run: |
-          # 1. Extract the base version from pubspec.yaml (e.g., 1.0.0)
-          BASE_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //g' | cut -d '+' -f 1 | tr -d '\r')
-          
-          # 2. Get the total number of Git commits (Build Number)
-          BUILD_NUMBER=$(git rev-list --count HEAD)
-          
-          # 3. Construct the Tag Name
-          TAG_NAME="v${BASE_VERSION}+${BUILD_NUMBER}"
-          
-          echo "Calculated Tag: $TAG_NAME"
-          
-          # 4. Configure Git identity for the bot
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          
-          # 5. Check if the tag already exists, otherwise create and push
-          if git ls-remote --tags origin | grep -q "refs/tags/$TAG_NAME"; then
-            echo "Tag $TAG_NAME already exists. Skipping."
-          else
-            git tag -a "$TAG_NAME" -m "Auto-generated release tag $TAG_NAME"
-            git push origin "$TAG_NAME"
-            echo "Successfully created and pushed tag: $TAG_NAME"
-          fi
+
+      - name: Set up Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: Install cider
+        run: dart pub global activate cider
+
+      - name: Bump Patch Version
+        run: |
+          export PATH="$PATH":"$HOME/.pub-cache/bin"
+
+          # Bump the patch version (1.0.0 -> 1.0.1 -> 1.0.2 ...)
+          cider bump patch
+
+          NEW_VERSION=$(cider version)
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "Bumped version to $NEW_VERSION"
+
+      - name: Commit and Tag
+        run: |
+          git add pubspec.yaml
+          git commit -m "chore: bump version to v${{ env.NEW_VERSION }} [skip ci]"
+          git tag "v${{ env.NEW_VERSION }}"
+          git push origin HEAD:${{ github.ref }}
+          git push origin "v${{ env.NEW_VERSION }}"

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:intl/intl.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
@@ -29,6 +30,7 @@ class VehicleDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<VehicleProvider>(context);
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
 
     // Find the latest version of this vehicle in the provider's list
@@ -229,14 +231,14 @@ class VehicleDetailScreen extends StatelessWidget {
               icon: Icons.security_outlined,
               expiryDate: currentVehicle.insurance?.expiryDate,
               attachmentUrl: currentVehicle.insurance?.attachmentUrl,
-              onDelete: () {
+              onDelete: isSuperAdmin ? () {
                 _confirmDelete(context, 'Insurance', () {
                   context.read<VehicleProvider>().deleteVehicleDocument(
                     currentVehicle,
                     'Insurance',
                   );
                 });
-              },
+              } : null,
             ),
             _buildDocumentCard(
               context,
@@ -244,14 +246,14 @@ class VehicleDetailScreen extends StatelessWidget {
               icon: Icons.description_outlined,
               expiryDate: currentVehicle.registration?.expiryDate,
               attachmentUrl: currentVehicle.registration?.attachmentUrl,
-              onDelete: () {
+              onDelete: isSuperAdmin ? () {
                 _confirmDelete(context, 'Isthimara', () {
                   context.read<VehicleProvider>().deleteVehicleDocument(
                     currentVehicle,
                     'Isthimara',
                   );
                 });
-              },
+              } : null,
             ),
             _buildDocumentCard(
               context,
@@ -259,14 +261,14 @@ class VehicleDetailScreen extends StatelessWidget {
               icon: Icons.fact_check_outlined,
               expiryDate: currentVehicle.fahas?.expiryDate,
               attachmentUrl: currentVehicle.fahas?.attachmentUrl,
-              onDelete: () {
+              onDelete: isSuperAdmin ? () {
                 _confirmDelete(context, 'Fahas', () {
                   context.read<VehicleProvider>().deleteVehicleDocument(
                     currentVehicle,
                     'Fahas',
                   );
                 });
-              },
+              } : null,
             ),
             _buildDocumentCard(
               context,
@@ -274,14 +276,14 @@ class VehicleDetailScreen extends StatelessWidget {
               icon: Icons.security_outlined,
               expiryDate: currentVehicle.bahrainInsurance?.expiryDate,
               attachmentUrl: currentVehicle.bahrainInsurance?.attachmentUrl,
-              onDelete: () {
+              onDelete: isSuperAdmin ? () {
                 _confirmDelete(context, 'Bahrain Insurance', () {
                   context.read<VehicleProvider>().deleteVehicleDocument(
                     currentVehicle,
                     'Bahrain Insurance',
                   );
                 });
-              },
+              } : null,
             ),
             const Divider(height: 32),
             Row(
@@ -362,7 +364,7 @@ class VehicleDetailScreen extends StatelessWidget {
                           currentVehicle,
                           tafweed,
                         ),
-                        onDelete: isAdmin
+                        onDelete: isSuperAdmin
                             ? () => _confirmDeleteTafweed(
                                   context,
                                   currentVehicle,
@@ -1048,15 +1050,11 @@ class VehicleDetailScreen extends StatelessWidget {
       try {
         await context.read<VehicleProvider>().deleteTafweed(vehicle, record);
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Tafweed deleted successfully')),
-          );
+          AppSnackBar.showSuccess(context, 'Tafweed deleted successfully');
         }
       } catch (e) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to delete Tafweed: $e')),
-          );
+          AppSnackBar.showError(context, 'Failed to delete Tafweed: $e');
         }
       }
     }

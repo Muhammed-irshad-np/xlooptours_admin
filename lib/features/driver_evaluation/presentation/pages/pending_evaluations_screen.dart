@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
@@ -13,6 +14,7 @@ import 'package:xloop_invoice/core/utils/share_dialog.dart';
 import 'package:xloop_invoice/features/driver_evaluation/domain/entities/evaluation_entity.dart';
 import 'package:xloop_invoice/widgets/searchable_dropdown.dart';
 import 'package:xloop_invoice/widgets/web_safe_image.dart';
+import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 
 class PendingEvaluationsScreen extends StatefulWidget {
   const PendingEvaluationsScreen({super.key});
@@ -262,11 +264,13 @@ class _PendingEvaluationsScreenState extends State<PendingEvaluationsScreen>
           evaluation: evaluation,
           employee: employee,
           vehicle: vehicle,
-          onDelete: () => _showDeleteConfirmationDialog(
-            context,
-            evaluation.id,
-            evaluation.driverName,
-          ),
+          onDelete: (context.read<AuthProvider>().user?.isSuperAdmin ?? false)
+              ? () => _showDeleteConfirmationDialog(
+                  context,
+                  evaluation.id,
+                  evaluation.driverName,
+                )
+              : null,
           onShare: () => _showShareDialog(
             context,
             evaluation.id,
@@ -817,22 +821,10 @@ class _PendingEvaluationsScreenState extends State<PendingEvaluationsScreen>
                 final success = await provider.deleteEvaluation(id);
                 if (context.mounted) {
                   if (success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Evaluation deleted successfully'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
+                    AppSnackBar.showSuccess(context, 'Evaluation deleted successfully');
                   } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          provider.errorMessage ??
-                              'Failed to delete evaluation',
-                        ),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
+                    AppSnackBar.showError(context, provider.errorMessage ??
+                              'Failed to delete evaluation',);
                   }
                 }
               },
@@ -974,14 +966,14 @@ class _EvaluationTile extends StatefulWidget {
   final EvaluationEntity evaluation;
   final EmployeeEntity? employee;
   final VehicleEntity? vehicle;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final VoidCallback onShare;
 
   const _EvaluationTile({
     required this.evaluation,
     this.employee,
     this.vehicle,
-    required this.onDelete,
+    this.onDelete,
     required this.onShare,
   });
 
@@ -1432,14 +1424,15 @@ class _EvaluationTileState extends State<_EvaluationTile> {
                         ),
                         SizedBox(width: 8.w),
                       ],
-                      IconButton(
-                        icon: const Icon(
-                          Icons.delete_outline,
-                          color: Colors.redAccent,
+                      if (widget.onDelete != null)
+                        IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: Colors.redAccent,
+                          ),
+                          tooltip: 'Delete Evaluation',
+                          onPressed: widget.onDelete,
                         ),
-                        tooltip: 'Delete Evaluation',
-                        onPressed: widget.onDelete,
-                      ),
                       const Spacer(),
                       ElevatedButton(
                         onPressed: () {

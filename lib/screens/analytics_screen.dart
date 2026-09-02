@@ -1,5 +1,6 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../features/analytics/presentation/providers/analytics_provider.dart';
@@ -38,9 +39,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading analytics: $e')));
+        AppSnackBar.showError(context, 'Error loading analytics: $e');
       }
     }
   }

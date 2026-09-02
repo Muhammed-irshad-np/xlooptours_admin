@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
@@ -32,6 +33,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   String _searchQuery = '';
   late TabController _tabController;
   bool _isAdmin = false;
+  bool _isSuperAdmin = false;
 
   final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(true);
   final ValueNotifier<bool> _showInactive = ValueNotifier<bool>(false);
@@ -44,6 +46,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   void initState() {
     super.initState();
     _isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    _isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
     _tabs.addAll([
       'All',
       'Management',
@@ -84,9 +87,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     } catch (e) {
       if (mounted) {
         _isLoading.value = false;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading employees: $e')));
+        AppSnackBar.showError(context, 'Error loading employees: $e');
       }
     }
   }
@@ -154,10 +155,8 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   }
 
   Future<void> _deleteEmployee(EmployeeEntity employee) async {
-    if (!_isAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only admins can delete employees.')),
-      );
+    if (!_isSuperAdmin) {
+      AppSnackBar.showWarning(context, 'Only Super Admins can delete employees.');
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -560,7 +559,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                             ],
                           ),
                         ),
-                        if (_isAdmin)
+                        if (_isSuperAdmin)
                           const PopupMenuItem(
                             value: 'delete',
                             child: Row(

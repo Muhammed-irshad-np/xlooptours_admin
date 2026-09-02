@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -131,6 +132,7 @@ class _AllVehiclesMaintenanceHistoryScreenState
   @override
   Widget build(BuildContext context) {
     final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
 
     return Consumer<VehicleProvider>(
       builder: (context, vehicleProvider, _) {
@@ -304,7 +306,7 @@ class _AllVehiclesMaintenanceHistoryScreenState
                             context,
                             item.vehicle,
                             item.record,
-                            isAdmin: isAdmin,
+                            isAdmin: isSuperAdmin,
                           );
                         },
                       ),
@@ -1065,7 +1067,6 @@ class _AllVehiclesMaintenanceHistoryScreenState
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogContext);
-              final messenger = ScaffoldMessenger.of(context);
               try {
                 await context.read<VehicleProvider>().deleteMaintenanceRecord(
                       vehicle,
@@ -1079,19 +1080,13 @@ class _AllVehiclesMaintenanceHistoryScreenState
                     relatedId: vehicle.id,
                   );
                 }
-                messenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Maintenance record deleted successfully'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                if (context.mounted) {
+                  AppSnackBar.showSuccess(context, 'Maintenance record deleted successfully');
+                }
               } catch (e) {
-                messenger.showSnackBar(
-                  SnackBar(
-                    content: Text('Failed to delete maintenance record: $e'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                if (context.mounted) {
+                  AppSnackBar.showError(context, 'Failed to delete maintenance record: $e');
+                }
               }
             },
             child: const Text('DELETE', style: TextStyle(color: Colors.red)),

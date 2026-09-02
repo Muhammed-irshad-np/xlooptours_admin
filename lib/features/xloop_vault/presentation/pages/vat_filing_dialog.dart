@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -90,9 +91,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
           final size = await xf.length();
           if (size > 5 * 1024 * 1024) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${pf.name} exceeds 5MB limit')),
-              );
+              AppSnackBar.showError(context, '${pf.name} exceeds 5MB limit');
             }
             return;
           }
@@ -112,9 +111,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error picking file: $e')));
+        AppSnackBar.showError(context, 'Error picking file: $e');
       }
     }
   }
@@ -150,17 +147,13 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
         _fromDate == null ||
         _toDate == null ||
         _amountController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill all date and amount fields')),
-      );
+      AppSnackBar.showInfo(context, 'Please fill all date and amount fields');
       return;
     }
 
     final amountValue = double.tryParse(_amountController.text);
     if (amountValue == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Invalid amount')));
+      AppSnackBar.showInfo(context, 'Invalid amount');
       return;
     }
 
@@ -246,15 +239,9 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
           relatedId: 'vault',
         );
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('VAT filing saved successfully')),
-        );
+        AppSnackBar.showInfo(context, 'VAT filing saved successfully');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to save filing: ${provider.errorMessage}'),
-          ),
-        );
+        AppSnackBar.showError(context, 'Failed to save filing: ${provider.errorMessage}');
       }
     }
   }
@@ -796,16 +783,12 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
       final uri = Uri.parse(url);
       if (!await launchUrl(uri)) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not open document')),
-          );
+          AppSnackBar.showInfo(context, 'Could not open document');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Failed to open document: $e')));
+        AppSnackBar.showError(context, 'Failed to open document: $e');
       }
     }
   }

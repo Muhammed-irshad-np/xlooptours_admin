@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -41,9 +42,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading invoices: $e')));
+        AppSnackBar.showError(context, 'Error loading invoices: $e');
       }
     }
   }
@@ -61,9 +60,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
   Future<void> _deleteInvoice(InvoiceEntity invoice) async {
     final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
     if (!isAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only admins can delete invoices.')),
-      );
+      AppSnackBar.showWarning(context, 'Only admins can delete invoices.');
       return;
     }
     // Show confirmation dialog
@@ -93,16 +90,12 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
       try {
         await context.read<InvoiceProvider>().deleteInvoice(invoice.id!);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Invoice deleted successfully')),
-          );
+          AppSnackBar.showSuccess(context, 'Invoice deleted successfully');
           _loadInvoices(); // Reload the list
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error deleting invoice: $e')));
+          AppSnackBar.showError(context, 'Error deleting invoice: $e');
         }
       }
     }
@@ -110,7 +103,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     final currencyFormat = NumberFormat.currency(
       symbol: 'SR ',
       decimalDigits: 2,
@@ -303,7 +296,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
     NumberFormat currencyFormat,
     DateFormat dateFormat,
   ) {
-    final isAdmin = context.read<AuthProvider>().user?.isAdmin ?? false;
+    final isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
@@ -349,7 +342,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                     ],
                   ),
                 ),
-                if (isAdmin)
+                if (isSuperAdmin)
                   const PopupMenuItem<String>(
                     value: 'delete',
                     child: Row(

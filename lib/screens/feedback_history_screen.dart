@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -1795,12 +1796,7 @@ class _GenerateFeedbackLinkDialogState extends State<_GenerateFeedbackLinkDialog
   Future<void> _copyToClipboard(String url) async {
     await Clipboard.setData(ClipboardData(text: url));
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Feedback link copied to clipboard!'),
-        backgroundColor: Colors.green,
-      ),
-    );
+    AppSnackBar.showInfo(context, 'Feedback link copied to clipboard!');
   }
 
   @override
