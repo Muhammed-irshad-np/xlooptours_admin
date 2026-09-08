@@ -22,6 +22,10 @@ abstract class FinanceRepository {
     int pageSize = 150,
   });
 
+  /// Expenses committed but not yet posted to a wallet (pending / approved).
+  /// Drives the projected ("if everything is approved") balance.
+  Future<List<ExpenseEntity>> getOutstandingExpenses();
+
   Future<List<ExpenseEntity>> getExpensesByDateRange(
     DateTime start,
     DateTime end,
@@ -88,6 +92,7 @@ abstract class FinanceRepository {
     required String sessionId,
     required String verifiedBy,
     required String? verifiedByUserId,
+    String? resolutionNotes,
   });
   Future<String> uploadClosingSheet(XFile file, String sessionId);
   Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt});

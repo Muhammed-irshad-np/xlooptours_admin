@@ -393,7 +393,7 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
         submittedBy: _driverNameCtrl.text.toUpperCase().trim(),
         submittedByRole: 'DRIVER',
         expenseCategory: 'VEHICLES',
-        expenseType: _selectedType!.toUpperCase(),
+        expenseType: _selectedType!,
         amount: double.parse(_amountCtrl.text),
         currency: 'SAR',
         fundAccountId: defaultAccount.id,

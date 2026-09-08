@@ -1,7 +1,9 @@
 import '../../domain/entities/employee_contact.dart';
 import '../../domain/entities/employee_entity.dart';
 import '../../domain/entities/employee_documents.dart';
+import '../../domain/entities/external_vehicle_info.dart';
 import 'employee_contact_model.dart';
+import 'external_vehicle_info_model.dart';
 import 'employee_document_models.dart';
 
 class EmployeeModel extends EmployeeEntity {
@@ -18,7 +20,8 @@ class EmployeeModel extends EmployeeEntity {
     super.joinDate,
     super.birthDate,
     required super.gender,
-    super.driverType,
+    super.employmentType,
+    super.externalVehicle,
     super.isActive = true,
     super.imageUrl,
     super.assignedVehicleId,
@@ -49,7 +52,13 @@ class EmployeeModel extends EmployeeEntity {
       'joinDate': joinDate?.toIso8601String(),
       'birthDate': birthDate?.toIso8601String(),
       'gender': gender,
-      'driverType': driverType,
+      'employmentType': employmentType,
+      // Legacy mirror: older builds and reports still read `driverType`, which
+      // only ever carried a value for drivers.
+      'driverType': isDriver ? employmentType : null,
+      'externalVehicle': externalVehicle != null
+          ? ExternalVehicleInfoModel.fromEntity(externalVehicle!).toJson()
+          : null,
       'isActive': isActive,
       'imageUrl': imageUrl,
       'assignedVehicleId': assignedVehicleId,
@@ -152,7 +161,16 @@ class EmployeeModel extends EmployeeEntity {
           ? DateTime.tryParse(json['birthDate'] as String)
           : null,
       gender: json['gender'] as String? ?? '',
-      driverType: json['driverType'] as String?,
+      // Records written before external staff existed only stored `driverType`
+      // (drivers only); everyone else defaults to Internal.
+      employmentType: json['employmentType'] as String? ??
+          json['driverType'] as String? ??
+          EmploymentType.internal,
+      externalVehicle: json['externalVehicle'] != null
+          ? ExternalVehicleInfoModel.fromJson(
+              json['externalVehicle'] as Map<String, dynamic>,
+            )
+          : null,
       isActive: json['isActive'] as bool? ?? true,
       imageUrl: json['imageUrl'] as String?,
       assignedVehicleId: json['assignedVehicleId'] as String?,
@@ -252,7 +270,8 @@ class EmployeeModel extends EmployeeEntity {
       joinDate: entity.joinDate,
       birthDate: entity.birthDate,
       gender: entity.gender,
-      driverType: entity.driverType,
+      employmentType: entity.employmentType,
+      externalVehicle: entity.externalVehicle,
       isActive: entity.isActive,
       imageUrl: entity.imageUrl,
       assignedVehicleId: entity.assignedVehicleId,
@@ -284,7 +303,8 @@ class EmployeeModel extends EmployeeEntity {
     DateTime? joinDate,
     DateTime? birthDate,
     String? gender,
-    String? driverType,
+    String? employmentType,
+    ExternalVehicleInfo? externalVehicle,
     bool? isActive,
     String? imageUrl,
     String? assignedVehicleId,
@@ -310,6 +330,7 @@ class EmployeeModel extends EmployeeEntity {
     bool clearDubaiVisa = false,
     bool clearQatarVisa = false,
     bool clearAuthorization = false,
+    bool clearExternalVehicle = false,
   }) {
     return EmployeeModel(
       id: id ?? this.id,
@@ -324,7 +345,10 @@ class EmployeeModel extends EmployeeEntity {
       joinDate: joinDate ?? this.joinDate,
       birthDate: birthDate ?? this.birthDate,
       gender: gender ?? this.gender,
-      driverType: driverType ?? this.driverType,
+      employmentType: employmentType ?? this.employmentType,
+      externalVehicle: clearExternalVehicle
+          ? null
+          : (externalVehicle ?? this.externalVehicle),
       isActive: isActive ?? this.isActive,
       imageUrl: imageUrl ?? this.imageUrl,
       assignedVehicleId: assignedVehicleId ?? this.assignedVehicleId,

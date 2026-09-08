@@ -197,12 +197,16 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
                     border: OutlineInputBorder(),
                   ),
                   value: _selectedDriverId,
-                  items: empProvider.employees.map((e) {
-                    return DropdownMenuItem(
-                      value: e.id,
-                      child: Text(e.fullName),
-                    );
-                  }).toList(),
+                  // Company-vehicle authorisation: internal staff only.
+                  items: empProvider.employees
+                      .where((e) => e.isInternal)
+                      .map((e) {
+                        return DropdownMenuItem(
+                          value: e.id,
+                          child: Text(e.fullName),
+                        );
+                      })
+                      .toList(),
                    onChanged: (val) {
                     setState(() {
                       _selectedDriverId = val;

@@ -135,6 +135,7 @@ class PettyCashProvider with ChangeNotifier {
     required String sessionId,
     required String verifiedBy,
     required String? verifiedByUserId,
+    String? resolutionNotes,
   }) async {
     _error = null;
     try {
@@ -142,13 +143,21 @@ class PettyCashProvider with ChangeNotifier {
         sessionId: sessionId,
         verifiedBy: verifiedBy,
         verifiedByUserId: verifiedByUserId,
+        resolutionNotes: resolutionNotes,
       );
       final index = _sessions.indexWhere((s) => s.id == sessionId);
       if (index != -1) {
+        final existing = _sessions[index].notes ?? '';
+        final updatedNotes = resolutionNotes != null && resolutionNotes.trim().isNotEmpty
+            ? (existing.isNotEmpty
+                ? '$existing\n[Resolution: ${resolutionNotes.trim()}]'
+                : '[Resolution: ${resolutionNotes.trim()}]')
+            : existing;
         _sessions[index] = _sessions[index].copyWith(
           status: PettyCashSessionStatus.verified,
           verifiedBy: verifiedBy,
           verifiedAt: DateTime.now(),
+          notes: updatedNotes.isNotEmpty ? updatedNotes : null,
         );
       }
       notifyListeners();

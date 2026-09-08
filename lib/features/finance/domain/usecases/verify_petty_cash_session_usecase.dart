@@ -9,11 +9,13 @@ class VerifyPettyCashSessionUseCase {
     required String sessionId,
     required String verifiedBy,
     required String? verifiedByUserId,
+    String? resolutionNotes,
   }) {
     return repository.verifyPettyCashSession(
       sessionId: sessionId,
       verifiedBy: verifiedBy,
       verifiedByUserId: verifiedByUserId,
+      resolutionNotes: resolutionNotes,
     );
   }
 }

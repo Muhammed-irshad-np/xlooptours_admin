@@ -178,8 +178,10 @@ class _AuthorizeDriverToVehicleDialogState
             );
           }
 
+          // Tafweed authorises someone to drive a *company* vehicle, so
+          // external drivers (who bring their own car) are excluded.
           final activeEmployees = employeeProvider.employees
-              .where((e) => e.isActive)
+              .where((e) => e.isActive && e.isInternal)
               .toList();
 
           return SingleChildScrollView(

@@ -61,10 +61,12 @@ class FinanceProvider with ChangeNotifier {
   });
 
   List<ExpenseEntity> _expenses = [];
+  List<ExpenseEntity> _outstandingExpenses = [];
   List<ExpenseCategoryEntity> _categories = [];
   FinancePolicyEntity? _policy;
   bool _isLoading = false;
   bool _isLoadingMore = false;
+  bool _isOutstandingLoading = false;
   bool _isCategoriesLoading = false;
   bool _isPolicyLoading = false;
   String? _error;
@@ -80,6 +82,7 @@ class FinanceProvider with ChangeNotifier {
 
   List<ExpenseEntity> get expenses => _expenses;
   List<ExpenseCategoryEntity> get categories => _categories;
+  bool get isOutstandingLoading => _isOutstandingLoading;
   FinancePolicyEntity get policy => _policy ?? const FinancePolicyEntity();
   bool get isLoading => _isLoading;
   bool get isLoadingMore => _isLoadingMore;
@@ -128,6 +131,73 @@ class FinanceProvider with ChangeNotifier {
   int get pendingCount =>
       _expenses.where((e) => e.status == ExpenseStatus.pending).length;
 
+  // ─── Projected (estimated) wallet position ──────────────────
+  //
+  // The fund account balances are the *real* ledger: money that has already
+  // been posted. Expenses sitting in pending/approved are committed but not
+  // yet posted, so they are invisible in the ledger while still being money
+  // that is effectively spoken for. These getters expose that commitment so
+  // the UI can show "balance if every pending expense gets approved".
+
+  /// Every expense that is committed but not yet posted, newest first.
+  List<ExpenseEntity> get outstandingExpenses => _outstandingExpenses;
+
+  /// Outstanding expenses that will actually move money out of a wallet.
+  /// Non-wallet (tracking-only) expenses never touch a balance.
+  List<ExpenseEntity> get walletCommitments => _outstandingExpenses
+      .where((e) => !e.isNonWallet && e.fundAccountId.isNotEmpty)
+      .toList();
+
+  /// Total committed outflow across all wallets, in halalas.
+  int get outstandingOutflowMinor =>
+      walletCommitments.fold(0, (acc, e) => acc + e.resolvedAmountMinor);
+
+  /// Committed outflow for a single wallet, in halalas.
+  int outstandingOutflowMinorFor(String accountId) => walletCommitments
+      .where((e) => e.fundAccountId == accountId)
+      .fold(0, (acc, e) => acc + e.resolvedAmountMinor);
+
+  /// Number of outstanding expenses queued against a single wallet.
+  int outstandingCountFor(String accountId) =>
+      walletCommitments.where((e) => e.fundAccountId == accountId).length;
+
+  /// Committed outflow per wallet id, in halalas.
+  Map<String, int> get outstandingOutflowByAccountMinor {
+    final map = <String, int>{};
+    for (final e in walletCommitments) {
+      map[e.fundAccountId] =
+          (map[e.fundAccountId] ?? 0) + e.resolvedAmountMinor;
+    }
+    return map;
+  }
+
+  /// Loads the committed-but-unposted expenses used for balance projection.
+  /// This is a separate query from the paginated list so the estimate stays
+  /// correct even when the table only shows the first page.
+  Future<void> fetchOutstandingExpenses() async {
+    _isOutstandingLoading = true;
+    notifyListeners();
+    try {
+      _outstandingExpenses = await financeRepository.getOutstandingExpenses();
+    } catch (e) {
+      debugPrint('Error fetching outstanding expenses: $e');
+    } finally {
+      _isOutstandingLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Refreshes the projection without surfacing errors — the ledger figures
+  /// stay usable even if this secondary query fails.
+  Future<void> _refreshOutstandingQuietly() async {
+    try {
+      _outstandingExpenses = await financeRepository.getOutstandingExpenses();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error refreshing outstanding expenses: $e');
+    }
+  }
+
   /// Total in halala (minor units) — excludes voided/rejected unless specifically filtered.
   int get totalFilteredAmountMinor {
     final list = _statusFilter == null
@@ -153,6 +223,7 @@ class FinanceProvider with ChangeNotifier {
       _expenses = page;
       _lastCursor = cursor;
       _hasMore = cursor != null;
+      await _refreshOutstandingQuietly();
     } catch (e) {
       _error = e.toString();
       debugPrint('Error fetching expenses: $e');
@@ -212,6 +283,7 @@ class FinanceProvider with ChangeNotifier {
 
     try {
       await insertExpenseUseCase(withMinor);
+      await _refreshOutstandingQuietly();
     } catch (e) {
       _expenses = _expenses.where((e) => e.id != withMinor.id).toList();
       _error = e.toString();
@@ -234,6 +306,7 @@ class FinanceProvider with ChangeNotifier {
 
     try {
       await updateExpenseUseCase(expense);
+      await _refreshOutstandingQuietly();
     } catch (e) {
       if (index != -1 && oldExpense != null) {
         _expenses[index] = oldExpense;
@@ -265,6 +338,7 @@ class FinanceProvider with ChangeNotifier {
 
     try {
       await deleteExpenseUseCase(id);
+      await _refreshOutstandingQuietly();
     } catch (e) {
       if (index != -1 && oldExpense != null) {
         _expenses.insert(index, oldExpense);
@@ -300,6 +374,7 @@ class FinanceProvider with ChangeNotifier {
         _expenses = [updated, ..._expenses];
       }
       notifyListeners();
+      await _refreshOutstandingQuietly();
     } catch (e, st) {
       _error = _readableError(e);
       debugPrint('Error approving expense: $_error');
@@ -350,6 +425,7 @@ class FinanceProvider with ChangeNotifier {
         _expenses[index] = updated;
       }
       notifyListeners();
+      await _refreshOutstandingQuietly();
     } catch (e) {
       _error = e.toString();
       debugPrint('Error rejecting expense: $e');
@@ -377,6 +453,7 @@ class FinanceProvider with ChangeNotifier {
         _expenses[index] = updated;
       }
       notifyListeners();
+      await _refreshOutstandingQuietly();
     } catch (e) {
       _error = e.toString();
       debugPrint('Error voiding expense: $e');
@@ -501,7 +578,10 @@ class FinanceProvider with ChangeNotifier {
   }
 
   List<ExpenseTypeEntity> getTypesForCategory(String categoryName) {
-    final index = _categories.indexWhere((c) => c.name == categoryName);
+    final trimmed = categoryName.trim().toLowerCase();
+    final index = _categories.indexWhere(
+      (c) => c.name.trim().toLowerCase() == trimmed,
+    );
     if (index == -1) return [];
     return _categories[index].expenseTypes.where((t) => t.isActive).toList();
   }

@@ -84,6 +84,7 @@ class FakeFinanceRepository implements FinanceRepository {
     required String sessionId,
     required String verifiedBy,
     required String? verifiedByUserId,
+    String? resolutionNotes,
   }) async {
     if (verifySessionError != null) throw verifySessionError!;
   }
@@ -121,6 +122,9 @@ class FakeFinanceRepository implements FinanceRepository {
     DocumentSnapshot? cursor,
     int pageSize = 150,
   }) async => (<ExpenseEntity>[], null);
+
+  @override
+  Future<List<ExpenseEntity>> getOutstandingExpenses() async => [];
 
   @override
   Future<List<ExpenseEntity>> getExpensesByDateRange(

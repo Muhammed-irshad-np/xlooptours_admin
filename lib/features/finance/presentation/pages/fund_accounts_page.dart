@@ -2075,7 +2075,10 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
         String searchQuery = '';
         return StatefulBuilder(
           builder: (ctx, setStateDialog) {
+            // A coordinator is custodian of a company fund account, so
+            // external (contracted) staff are not eligible.
             final filtered = empProv.employees.where((e) {
+              if (e.isExternal) return false;
               final q = searchQuery.toLowerCase();
               return e.fullName.toLowerCase().contains(q) ||
                   e.position.toLowerCase().contains(q);

@@ -409,11 +409,19 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   }
 
   Widget _buildCurrencyField() {
+    const defaultCurrencies = ['SAR', 'BHD', 'AED', 'QAR', 'USD'];
+    final currencies = List<String>.from(defaultCurrencies);
+    final cur = _selectedCurrency.toUpperCase().trim();
+    if (cur.isNotEmpty && !currencies.contains(cur)) {
+      currencies.add(cur);
+    }
+    final resolvedCur = currencies.contains(cur) ? cur : 'SAR';
+
     return _FieldWrapper(
       label: 'Currency',
       child: DropdownButtonFormField<String>(
-        initialValue: _selectedCurrency,
-        items: ['SAR', 'BHD', 'AED', 'QAR', 'USD']
+        initialValue: resolvedCur,
+        items: currencies
             .map((c) => DropdownMenuItem(value: c, child: Text(c)))
             .toList(),
         onChanged: (v) => setState(() => _selectedCurrency = v ?? 'SAR'),
@@ -625,7 +633,12 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                                     ),
                                   ),
                                   subtitle: Text(
-                                    emp.position.isNotEmpty ? emp.position : 'Employee',
+                                    [
+                                      emp.position.isNotEmpty
+                                          ? emp.position
+                                          : 'Employee',
+                                      if (emp.isExternal) 'External',
+                                    ].join(' · '),
                                     style: GoogleFonts.inter(
                                       fontSize: 11.sp,
                                       color: FinDT.textSecondary,
@@ -649,14 +662,55 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   }
 
   Widget _buildCategoryDropdown(FinanceProvider finProv) {
+    final activeCategories = finProv.categories.where((c) => c.isActive).toList();
+
+    // Resolve matching category for _selectedCategory (case-insensitive & trimmed)
+    String? resolvedCategory = _selectedCategory;
+    if (resolvedCategory != null && resolvedCategory.isNotEmpty) {
+      final match = activeCategories.cast<ExpenseCategoryEntity?>().firstWhere(
+            (c) => c!.name.trim().toLowerCase() == resolvedCategory!.trim().toLowerCase(),
+            orElse: () => null,
+          );
+      if (match != null) {
+        resolvedCategory = match.name;
+        if (_selectedCategory != match.name) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _selectedCategory != match.name) {
+              setState(() => _selectedCategory = match.name);
+            }
+          });
+        }
+      }
+    }
+
+    final categoryNames = <String>{};
+    final items = <DropdownMenuItem<String>>[];
+
+    for (final c in activeCategories) {
+      if (categoryNames.add(c.name)) {
+        items.add(DropdownMenuItem(value: c.name, child: Text(c.name)));
+      }
+    }
+
+    if (resolvedCategory != null && resolvedCategory.isNotEmpty && !categoryNames.contains(resolvedCategory)) {
+      categoryNames.add(resolvedCategory);
+      items.insert(
+        0,
+        DropdownMenuItem(
+          value: resolvedCategory,
+          child: Text(resolvedCategory),
+        ),
+      );
+    }
+
+    final hasValidValue = resolvedCategory != null && categoryNames.contains(resolvedCategory);
+
     return _FieldWrapper(
       label: 'Category *',
       child: DropdownButtonFormField<String>(
-        initialValue: _selectedCategory,
-        items: finProv.categories
-            .where((c) => c.isActive)
-            .map((c) => DropdownMenuItem(value: c.name, child: Text(c.name)))
-            .toList(),
+        key: ValueKey('category_${resolvedCategory ?? "none"}'),
+        initialValue: hasValidValue ? resolvedCategory : null,
+        items: items,
         onChanged: (v) {
           setState(() {
             _selectedCategory = v;
@@ -680,13 +734,53 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         ? finProv.getTypesForCategory(_selectedCategory!)
         : <ExpenseTypeEntity>[];
 
+    // Resolve matching type for _selectedType (case-insensitive & trimmed)
+    String? resolvedType = _selectedType;
+    if (resolvedType != null && resolvedType.isNotEmpty) {
+      final match = types.cast<ExpenseTypeEntity?>().firstWhere(
+            (t) => t!.name.trim().toLowerCase() == resolvedType!.trim().toLowerCase(),
+            orElse: () => null,
+          );
+      if (match != null) {
+        resolvedType = match.name;
+        if (_selectedType != match.name) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _selectedType != match.name) {
+              setState(() => _selectedType = match.name);
+            }
+          });
+        }
+      }
+    }
+
+    final typeNames = <String>{};
+    final items = <DropdownMenuItem<String>>[];
+
+    for (final t in types) {
+      if (typeNames.add(t.name)) {
+        items.add(DropdownMenuItem(value: t.name, child: Text(t.name)));
+      }
+    }
+
+    if (resolvedType != null && resolvedType.isNotEmpty && !typeNames.contains(resolvedType)) {
+      typeNames.add(resolvedType);
+      items.insert(
+        0,
+        DropdownMenuItem(
+          value: resolvedType,
+          child: Text(resolvedType),
+        ),
+      );
+    }
+
+    final hasValidValue = resolvedType != null && typeNames.contains(resolvedType);
+
     return _FieldWrapper(
       label: 'Type *',
       child: DropdownButtonFormField<String>(
-        initialValue: _selectedType,
-        items: types
-            .map((t) => DropdownMenuItem(value: t.name, child: Text(t.name)))
-            .toList(),
+        key: ValueKey('type_${_selectedCategory ?? "none"}_${resolvedType ?? "none"}'),
+        initialValue: hasValidValue ? resolvedType : null,
+        items: items,
         onChanged: (v) {
           setState(() {
             _selectedType = v;
@@ -713,15 +807,37 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     final isPettyCash = selectedAcc?.isPettyCash ?? false;
     final currencyFormat = NumberFormat('#,##0.00', 'en_US');
 
+    // Gather active accounts and ensure selected account is included even if inactive/archived
+    final accountList = List<FundAccountEntity>.from(accProv.activeAccounts);
+    if (_selectedAccountId != null && _selectedAccountId!.isNotEmpty) {
+      final existsInActive = accountList.any((a) => a.id == _selectedAccountId);
+      if (!existsInActive && selectedAcc != null) {
+        accountList.insert(0, selectedAcc);
+      }
+    }
+
+    // Deduplicate by account ID
+    final seenIds = <String>{};
+    final uniqueAccounts = <FundAccountEntity>[];
+    for (final a in accountList) {
+      if (seenIds.add(a.id)) {
+        uniqueAccounts.add(a);
+      }
+    }
+
+    final hasValidValue = _selectedAccountId != null &&
+        seenIds.contains(_selectedAccountId);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _FieldWrapper(
           label: 'Fund Account *',
           child: DropdownButtonFormField<String>(
-            initialValue: _selectedAccountId,
+            key: ValueKey('account_${_selectedAccountId ?? "none"}'),
+            initialValue: hasValidValue ? _selectedAccountId : null,
             isExpanded: true,
-            items: accProv.activeAccounts.map((a) {
+            items: uniqueAccounts.map((a) {
               final isPos = a.currentBalance >= 0;
               return DropdownMenuItem<String>(
                 value: a.id,
@@ -797,7 +913,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
               );
             }).toList(),
             selectedItemBuilder: (context) {
-              return accProv.activeAccounts.map((a) {
+              return uniqueAccounts.map((a) {
                 final isPos = a.currentBalance >= 0;
                 return Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,

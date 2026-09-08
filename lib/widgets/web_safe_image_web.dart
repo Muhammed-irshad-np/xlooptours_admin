@@ -1,13 +1,17 @@
+// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
+
 import 'dart:html' as html;
 import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
+
+final Set<String> _registeredWebImageFactories = <String>{};
 
 Widget buildWebImage({
   required String imageUrl,
   required BoxFit fit,
   Widget? errorWidget,
 }) {
-  final viewId = 'web-image-${imageUrl.hashCode}';
+  final viewId = 'web-img-${imageUrl.hashCode.abs()}-${fit.name}';
 
   // Map BoxFit to CSS object-fit properties
   String objectFit = 'cover';
@@ -22,16 +26,21 @@ Widget buildWebImage({
   }
 
   // Register the element
-  // ignore: undefined_prefixed_name
-  ui_web.platformViewRegistry.registerViewFactory(viewId, (int id) {
-    final img = html.ImageElement()
-      ..src = imageUrl
-      ..style.border = 'none'
-      ..style.width = '100%'
-      ..style.height = '100%'
-      ..style.objectFit = objectFit;
-    return img;
-  });
+  if (!_registeredWebImageFactories.contains(viewId)) {
+    _registeredWebImageFactories.add(viewId);
+    // ignore: undefined_prefixed_name
+    ui_web.platformViewRegistry.registerViewFactory(viewId, (int id) {
+      final img = html.ImageElement()
+        ..src = imageUrl
+        ..style.border = 'none'
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.objectFit = objectFit
+        ..style.display = 'block'
+        ..style.pointerEvents = 'none';
+      return img;
+    });
+  }
 
   return HtmlElementView(viewType: viewId);
 }

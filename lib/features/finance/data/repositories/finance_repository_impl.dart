@@ -42,6 +42,11 @@ class FinanceRepositoryImpl implements FinanceRepository {
   }
 
   @override
+  Future<List<ExpenseEntity>> getOutstandingExpenses() async {
+    return List.from(await remoteDataSource.getOutstandingExpenses());
+  }
+
+  @override
   Future<List<ExpenseEntity>> getExpensesByDateRange(
     DateTime start,
     DateTime end,
@@ -222,11 +227,13 @@ class FinanceRepositoryImpl implements FinanceRepository {
     required String sessionId,
     required String verifiedBy,
     required String? verifiedByUserId,
+    String? resolutionNotes,
   }) {
     return remoteDataSource.verifyPettyCashSession(
       sessionId: sessionId,
       verifiedBy: verifiedBy,
       verifiedByUserId: verifiedByUserId,
+      resolutionNotes: resolutionNotes,
     );
   }
 

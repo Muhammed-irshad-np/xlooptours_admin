@@ -30,6 +30,10 @@ abstract class FinanceRemoteDataSource {
     DocumentSnapshot? cursor,
     int pageSize = 150,
   });
+
+  /// Expenses that are committed but not yet posted to a wallet
+  /// (status pending / approved). Used to project future balances.
+  Future<List<ExpenseModel>> getOutstandingExpenses();
   Future<List<ExpenseModel>> getExpensesByDateRange(DateTime start, DateTime end);
   Future<List<ExpenseModel>> getExpensesByAccount(String fundAccountId);
   Future<ExpenseModel?> getExpenseById(String id);
@@ -97,6 +101,7 @@ abstract class FinanceRemoteDataSource {
     required String sessionId,
     required String verifiedBy,
     required String? verifiedByUserId,
+    String? resolutionNotes,
   });
   Future<String> uploadClosingSheet(XFile file, String sessionId);
   Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt});
@@ -197,6 +202,23 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         .toList();
     final lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
     return (docs, lastDoc);
+  }
+
+  @override
+  Future<List<ExpenseModel>> getOutstandingExpenses() async {
+    // Single-field `whereIn` — no composite index required. Sorting happens
+    // client-side so this keeps working without a Firestore index deploy.
+    final snapshot = await _expenses
+        .where('status', whereIn: [
+          ExpenseStatus.pending.name,
+          ExpenseStatus.approved.name,
+        ])
+        .get();
+    final docs = snapshot.docs
+        .map((d) => ExpenseModel.fromJson(d.data()))
+        .toList();
+    docs.sort((a, b) => b.date.compareTo(a.date));
+    return docs;
   }
 
   @override
@@ -1231,6 +1253,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     required String sessionId,
     required String verifiedBy,
     required String? verifiedByUserId,
+    String? resolutionNotes,
   }) async {
     final ref = firestore.collection('petty_cash_sessions').doc(sessionId);
     final snap = await ref.get();
@@ -1245,12 +1268,23 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     final lockId = DayLockEntity.lockId(session.fundAccountId, session.date);
     final dayKey = DayLockEntity.dayKeyFrom(session.date);
 
+    final existingNotes = session.notes ?? '';
+    final combinedNotes = resolutionNotes != null && resolutionNotes.trim().isNotEmpty
+        ? (existingNotes.isNotEmpty
+            ? '$existingNotes\n[Resolution: ${resolutionNotes.trim()}]'
+            : '[Resolution: ${resolutionNotes.trim()}]')
+        : existingNotes;
+
     await firestore.runTransaction((txn) async {
-      txn.update(ref, {
+      final updateData = <String, dynamic>{
         'status': 'verified',
         'verifiedBy': verifiedBy,
         'verifiedAt': now.toIso8601String(),
-      });
+      };
+      if (combinedNotes.isNotEmpty) {
+        updateData['notes'] = combinedNotes;
+      }
+      txn.update(ref, updateData);
       txn.set(_dayLocks.doc(lockId), {
         'id': lockId,
         'fundAccountId': session.fundAccountId,
@@ -1270,7 +1304,8 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       entityId: sessionId,
       actorUserId: verifiedByUserId,
       actorName: verifiedBy,
-      detail: 'dayLock=$lockId',
+      detail:
+          'dayLock=$lockId${resolutionNotes != null && resolutionNotes.isNotEmpty ? ' resolution=$resolutionNotes' : ''}',
     );
   }
 

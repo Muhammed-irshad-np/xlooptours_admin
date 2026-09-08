@@ -229,9 +229,12 @@ class _UserFormDialogState extends State<UserFormDialog> {
     final isEditing = widget.userToEdit != null;
     final roles = context.watch<UserManagementProvider>().roles;
     final employeeProvider = context.watch<EmployeeProvider>();
-    final employees =
-        employeeProvider.employees.where((e) => e.isActive).toList()
-          ..sort((a, b) => a.fullName.compareTo(b.fullName));
+    // External staff are contracted third parties — they never get an app
+    // login, so they are not offered here.
+    final employees = employeeProvider.employees
+        .where((e) => e.isActive && e.isInternal)
+        .toList()
+      ..sort((a, b) => a.fullName.compareTo(b.fullName));
 
     // Employees already linked to another login (exclude current user when editing)
     final linkedElsewhere = <String>{};

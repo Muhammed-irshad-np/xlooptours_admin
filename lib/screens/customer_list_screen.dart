@@ -826,9 +826,7 @@ class _RecordFeedbackDialogState extends State<_RecordFeedbackDialog> {
 
                   final allEmployees = provider.employees;
                   final drivers = allEmployees.where((e) =>
-                      e.isActive &&
-                      (e.position.toLowerCase().contains('driver') ||
-                          e.driverType != null)).toList();
+                      e.isActive && e.isDriver).toList();
 
                   final filteredDrivers = drivers.where((driver) {
                     return driver.fullName.toLowerCase().contains(_query.toLowerCase());
