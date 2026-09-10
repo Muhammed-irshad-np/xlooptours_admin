@@ -141,6 +141,7 @@ import 'features/finance/domain/usecases/insert_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/update_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/delete_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/get_transactions_usecase.dart';
+import 'features/finance/domain/usecases/get_transaction_by_id_usecase.dart';
 import 'features/finance/domain/usecases/insert_transaction_usecase.dart';
 import 'features/finance/domain/usecases/post_fund_movement_usecase.dart';
 import 'features/finance/domain/usecases/transfer_funds_usecase.dart';
@@ -568,6 +569,7 @@ Future<void> init() async {
       updateFundAccountUseCase: sl(),
       deleteFundAccountUseCase: sl(),
       getTransactionsUseCase: sl(),
+      getTransactionByIdUseCase: sl(),
       insertTransactionUseCase: sl(),
       postFundMovementUseCase: sl(),
       transferFundsUseCase: sl(),
@@ -618,6 +620,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => UpdateFundAccountUseCase(sl()));
   sl.registerLazySingleton(() => DeleteFundAccountUseCase(sl()));
   sl.registerLazySingleton(() => GetTransactionsUseCase(sl()));
+  sl.registerLazySingleton(() => GetTransactionByIdUseCase(sl()));
   sl.registerLazySingleton(() => InsertTransactionUseCase(sl()));
   sl.registerLazySingleton(() => PostFundMovementUseCase(sl()));
   sl.registerLazySingleton(() => TransferFundsUseCase(sl()));

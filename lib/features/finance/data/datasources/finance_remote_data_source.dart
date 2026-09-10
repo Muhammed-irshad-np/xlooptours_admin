@@ -73,6 +73,7 @@ abstract class FinanceRemoteDataSource {
   Future<void> deleteFundAccount(String id);
 
   // Fund transactions
+  Future<FundTransactionModel?> getTransactionById(String id);
   Future<List<FundTransactionModel>> getTransactionsForAccount(String accountId);
   Future<FundTransactionModel> postFundMovement(PostFundRequest request);
   Future<void> transferBetweenAccounts({
@@ -466,6 +467,8 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
         final now = DateTime.now();
         String? ledgerId;
+        double? balAfter;
+        int? balAfterMinor;
 
         if (!expense.isNonWallet && expense.fundAccountId.isNotEmpty) {
           final lockId =
@@ -488,7 +491,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           final amountMinor = expense.resolvedAmountMinor;
           final amountMajor = amountMinor / 100.0;
           final balBeforeMinor = account.currentBalanceMinor;
-          final balAfterMinor = balBeforeMinor - amountMinor;
+          balAfterMinor = balBeforeMinor - amountMinor;
           if (balAfterMinor < 0) {
             throw Exception('Insufficient fund balance');
           }
@@ -523,7 +526,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
 
           ledgerId = _uuid.v4();
           final balBefore = balBeforeMinor / 100.0;
-          final balAfter = balAfterMinor / 100.0;
+          balAfter = balAfterMinor / 100.0;
 
           final tx = FundTransactionModel(
             id: ledgerId,
@@ -569,6 +572,8 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           paidByUserId: expense.isNonWallet ? null : actorUserId,
           paidAt: expense.isNonWallet ? null : now,
           ledgerEntryId: ledgerId,
+          balanceAfter: expense.isNonWallet ? null : balAfter,
+          balanceAfterMinor: expense.isNonWallet ? null : balAfterMinor,
           updatedAt: now,
           amountMinor: expense.resolvedAmountMinor,
         );
@@ -797,6 +802,13 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   }
 
   // ─── Fund transactions ──────────────────────────────────────
+
+  @override
+  Future<FundTransactionModel?> getTransactionById(String id) async {
+    final doc = await _txs.doc(id).get();
+    if (!doc.exists || doc.data() == null) return null;
+    return FundTransactionModel.fromJson(doc.data()!);
+  }
 
   @override
   Future<List<FundTransactionModel>> getTransactionsForAccount(

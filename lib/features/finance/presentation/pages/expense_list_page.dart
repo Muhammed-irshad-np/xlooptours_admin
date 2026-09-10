@@ -12,6 +12,7 @@ import '../widgets/expense_review_dialog.dart';
 import '../widgets/expense_status_badge.dart';
 import '../widgets/projected_balance_strip.dart';
 import '../../domain/entities/expense_entity.dart';
+import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/services/finance_export_service.dart';
 import '../../domain/services/finance_permission_service.dart';
 import 'expense_form_page.dart';
@@ -909,7 +910,16 @@ class _ExpenseDataTable extends StatelessWidget {
                     ),
                     subtitle:
                         'Paid by ${expense.paidBy ?? expense.approvedBy ?? "Admin"} from $accountName',
-                    extraNote: expense.ledgerEntryId != null
+                    extraWidget: (expense.status == ExpenseStatus.paid)
+                        ? _buildPaidBalanceAfterCard(
+                            context: context,
+                            expense: expense,
+                            accountName: accountName,
+                            formatter: formatter,
+                          )
+                        : null,
+                    extraNote: (expense.status != ExpenseStatus.paid &&
+                            expense.ledgerEntryId != null)
                         ? 'Ledger Entry: ${expense.ledgerEntryId}'
                         : null,
                     isLast: !isVoided,
@@ -1000,96 +1010,259 @@ class _ExpenseDataTable extends StatelessWidget {
     required String timestamp,
     required String subtitle,
     String? extraNote,
+    Widget? extraWidget,
     bool isFirst = false,
     bool isLast = false,
     bool isAlert = false,
     Color? alertColor,
   }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            Container(
-              padding: EdgeInsets.all(6.w),
-              decoration: BoxDecoration(
-                color: iconColor.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                padding: EdgeInsets.all(6.w),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 14.sp, color: iconColor),
               ),
-              child: Icon(icon, size: 14.sp, color: iconColor),
-            ),
-            if (!isLast)
-              Container(width: 2.w, height: 38.h, color: FinDT.border),
-          ],
-        ),
-        SizedBox(width: 12.w),
-        Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(bottom: isLast ? 0 : 12.h),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w700,
-                        color: FinDT.textPrimary,
+              if (!isLast)
+                Expanded(
+                  child: Container(width: 2.w, color: FinDT.border),
+                ),
+            ],
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 12.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w700,
+                          color: FinDT.textPrimary,
+                        ),
                       ),
+                      Text(
+                        timestamp,
+                        style: GoogleFonts.inter(
+                          fontSize: 10.sp,
+                          color: FinDT.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      color: FinDT.textSecondary,
                     ),
-                    Text(
-                      timestamp,
-                      style: GoogleFonts.inter(
-                        fontSize: 10.sp,
-                        color: FinDT.textMuted,
+                  ),
+                  if (extraWidget != null) ...[
+                    SizedBox(height: 6.h),
+                    extraWidget,
+                  ] else if (extraNote != null) ...[
+                    SizedBox(height: 6.h),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(8.w),
+                      decoration: BoxDecoration(
+                        color: isAlert && alertColor != null
+                            ? alertColor.withValues(alpha: 0.08)
+                            : FinDT.bgPage,
+                        borderRadius: BorderRadius.circular(6.r),
+                        border: Border.all(
+                          color: isAlert && alertColor != null
+                              ? alertColor.withValues(alpha: 0.25)
+                              : FinDT.border,
+                        ),
+                      ),
+                      child: Text(
+                        extraNote,
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          color: isAlert && alertColor != null
+                              ? alertColor
+                              : FinDT.textSecondary,
+                          height: 1.35,
+                        ),
                       ),
                     ),
                   ],
-                ),
-                SizedBox(height: 2.h),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.inter(
-                    fontSize: 11.sp,
-                    color: FinDT.textSecondary,
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Builds a card displaying the fund account's balance after this payment occurred.
+  /// Only rendered for paid expenses (`status == ExpenseStatus.paid`).
+  Widget _buildPaidBalanceAfterCard({
+    required BuildContext context,
+    required ExpenseEntity expense,
+    required String accountName,
+    required NumberFormat formatter,
+  }) {
+    if (expense.balanceAfter != null) {
+      return _buildBalanceAfterContainer(
+        balanceAfter: expense.balanceAfter!,
+        currency: expense.currency,
+        accountName: accountName,
+        ledgerEntryId: expense.ledgerEntryId,
+        formatter: formatter,
+      );
+    }
+
+    if (expense.ledgerEntryId == null || expense.ledgerEntryId!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder<FundTransactionEntity?>(
+      future: context
+          .read<FundAccountProvider>()
+          .getTransactionById(expense.ledgerEntryId!),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+            decoration: BoxDecoration(
+              color: FinDT.bgPage,
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: FinDT.border),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 12.w,
+                  height: 12.w,
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(FinDT.textMuted),
                   ),
                 ),
-                if (extraNote != null) ...[
-                  SizedBox(height: 6.h),
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(8.w),
-                    decoration: BoxDecoration(
-                      color: isAlert && alertColor != null
-                          ? alertColor.withValues(alpha: 0.08)
-                          : FinDT.bgPage,
-                      borderRadius: BorderRadius.circular(6.r),
-                      border: Border.all(
-                        color: isAlert && alertColor != null
-                            ? alertColor.withValues(alpha: 0.25)
-                            : FinDT.border,
-                      ),
-                    ),
-                    child: Text(
-                      extraNote,
-                      style: GoogleFonts.inter(
-                        fontSize: 11.sp,
-                        color: isAlert && alertColor != null
-                            ? alertColor
-                            : FinDT.textSecondary,
-                        height: 1.35,
-                      ),
+                SizedBox(width: 8.w),
+                Text(
+                  'Loading balance history...',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    color: FinDT.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final tx = snapshot.data;
+        if (tx != null) {
+          return _buildBalanceAfterContainer(
+            balanceAfter: tx.balanceAfter,
+            currency: expense.currency,
+            accountName: accountName,
+            ledgerEntryId: expense.ledgerEntryId,
+            formatter: formatter,
+          );
+        }
+
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(8.w),
+          decoration: BoxDecoration(
+            color: FinDT.bgPage,
+            borderRadius: BorderRadius.circular(6.r),
+            border: Border.all(color: FinDT.border),
+          ),
+          child: Text(
+            'Ledger Entry: ${expense.ledgerEntryId}',
+            style: GoogleFonts.inter(
+              fontSize: 11.sp,
+              color: FinDT.textSecondary,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBalanceAfterContainer({
+    required double balanceAfter,
+    required String currency,
+    required String accountName,
+    required String? ledgerEntryId,
+    required NumberFormat formatter,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+      decoration: BoxDecoration(
+        color: FinDT.brandLight.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: FinDT.brand.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 13.sp,
+                    color: FinDT.brand,
+                  ),
+                  SizedBox(width: 5.w),
+                  Text(
+                    'Balance After ($accountName)',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w600,
+                      color: FinDT.brand,
                     ),
                   ),
                 ],
-              ],
-            ),
+              ),
+              Text(
+                '${formatter.format(balanceAfter)} $currency',
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w800,
+                  color: FinDT.brand,
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+          if (ledgerEntryId != null && ledgerEntryId.isNotEmpty) ...[
+            SizedBox(height: 4.h),
+            Text(
+              'Ledger Entry: $ledgerEntryId',
+              style: GoogleFonts.inter(
+                fontSize: 10.sp,
+                color: FinDT.textMuted,
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

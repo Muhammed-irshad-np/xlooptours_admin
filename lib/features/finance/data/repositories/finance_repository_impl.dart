@@ -153,6 +153,10 @@ class FinanceRepositoryImpl implements FinanceRepository {
       remoteDataSource.deleteFundAccount(id);
 
   @override
+  Future<FundTransactionEntity?> getTransactionById(String id) =>
+      remoteDataSource.getTransactionById(id);
+
+  @override
   Future<List<FundTransactionEntity>> getTransactionsForAccount(
     String accountId,
   ) async {

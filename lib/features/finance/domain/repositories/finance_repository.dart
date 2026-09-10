@@ -64,6 +64,7 @@ abstract class FinanceRepository {
   Future<void> updateFundAccount(FundAccountEntity account);
   Future<void> deleteFundAccount(String id);
 
+  Future<FundTransactionEntity?> getTransactionById(String id);
   Future<List<FundTransactionEntity>> getTransactionsForAccount(
     String accountId,
   );

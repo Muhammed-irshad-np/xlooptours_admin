@@ -9,6 +9,7 @@ import '../../domain/usecases/insert_fund_account_usecase.dart';
 import '../../domain/usecases/update_fund_account_usecase.dart';
 import '../../domain/usecases/delete_fund_account_usecase.dart';
 import '../../domain/usecases/get_transactions_usecase.dart';
+import '../../domain/usecases/get_transaction_by_id_usecase.dart';
 import '../../domain/usecases/insert_transaction_usecase.dart';
 import '../../domain/usecases/post_fund_movement_usecase.dart';
 import '../../domain/usecases/transfer_funds_usecase.dart';
@@ -23,6 +24,7 @@ class FundAccountProvider with ChangeNotifier {
   final UpdateFundAccountUseCase updateFundAccountUseCase;
   final DeleteFundAccountUseCase deleteFundAccountUseCase;
   final GetTransactionsUseCase getTransactionsUseCase;
+  final GetTransactionByIdUseCase getTransactionByIdUseCase;
   final InsertTransactionUseCase insertTransactionUseCase;
   final PostFundMovementUseCase postFundMovementUseCase;
   final TransferFundsUseCase transferFundsUseCase;
@@ -38,6 +40,7 @@ class FundAccountProvider with ChangeNotifier {
     required this.updateFundAccountUseCase,
     required this.deleteFundAccountUseCase,
     required this.getTransactionsUseCase,
+    required this.getTransactionByIdUseCase,
     required this.insertTransactionUseCase,
     required this.postFundMovementUseCase,
     required this.transferFundsUseCase,
@@ -288,6 +291,8 @@ class FundAccountProvider with ChangeNotifier {
     }
   }
 
+  final Map<String, FundTransactionEntity> _txByIdCache = {};
+
   Future<void> fetchTransactions(String accountId) async {
     _isTransactionsLoading = true;
     _error = null;
@@ -295,12 +300,37 @@ class FundAccountProvider with ChangeNotifier {
 
     try {
       _transactions = await getTransactionsUseCase(accountId);
+      for (final tx in _transactions) {
+        _txByIdCache[tx.id] = tx;
+      }
     } catch (e) {
       _error = e.toString();
       debugPrint('Error fetching transactions: $e');
     } finally {
       _isTransactionsLoading = false;
       notifyListeners();
+    }
+  }
+
+  /// Fetches a transaction by ID, checking cache first then loading from database.
+  Future<FundTransactionEntity?> getTransactionById(String id) async {
+    if (_txByIdCache.containsKey(id)) {
+      return _txByIdCache[id];
+    }
+    final existing = _transactions.where((t) => t.id == id).firstOrNull;
+    if (existing != null) {
+      _txByIdCache[id] = existing;
+      return existing;
+    }
+    try {
+      final tx = await getTransactionByIdUseCase(id);
+      if (tx != null) {
+        _txByIdCache[id] = tx;
+      }
+      return tx;
+    } catch (e) {
+      debugPrint('Error fetching transaction $id: $e');
+      return null;
     }
   }
 
