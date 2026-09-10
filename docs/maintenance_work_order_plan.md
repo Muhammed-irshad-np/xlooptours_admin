@@ -1,5 +1,9 @@
 # Vehicle Maintenance Work Order — implementation plan
 
+> **Status:** phases 1 and 2 are built on `feat/maintenance-work-orders`.
+> See [Build status](#build-status) at the end for exactly what shipped and
+> what is deliberately left.
+
 ## 1. The problem today
 
 Maintenance is currently a **record**, not a **process**.
@@ -397,3 +401,81 @@ does not need migrating later.
 | Auto-approve threshold | **300 SAR.** Oil changes and car washes flow without ceremony; anything meaningful gets a human. |
 | Where does the board live in nav? | **Under Vehicles**, not Finance. Coordinators and Shamnad live in Vehicles; finance only needs the resulting expense. |
 | Backfill existing history into WOs? | **No.** Work orders start from go-live; historical records display "No work order". Backfilling invents approvals that never happened. |
+
+
+---
+
+## Build status
+
+Built on branch `feat/maintenance-work-orders`.
+
+### Shipped
+
+**Domain & data** — `lib/features/maintenance/`
+- `WorkOrderEntity` / `WorkOrderLine` / `WorkOrderEvent`, `work_orders`
+  collection, sequential `WO-<year>-<n>` numbering off the existing `counters`
+  pattern
+- `WorkOrderTransitionService` — the single authority on legal next actions,
+  board lanes, entry status and blocker messages
+- Use cases: create, update, issue, approve, reject, start, hold, resume,
+  complete, cancel, close
+- Firestore rules and two composite indexes
+
+**Finance bridge**
+- `CloseWorkOrderUseCase` creates the expense under the deterministic id
+  `wo_<number>`, adopts an already-paid expense rather than overwriting it,
+  writes one `MaintenanceRecord` per completed line, restores the vehicle's
+  status and advances the odometer when the service reading is newer
+- `ExpenseEntity.workOrderId` / `workOrderNumber`, with a chip on the expense
+  list linking back
+- Variance guard on both `complete` (routes back to `pendingApproval`) and
+  `close` (refuses)
+
+**Permissions** — four `WorkflowPermissionConfig`s plus
+`workOrderAutoApproveBelow`, `workOrderVarianceTolerancePct`,
+`autoApproveExpenseWithinEstimate`, `requireInvoiceOnWorkOrderComplete`, all
+editable from a new category in the finance workflow policy editor.
+`AppPermission.manageMaintenance` added with `manageVehicles` as an implicit
+grant.
+
+**UI** — board (three lanes, per-user queue), detail (timeline + single
+action bar), create/edit form with line editor, and `ReportIssueDialog`.
+Reachable from Vehicles → Work Orders / Report a Problem, and `/work-orders`.
+
+**Vehicle tagging** — `VehicleStatus` names the existing status vocabulary;
+starting a work order sets `In-Shop` and parks the previous value on the work
+order. The fleet list badges those vehicles and no longer filters them in with
+retired ones. Vehicle detail gains a maintenance banner and work order history.
+
+**Alerts** — a *Work Order* button prefilled from the alert; while a work
+order is open for that vehicle and service the alert shows
+`WO-2026-0014 · In Progress` instead of nagging.
+
+**Refactors from §6** — `MaintenanceHistoryWriter` extracted (6.1),
+`sourceWorkOrderId` dedupe key added (6.3), `VehicleRepository.getVehicleById`
+and `FinanceRepository.getExpenseById` added for fresh reads.
+
+**Tests** — 48, over the close path (double-post guards, variance tolerance,
+per-line history write-back, status restore, orphaned-expense adoption) and
+the state machine (per-role actions, lanes, entry status, blockers).
+
+### Not built
+
+- **Driver cash advance path (§8.3).** `paidFromDriverAdvance` exists on the
+  entity so no migration is needed later, but closing such a work order is
+  refused with a message pointing at Finance → Advances rather than
+  double-counting the spend.
+- **Dedicated work order notifications.** Every transition is written to the
+  activity log via `ActivityLogger`, but there is no `NotificationType.workOrder`
+  routing to approvers or coordinators yet.
+- **Public `/report-issue` form** for drivers without a login (§7 phase 3).
+- **Shop performance view and CSV export** (§7 phase 3).
+- **`AddMaintenanceRecordDialog` relabelling** (§6.2) — the dialog still works
+  unchanged for retro entry, but does not yet offer "create a work order
+  instead?" when a cost is entered.
+
+### Known pre-existing failure
+
+`test/widget_test.dart` does not compile: `pdf_preview_screen.dart` imports
+`dart:html`, which is unavailable on the VM test platform. It fails on
+`expense_try` too and is unrelated to this work.
