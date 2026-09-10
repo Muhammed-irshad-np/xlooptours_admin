@@ -1,3 +1,4 @@
+import 'package:xloop_invoice/features/maintenance/presentation/pages/work_order_detail_page.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -666,6 +667,43 @@ class _ExpenseDataTable extends StatelessWidget {
                         expense.expenseType,
                         style: GoogleFonts.inter(fontWeight: FontWeight.w500),
                       ),
+                      // Traceability back to the maintenance job this came
+                      // from, for expenses raised by closing a work order.
+                      if (expense.workOrderNumber != null) ...[
+                        SizedBox(width: 6.w),
+                        InkWell(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => WorkOrderDetailPage(
+                                workOrderId: expense.workOrderId!,
+                              ),
+                            ),
+                          ),
+                          borderRadius: BorderRadius.circular(5.r),
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 6.w,
+                              vertical: 2.h,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(5.r),
+                              border: Border.all(
+                                color: const Color(0xFFBFDBFE),
+                              ),
+                            ),
+                            child: Text(
+                              expense.workOrderNumber!,
+                              style: GoogleFonts.robotoMono(
+                                fontSize: 9.sp,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1E40AF),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

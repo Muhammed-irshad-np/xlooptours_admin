@@ -191,6 +191,11 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
         subtitle: 'Movement, transfers & account setup',
       ),
       _PolicyCategoryItem(
+        title: 'Maintenance Work Orders',
+        icon: Icons.build_outlined,
+        subtitle: 'Reporting, approval & closing thresholds',
+      ),
+      _PolicyCategoryItem(
         title: 'Compliance & Safety Limits',
         icon: Icons.shield_outlined,
         subtitle: 'Receipt thresholds & integrity rules',
@@ -285,6 +290,8 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
       case 2:
         return _buildFundOperationsSection(finProv, userMgmt, policy);
       case 3:
+        return _buildWorkOrderSection(finProv, userMgmt, policy);
+      case 4:
         return _buildComplianceSummarySection(finProv, policy);
       default:
         return const SizedBox.shrink();
@@ -1002,6 +1009,322 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
   // ═════════════════════════════════════════════════════════════════════════════
   // 4. COMPLIANCE & SAFETY SUMMARY SECTION
   // ═════════════════════════════════════════════════════════════════════════════
+
+  // ═════════════════════════════════════════════════════════════════════════════
+  // 4. MAINTENANCE WORK ORDER SECTION
+  // ═════════════════════════════════════════════════════════════════════════════
+
+  Widget _buildWorkOrderSection(
+    FinanceProvider finProv,
+    UserManagementProvider userMgmt,
+    FinancePolicyEntity policy,
+  ) {
+    final formatter = NumberFormat('#,##0.00', 'en_US');
+
+    return Column(
+      key: const ValueKey('work_order_section'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildInfoBanner(
+          icon: Icons.info_outline_rounded,
+          title: 'Vehicle Maintenance Work Orders',
+          message:
+              'A fault is reported by the fleet manager or a driver, a coordinator costs it and sends it for approval, the workshop does the job, and closing the work order posts the expense to a wallet. Approval on the work order authorises the commitment; the expense approval releases the payment.',
+        ),
+        SizedBox(height: 16.h),
+
+        _buildThresholdCard(finProv, policy, formatter),
+        SizedBox(height: 12.h),
+
+        _buildPermissionConfigCard(
+          title: 'Report a Vehicle Problem',
+          description:
+              'Authorized to raise a fault report against a vehicle. Deliberately wide — the person who notices a problem should always be able to record it, with no costing required.',
+          icon: Icons.report_problem_outlined,
+          color: const Color(0xFF0284C7),
+          config: policy.workOrderRaise,
+          allRoles: userMgmt.roles,
+          allUsers: userMgmt.users,
+          onSave: (newConfig) async {
+            final updated = policy.copyWith(workOrderRaise: newConfig);
+            await _savePolicy(
+                finProv, updated, 'Work order reporting permission updated');
+          },
+        ),
+        SizedBox(height: 12.h),
+
+        _buildPermissionConfigCard(
+          title: 'Cost & Run Work Orders',
+          description:
+              'Authorized to turn a report into a costed work order, pick the workshop, send it for approval, and drive it through start / hold / complete.',
+          icon: Icons.assignment_outlined,
+          color: const Color(0xFFD97706),
+          config: policy.workOrderIssue,
+          allRoles: userMgmt.roles,
+          allUsers: userMgmt.users,
+          onSave: (newConfig) async {
+            final updated = policy.copyWith(workOrderIssue: newConfig);
+            await _savePolicy(
+                finProv, updated, 'Work order issuing permission updated');
+          },
+        ),
+        SizedBox(height: 12.h),
+
+        _buildPermissionConfigCard(
+          title: 'Approve Work Order Spend',
+          description:
+              'Authorized to authorise the estimated spend. The same amount ceilings as expense approval apply, so nobody can commit more on a work order than they could approve as an expense.',
+          icon: Icons.verified_outlined,
+          color: const Color(0xFF16A34A),
+          config: policy.workOrderApproval,
+          allRoles: userMgmt.roles,
+          allUsers: userMgmt.users,
+          onSave: (newConfig) async {
+            final updated = policy.copyWith(workOrderApproval: newConfig);
+            await _savePolicy(
+                finProv, updated, 'Work order approval permission updated');
+          },
+        ),
+        SizedBox(height: 12.h),
+
+        _buildPermissionConfigCard(
+          title: 'Close & Post to Finance',
+          description:
+              'Authorized to close a completed work order. This is the step that creates the expense, charges the chosen wallet and writes the service back to the vehicle\'s maintenance history.',
+          icon: Icons.task_alt_rounded,
+          color: const Color(0xFF7C3AED),
+          config: policy.workOrderClose,
+          allRoles: userMgmt.roles,
+          allUsers: userMgmt.users,
+          onSave: (newConfig) async {
+            final updated = policy.copyWith(workOrderClose: newConfig);
+            await _savePolicy(
+                finProv, updated, 'Work order closing permission updated');
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThresholdCard(
+    FinanceProvider finProv,
+    FinancePolicyEntity policy,
+    NumberFormat formatter,
+  ) {
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: FinDT.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.tune_rounded, size: 18.sp, color: FinDT.brand),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Text(
+                  'Thresholds',
+                  style: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w700,
+                    color: FinDT.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () =>
+                    _showWorkOrderThresholdDialog(context, finProv, policy),
+                icon: Icon(Icons.edit_outlined, size: 14.sp),
+                label: Text(
+                  'Edit',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10.h),
+          _buildRuleTile(
+            title: policy.workOrderAutoApproveBelow > 0
+                ? 'Auto-approve below ${formatter.format(policy.workOrderAutoApproveBelow)} SAR'
+                : 'Auto-approve disabled',
+            subtitle: policy.workOrderAutoApproveBelow > 0
+                ? 'Routine servicing under this amount skips approval entirely and goes straight to Approved.'
+                : 'Every work order goes for approval, however small.',
+            isActive: policy.workOrderAutoApproveBelow > 0,
+          ),
+          SizedBox(height: 8.h),
+          _buildRuleTile(
+            title:
+                'Overrun tolerance ${policy.workOrderVarianceTolerancePct.toStringAsFixed(0)}%',
+            subtitle:
+                'An actual cost more than this far above the approved amount cannot be closed — it goes back for re-approval.',
+            isActive: true,
+          ),
+          SizedBox(height: 8.h),
+          _buildRuleTile(
+            title: 'Skip second approval on the expense',
+            subtitle: policy.autoApproveExpenseWithinEstimate
+                ? 'When the actual stays inside what was approved, the expense is created already approved — the payer only confirms payment.'
+                : 'Every maintenance expense is approved again before payment, even when the work order already authorised it.',
+            isActive: policy.autoApproveExpenseWithinEstimate,
+          ),
+          SizedBox(height: 8.h),
+          _buildRuleTile(
+            title: 'Shop invoice required to complete',
+            subtitle: policy.requireInvoiceOnWorkOrderComplete
+                ? 'A work order cannot be marked completed until the shop invoice is attached.'
+                : 'Work orders can be completed without an invoice attached.',
+            isActive: policy.requireInvoiceOnWorkOrderComplete,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showWorkOrderThresholdDialog(
+    BuildContext context,
+    FinanceProvider finProv,
+    FinancePolicyEntity policy,
+  ) {
+    final formKey = GlobalKey<FormState>();
+    final autoApproveCtrl = TextEditingController(
+        text: policy.workOrderAutoApproveBelow.toString());
+    final toleranceCtrl = TextEditingController(
+        text: policy.workOrderVarianceTolerancePct.toString());
+    bool skipSecondApproval = policy.autoApproveExpenseWithinEstimate;
+    bool requireInvoice = policy.requireInvoiceOnWorkOrderComplete;
+    bool isSaving = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: finDialogShape,
+          title: finDialogTitle('Work Order Thresholds',
+              icon: Icons.tune_rounded),
+          content: SizedBox(
+            width: 440.w,
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: autoApproveCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d*')),
+                      ],
+                      decoration: finDialogInputDecoration(
+                        label: 'Auto-approve below (SAR) — 0 disables',
+                        prefixIcon: Icons.bolt_outlined,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp),
+                      validator: (v) =>
+                          (v == null || v.isEmpty) ? 'Required' : null,
+                    ),
+                    SizedBox(height: 14.h),
+                    TextFormField(
+                      controller: toleranceCtrl,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d*')),
+                      ],
+                      decoration: finDialogInputDecoration(
+                        label: 'Overrun tolerance (%)',
+                        prefixIcon: Icons.trending_up_rounded,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp),
+                      validator: (v) =>
+                          (v == null || v.isEmpty) ? 'Required' : null,
+                    ),
+                    SizedBox(height: 14.h),
+                    const Divider(),
+                    SwitchListTile(
+                      title: Text('Skip second approval on the expense',
+                          style: GoogleFonts.inter(
+                              fontSize: 12.sp, fontWeight: FontWeight.w600)),
+                      subtitle: Text(
+                        'Only when the actual stays inside the approved amount.',
+                        style: GoogleFonts.inter(
+                            fontSize: 10.sp, color: FinDT.textSecondary),
+                      ),
+                      contentPadding: EdgeInsets.zero,
+                      value: skipSecondApproval,
+                      activeTrackColor: FinDT.brand,
+                      onChanged: isSaving
+                          ? null
+                          : (v) =>
+                              setDialogState(() => skipSecondApproval = v),
+                    ),
+                    SwitchListTile(
+                      title: Text('Require shop invoice to complete',
+                          style: GoogleFonts.inter(
+                              fontSize: 12.sp, fontWeight: FontWeight.w600)),
+                      contentPadding: EdgeInsets.zero,
+                      value: requireInvoice,
+                      activeTrackColor: FinDT.brand,
+                      onChanged: isSaving
+                          ? null
+                          : (v) => setDialogState(() => requireInvoice = v),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSaving ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+
+                final updated = policy.copyWith(
+                  workOrderAutoApproveBelow:
+                      double.tryParse(autoApproveCtrl.text) ?? 300,
+                  workOrderVarianceTolerancePct:
+                      double.tryParse(toleranceCtrl.text) ?? 10,
+                  autoApproveExpenseWithinEstimate: skipSecondApproval,
+                  requireInvoiceOnWorkOrderComplete: requireInvoice,
+                );
+
+                setDialogState(() => isSaving = true);
+                try {
+                  await _savePolicy(
+                      finProv, updated, 'Work order thresholds updated');
+                  if (ctx.mounted) finSafePop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isSaving = false);
+                  }
+                }
+              },
+              label: 'Save Thresholds',
+              backgroundColor: FinDT.brand,
+              isLoading: isSaving,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildComplianceSummarySection(
     FinanceProvider finProv,
