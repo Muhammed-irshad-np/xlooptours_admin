@@ -25,6 +25,11 @@ class VehicleRepositoryImpl implements VehicleRepository {
   }
 
   @override
+  Future<VehicleEntity?> getVehicleById(String id) async {
+    return await remoteDataSource.getVehicleById(id);
+  }
+
+  @override
   Future<void> insertVehicle(VehicleEntity vehicle) async {
     final vehicleModel = VehicleModel.fromEntity(vehicle);
     return await remoteDataSource.insertVehicle(vehicleModel);

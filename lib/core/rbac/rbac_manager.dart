@@ -67,6 +67,16 @@ class RbacManager {
   static bool canManageFinance(UserEntity? user) =>
       hasPermission(user, AppPermission.manageFinance);
 
+  /// Whether the user may open the maintenance work order module.
+  ///
+  /// [AppPermission.manageVehicles] is an implicit grant so existing users
+  /// keep access without anyone re-editing their role.
+  static bool canManageMaintenance(UserEntity? user) =>
+      hasAnyPermission(user, [
+        AppPermission.manageMaintenance,
+        AppPermission.manageVehicles,
+      ]);
+
   /// Whether the user may open a top-level nav item.
   /// [requiredPermission] null means any authenticated user.
   static bool canAccessNav(

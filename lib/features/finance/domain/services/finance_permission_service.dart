@@ -172,6 +172,76 @@ class FinancePermissionService {
     return _check(user, policy.cashAdvanceManagement);
   }
 
+  // ─── Maintenance Work Orders ─────────────────────────────────
+
+  /// Can [user] report a vehicle fault / raise a work order?
+  static bool canRaiseWorkOrder({
+    required UserEntity? user,
+    required FinancePolicyEntity policy,
+  }) {
+    return _check(user, policy.workOrderRaise);
+  }
+
+  /// Can [user] cost a report and send it for approval?
+  static bool canIssueWorkOrder({
+    required UserEntity? user,
+    required FinancePolicyEntity policy,
+  }) {
+    return _check(user, policy.workOrderIssue);
+  }
+
+  /// Can [user] approve a work order estimated at [amount] SAR?
+  ///
+  /// Reuses the expense approval limits: a work order is a commitment to
+  /// spend, so the same ceiling applies to who may authorise it.
+  static bool canApproveWorkOrder({
+    required UserEntity? user,
+    required FinancePolicyEntity policy,
+    required double amount,
+  }) {
+    if (user == null) return false;
+    if (user.isAdmin) return true;
+    if (!_check(user, policy.workOrderApproval)) return false;
+
+    final roleId = RbacManager.normalizeRoleId(user.roleId);
+    if (policy.multiLevelApprovalEnabled && policy.approvalChain.isNotEmpty) {
+      final sorted = [...policy.approvalChain]
+        ..sort((a, b) => a.order.compareTo(b.order));
+      for (final stage in sorted) {
+        if (stage.isUserAuthorized(roleId, user.id)) {
+          return stage.canApproveAmount(amount);
+        }
+      }
+      return false;
+    }
+    return policy.canApproveAmount(roleId, amount);
+  }
+
+  /// Can [user] mark a work order as started / completed?
+  /// Same audience as issuing — whoever runs the job runs its progress.
+  static bool canProgressWorkOrder({
+    required UserEntity? user,
+    required FinancePolicyEntity policy,
+  }) {
+    return _check(user, policy.workOrderIssue);
+  }
+
+  /// Can [user] close a completed work order (posting the expense)?
+  static bool canCloseWorkOrder({
+    required UserEntity? user,
+    required FinancePolicyEntity policy,
+  }) {
+    return _check(user, policy.workOrderClose);
+  }
+
+  /// Can [user] cancel a work order before it completes?
+  static bool canCancelWorkOrder({
+    required UserEntity? user,
+    required FinancePolicyEntity policy,
+  }) {
+    return _check(user, policy.workOrderIssue);
+  }
+
   // ─── View Access ─────────────────────────────────────────────
 
   /// Can [user] view the finance module at all?
@@ -197,6 +267,10 @@ class FinancePermissionService {
       policy.accountManagement,
       policy.masterDataManagement,
       policy.cashAdvanceManagement,
+      policy.workOrderRaise,
+      policy.workOrderIssue,
+      policy.workOrderApproval,
+      policy.workOrderClose,
     ];
     return configs.any((c) => c.isAuthorized(roleId, user.id));
   }

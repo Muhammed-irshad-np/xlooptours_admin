@@ -91,6 +91,12 @@ class ExpenseEntity extends Equatable {
   final double? mileageKm;
   final List<String> receiptUrls;
   final String? srvNumber;
+
+  /// Work order this expense was generated from, when it came from the
+  /// vehicle maintenance workflow. Also the idempotency key on that side:
+  /// a work order holds the resulting expense id and refuses to close twice.
+  final String? workOrderId;
+  final String? workOrderNumber;
   final int? numberOfTrips;
   final String? simOperator;
   final String? country;
@@ -146,6 +152,8 @@ class ExpenseEntity extends Equatable {
     this.mileageKm,
     this.receiptUrls = const [],
     this.srvNumber,
+    this.workOrderId,
+    this.workOrderNumber,
     this.numberOfTrips,
     this.simOperator,
     this.country,
@@ -214,6 +222,8 @@ class ExpenseEntity extends Equatable {
     double? mileageKm,
     List<String>? receiptUrls,
     String? srvNumber,
+    String? workOrderId,
+    String? workOrderNumber,
     int? numberOfTrips,
     String? simOperator,
     String? country,
@@ -284,6 +294,8 @@ class ExpenseEntity extends Equatable {
       mileageKm: clearMileageKm ? null : (mileageKm ?? this.mileageKm),
       receiptUrls: receiptUrls ?? this.receiptUrls,
       srvNumber: clearSrvNumber ? null : (srvNumber ?? this.srvNumber),
+      workOrderId: workOrderId ?? this.workOrderId,
+      workOrderNumber: workOrderNumber ?? this.workOrderNumber,
       numberOfTrips:
           clearNumberOfTrips ? null : (numberOfTrips ?? this.numberOfTrips),
       simOperator:
@@ -339,6 +351,8 @@ class ExpenseEntity extends Equatable {
         mileageKm,
         receiptUrls,
         srvNumber,
+        workOrderId,
+        workOrderNumber,
         numberOfTrips,
         simOperator,
         country,

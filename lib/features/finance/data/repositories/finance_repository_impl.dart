@@ -62,6 +62,11 @@ class FinanceRepositoryImpl implements FinanceRepository {
   }
 
   @override
+  Future<ExpenseEntity?> getExpenseById(String id) async {
+    return await remoteDataSource.getExpenseById(id);
+  }
+
+  @override
   Future<void> insertExpense(ExpenseEntity expense) async {
     await remoteDataSource.insertExpense(ExpenseModel.fromEntity(expense));
   }

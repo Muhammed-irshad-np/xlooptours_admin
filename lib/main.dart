@@ -15,6 +15,7 @@ import 'features/company/presentation/providers/company_provider.dart';
 import 'features/customer/presentation/providers/customer_provider.dart';
 import 'features/employee/presentation/providers/employee_provider.dart';
 import 'features/vehicle/presentation/providers/vehicle_provider.dart';
+import 'features/maintenance/presentation/providers/work_order_provider.dart';
 import 'features/invoice/presentation/providers/invoice_provider.dart';
 import 'features/analytics/presentation/providers/analytics_provider.dart';
 import 'features/xloop_vault/presentation/providers/vault_provider.dart';
@@ -318,6 +319,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => di.sl<FundAccountProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<PettyCashProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<CashAdvanceProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<WorkOrderProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<UserManagementProvider>()),
       ],
       child: ScreenUtilInit(

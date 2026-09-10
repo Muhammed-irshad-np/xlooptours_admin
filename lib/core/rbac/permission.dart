@@ -4,6 +4,7 @@ enum AppPermission {
   manageUsers,
   manageRoles,
   manageVehicles,
+  manageMaintenance,
   manageEmployees,
   manageInvoices,
   manageCustomers,
@@ -30,6 +31,8 @@ extension AppPermissionExtension on AppPermission {
         return 'manage_roles';
       case AppPermission.manageVehicles:
         return 'manage_vehicles';
+      case AppPermission.manageMaintenance:
+        return 'manage_maintenance';
       case AppPermission.manageEmployees:
         return 'manage_employees';
       case AppPermission.manageInvoices:
@@ -67,6 +70,8 @@ extension AppPermissionExtension on AppPermission {
         return 'Manage Roles & Permissions';
       case AppPermission.manageVehicles:
         return 'Manage Vehicles';
+      case AppPermission.manageMaintenance:
+        return 'Manage Maintenance Work Orders';
       case AppPermission.manageEmployees:
         return 'Manage Employees';
       case AppPermission.manageInvoices:

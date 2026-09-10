@@ -13,6 +13,11 @@ import '../models/shop_model.dart';
 abstract class VehicleRemoteDataSource {
   // Vehicle
   Future<List<VehicleModel>> getAllVehicles();
+
+  /// Fresh single-document read. Callers that mutate nested arrays
+  /// (maintenance history, tafweeds) must read through this rather than
+  /// reusing a cached list entry, or they will clobber concurrent writes.
+  Future<VehicleModel?> getVehicleById(String id);
   Future<void> insertVehicle(VehicleModel vehicle);
   Future<void> updateVehicle(VehicleModel vehicle);
   Future<void> deleteVehicle(String id);
@@ -60,6 +65,14 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
     return snapshot.docs
         .map((doc) => VehicleModel.fromJson(doc.data()))
         .toList();
+  }
+
+  @override
+  Future<VehicleModel?> getVehicleById(String id) async {
+    final doc = await firestore.collection('vehicles').doc(id).get();
+    final data = doc.data();
+    if (!doc.exists || data == null) return null;
+    return VehicleModel.fromJson(data);
   }
 
   @override

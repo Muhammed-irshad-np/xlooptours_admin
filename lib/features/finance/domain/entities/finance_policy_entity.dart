@@ -82,6 +82,38 @@ class FinancePolicyEntity extends Equatable {
   /// Who can issue/settle cash advances.
   final WorkflowPermissionConfig cashAdvanceManagement;
 
+  // ─── Maintenance Work Orders ────────────────────────────────
+
+  /// Who can report a vehicle fault (raise a work order in `reported`).
+  /// Deliberately wide — drivers and the fleet manager live here.
+  final WorkflowPermissionConfig workOrderRaise;
+
+  /// Who can turn a report into a costed work order and send it for approval.
+  final WorkflowPermissionConfig workOrderIssue;
+
+  /// Who can approve the spend commitment on a work order.
+  final WorkflowPermissionConfig workOrderApproval;
+
+  /// Who can close a completed work order (which posts the expense).
+  final WorkflowPermissionConfig workOrderClose;
+
+  /// Work orders estimated below this amount skip approval entirely
+  /// (major units). 0 disables auto-approval.
+  final double workOrderAutoApproveBelow;
+
+  /// How far the actual cost may exceed the approved amount before the work
+  /// order must go back for re-approval, as a percentage.
+  final double workOrderVarianceTolerancePct;
+
+  /// When true, the expense created on close is born `approved` provided the
+  /// actual cost is within the approved amount — the work-order approval
+  /// already authorised that spend, so asking twice adds nothing.
+  final bool autoApproveExpenseWithinEstimate;
+
+  /// Require at least one invoice attachment before a work order can be
+  /// marked complete.
+  final bool requireInvoiceOnWorkOrderComplete;
+
   const FinancePolicyEntity({
     // Legacy approval limits
     this.approvalLimits = const {
@@ -141,6 +173,30 @@ class FinancePolicyEntity extends Equatable {
     this.cashAdvanceManagement = const WorkflowPermissionConfig(
       allowedRoles: ['finance', 'admin', 'super_admin'],
     ),
+    // Maintenance work orders
+    this.workOrderRaise = const WorkflowPermissionConfig(
+      allowedRoles: [
+        'driver',
+        'coordinator',
+        'manager',
+        'finance',
+        'admin',
+        'super_admin',
+      ],
+    ),
+    this.workOrderIssue = const WorkflowPermissionConfig(
+      allowedRoles: ['coordinator', 'manager', 'finance', 'admin', 'super_admin'],
+    ),
+    this.workOrderApproval = const WorkflowPermissionConfig(
+      allowedRoles: ['manager', 'finance', 'admin', 'super_admin'],
+    ),
+    this.workOrderClose = const WorkflowPermissionConfig(
+      allowedRoles: ['coordinator', 'finance', 'admin', 'super_admin'],
+    ),
+    this.workOrderAutoApproveBelow = 300,
+    this.workOrderVarianceTolerancePct = 10,
+    this.autoApproveExpenseWithinEstimate = true,
+    this.requireInvoiceOnWorkOrderComplete = true,
   });
 
   // ─── Query Helpers ──────────────────────────────────────────
@@ -168,6 +224,23 @@ class FinancePolicyEntity extends Equatable {
     return sorted.last;
   }
 
+  /// Whether a work order estimated at [amount] can skip approval.
+  bool workOrderSkipsApproval(double amount) =>
+      workOrderAutoApproveBelow > 0 &&
+      amount <= workOrderAutoApproveBelow + 1e-9;
+
+  /// Highest actual cost a work order approved at [approvedAmount] may reach
+  /// before it needs re-approval.
+  double workOrderVarianceCeiling(double approvedAmount) =>
+      approvedAmount * (1 + workOrderVarianceTolerancePct / 100);
+
+  /// Whether [actual] is within tolerance of [approvedAmount].
+  bool isWorkOrderVarianceAcceptable({
+    required double approvedAmount,
+    required double actual,
+  }) =>
+      actual <= workOrderVarianceCeiling(approvedAmount) + 1e-9;
+
   // ─── Copy / Serialization ──────────────────────────────────
 
   FinancePolicyEntity copyWith({
@@ -189,6 +262,14 @@ class FinancePolicyEntity extends Equatable {
     WorkflowPermissionConfig? accountManagement,
     WorkflowPermissionConfig? masterDataManagement,
     WorkflowPermissionConfig? cashAdvanceManagement,
+    WorkflowPermissionConfig? workOrderRaise,
+    WorkflowPermissionConfig? workOrderIssue,
+    WorkflowPermissionConfig? workOrderApproval,
+    WorkflowPermissionConfig? workOrderClose,
+    double? workOrderAutoApproveBelow,
+    double? workOrderVarianceTolerancePct,
+    bool? autoApproveExpenseWithinEstimate,
+    bool? requireInvoiceOnWorkOrderComplete,
   }) {
     return FinancePolicyEntity(
       approvalLimits: approvalLimits ?? this.approvalLimits,
@@ -213,6 +294,18 @@ class FinancePolicyEntity extends Equatable {
       masterDataManagement: masterDataManagement ?? this.masterDataManagement,
       cashAdvanceManagement:
           cashAdvanceManagement ?? this.cashAdvanceManagement,
+      workOrderRaise: workOrderRaise ?? this.workOrderRaise,
+      workOrderIssue: workOrderIssue ?? this.workOrderIssue,
+      workOrderApproval: workOrderApproval ?? this.workOrderApproval,
+      workOrderClose: workOrderClose ?? this.workOrderClose,
+      workOrderAutoApproveBelow:
+          workOrderAutoApproveBelow ?? this.workOrderAutoApproveBelow,
+      workOrderVarianceTolerancePct:
+          workOrderVarianceTolerancePct ?? this.workOrderVarianceTolerancePct,
+      autoApproveExpenseWithinEstimate: autoApproveExpenseWithinEstimate ??
+          this.autoApproveExpenseWithinEstimate,
+      requireInvoiceOnWorkOrderComplete: requireInvoiceOnWorkOrderComplete ??
+          this.requireInvoiceOnWorkOrderComplete,
     );
   }
 
@@ -235,6 +328,15 @@ class FinancePolicyEntity extends Equatable {
         'accountManagement': accountManagement.toJson(),
         'masterDataManagement': masterDataManagement.toJson(),
         'cashAdvanceManagement': cashAdvanceManagement.toJson(),
+        'workOrderRaise': workOrderRaise.toJson(),
+        'workOrderIssue': workOrderIssue.toJson(),
+        'workOrderApproval': workOrderApproval.toJson(),
+        'workOrderClose': workOrderClose.toJson(),
+        'workOrderAutoApproveBelow': workOrderAutoApproveBelow,
+        'workOrderVarianceTolerancePct': workOrderVarianceTolerancePct,
+        'autoApproveExpenseWithinEstimate': autoApproveExpenseWithinEstimate,
+        'requireInvoiceOnWorkOrderComplete':
+            requireInvoiceOnWorkOrderComplete,
       };
 
   factory FinancePolicyEntity.fromJson(Map<String, dynamic>? json) {
@@ -315,6 +417,30 @@ class FinancePolicyEntity extends Equatable {
           ? WorkflowPermissionConfig.fromJson(
               json['cashAdvanceManagement'] as Map<String, dynamic>?)
           : const FinancePolicyEntity().cashAdvanceManagement,
+      workOrderRaise: json['workOrderRaise'] != null
+          ? WorkflowPermissionConfig.fromJson(
+              json['workOrderRaise'] as Map<String, dynamic>?)
+          : const FinancePolicyEntity().workOrderRaise,
+      workOrderIssue: json['workOrderIssue'] != null
+          ? WorkflowPermissionConfig.fromJson(
+              json['workOrderIssue'] as Map<String, dynamic>?)
+          : const FinancePolicyEntity().workOrderIssue,
+      workOrderApproval: json['workOrderApproval'] != null
+          ? WorkflowPermissionConfig.fromJson(
+              json['workOrderApproval'] as Map<String, dynamic>?)
+          : const FinancePolicyEntity().workOrderApproval,
+      workOrderClose: json['workOrderClose'] != null
+          ? WorkflowPermissionConfig.fromJson(
+              json['workOrderClose'] as Map<String, dynamic>?)
+          : const FinancePolicyEntity().workOrderClose,
+      workOrderAutoApproveBelow:
+          (json['workOrderAutoApproveBelow'] as num?)?.toDouble() ?? 300,
+      workOrderVarianceTolerancePct:
+          (json['workOrderVarianceTolerancePct'] as num?)?.toDouble() ?? 10,
+      autoApproveExpenseWithinEstimate:
+          json['autoApproveExpenseWithinEstimate'] as bool? ?? true,
+      requireInvoiceOnWorkOrderComplete:
+          json['requireInvoiceOnWorkOrderComplete'] as bool? ?? true,
     );
   }
 
@@ -338,5 +464,13 @@ class FinancePolicyEntity extends Equatable {
         accountManagement,
         masterDataManagement,
         cashAdvanceManagement,
+        workOrderRaise,
+        workOrderIssue,
+        workOrderApproval,
+        workOrderClose,
+        workOrderAutoApproveBelow,
+        workOrderVarianceTolerancePct,
+        autoApproveExpenseWithinEstimate,
+        requireInvoiceOnWorkOrderComplete,
       ];
 }

@@ -121,6 +121,16 @@ import 'features/driver_evaluation/domain/usecases/delete_evaluation_usecase.dar
 import 'features/driver_evaluation/presentation/providers/admin_evaluation_provider.dart';
 import 'features/driver_evaluation/presentation/providers/driver_form_provider.dart';
 
+import 'features/maintenance/data/datasources/work_order_remote_data_source.dart';
+import 'features/maintenance/data/repositories/work_order_repository_impl.dart';
+import 'features/maintenance/domain/repositories/work_order_repository.dart';
+import 'features/maintenance/domain/services/work_order_transition_service.dart';
+import 'features/maintenance/domain/usecases/close_work_order_usecase.dart';
+import 'features/maintenance/domain/usecases/create_work_order_usecase.dart';
+import 'features/maintenance/domain/usecases/get_work_orders_usecase.dart';
+import 'features/maintenance/domain/usecases/work_order_workflow_usecases.dart';
+import 'features/maintenance/presentation/providers/work_order_provider.dart';
+import 'features/vehicle/domain/services/maintenance_history_writer.dart';
 import 'features/finance/data/datasources/finance_remote_data_source.dart';
 import 'features/finance/data/repositories/finance_repository_impl.dart';
 import 'features/finance/domain/repositories/finance_repository.dart';
@@ -660,6 +670,69 @@ Future<void> init() async {
   // Data sources
   sl.registerLazySingleton<FinanceRemoteDataSource>(
     () => FinanceRemoteDataSourceImpl(firestore: sl(), storage: sl()),
+  );
+
+  //! Features - Maintenance Work Orders
+  // State Management (Provider)
+  sl.registerFactory(
+    () => WorkOrderProvider(
+      getWorkOrdersUseCase: sl(),
+      getWorkOrdersForVehicleUseCase: sl(),
+      getOpenWorkOrdersUseCase: sl(),
+      getWorkOrderByIdUseCase: sl(),
+      createWorkOrderUseCase: sl(),
+      updateWorkOrderUseCase: sl(),
+      issueWorkOrderUseCase: sl(),
+      approveWorkOrderUseCase: sl(),
+      rejectWorkOrderUseCase: sl(),
+      startWorkOrderUseCase: sl(),
+      holdWorkOrderUseCase: sl(),
+      resumeWorkOrderUseCase: sl(),
+      completeWorkOrderUseCase: sl(),
+      cancelWorkOrderUseCase: sl(),
+      closeWorkOrderUseCase: sl(),
+      transitions: sl(),
+      repository: sl(),
+    ),
+  );
+
+  // Services
+  sl.registerLazySingleton(() => const WorkOrderTransitionService());
+  sl.registerLazySingleton(() => const MaintenanceHistoryWriter());
+
+  // UseCases
+  sl.registerLazySingleton(() => GetWorkOrdersUseCase(sl()));
+  sl.registerLazySingleton(() => GetWorkOrdersForVehicleUseCase(sl()));
+  sl.registerLazySingleton(() => GetOpenWorkOrdersUseCase(sl()));
+  sl.registerLazySingleton(() => GetWorkOrderByIdUseCase(sl()));
+  sl.registerLazySingleton(() => CreateWorkOrderUseCase(sl(), sl()));
+  sl.registerLazySingleton(() => UpdateWorkOrderUseCase(sl()));
+  sl.registerLazySingleton(() => IssueWorkOrderUseCase(sl(), sl()));
+  sl.registerLazySingleton(() => ApproveWorkOrderUseCase(sl(), sl()));
+  sl.registerLazySingleton(() => RejectWorkOrderUseCase(sl(), sl()));
+  sl.registerLazySingleton(() => StartWorkOrderUseCase(sl(), sl(), sl()));
+  sl.registerLazySingleton(() => HoldWorkOrderUseCase(sl(), sl()));
+  sl.registerLazySingleton(() => ResumeWorkOrderUseCase(sl(), sl()));
+  sl.registerLazySingleton(() => CompleteWorkOrderUseCase(sl(), sl()));
+  sl.registerLazySingleton(() => CancelWorkOrderUseCase(sl(), sl(), sl()));
+  sl.registerLazySingleton(
+    () => CloseWorkOrderUseCase(
+      repository: sl(),
+      financeRepository: sl(),
+      vehicleRepository: sl(),
+      historyWriter: sl(),
+      transitions: sl(),
+    ),
+  );
+
+  // Repositories
+  sl.registerLazySingleton<WorkOrderRepository>(
+    () => WorkOrderRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data sources
+  sl.registerLazySingleton<WorkOrderRemoteDataSource>(
+    () => WorkOrderRemoteDataSourceImpl(firestore: sl(), storage: sl()),
   );
 
   //! Features - User Management

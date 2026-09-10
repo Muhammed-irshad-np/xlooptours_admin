@@ -31,6 +31,8 @@ abstract class FinanceRepository {
     DateTime end,
   );
   Future<List<ExpenseEntity>> getExpensesByAccount(String fundAccountId);
+  /// Single expense by id, or null when it does not exist.
+  Future<ExpenseEntity?> getExpenseById(String id);
   Future<void> insertExpense(ExpenseEntity expense);
   Future<void> updateExpense(ExpenseEntity expense);
   Future<void> deleteExpense(String id);

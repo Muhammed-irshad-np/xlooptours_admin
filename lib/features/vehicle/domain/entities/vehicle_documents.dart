@@ -132,6 +132,11 @@ class MaintenanceRecord extends Equatable {
   final double? laborCost;
   final String? serviceProvider;
   final String? workOrderNumber;
+
+  /// Id of the work order that produced this record, when it came from one.
+  /// Used as a dedupe key so closing a work order twice cannot double-reset
+  /// a maintenance interval.
+  final String? sourceWorkOrderId;
   final String? serviceType;
   final String? partsReplaced;
   final String? notes;
@@ -166,6 +171,7 @@ class MaintenanceRecord extends Equatable {
     this.laborCost,
     this.serviceProvider,
     this.workOrderNumber,
+    this.sourceWorkOrderId,
     this.serviceType,
     this.partsReplaced,
     this.notes,
@@ -195,6 +201,7 @@ class MaintenanceRecord extends Equatable {
     double? laborCost,
     String? serviceProvider,
     String? workOrderNumber,
+    String? sourceWorkOrderId,
     String? serviceType,
     String? partsReplaced,
     String? notes,
@@ -224,6 +231,7 @@ class MaintenanceRecord extends Equatable {
       laborCost: laborCost ?? this.laborCost,
       serviceProvider: serviceProvider ?? this.serviceProvider,
       workOrderNumber: workOrderNumber ?? this.workOrderNumber,
+      sourceWorkOrderId: sourceWorkOrderId ?? this.sourceWorkOrderId,
       serviceType: serviceType ?? this.serviceType,
       partsReplaced: partsReplaced ?? this.partsReplaced,
       notes: notes ?? this.notes,
@@ -255,6 +263,7 @@ class MaintenanceRecord extends Equatable {
     laborCost,
     serviceProvider,
     workOrderNumber,
+    sourceWorkOrderId,
     serviceType,
     partsReplaced,
     notes,

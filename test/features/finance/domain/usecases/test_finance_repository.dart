@@ -16,6 +16,10 @@ import 'package:xloop_invoice/features/finance/domain/repositories/finance_repos
 /// Configurable fake repository for unit tests. Set the result/error
 /// fields before calling the use case under test.
 class FakeFinanceRepository implements FinanceRepository {
+  // --- Lookups ---
+  final Map<String, ExpenseEntity> expensesById = {};
+  final Map<String, FundTransactionEntity> transactionsById = {};
+
   // --- Expense approval ---
   ExpenseEntity? approveResult;
   Object? approveError;
@@ -138,6 +142,10 @@ class FakeFinanceRepository implements FinanceRepository {
   ) async => [];
 
   @override
+  Future<ExpenseEntity?> getExpenseById(String id) async =>
+      expensesById[id];
+
+  @override
   Future<void> insertExpense(ExpenseEntity expense) async {}
 
   @override
@@ -176,6 +184,10 @@ class FakeFinanceRepository implements FinanceRepository {
   Future<List<FundTransactionEntity>> getTransactionsForAccount(
     String accountId,
   ) async => [];
+
+  @override
+  Future<FundTransactionEntity?> getTransactionById(String id) async =>
+      transactionsById[id];
 
   @override
   Future<List<PettyCashSessionEntity>> getPettyCashSessions(

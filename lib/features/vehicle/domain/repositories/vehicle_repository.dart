@@ -9,6 +9,9 @@ import '../entities/shop_entity.dart';
 abstract class VehicleRepository {
   // Vehicle Methods
   Future<List<VehicleEntity>> getAllVehicles();
+
+  /// Fresh single-vehicle read — see [VehicleRemoteDataSource.getVehicleById].
+  Future<VehicleEntity?> getVehicleById(String id);
   Future<void> insertVehicle(VehicleEntity vehicle);
   Future<void> updateVehicle(VehicleEntity vehicle);
   Future<void> deleteVehicle(String id);
