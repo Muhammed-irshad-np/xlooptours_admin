@@ -2578,12 +2578,12 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     );
   }
 
-  void _showTransactionDialog(
+  Future<void> _showTransactionDialog(
     BuildContext context,
     FundAccountProvider provider,
     FundAccountEntity account,
     bool isDeposit,
-  ) {
+  ) async {
     final formKey = GlobalKey<FormState>();
     final isPettyCash = account.isPettyCash;
 
@@ -2593,199 +2593,710 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     final descCtrl = TextEditingController();
     bool isSubmitting = false;
 
-    showDialog(
+    await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          shape: finDialogShape,
-          title: finDialogTitle(
-            isDeposit ? 'Deposit Funds' : 'Withdraw Funds',
-            icon: isDeposit ? Icons.add_circle_outline_rounded : Icons.remove_circle_outline_rounded,
-            iconColor: isDeposit ? FinDT.success : FinDT.danger,
-          ),
-          content: SizedBox(
-            width: 420.w,
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: double.infinity,
-                    padding: EdgeInsets.all(12.w),
-                    decoration: BoxDecoration(
-                      color: FinDT.bgPage,
-                      borderRadius: BorderRadius.circular(10.r),
-                      border: Border.all(color: FinDT.border),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.account_balance_wallet_outlined, size: 16.sp, color: FinDT.brand),
-                        SizedBox(width: 8.w),
-                        Text(
-                          'Account: ',
-                          style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
+        builder: (ctx, setDialogState) {
+          final formatter = NumberFormat('#,##0.00', 'en_US');
+          final cashAmt = double.tryParse(cashAmountCtrl.text) ?? 0.0;
+          final stcAmt = double.tryParse(stcAmountCtrl.text) ?? 0.0;
+          final singleAmt = double.tryParse(amountCtrl.text) ?? 0.0;
+          final totalAmt = isPettyCash ? (cashAmt + stcAmt) : singleAmt;
+
+          final projectedTotal = isDeposit
+              ? (account.currentBalance + totalAmt)
+              : (account.currentBalance - totalAmt);
+
+          final projectedCash = isDeposit
+              ? (account.cashBalance + cashAmt)
+              : (account.cashBalance - cashAmt);
+
+          final projectedStc = isDeposit
+              ? (account.stcPayBalance + stcAmt)
+              : (account.stcPayBalance - stcAmt);
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: finDialogShape,
+            title: finDialogTitle(
+              isDeposit ? 'Deposit Funds' : 'Withdraw Funds',
+              icon: isDeposit
+                  ? Icons.add_circle_outline_rounded
+                  : Icons.remove_circle_outline_rounded,
+              iconColor: isDeposit ? FinDT.success : FinDT.danger,
+            ),
+            content: SizedBox(
+              width: 440.w,
+              child: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Account Header ──
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 14.w, vertical: 10.h),
+                        decoration: BoxDecoration(
+                          color: FinDT.bgPage,
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(color: FinDT.border),
                         ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.account_balance_wallet_outlined,
+                              size: 16.sp,
+                              color: FinDT.brand,
+                            ),
+                            SizedBox(width: 8.w),
+                            Text(
+                              'Account: ',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.sp,
+                                color: FinDT.textSecondary,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                '${account.name} (${account.code})',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: FinDT.textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 7.w, vertical: 2.h),
+                              decoration: BoxDecoration(
+                                color: FinDT.brand.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6.r),
+                              ),
+                              child: Text(
+                                account.typeDisplayName,
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: FinDT.brand,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 12.h),
+
+                      // ── Live Balance & Projection Card ──
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              FinDT.brand.withValues(alpha: 0.06),
+                              FinDT.brand.withValues(alpha: 0.02),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(
+                            color: FinDT.brand.withValues(alpha: 0.16),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.query_stats_rounded,
+                                      size: 14.sp,
+                                      color: FinDT.brand,
+                                    ),
+                                    SizedBox(width: 6.w),
+                                    Text(
+                                      'BALANCE OVERVIEW',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10.sp,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.5,
+                                        color: FinDT.brand,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (totalAmt > 0)
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 7.w,
+                                      vertical: 2.h,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: (isDeposit
+                                              ? FinDT.success
+                                              : FinDT.danger)
+                                          .withValues(alpha: 0.12),
+                                      borderRadius:
+                                          BorderRadius.circular(8.r),
+                                      border: Border.all(
+                                        color: (isDeposit
+                                                ? FinDT.success
+                                                : FinDT.danger)
+                                            .withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '${isDeposit ? "+" : "-"}${formatter.format(totalAmt)} ${account.currency}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDeposit
+                                            ? FinDT.success
+                                            : FinDT.danger,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            SizedBox(height: 8.h),
+                            // Total balance comparison
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12.w,
+                                vertical: 8.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10.r),
+                                border: Border.all(color: FinDT.borderLight),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Current Total',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 10.sp,
+                                            color: FinDT.textSecondary,
+                                          ),
+                                        ),
+                                        SizedBox(height: 2.h),
+                                        Text(
+                                          '${formatter.format(account.currentBalance)} ${account.currency}',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13.sp,
+                                            fontWeight: FontWeight.w700,
+                                            color: FinDT.textPrimary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 16.sp,
+                                    color: FinDT.textMuted,
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          'Projected Total',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 10.sp,
+                                            fontWeight: FontWeight.w600,
+                                            color: projectedTotal < 0
+                                                ? FinDT.danger
+                                                : (isDeposit && totalAmt > 0
+                                                    ? FinDT.success
+                                                    : FinDT.brand),
+                                          ),
+                                        ),
+                                        SizedBox(height: 2.h),
+                                        Text(
+                                          '${formatter.format(projectedTotal)} ${account.currency}',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13.sp,
+                                            fontWeight: FontWeight.w800,
+                                            color: projectedTotal < 0
+                                                ? FinDT.danger
+                                                : (isDeposit && totalAmt > 0
+                                                    ? FinDT.success
+                                                    : FinDT.brand),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // If Petty Cash, show physical & stc dual breakdown
+                            if (isPettyCash) ...[
+                              SizedBox(height: 8.h),
+                              Row(
+                                children: [
+                                  // Physical Cash Sub-card
+                                  Expanded(
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 10.w,
+                                        vertical: 8.h,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius:
+                                            BorderRadius.circular(8.r),
+                                        border: Border.all(
+                                          color: const Color(0xFF16A34A)
+                                              .withValues(alpha: 0.25),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: EdgeInsets.all(4.w),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF16A34A)
+                                                      .withValues(alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          6.r),
+                                                ),
+                                                child: Icon(
+                                                  Icons.payments_outlined,
+                                                  size: 12.sp,
+                                                  color:
+                                                      const Color(0xFF16A34A),
+                                                ),
+                                              ),
+                                              SizedBox(width: 5.w),
+                                              Expanded(
+                                                child: Text(
+                                                  'Physical Cash',
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 10.sp,
+                                                    fontWeight:
+                                                        FontWeight.w600,
+                                                    color:
+                                                        const Color(0xFF16A34A),
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(height: 6.h),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                'Current:',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.sp,
+                                                  color: FinDT.textSecondary,
+                                                ),
+                                              ),
+                                              Text(
+                                                formatter.format(
+                                                    account.cashBalance),
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.sp,
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                  color: FinDT.textPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(height: 2.h),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                'Projected:',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.sp,
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                  color:
+                                                      const Color(0xFF16A34A),
+                                                ),
+                                              ),
+                                              Text(
+                                                '${formatter.format(projectedCash)} ${account.currency}',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 10.sp,
+                                                  fontWeight:
+                                                      FontWeight.w700,
+                                                  color: projectedCash < 0
+                                                      ? FinDT.danger
+                                                      : (cashAmt > 0
+                                                          ? const Color(
+                                                              0xFF16A34A)
+                                                          : FinDT.textPrimary),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  // STC Pay Sub-card
+                                  Expanded(
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 10.w,
+                                        vertical: 8.h,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius:
+                                            BorderRadius.circular(8.r),
+                                        border: Border.all(
+                                          color: const Color(0xFF7C3AED)
+                                              .withValues(alpha: 0.25),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: EdgeInsets.all(4.w),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF7C3AED)
+                                                      .withValues(alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          6.r),
+                                                ),
+                                                child: Icon(
+                                                  Icons.phone_android_outlined,
+                                                  size: 12.sp,
+                                                  color:
+                                                      const Color(0xFF7C3AED),
+                                                ),
+                                              ),
+                                              SizedBox(width: 5.w),
+                                              Expanded(
+                                                child: Text(
+                                                  'STC Pay Float',
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 10.sp,
+                                                    fontWeight:
+                                                        FontWeight.w600,
+                                                    color:
+                                                        const Color(0xFF7C3AED),
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(height: 6.h),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                'Current:',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.sp,
+                                                  color: FinDT.textSecondary,
+                                                ),
+                                              ),
+                                              Text(
+                                                formatter.format(
+                                                    account.stcPayBalance),
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.sp,
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                  color: FinDT.textPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(height: 2.h),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                'Projected:',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.sp,
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                  color:
+                                                      const Color(0xFF7C3AED),
+                                                ),
+                                              ),
+                                              Text(
+                                                '${formatter.format(projectedStc)} ${account.currency}',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 10.sp,
+                                                  fontWeight:
+                                                      FontWeight.w700,
+                                                  color: projectedStc < 0
+                                                      ? FinDT.danger
+                                                      : (stcAmt > 0
+                                                          ? const Color(
+                                                              0xFF7C3AED)
+                                                          : FinDT.textPrimary),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16.h),
+
+                      if (isPettyCash) ...[
+                        // Dual Bucket deposit/withdrawal for Petty Cash
                         Text(
-                          '${account.name} (${account.code})',
-                          style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
+                          'Specify breakdown for ${isDeposit ? "deposit" : "withdrawal"}:',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                            color: FinDT.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 10.h),
+                        TextFormField(
+                          controller: cashAmountCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d*')),
+                          ],
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: _dialogInputDecoration(
+                            label: 'Cash Amount (${account.currency})',
+                            hint: '0.00',
+                            prefixIcon: Icons.payments_outlined,
+                          ),
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: FinDT.textPrimary,
+                          ),
+                          validator: (v) {
+                            final cash =
+                                double.tryParse(cashAmountCtrl.text) ?? 0.0;
+                            final stc =
+                                double.tryParse(stcAmountCtrl.text) ?? 0.0;
+                            if (cash <= 0 && stc <= 0) {
+                              return 'Enter at least one amount';
+                            }
+                            if (!isDeposit && cash > account.cashBalance) {
+                              return 'Exceeds cash balance (${formatter.format(account.cashBalance)})';
+                            }
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: 12.h),
+                        TextFormField(
+                          controller: stcAmountCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d*')),
+                          ],
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: _dialogInputDecoration(
+                            label: 'STC Pay Amount (${account.currency})',
+                            hint: '0.00',
+                            prefixIcon: Icons.phone_android_outlined,
+                          ),
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: FinDT.textPrimary,
+                          ),
+                          validator: (v) {
+                            final cash =
+                                double.tryParse(cashAmountCtrl.text) ?? 0.0;
+                            final stc =
+                                double.tryParse(stcAmountCtrl.text) ?? 0.0;
+                            if (cash <= 0 && stc <= 0) {
+                              return 'Enter at least one amount';
+                            }
+                            if (!isDeposit && stc > account.stcPayBalance) {
+                              return 'Exceeds STC Pay balance (${formatter.format(account.stcPayBalance)})';
+                            }
+                            return null;
+                          },
+                        ),
+                      ] else ...[
+                        TextFormField(
+                          controller: amountCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d*')),
+                          ],
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: _dialogInputDecoration(
+                            label: 'Amount *',
+                            hint: '0.00',
+                            prefixIcon: Icons.payments_outlined,
+                            suffixText: account.currency,
+                          ),
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: FinDT.textPrimary,
+                          ),
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Required';
+                            final val = double.tryParse(v);
+                            if (val == null || val <= 0) {
+                              return 'Invalid amount';
+                            }
+                            if (!isDeposit && val > account.currentBalance) {
+                              return 'Insufficient balance (${formatter.format(account.currentBalance)})';
+                            }
+                            return null;
+                          },
                         ),
                       ],
-                    ),
+                      SizedBox(height: 14.h),
+                      TextFormField(
+                        controller: descCtrl,
+                        decoration: _dialogInputDecoration(
+                          label: 'Description / Purpose *',
+                          hint: isDeposit
+                              ? 'e.g., Seed petty cash fund'
+                              : 'e.g., Return funds to treasury',
+                          prefixIcon: Icons.description_outlined,
+                        ),
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          color: FinDT.textPrimary,
+                        ),
+                        validator: (v) =>
+                            (v == null || v.isEmpty) ? 'Required' : null,
+                      ),
+                    ],
                   ),
-                  SizedBox(height: 16.h),
-                  if (isPettyCash) ...[
-                    // Dual Bucket deposit/withdrawal for Petty Cash
-                    Text(
-                      'Specify breakdown for ${isDeposit ? "deposit" : "withdrawal"}:',
-                      style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
-                    ),
-                    SizedBox(height: 10.h),
-                    TextFormField(
-                      controller: cashAmountCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                      decoration: _dialogInputDecoration(
-                        label: 'Cash Amount (SAR)',
-                        hint: '0.00',
-                        prefixIcon: Icons.payments_outlined,
-                      ),
-                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                      validator: (v) {
-                        final cash = double.tryParse(cashAmountCtrl.text) ?? 0.0;
-                        final stc = double.tryParse(stcAmountCtrl.text) ?? 0.0;
-                        if (cash <= 0 && stc <= 0) return 'Enter at least one amount';
-                        if (!isDeposit && cash > account.cashBalance) {
-                          return 'Exceeds cash balance (${account.cashBalance.toStringAsFixed(2)})';
-                        }
-                        return null;
-                      },
-                    ),
-                    SizedBox(height: 12.h),
-                    TextFormField(
-                      controller: stcAmountCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                      decoration: _dialogInputDecoration(
-                        label: 'STC Pay Amount (SAR)',
-                        hint: '0.00',
-                        prefixIcon: Icons.phone_android_outlined,
-                      ),
-                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                      validator: (v) {
-                        final cash = double.tryParse(cashAmountCtrl.text) ?? 0.0;
-                        final stc = double.tryParse(stcAmountCtrl.text) ?? 0.0;
-                        if (cash <= 0 && stc <= 0) return 'Enter at least one amount';
-                        if (!isDeposit && stc > account.stcPayBalance) {
-                          return 'Exceeds STC Pay balance (${account.stcPayBalance.toStringAsFixed(2)})';
-                        }
-                        return null;
-                      },
-                    ),
-                  ] else ...[
-                    TextFormField(
-                      controller: amountCtrl,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*'))],
-                      decoration: _dialogInputDecoration(
-                        label: 'Amount *',
-                        hint: '0.00',
-                        prefixIcon: Icons.payments_outlined,
-                        suffixText: 'SAR',
-                      ),
-                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Required';
-                        final val = double.tryParse(v);
-                        if (val == null || val <= 0) return 'Invalid amount';
-                        if (!isDeposit && val > account.currentBalance) {
-                          return 'Insufficient balance';
-                        }
-                        return null;
-                      },
-                    ),
-                  ],
-                  SizedBox(height: 14.h),
-                  TextFormField(
-                    controller: descCtrl,
-                    decoration: _dialogInputDecoration(
-                      label: 'Description / Purpose *',
-                      hint: 'e.g., Seed petty cash fund',
-                      prefixIcon: Icons.description_outlined,
-                    ),
-                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                    validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-          actions: [
-            finDialogCancelButton(
-              ctx,
-              onPressed: isSubmitting ? () {} : null,
-            ),
-            finDialogActionButton(
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-                final cashAmt = double.tryParse(cashAmountCtrl.text) ?? 0.0;
-                final stcAmt = double.tryParse(stcAmountCtrl.text) ?? 0.0;
-                final totalAmt = isPettyCash ? (cashAmt + stcAmt) : double.parse(amountCtrl.text);
+            actions: [
+              finDialogCancelButton(
+                ctx,
+                onPressed: isSubmitting ? () {} : null,
+              ),
+              finDialogActionButton(
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+                  final cashAmt = double.tryParse(cashAmountCtrl.text) ?? 0.0;
+                  final stcAmt = double.tryParse(stcAmountCtrl.text) ?? 0.0;
+                  final totalAmt = isPettyCash
+                      ? (cashAmt + stcAmt)
+                      : (double.tryParse(amountCtrl.text) ?? 0.0);
 
-                final auth = context.read<AuthProvider>().user;
-                final actorName = auth?.actorLabel ?? 'Unknown';
-                final actorId = auth?.id ?? '';
+                  final auth = context.read<AuthProvider>().user;
+                  final actorName = auth?.actorLabel ?? 'Unknown';
+                  final actorId = auth?.id ?? '';
 
-                setDialogState(() => isSubmitting = true);
-                try {
-                  await provider.recordMovement(
-                    fundAccountId: account.id,
-                    type: isDeposit
-                        ? FundTransactionType.deposit
-                        : FundTransactionType.withdrawal,
-                    amountMajor: totalAmt,
-                    currency: account.currency,
-                    description: isPettyCash
-                        ? '${descCtrl.text} [Cash: $cashAmt, STC: $stcAmt]'
-                        : descCtrl.text,
-                    performedBy: actorName,
-                    performedByUserId: actorId,
-                    bucket: isPettyCash ? FundBucket.total : FundBucket.total,
-                    cashDelta:
-                        isPettyCash ? (isDeposit ? cashAmt : -cashAmt) : null,
-                    stcPayDelta:
-                        isPettyCash ? (isDeposit ? stcAmt : -stcAmt) : null,
-                  );
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(isDeposit ? 'Funds deposited successfully' : 'Funds withdrawn successfully'),
-                        backgroundColor: FinDT.success,
-                      ),
+                  setDialogState(() => isSubmitting = true);
+                  try {
+                    await provider.recordMovement(
+                      fundAccountId: account.id,
+                      type: isDeposit
+                          ? FundTransactionType.deposit
+                          : FundTransactionType.withdrawal,
+                      amountMajor: totalAmt,
+                      currency: account.currency,
+                      description: isPettyCash
+                          ? '${descCtrl.text} [Cash: $cashAmt, STC: $stcAmt]'
+                          : descCtrl.text,
+                      performedBy: actorName,
+                      performedByUserId: actorId,
+                      bucket: isPettyCash ? FundBucket.total : FundBucket.total,
+                      cashDelta:
+                          isPettyCash ? (isDeposit ? cashAmt : -cashAmt) : null,
+                      stcPayDelta:
+                          isPettyCash ? (isDeposit ? stcAmt : -stcAmt) : null,
                     );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(isDeposit
+                              ? 'Funds deposited successfully'
+                              : 'Funds withdrawn successfully'),
+                          backgroundColor: FinDT.success,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      setDialogState(() => isSubmitting = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text('$e'),
+                            backgroundColor: FinDT.danger),
+                      );
+                    }
                   }
-                } catch (e) {
-                  if (ctx.mounted) {
-                    setDialogState(() => isSubmitting = false);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
-                    );
-                  }
-                }
-              },
-              label: isDeposit ? 'Deposit Funds' : 'Withdraw Funds',
-              backgroundColor: isDeposit ? FinDT.success : FinDT.danger,
-              isLoading: isSubmitting,
-            ),
-          ],
-        ),
+                },
+                label: isDeposit ? 'Deposit Funds' : 'Withdraw Funds',
+                backgroundColor: isDeposit ? FinDT.success : FinDT.danger,
+                isLoading: isSubmitting,
+              ),
+            ],
+          );
+        },
       ),
     );
+    amountCtrl.dispose();
+    cashAmountCtrl.dispose();
+    stcAmountCtrl.dispose();
+    descCtrl.dispose();
   }
 
   void _confirmDeleteAccount(
