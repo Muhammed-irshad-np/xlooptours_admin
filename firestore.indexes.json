@@ -4,48 +4,112 @@
       "collectionGroup": "evaluations",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "mode": "ASCENDING" },
-        { "fieldPath": "createdAt", "mode": "DESCENDING" }
+        {
+          "fieldPath": "status",
+          "mode": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "mode": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "fund_transactions",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "fundAccountId", "mode": "ASCENDING" },
-        { "fieldPath": "date", "mode": "DESCENDING" }
+        {
+          "fieldPath": "fundAccountId",
+          "mode": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "mode": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "expenses",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "fundAccountId", "mode": "ASCENDING" },
-        { "fieldPath": "date", "mode": "DESCENDING" }
+        {
+          "fieldPath": "fundAccountId",
+          "mode": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "mode": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "petty_cash_sessions",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "fundAccountId", "mode": "ASCENDING" },
-        { "fieldPath": "date", "mode": "DESCENDING" }
+        {
+          "fieldPath": "fundAccountId",
+          "mode": "ASCENDING"
+        },
+        {
+          "fieldPath": "date",
+          "mode": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "petty_cash_sessions",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "fundAccountId", "mode": "ASCENDING" },
-        { "fieldPath": "status", "mode": "ASCENDING" }
+        {
+          "fieldPath": "fundAccountId",
+          "mode": "ASCENDING"
+        },
+        {
+          "fieldPath": "status",
+          "mode": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "cash_advances",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "fundAccountId", "mode": "ASCENDING" },
-        { "fieldPath": "issuedAt", "mode": "DESCENDING" }
+        {
+          "fieldPath": "fundAccountId",
+          "mode": "ASCENDING"
+        },
+        {
+          "fieldPath": "issuedAt",
+          "mode": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "work_orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "mode": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "mode": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "work_orders",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "vehicleId",
+          "mode": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "mode": "DESCENDING"
+        }
       ]
     }
   ],

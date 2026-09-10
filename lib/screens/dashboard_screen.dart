@@ -27,6 +27,10 @@ import 'package:xloop_invoice/widgets/responsive_layout.dart';
 import 'package:xloop_invoice/injection_container.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/widgets/maintenance_extension_dialog.dart';
 import 'package:xloop_invoice/features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
+import 'package:xloop_invoice/features/maintenance/presentation/providers/work_order_provider.dart';
+import 'package:xloop_invoice/features/maintenance/presentation/pages/work_order_detail_page.dart';
+import 'package:xloop_invoice/features/maintenance/presentation/pages/work_order_form_page.dart';
+import 'package:xloop_invoice/features/maintenance/domain/entities/work_order_entity.dart';
 import 'package:xloop_invoice/core/utils/update_dialog_helper.dart';
 import 'package:xloop_invoice/screens/employee_expiry_tracker_screen.dart';
 import 'package:xloop_invoice/screens/vehicle_expiry_tracker_screen.dart';
@@ -137,6 +141,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         vehicleProvider.fetchAllMaintenanceTypes(),
         vehicleProvider.fetchVehicleSettings(),
         vaultProvider.loadVaultData(),
+        // Lets maintenance alerts show "already booked in" instead of nagging.
+        context.read<WorkOrderProvider>().fetchWorkOrders(),
         if (isAdmin) context.read<FeedbackProvider>().fetchLatestFeedbacks(),
         if (isAdmin) context.read<CustomerProvider>().fetchAllCustomers(),
       ]);
@@ -1139,6 +1145,62 @@ class _ExpiryCardState extends State<_ExpiryCard> {
     }
   }
 
+  /// The category name this maintenance alert is about.
+  String? _alertCategory() {
+    final relatedId = widget.alert.relatedId;
+    if (relatedId == null) return null;
+    final prefix = 'maintenance_${relatedId}_';
+    if (!widget.alert.id.startsWith(prefix)) return null;
+    return widget.alert.id.substring(prefix.length).replaceAll('_', ' ');
+  }
+
+  /// An already-open work order covering this alert, if there is one.
+  ///
+  /// When a job is already booked in there is nothing useful for the reader
+  /// to do here, so the card points at the work order instead of nagging
+  /// about a service that is already being handled.
+  WorkOrderEntity? _existingWorkOrder() {
+    final relatedId = widget.alert.relatedId;
+    final category = _alertCategory();
+    if (relatedId == null || category == null) return null;
+    return context.watch<WorkOrderProvider>().openWorkOrderFor(
+          vehicleId: relatedId,
+          maintenanceTypeName: category,
+        );
+  }
+
+  Future<void> _createWorkOrder() async {
+    final relatedId = widget.alert.relatedId;
+    final category = _alertCategory();
+    if (relatedId == null || category == null) return;
+
+    final vehicleProvider = context.read<VehicleProvider>();
+    final vehicle = vehicleProvider.vehicles
+        .cast<VehicleEntity?>()
+        .firstWhere((v) => v?.id == relatedId, orElse: () => null);
+    if (vehicle == null) return;
+
+    // Match the alert's category back to a master-data id so the work order
+    // line carries the id rather than a name that master data could rename.
+    final type = vehicleProvider.maintenanceTypes
+        .where((t) => t.name.toLowerCase().trim() == category.toLowerCase().trim())
+        .firstOrNull;
+
+    final created = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WorkOrderFormPage(
+          initialVehicle: vehicle,
+          initialMaintenanceTypeId: type?.id,
+          initialComplaint: '$category due at ${vehicle.currentOdometer ?? 0} km',
+        ),
+      ),
+    );
+    if (created == true && mounted) {
+      await context.read<WorkOrderProvider>().fetchWorkOrders(force: true);
+    }
+  }
+
   void _extendAlert() {
     final relatedId = widget.alert.relatedId;
     if (relatedId == null) return;
@@ -1332,6 +1394,7 @@ class _ExpiryCardState extends State<_ExpiryCard> {
   @override
   Widget build(BuildContext context) {
     final mAlert = _getMaintenanceAlert();
+    final existingWorkOrder = _existingWorkOrder();
     final hasExtensions = mAlert != null && mAlert.extensionHistory.isNotEmpty;
 
     return MouseRegion(
@@ -1452,7 +1515,75 @@ class _ExpiryCardState extends State<_ExpiryCard> {
                     ),
                   ),
                   SizedBox(width: 12.w),
-                  if (widget.alert.id.startsWith('maintenance_')) ...[
+                  if (widget.alert.id.startsWith('maintenance_') &&
+                      existingWorkOrder != null) ...[
+                    // Already booked in — point at the job rather than asking
+                    // the reader to act on something in hand.
+                    InkWell(
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => WorkOrderDetailPage(
+                            workOrderId: existingWorkOrder.id,
+                          ),
+                        ),
+                      ),
+                      borderRadius: BorderRadius.circular(8.r),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12.w,
+                          vertical: 8.h,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(8.r),
+                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.assignment_outlined,
+                              size: 13.sp,
+                              color: const Color(0xFF2563EB),
+                            ),
+                            SizedBox(width: 5.w),
+                            Text(
+                              '${existingWorkOrder.workOrderNumber} · '
+                              '${existingWorkOrder.status.displayName}',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF1E40AF),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ] else if (widget.alert.id.startsWith('maintenance_')) ...[
+                    OutlinedButton(
+                      onPressed: _createWorkOrder,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF2563EB),
+                        side: const BorderSide(color: Color(0xFF2563EB)),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 12.w,
+                          vertical: 8.h,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.r),
+                        ),
+                      ),
+                      child: Text(
+                        'Work Order',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
                     OutlinedButton(
                       onPressed: _extendAlert,
                       style: OutlinedButton.styleFrom(

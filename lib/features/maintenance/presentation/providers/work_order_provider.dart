@@ -120,6 +120,17 @@ class WorkOrderProvider with ChangeNotifier {
     return null;
   }
 
+  /// The work order that currently has [vehicleId] off the road, if any.
+  ///
+  /// Only `inProgress` / `onHold` count — a vehicle with a fault merely
+  /// *reported* is still driveable and must not be badged as in maintenance.
+  WorkOrderEntity? occupyingWorkOrderFor(String vehicleId) {
+    for (final wo in _workOrders) {
+      if (wo.vehicleId == vehicleId && wo.occupiesVehicle) return wo;
+    }
+    return null;
+  }
+
   /// Vehicles currently at the workshop, by id.
   Set<String> get vehicleIdsInShop => _workOrders
       .where((w) => w.occupiesVehicle)

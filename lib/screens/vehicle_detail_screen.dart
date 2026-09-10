@@ -1,3 +1,4 @@
+import 'package:xloop_invoice/features/maintenance/presentation/widgets/vehicle_work_orders_section.dart';
 import 'package:flutter/material.dart';
 import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:intl/intl.dart';
@@ -85,6 +86,9 @@ class VehicleDetailScreen extends StatelessWidget {
                   },
                 ),
               ),
+
+            VehicleWorkOrdersSection(vehicle: currentVehicle),
+            const Divider(height: 32),
 
             _buildDetailRow(
               context,

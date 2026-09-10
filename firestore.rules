@@ -114,6 +114,15 @@ service cloud.firestore {
       allow delete: if isFinance();
     }
 
+    // Maintenance work orders — anyone on staff may report a fault;
+    // moving a work order through its lifecycle is coordinator and above.
+    match /work_orders/{id} {
+      allow read: if isAllowedUser();
+      allow create: if isAllowedUser();
+      allow update: if isCoordinatorOrAbove();
+      allow delete: if isAdmin();
+    }
+
     match /finance_settings/{id} {
       allow read: if isAllowedUser();
       allow write: if isFinance();

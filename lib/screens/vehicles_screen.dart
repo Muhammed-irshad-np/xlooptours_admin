@@ -7,6 +7,10 @@ import 'package:xloop_invoice/screens/all_vehicles_maintenance_history_screen.da
 import 'package:xloop_invoice/screens/vehicle_detail_screen.dart';
 import 'package:xloop_invoice/screens/vehicle_expiry_tracker_screen.dart';
 import 'package:provider/provider.dart';
+import 'package:xloop_invoice/features/maintenance/presentation/providers/work_order_provider.dart';
+import 'package:xloop_invoice/features/maintenance/presentation/pages/work_order_detail_page.dart';
+import 'package:xloop_invoice/features/maintenance/presentation/widgets/work_order_status_badge.dart';
+import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_status.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../widgets/add_maintenance_record_dialog.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
@@ -50,6 +54,9 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   Future<void> _loadData() async {
     try {
       await context.read<VehicleProvider>().fetchAllVehicles();
+      if (!mounted) return;
+      // Powers the In Maintenance badge on each row.
+      await context.read<WorkOrderProvider>().fetchWorkOrders();
       if (!mounted) return;
       await context.read<EmployeeProvider>().fetchAllEmployees();
       if (!mounted) return;
@@ -147,10 +154,13 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     final vehicles = vehicleProvider.vehicles;
 
+    // A vehicle at the workshop is temporarily unavailable, not
+    // decommissioned — it stays in the fleet list with an In Maintenance
+    // badge rather than being hidden away with retired vehicles.
     final filteredVehicles = vehicles.where((v) {
-      final isActive = (v.status?.toLowerCase() ?? 'active') == 'active';
-      if (_showInactive) return !isActive;
-      return isActive;
+      final inFleet = VehicleStatus.isInFleet(v.status);
+      if (_showInactive) return !inFleet;
+      return inFleet;
     }).toList();
 
     return DefaultTabController(
@@ -286,6 +296,8 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
 
   Widget _buildVehicleCard(VehicleEntity vehicle, EmployeeEntity? driver) {
     final isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
+    final openWorkOrder =
+        context.watch<WorkOrderProvider>().occupyingWorkOrderFor(vehicle.id);
     return Card(
       child: ListTile(
         leading: Container(
@@ -322,6 +334,24 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
           children: [
             SizedBox(height: 4.h),
             Text('Plate: ${vehicle.plateNumber} • ${vehicle.color}'),
+            if (openWorkOrder != null || VehicleStatus.isInShop(vehicle.status)) ...[
+              SizedBox(height: 6.h),
+              InkWell(
+                onTap: openWorkOrder == null
+                    ? null
+                    : () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => WorkOrderDetailPage(
+                              workOrderId: openWorkOrder.id,
+                            ),
+                          ),
+                        ),
+                child: InMaintenanceChip(
+                  workOrderNumber: openWorkOrder?.workOrderNumber,
+                ),
+              ),
+            ],
             SizedBox(height: 4.h),
             Row(
               children: [

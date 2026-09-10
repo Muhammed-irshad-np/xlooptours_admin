@@ -90,6 +90,20 @@ enum WorkOrderAction {
       this == WorkOrderAction.close ||
       this == WorkOrderAction.cancel ||
       this == WorkOrderAction.reject;
+
+  /// Whether this action advances the work order towards closure.
+  ///
+  /// Editing, cancelling, rejecting and holding are always *available* to
+  /// whoever runs the job, so treating them as forward moves would park every
+  /// live work order in that person's queue forever.
+  bool get movesForward =>
+      this == WorkOrderAction.issue ||
+      this == WorkOrderAction.reissue ||
+      this == WorkOrderAction.approve ||
+      this == WorkOrderAction.start ||
+      this == WorkOrderAction.resume ||
+      this == WorkOrderAction.complete ||
+      this == WorkOrderAction.close;
 }
 
 /// Which lane a work order sits in on the board.
@@ -218,14 +232,11 @@ class WorkOrderTransitionService {
       policy: policy,
     );
     for (final action in actions) {
-      if (action != WorkOrderAction.edit &&
-          action != WorkOrderAction.cancel &&
-          action != WorkOrderAction.reject &&
-          action != WorkOrderAction.hold) {
-        return action;
-      }
+      if (action.movesForward) return action;
     }
-    return actions.isEmpty ? null : actions.first;
+    // Only secondary actions (edit / cancel / reject / hold) are open to this
+    // user, and none of those is something they are being *waited on* for.
+    return null;
   }
 
   /// Whether [workOrder] is waiting on [user] specifically.

@@ -28,6 +28,8 @@ import 'invoice_list_screen.dart';
 import 'expiries_list_screen.dart';
 import '../core/utils/share_dialog.dart';
 import 'package:go_router/go_router.dart';
+import 'package:xloop_invoice/features/maintenance/presentation/pages/work_order_board_page.dart';
+import 'package:xloop_invoice/features/maintenance/presentation/widgets/report_issue_dialog.dart';
 import 'package:provider/provider.dart';
 import '../core/rbac/permission.dart';
 import '../core/rbac/rbac_manager.dart';
@@ -348,6 +350,23 @@ class _AdminLayoutState extends State<AdminLayout> {
               context,
               MaterialPageRoute(builder: (_) => const VehicleFormScreen()),
             );
+          },
+        ),
+        _SubNavItem(
+          label: 'Work Orders',
+          icon: Icons.assignment_outlined,
+          onAction: (context) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const WorkOrderBoardPage()),
+            );
+          },
+        ),
+        _SubNavItem(
+          label: 'Report a Problem',
+          icon: Icons.report_problem_outlined,
+          onAction: (context) {
+            ReportIssueDialog.show(context);
           },
         ),
         _SubNavItem(
