@@ -10,6 +10,7 @@ import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/entities/ledger_day_totals.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
 import '../../domain/entities/post_fund_request.dart';
+import '../../domain/entities/session_expense_item.dart';
 import '../../domain/repositories/finance_repository.dart';
 import '../datasources/finance_remote_data_source.dart';
 import '../models/cash_advance_model.dart';
@@ -244,6 +245,12 @@ class FinanceRepositoryImpl implements FinanceRepository {
   @override
   Future<String> uploadClosingSheet(XFile file, String sessionId) =>
       remoteDataSource.uploadClosingSheet(file, sessionId);
+
+  @override
+  Future<List<SessionExpenseItem>> getSessionExpenses(
+    PettyCashSessionEntity session,
+  ) =>
+      remoteDataSource.getSessionExpenses(session);
 
   @override
   Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt}) =>

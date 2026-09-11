@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../domain/entities/ledger_day_totals.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
+import '../../domain/entities/session_expense_item.dart';
 import '../../domain/repositories/finance_repository.dart';
 import '../../domain/usecases/get_petty_cash_sessions_usecase.dart';
 import '../../domain/usecases/get_open_session_usecase.dart';
@@ -9,6 +10,7 @@ import '../../domain/usecases/open_petty_cash_session_usecase.dart';
 import '../../domain/usecases/close_petty_cash_session_usecase.dart';
 import '../../domain/usecases/verify_petty_cash_session_usecase.dart';
 import '../../domain/usecases/upload_closing_sheet_usecase.dart';
+import '../../domain/usecases/get_session_expenses_usecase.dart';
 
 class PettyCashProvider with ChangeNotifier {
   final GetPettyCashSessionsUseCase getPettyCashSessionsUseCase;
@@ -17,6 +19,7 @@ class PettyCashProvider with ChangeNotifier {
   final ClosePettyCashSessionUseCase closePettyCashSessionUseCase;
   final VerifyPettyCashSessionUseCase verifyPettyCashSessionUseCase;
   final UploadClosingSheetUseCase uploadClosingSheetUseCase;
+  final GetSessionExpensesUseCase getSessionExpensesUseCase;
   final FinanceRepository financeRepository;
 
   PettyCashProvider({
@@ -26,6 +29,7 @@ class PettyCashProvider with ChangeNotifier {
     required this.closePettyCashSessionUseCase,
     required this.verifyPettyCashSessionUseCase,
     required this.uploadClosingSheetUseCase,
+    required this.getSessionExpensesUseCase,
     required this.financeRepository,
   });
 
@@ -181,5 +185,13 @@ class PettyCashProvider with ChangeNotifier {
       sessionOpenedAt: _currentSession!.createdAt,
     );
     notifyListeners();
+  }
+
+  /// Fetches all expense records and ledger outflows that occurred during
+  /// a specific petty cash session.
+  Future<List<SessionExpenseItem>> getSessionExpenses(
+    PettyCashSessionEntity session,
+  ) async {
+    return await getSessionExpensesUseCase(session);
   }
 }

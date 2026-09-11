@@ -14,9 +14,12 @@ import '../providers/fund_account_provider.dart';
 import '../providers/finance_provider.dart';
 import '../providers/cash_advance_provider.dart';
 import '../../domain/entities/cash_advance_entity.dart';
+import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
+import '../../domain/entities/session_expense_item.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../../domain/services/finance_permission_service.dart';
+import '../widgets/expense_review_dialog.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
 
@@ -447,13 +450,17 @@ class _PettyCashPageState extends State<PettyCashPage> {
 
                       // 2. Today's Expenses
                       Expanded(
-                        child: _buildSessionKpiCard(
-                          title: "TODAY'S EXPENSES",
-                          value: '${formatter.format(expTotal)} SAR',
-                          icon: Icons.arrow_upward_rounded,
-                          accentColor: const Color(0xFFDC2626),
-                          cashValue: '${formatter.format(cashExp)} SAR',
-                          stcValue: '${formatter.format(stcExp)} SAR',
+                        child: InkWell(
+                          onTap: () => _showSessionExpensesDialog(context, provider, session),
+                          borderRadius: BorderRadius.circular(16.r),
+                          child: _buildSessionKpiCard(
+                            title: "TODAY'S EXPENSES",
+                            value: '${formatter.format(expTotal)} SAR',
+                            icon: Icons.arrow_upward_rounded,
+                            accentColor: const Color(0xFFDC2626),
+                            cashValue: '${formatter.format(cashExp)} SAR',
+                            stcValue: '${formatter.format(stcExp)} SAR',
+                          ),
                         ),
                       ),
                       SizedBox(width: 12.w),
@@ -920,6 +927,17 @@ class _PettyCashPageState extends State<PettyCashPage> {
                 final discrepancy = session.discrepancy ?? 0.0;
                 final isBalanced = discrepancy.abs() < 0.01;
 
+                final live = (session.id == provider.currentSession?.id) ? provider.previewTotals : null;
+                final cashExp = live?.cashExpenses ?? session.cashExpenses;
+                final stcExp = live?.stcPayExpenses ?? session.stcPayExpenses;
+                final totalExp = cashExp + stcExp;
+                final cashDep = live?.cashDeposits ?? session.cashDeposits;
+                final stcDep = live?.stcPayDeposits ?? session.stcPayDeposits;
+                final totalDep = cashDep + stcDep;
+                final expectedBal = live != null
+                    ? (session.openingBalance + totalDep - totalExp)
+                    : session.expectedClosingBalance;
+
                 return Container(
                   padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 14.h),
                   child: Row(
@@ -993,21 +1011,98 @@ class _PettyCashPageState extends State<PettyCashPage> {
                               ],
                             ),
                             SizedBox(height: 4.h),
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 6.w,
+                              runSpacing: 4.h,
                               children: [
                                 Text(
                                   'Opening: ${formatter.format(session.openingBalance)} SAR',
                                   style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.textSecondary),
                                 ),
-                                Text(' • ', style: TextStyle(color: FinDT.border)),
+                                Text('•', style: TextStyle(color: FinDT.border, fontSize: 11.sp)),
+                                InkWell(
+                                  onTap: () => _showSessionExpensesDialog(context, provider, session),
+                                  borderRadius: BorderRadius.circular(6.r),
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
+                                    decoration: BoxDecoration(
+                                      color: totalExp > 0
+                                          ? const Color(0xFFDC2626).withValues(alpha: 0.08)
+                                          : FinDT.bgPage,
+                                      borderRadius: BorderRadius.circular(6.r),
+                                      border: Border.all(
+                                        color: totalExp > 0
+                                            ? const Color(0xFFDC2626).withValues(alpha: 0.25)
+                                            : FinDT.border,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.arrow_upward_rounded,
+                                          size: 11.sp,
+                                          color: totalExp > 0 ? const Color(0xFFDC2626) : FinDT.textSecondary,
+                                        ),
+                                        SizedBox(width: 3.w),
+                                        Text(
+                                          'Expenses: ${formatter.format(totalExp)} SAR',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11.sp,
+                                            fontWeight: FontWeight.w700,
+                                            color: totalExp > 0 ? const Color(0xFFDC2626) : FinDT.textSecondary,
+                                          ),
+                                        ),
+                                        if (cashExp > 0 || stcExp > 0) ...[
+                                          SizedBox(width: 4.w),
+                                          Text(
+                                            '(${formatter.format(cashExp)} cash • ${formatter.format(stcExp)} stc)',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 10.sp,
+                                              fontWeight: FontWeight.w500,
+                                              color: totalExp > 0
+                                                  ? const Color(0xFFDC2626).withValues(alpha: 0.85)
+                                                  : FinDT.textMuted,
+                                            ),
+                                          ),
+                                        ],
+                                        SizedBox(width: 4.w),
+                                        Icon(
+                                          Icons.open_in_new_rounded,
+                                          size: 10.sp,
+                                          color: totalExp > 0
+                                              ? const Color(0xFFDC2626).withValues(alpha: 0.7)
+                                              : FinDT.textMuted,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                if (totalDep > 0) ...[
+                                  Text('•', style: TextStyle(color: FinDT.border, fontSize: 11.sp)),
+                                  Text(
+                                    'Deposits: +${formatter.format(totalDep)} SAR',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: const Color(0xFF16A34A),
+                                    ),
+                                  ),
+                                ],
+                                Text('•', style: TextStyle(color: FinDT.border, fontSize: 11.sp)),
                                 Text(
-                                  'Expected: ${formatter.format(session.expectedClosingBalance)} SAR',
+                                  'Expected: ${formatter.format(expectedBal)} SAR',
                                   style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.textSecondary),
                                 ),
-                                Text(' • ', style: TextStyle(color: FinDT.border)),
+                                Text('•', style: TextStyle(color: FinDT.border, fontSize: 11.sp)),
                                 Text(
                                   'Declared: ${formatter.format(session.closingBalance)} SAR',
-                                  style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.w600,
+                                    color: FinDT.textPrimary,
+                                  ),
                                 ),
                               ],
                             ),
@@ -1048,30 +1143,50 @@ class _PettyCashPageState extends State<PettyCashPage> {
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
-                            decoration: BoxDecoration(
-                              color: isBalanced
-                                  ? const Color(0xFF16A34A).withValues(alpha: 0.1)
-                                  : (discrepancy > 0
-                                      ? const Color(0xFF16A34A).withValues(alpha: 0.1)
-                                      : const Color(0xFFDC2626).withValues(alpha: 0.1)),
-                              borderRadius: BorderRadius.circular(8.r),
-                            ),
-                            child: Text(
-                              isBalanced
-                                  ? 'Balanced'
-                                  : (discrepancy > 0
-                                      ? '+${formatter.format(discrepancy)} SAR Overage'
-                                      : '${formatter.format(discrepancy)} SAR Shortage'),
-                              style: GoogleFonts.inter(
-                                fontSize: 11.sp,
-                                fontWeight: FontWeight.w700,
-                                color: isBalanced
-                                    ? const Color(0xFF16A34A)
-                                    : (discrepancy > 0 ? const Color(0xFF16A34A) : const Color(0xFFDC2626)),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              OutlinedButton.icon(
+                                onPressed: () => _showSessionExpensesDialog(context, provider, session),
+                                icon: Icon(Icons.receipt_long_rounded, size: 13.sp),
+                                label: Text(
+                                  'View Expenses',
+                                  style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w600),
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: FinDT.brand,
+                                  side: BorderSide(color: FinDT.brand.withValues(alpha: 0.3)),
+                                  padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
+                                ),
                               ),
-                            ),
+                              SizedBox(width: 8.w),
+                              Container(
+                                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+                                decoration: BoxDecoration(
+                                  color: isBalanced
+                                      ? const Color(0xFF16A34A).withValues(alpha: 0.1)
+                                      : (discrepancy > 0
+                                          ? const Color(0xFF16A34A).withValues(alpha: 0.1)
+                                          : const Color(0xFFDC2626).withValues(alpha: 0.1)),
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                child: Text(
+                                  isBalanced
+                                      ? 'Balanced'
+                                      : (discrepancy > 0
+                                          ? '+${formatter.format(discrepancy)} SAR Overage'
+                                          : '${formatter.format(discrepancy)} SAR Shortage'),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: isBalanced
+                                        ? const Color(0xFF16A34A)
+                                        : (discrepancy > 0 ? const Color(0xFF16A34A) : const Color(0xFFDC2626)),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                           if (isClosed) ...[
                             Builder(builder: (_) {
@@ -2219,6 +2334,706 @@ class _PettyCashPageState extends State<PettyCashPage> {
           );
         }
       },
+    );
+  }
+
+  void _showSessionExpensesDialog(
+    BuildContext context,
+    PettyCashProvider provider,
+    PettyCashSessionEntity session,
+  ) {
+    final formatter = NumberFormat('#,##0.00', 'en_US');
+    final accProv = context.read<FundAccountProvider>();
+    final account = accProv.getAccountById(session.fundAccountId);
+    final accountName = account?.name ?? 'Petty Cash Drawer';
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        String filterBucket = 'ALL';
+        String searchQuery = '';
+        final future = provider.getSessionExpenses(session);
+
+        return StatefulBuilder(
+          builder: (dialogCtx, setDialogState) {
+            final size = MediaQuery.of(dialogCtx).size;
+            final dialogWidth = (size.width * 0.78).clamp(440.0, 920.0);
+            final dialogHeight = (size.height * 0.85).clamp(480.0, 780.0);
+
+            return Dialog(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: finDialogShape,
+              insetPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
+              child: SizedBox(
+                width: dialogWidth,
+                height: dialogHeight,
+                child: Column(
+                  children: [
+                    // Header
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 16.h),
+                      decoration: BoxDecoration(
+                        border: Border(bottom: BorderSide(color: FinDT.borderLight)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: EdgeInsets.all(10.w),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDC2626).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10.r),
+                            ),
+                            child: Icon(
+                              Icons.receipt_long_rounded,
+                              color: const Color(0xFFDC2626),
+                              size: 22.sp,
+                            ),
+                          ),
+                          SizedBox(width: 14.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Session Expenses & Outflows',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 16.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: FinDT.textPrimary,
+                                      ),
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Container(
+                                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                                      decoration: BoxDecoration(
+                                        color: session.status == PettyCashSessionStatus.verified
+                                            ? const Color(0xFF16A34A).withValues(alpha: 0.1)
+                                            : (session.status == PettyCashSessionStatus.closed
+                                                ? const Color(0xFFD97706).withValues(alpha: 0.1)
+                                                : FinDT.brand.withValues(alpha: 0.1)),
+                                        borderRadius: BorderRadius.circular(6.r),
+                                      ),
+                                      child: Text(
+                                        session.status.displayName.toUpperCase(),
+                                        style: GoogleFonts.inter(
+                                          fontSize: 10.sp,
+                                          fontWeight: FontWeight.w700,
+                                          color: session.status == PettyCashSessionStatus.verified
+                                              ? const Color(0xFF16A34A)
+                                              : (session.status == PettyCashSessionStatus.closed
+                                                  ? const Color(0xFFD97706)
+                                                  : FinDT.brand),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 2.h),
+                                Text(
+                                  '${DateFormat('EEEE, dd MMMM yyyy').format(session.date)} • $accountName',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.sp,
+                                    color: FinDT.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.of(dialogCtx).pop(),
+                            icon: Icon(Icons.close_rounded, size: 20.sp, color: FinDT.textSecondary),
+                            splashRadius: 18.r,
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    // Body
+                    Expanded(
+                      child: FutureBuilder<List<SessionExpenseItem>>(
+                        future: future,
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+                          if (snapshot.hasError) {
+                            return Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24.w),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.error_outline_rounded, size: 40.sp, color: Colors.red),
+                                    SizedBox(height: 12.h),
+                                    Text(
+                                      'Failed to load expenses',
+                                      style: GoogleFonts.inter(fontSize: 14.sp, fontWeight: FontWeight.w700),
+                                    ),
+                                    SizedBox(height: 4.h),
+                                    Text(
+                                      '${snapshot.error}',
+                                      style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.textSecondary),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          }
+
+                          final allItems = snapshot.data ?? [];
+
+                          // Calculate totals
+                          double cashSpent = 0;
+                          double stcSpent = 0;
+                          for (final it in allItems) {
+                            if (it.bucket == FundBucket.cash) {
+                              cashSpent += it.amount;
+                            } else if (it.bucket == FundBucket.stcPay) {
+                              stcSpent += it.amount;
+                            } else {
+                              cashSpent += it.amount;
+                            }
+                          }
+                          final totalSpent = cashSpent + stcSpent;
+
+                          // Apply search & bucket filter
+                          final filtered = allItems.where((it) {
+                            if (filterBucket == 'CASH' && it.bucket != FundBucket.cash) return false;
+                            if (filterBucket == 'STC_PAY' && it.bucket != FundBucket.stcPay) return false;
+                            if (searchQuery.isNotEmpty) {
+                              final q = searchQuery.toLowerCase();
+                              final matchesRef = it.referenceNumber.toLowerCase().contains(q);
+                              final matchesTitle = it.title.toLowerCase().contains(q);
+                              final matchesCat = it.category.toLowerCase().contains(q);
+                              final matchesType = it.expenseType.toLowerCase().contains(q);
+                              final matchesUser = it.performedBy.toLowerCase().contains(q);
+                              final matchesVehicle = (it.vehicleName ?? '').toLowerCase().contains(q);
+                              if (!matchesRef && !matchesTitle && !matchesCat && !matchesType && !matchesUser && !matchesVehicle) {
+                                return false;
+                              }
+                            }
+                            return true;
+                          }).toList();
+
+                          return Column(
+                            children: [
+                              // KPI Summary strip
+                              Container(
+                                padding: EdgeInsets.all(14.w),
+                                color: FinDT.bgPage,
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildExpenseSummaryCard(
+                                        title: 'TOTAL EXPENSES',
+                                        amount: '${formatter.format(totalSpent)} SAR',
+                                        icon: Icons.arrow_upward_rounded,
+                                        color: const Color(0xFFDC2626),
+                                      ),
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: _buildExpenseSummaryCard(
+                                        title: 'CASH PAID',
+                                        amount: '${formatter.format(cashSpent)} SAR',
+                                        icon: Icons.payments_outlined,
+                                        color: const Color(0xFFD97706),
+                                      ),
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: _buildExpenseSummaryCard(
+                                        title: 'STC PAY PAID',
+                                        amount: '${formatter.format(stcSpent)} SAR',
+                                        icon: Icons.account_balance_wallet_outlined,
+                                        color: FinDT.brand,
+                                      ),
+                                    ),
+                                    SizedBox(width: 8.w),
+                                    Expanded(
+                                      child: _buildExpenseSummaryCard(
+                                        title: 'TRANSACTIONS',
+                                        amount: '${allItems.length}',
+                                        icon: Icons.receipt_outlined,
+                                        color: FinDT.textPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Divider(height: 1, color: FinDT.borderLight),
+
+                              // Filter & Search bar
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 10.h),
+                                child: Row(
+                                  children: [
+                                    // Search field
+                                    Expanded(
+                                      child: SizedBox(
+                                        height: 36.h,
+                                        child: TextField(
+                                          onChanged: (val) => setDialogState(() => searchQuery = val.trim()),
+                                          decoration: InputDecoration(
+                                            hintText: 'Search by reference, category, driver, or notes...',
+                                            hintStyle: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.textMuted),
+                                            prefixIcon: Icon(Icons.search, size: 16.sp, color: FinDT.textMuted),
+                                            filled: true,
+                                            fillColor: FinDT.bgPage,
+                                            contentPadding: EdgeInsets.symmetric(vertical: 6.h),
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(8.r),
+                                              borderSide: BorderSide(color: FinDT.borderLight),
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(8.r),
+                                              borderSide: BorderSide(color: FinDT.borderLight),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    SizedBox(width: 12.w),
+
+                                    // Filter pills
+                                    _buildFilterTab(
+                                      label: 'All (${allItems.length})',
+                                      isSelected: filterBucket == 'ALL',
+                                      onTap: () => setDialogState(() => filterBucket = 'ALL'),
+                                    ),
+                                    SizedBox(width: 6.w),
+                                    _buildFilterTab(
+                                      label: 'Cash (${allItems.where((i) => i.bucket == FundBucket.cash).length})',
+                                      isSelected: filterBucket == 'CASH',
+                                      onTap: () => setDialogState(() => filterBucket = 'CASH'),
+                                    ),
+                                    SizedBox(width: 6.w),
+                                    _buildFilterTab(
+                                      label: 'STC Pay (${allItems.where((i) => i.bucket == FundBucket.stcPay).length})',
+                                      isSelected: filterBucket == 'STC_PAY',
+                                      onTap: () => setDialogState(() => filterBucket = 'STC_PAY'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Divider(height: 1, color: FinDT.borderLight),
+
+                              // Items List
+                              Expanded(
+                                child: filtered.isEmpty
+                                    ? Center(
+                                        child: Padding(
+                                          padding: EdgeInsets.all(24.w),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                Icons.receipt_long_outlined,
+                                                size: 44.sp,
+                                                color: FinDT.textMuted,
+                                              ),
+                                              SizedBox(height: 10.h),
+                                              Text(
+                                                allItems.isEmpty
+                                                    ? 'No expenses recorded for this session'
+                                                    : 'No expenses match the current filter',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 13.sp,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: FinDT.textSecondary,
+                                                ),
+                                              ),
+                                              SizedBox(height: 4.h),
+                                              Text(
+                                                allItems.isEmpty
+                                                    ? 'Opening balance remained unspent or only received deposits.'
+                                                    : 'Try clearing the search query or switching filter tabs.',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 11.sp,
+                                                  color: FinDT.textMuted,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      )
+                                    : ListView.separated(
+                                        padding: EdgeInsets.all(14.w),
+                                        itemCount: filtered.length,
+                                        separatorBuilder: (_, __) => SizedBox(height: 8.h),
+                                        itemBuilder: (ctx, i) {
+                                          final item = filtered[i];
+                                          final isCash = item.bucket == FundBucket.cash;
+
+                                          return Container(
+                                            padding: EdgeInsets.all(12.w),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(10.r),
+                                              border: Border.all(color: FinDT.borderLight),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: FinDT.shadow.withValues(alpha: 0.04),
+                                                  blurRadius: 4,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ],
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                // Icon
+                                                Container(
+                                                  padding: EdgeInsets.all(8.w),
+                                                  decoration: BoxDecoration(
+                                                    color: isCash
+                                                        ? const Color(0xFFD97706).withValues(alpha: 0.1)
+                                                        : FinDT.brand.withValues(alpha: 0.1),
+                                                    borderRadius: BorderRadius.circular(8.r),
+                                                  ),
+                                                  child: Icon(
+                                                    isCash
+                                                        ? Icons.payments_outlined
+                                                        : Icons.account_balance_wallet_outlined,
+                                                    color: isCash ? const Color(0xFFD97706) : FinDT.brand,
+                                                    size: 18.sp,
+                                                  ),
+                                                ),
+                                                SizedBox(width: 12.w),
+
+                                                // Details
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Row(
+                                                        children: [
+                                                          // Ref chip
+                                                          Container(
+                                                            padding: EdgeInsets.symmetric(
+                                                              horizontal: 6.w,
+                                                              vertical: 2.h,
+                                                            ),
+                                                            decoration: BoxDecoration(
+                                                              color: FinDT.bgPage,
+                                                              borderRadius: BorderRadius.circular(4.r),
+                                                              border: Border.all(color: FinDT.border),
+                                                            ),
+                                                            child: Text(
+                                                              item.referenceNumber,
+                                                              style: GoogleFonts.inter(
+                                                                fontSize: 10.sp,
+                                                                fontWeight: FontWeight.w700,
+                                                                color: FinDT.textPrimary,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          SizedBox(width: 6.w),
+
+                                                          // Bucket badge
+                                                          Container(
+                                                            padding: EdgeInsets.symmetric(
+                                                              horizontal: 6.w,
+                                                              vertical: 2.h,
+                                                            ),
+                                                            decoration: BoxDecoration(
+                                                              color: isCash
+                                                                  ? const Color(0xFFD97706).withValues(alpha: 0.1)
+                                                                  : FinDT.brand.withValues(alpha: 0.1),
+                                                              borderRadius: BorderRadius.circular(4.r),
+                                                            ),
+                                                            child: Text(
+                                                              isCash ? 'CASH' : 'STC PAY',
+                                                              style: GoogleFonts.inter(
+                                                                fontSize: 9.sp,
+                                                                fontWeight: FontWeight.w700,
+                                                                color: isCash ? const Color(0xFFD97706) : FinDT.brand,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          SizedBox(width: 8.w),
+
+                                                          // Title
+                                                          Expanded(
+                                                            child: Text(
+                                                              item.title,
+                                                              style: GoogleFonts.inter(
+                                                                fontSize: 12.sp,
+                                                                fontWeight: FontWeight.w700,
+                                                                color: FinDT.textPrimary,
+                                                              ),
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
+                                                          ),
+                                                          SizedBox(width: 6.w),
+
+                                                          // Time
+                                                          Text(
+                                                            DateFormat('hh:mm a').format(item.date),
+                                                            style: GoogleFonts.inter(
+                                                              fontSize: 10.sp,
+                                                              color: FinDT.textMuted,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                      SizedBox(height: 4.h),
+                                                      Wrap(
+                                                        crossAxisAlignment: WrapCrossAlignment.center,
+                                                        spacing: 4.w,
+                                                        children: [
+                                                          Text(
+                                                            '${item.category} • ${item.expenseType}',
+                                                            style: GoogleFonts.inter(
+                                                              fontSize: 11.sp,
+                                                              color: FinDT.textSecondary,
+                                                            ),
+                                                          ),
+                                                          if (item.vehicleName != null && item.vehicleName!.isNotEmpty) ...[
+                                                            Text('•', style: TextStyle(color: FinDT.border, fontSize: 10.sp)),
+                                                            Icon(Icons.directions_car_outlined, size: 11.sp, color: FinDT.textMuted),
+                                                            Text(
+                                                              item.vehicleName!,
+                                                              style: GoogleFonts.inter(fontSize: 10.sp, color: FinDT.textSecondary),
+                                                            ),
+                                                          ],
+                                                          if (item.employeeName != null && item.employeeName!.isNotEmpty) ...[
+                                                            Text('•', style: TextStyle(color: FinDT.border, fontSize: 10.sp)),
+                                                            Icon(Icons.person_outline, size: 11.sp, color: FinDT.textMuted),
+                                                            Text(
+                                                              item.employeeName!,
+                                                              style: GoogleFonts.inter(fontSize: 10.sp, color: FinDT.textSecondary),
+                                                            ),
+                                                          ],
+                                                          Text('•', style: TextStyle(color: FinDT.border, fontSize: 10.sp)),
+                                                          Text(
+                                                            'By ${item.performedBy}',
+                                                            style: GoogleFonts.inter(fontSize: 10.sp, color: FinDT.textMuted),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                SizedBox(width: 14.w),
+
+                                                // Amount
+                                                Text(
+                                                  '-${formatter.format(item.amount)} SAR',
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 13.sp,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: const Color(0xFFDC2626),
+                                                  ),
+                                                ),
+                                                SizedBox(width: 10.w),
+
+                                                // Actions
+                                                if (item.receiptUrls.isNotEmpty) ...[
+                                                  IconButton(
+                                                    tooltip: 'View Receipt',
+                                                    onPressed: () => _previewReceipt(dialogCtx, item.receiptUrls.first),
+                                                    icon: Icon(Icons.receipt_outlined, size: 18.sp, color: FinDT.brand),
+                                                    padding: EdgeInsets.zero,
+                                                    constraints: const BoxConstraints(),
+                                                  ),
+                                                  SizedBox(width: 8.w),
+                                                ],
+                                                if (item.originalExpense != null) ...[
+                                                  OutlinedButton(
+                                                    onPressed: () {
+                                                      showExpenseReviewDialog(
+                                                        context: dialogCtx,
+                                                        expense: item.originalExpense!,
+                                                        accountName: accountName,
+                                                        readOnly: true,
+                                                      );
+                                                    },
+                                                    style: OutlinedButton.styleFrom(
+                                                      foregroundColor: FinDT.brand,
+                                                      side: BorderSide(color: FinDT.brand.withValues(alpha: 0.3)),
+                                                      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                                                      shape: RoundedRectangleBorder(
+                                                        borderRadius: BorderRadius.circular(6.r),
+                                                      ),
+                                                      minimumSize: Size.zero,
+                                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                    ),
+                                                    child: Text(
+                                                      'Details',
+                                                      style: GoogleFonts.inter(fontSize: 10.sp, fontWeight: FontWeight.w600),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+
+                    // Footer
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
+                      decoration: BoxDecoration(
+                        border: Border(top: BorderSide(color: FinDT.borderLight)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'All figures in Saudi Riyal (SAR)',
+                            style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.textMuted),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.of(dialogCtx).pop(),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: FinDT.brand,
+                              foregroundColor: Colors.white,
+                              padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 10.h),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8.r),
+                              ),
+                            ),
+                            child: Text(
+                              'Close',
+                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildExpenseSummaryCard({
+    required String title,
+    required String amount,
+    required IconData icon,
+    required Color color,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: FinDT.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 12.sp, color: color),
+              SizedBox(width: 4.w),
+              Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 9.sp,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                  color: FinDT.textMuted,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 4.h),
+          Text(
+            amount,
+            style: GoogleFonts.inter(
+              fontSize: 13.sp,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterTab({
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+        decoration: BoxDecoration(
+          color: isSelected ? FinDT.brand : FinDT.bgPage,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(
+            color: isSelected ? FinDT.brand : FinDT.borderLight,
+          ),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11.sp,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? Colors.white : FinDT.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _previewReceipt(BuildContext context, String url) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black.withValues(alpha: 0.85),
+        insetPadding: EdgeInsets.all(20.w),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            Center(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8.r),
+                child: InteractiveViewer(
+                  child: Image.network(
+                    url,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => Container(
+                      color: Colors.white,
+                      padding: EdgeInsets.all(24.w),
+                      child: Text(
+                        'Failed to load receipt image',
+                        style: GoogleFonts.inter(color: Colors.red),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 10.h,
+              right: 10.w,
+              child: IconButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

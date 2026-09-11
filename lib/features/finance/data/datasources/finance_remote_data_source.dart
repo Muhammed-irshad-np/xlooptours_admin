@@ -12,6 +12,7 @@ import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/entities/ledger_day_totals.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
 import '../../domain/entities/post_fund_request.dart';
+import '../../domain/entities/session_expense_item.dart';
 import '../models/cash_advance_model.dart';
 import '../models/expense_model.dart';
 import '../models/fund_account_model.dart';
@@ -105,6 +106,7 @@ abstract class FinanceRemoteDataSource {
     String? resolutionNotes,
   });
   Future<String> uploadClosingSheet(XFile file, String sessionId);
+  Future<List<SessionExpenseItem>> getSessionExpenses(PettyCashSessionEntity session);
   Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt});
   Future<bool> isDayLocked(String fundAccountId, DateTime day);
 
@@ -1390,6 +1392,129 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       otherIn: otherIn,
       otherOut: otherOut,
     );
+  }
+
+  @override
+  Future<List<SessionExpenseItem>> getSessionExpenses(
+    PettyCashSessionEntity session,
+  ) async {
+    final start = DateTime(session.date.year, session.date.month, session.date.day);
+    final end = start.add(const Duration(days: 1));
+
+    // 1. Fetch transactions for account and filter for this session day
+    final allTxs = await getTransactionsForAccount(session.fundAccountId);
+    final sessionTxs = <FundTransactionModel>[];
+    for (final tx in allTxs) {
+      if (tx.isReversed) continue;
+      if (tx.date.isBefore(start) || !tx.date.isBefore(end)) continue;
+      if (session.status == PettyCashSessionStatus.open &&
+          tx.createdAt.isBefore(session.createdAt)) {
+        continue;
+      }
+      if (tx.type == FundTransactionType.reversal) continue;
+
+      final isOut = tx.type == FundTransactionType.withdrawal ||
+          tx.type == FundTransactionType.expensePayment ||
+          (tx.type == FundTransactionType.transfer &&
+              tx.balanceAfter < tx.balanceBefore);
+      if (isOut) {
+        sessionTxs.add(tx);
+      }
+    }
+
+    // 2. Fetch all expenses for account
+    final allExpenses = await getExpensesByAccount(session.fundAccountId);
+    final expenseMap = <String, ExpenseModel>{};
+    for (final exp in allExpenses) {
+      expenseMap[exp.id] = exp;
+    }
+
+    // 3. Map transactions to SessionExpenseItems
+    final items = <SessionExpenseItem>[];
+    final matchedExpenseIds = <String>{};
+
+    for (final tx in sessionTxs) {
+      ExpenseModel? matched;
+      if (tx.referenceExpenseId != null) {
+        matched = expenseMap[tx.referenceExpenseId];
+      }
+      matched ??= allExpenses.where((e) => e.ledgerEntryId == tx.id).firstOrNull;
+      if (matched != null) {
+        matchedExpenseIds.add(matched.id);
+      }
+
+      final refNum = matched?.referenceNumber ??
+          (tx.id.length >= 6 ? 'TX-${tx.id.substring(0, 6).toUpperCase()}' : 'TX-${tx.id.toUpperCase()}');
+
+      final title = (matched?.description != null && matched!.description!.isNotEmpty)
+          ? matched.description!
+          : (matched?.expenseType ?? tx.description);
+
+      final category = (matched?.expenseCategory != null && matched!.expenseCategory.isNotEmpty)
+          ? matched.expenseCategory
+          : (tx.type == FundTransactionType.expensePayment ? 'Expense Payment' : tx.type.displayName);
+
+      final expenseType = matched?.expenseType ??
+          (tx.bucket == FundBucket.cash ? 'Cash Outflow' : 'Digital Outflow');
+
+      items.add(SessionExpenseItem(
+        id: tx.id,
+        transactionId: tx.id,
+        expenseId: matched?.id,
+        referenceNumber: refNum,
+        title: title,
+        category: category,
+        expenseType: expenseType,
+        amount: tx.amount,
+        bucket: tx.bucket,
+        date: tx.date,
+        performedBy: (matched?.submittedBy != null && matched!.submittedBy.isNotEmpty)
+            ? matched.submittedBy
+            : tx.performedBy,
+        notes: matched?.description ?? tx.description,
+        receiptUrls: matched?.receiptUrls ?? const [],
+        status: matched?.status.displayName ?? 'Paid',
+        vehicleName: matched?.vehicleName,
+        employeeName: matched?.employeeName,
+        originalExpense: matched,
+        originalTransaction: tx,
+      ));
+    }
+
+    // 4. Include any expenses on that calendar day not matched to a transaction
+    for (final exp in allExpenses) {
+      if (matchedExpenseIds.contains(exp.id)) continue;
+      final expDate = exp.paidAt ?? exp.date;
+      if (!expDate.isBefore(start) && expDate.isBefore(end)) {
+        if (exp.status == ExpenseStatus.paid || exp.status == ExpenseStatus.approved) {
+          items.add(SessionExpenseItem(
+            id: exp.id,
+            expenseId: exp.id,
+            referenceNumber: exp.referenceNumber,
+            title: (exp.description != null && exp.description!.isNotEmpty)
+                ? exp.description!
+                : exp.expenseType,
+            category: exp.expenseCategory,
+            expenseType: exp.expenseType,
+            amount: exp.amount,
+            bucket: exp.paymentMethod.toLowerCase().contains('stc')
+                ? FundBucket.stcPay
+                : FundBucket.cash,
+            date: expDate,
+            performedBy: exp.submittedBy,
+            notes: exp.description,
+            receiptUrls: exp.receiptUrls,
+            status: exp.status.displayName,
+            vehicleName: exp.vehicleName,
+            employeeName: exp.employeeName,
+            originalExpense: exp,
+          ));
+        }
+      }
+    }
+
+    items.sort((a, b) => b.date.compareTo(a.date));
+    return items;
   }
 
   @override

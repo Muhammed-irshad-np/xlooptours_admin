@@ -10,6 +10,7 @@ import '../entities/fund_transaction_entity.dart';
 import '../entities/ledger_day_totals.dart';
 import '../entities/petty_cash_session_entity.dart';
 import '../entities/post_fund_request.dart';
+import '../entities/session_expense_item.dart';
 
 abstract class FinanceRepository {
   Future<List<ExpenseEntity>> getAllExpenses();
@@ -96,6 +97,7 @@ abstract class FinanceRepository {
     String? resolutionNotes,
   });
   Future<String> uploadClosingSheet(XFile file, String sessionId);
+  Future<List<SessionExpenseItem>> getSessionExpenses(PettyCashSessionEntity session);
   Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt});
   Future<bool> isDayLocked(String fundAccountId, DateTime day);
 
