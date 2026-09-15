@@ -63,6 +63,17 @@ class SalaryStructureModel extends SalaryStructureEntity {
       );
 }
 
+/// Firestore hands maps back as `Map<String, dynamic>`; normalise to doubles.
+Map<String, double> _recoveriesFromJson(dynamic raw) {
+  if (raw is! Map) return const {};
+  final out = <String, double>{};
+  raw.forEach((key, value) {
+    final amount = (value as num?)?.toDouble();
+    if (amount != null && amount > 0) out[key.toString()] = amount;
+  });
+  return out;
+}
+
 class SalaryPaymentModel extends SalaryPaymentEntity {
   const SalaryPaymentModel({
     required super.id,
@@ -74,11 +85,15 @@ class SalaryPaymentModel extends SalaryPaymentEntity {
     super.allowances,
     super.deductions,
     super.deductionNote,
+    super.advanceRecovery,
+    super.advanceRecoveries,
     required super.netAmount,
     super.netAmountMinor,
     super.currency,
     super.fundAccountId,
     super.fundAccountName,
+    super.paymentMethod,
+    super.expenseId,
     super.status,
     super.paidAt,
     super.paidBy,
@@ -103,11 +118,15 @@ class SalaryPaymentModel extends SalaryPaymentEntity {
         'allowances': allowances,
         'deductions': deductions,
         'deductionNote': deductionNote,
+        'advanceRecovery': advanceRecovery,
+        'advanceRecoveries': advanceRecoveries,
         'netAmount': netAmount,
         'netAmountMinor': resolvedNetMinor,
         'currency': currency,
         'fundAccountId': fundAccountId,
         'fundAccountName': fundAccountName,
+        'paymentMethod': paymentMethod,
+        'expenseId': expenseId,
         'status': status.name,
         'paidAt': paidAt?.toIso8601String(),
         'paidBy': paidBy,
@@ -134,12 +153,16 @@ class SalaryPaymentModel extends SalaryPaymentEntity {
       allowances: (json['allowances'] as num?)?.toDouble() ?? 0,
       deductions: (json['deductions'] as num?)?.toDouble() ?? 0,
       deductionNote: json['deductionNote'] as String?,
+      advanceRecovery: (json['advanceRecovery'] as num?)?.toDouble() ?? 0,
+      advanceRecoveries: _recoveriesFromJson(json['advanceRecoveries']),
       netAmount: net,
       netAmountMinor:
           (json['netAmountMinor'] as num?)?.toInt() ?? (net * 100).round(),
       currency: json['currency'] as String? ?? 'SAR',
       fundAccountId: json['fundAccountId'] as String?,
       fundAccountName: json['fundAccountName'] as String?,
+      paymentMethod: json['paymentMethod'] as String? ?? 'cash',
+      expenseId: json['expenseId'] as String?,
       status: SalaryPaymentStatus.values.firstWhere(
         (s) => s.name == json['status'],
         orElse: () => SalaryPaymentStatus.pending,
@@ -175,11 +198,15 @@ class SalaryPaymentModel extends SalaryPaymentEntity {
         allowances: e.allowances,
         deductions: e.deductions,
         deductionNote: e.deductionNote,
+        advanceRecovery: e.advanceRecovery,
+        advanceRecoveries: e.advanceRecoveries,
         netAmount: e.netAmount,
         netAmountMinor: e.netAmountMinor,
         currency: e.currency,
         fundAccountId: e.fundAccountId,
         fundAccountName: e.fundAccountName,
+        paymentMethod: e.paymentMethod,
+        expenseId: e.expenseId,
         status: e.status,
         paidAt: e.paidAt,
         paidBy: e.paidBy,

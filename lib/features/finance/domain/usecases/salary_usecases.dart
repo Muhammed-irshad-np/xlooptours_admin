@@ -58,12 +58,16 @@ class PaySalaryUseCase {
     required String fundAccountId,
     required String actorName,
     String? actorUserId,
+    String paymentMethod = 'cash',
+    Map<String, double> advanceRecoveries = const {},
   }) =>
       repository.paySalary(
         paymentId: paymentId,
         fundAccountId: fundAccountId,
         actorName: actorName,
         actorUserId: actorUserId,
+        paymentMethod: paymentMethod,
+        advanceRecoveries: advanceRecoveries,
       );
 }
 

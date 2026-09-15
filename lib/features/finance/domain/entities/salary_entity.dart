@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 
+import 'cash_advance_entity.dart';
+
 /// Monthly salary setup for one employee ("who is on the payroll").
 ///
 /// One document per employee. The amounts here are the *template* used when a
@@ -126,17 +128,35 @@ class SalaryPaymentEntity extends Equatable {
   final double basicSalary;
   final double allowances;
 
-  /// Absences, loan instalments, advance recovery, etc. (major units).
+  /// Manual deductions: absences, fines, etc. (major units). Advance recovery
+  /// is tracked separately in [advanceRecovery].
   final double deductions;
   final String? deductionNote;
 
-  /// basic + allowances − deductions, never below zero.
+  /// Total recovered this month against the employee's outstanding cash
+  /// advances. Reduces net pay without any extra money movement — the cash
+  /// simply never leaves the fund.
+  final double advanceRecovery;
+
+  /// Which advances were recovered and by how much: advanceId → amount.
+  /// Kept so voiding the salary can put the amounts back on those advances.
+  final Map<String, double> advanceRecoveries;
+
+  /// basic + allowances − deductions − advance recovery, never below zero.
   final double netAmount;
   final int? netAmountMinor;
   final String currency;
 
   final String? fundAccountId;
   final String? fundAccountName;
+
+  /// Which wallet bucket the salary was paid out of: 'cash', 'stcPay' or
+  /// 'bank'. Drives the petty-cash cash/STC split, same as expenses.
+  final String paymentMethod;
+
+  /// Mirrored `expenses` document so salaries show up in the expense list
+  /// and in petty cash session reports.
+  final String? expenseId;
 
   final SalaryPaymentStatus status;
 
@@ -166,11 +186,15 @@ class SalaryPaymentEntity extends Equatable {
     this.allowances = 0,
     this.deductions = 0,
     this.deductionNote,
+    this.advanceRecovery = 0,
+    this.advanceRecoveries = const {},
     required this.netAmount,
     this.netAmountMinor,
     this.currency = 'SAR',
     this.fundAccountId,
     this.fundAccountName,
+    this.paymentMethod = 'cash',
+    this.expenseId,
     this.status = SalaryPaymentStatus.pending,
     this.paidAt,
     this.paidBy,
@@ -186,6 +210,9 @@ class SalaryPaymentEntity extends Equatable {
   });
 
   double get grossSalary => basicSalary + allowances;
+
+  /// Everything withheld from gross pay this month.
+  double get totalWithheld => deductions + advanceRecovery;
 
   int get resolvedNetMinor => netAmountMinor ?? (netAmount * 100).round();
 
@@ -204,20 +231,54 @@ class SalaryPaymentEntity extends Equatable {
     required double basicSalary,
     double allowances = 0,
     double deductions = 0,
+    double advanceRecovery = 0,
   }) {
-    final net = basicSalary + allowances - deductions;
+    final net = basicSalary + allowances - deductions - advanceRecovery;
     return net < 0 ? 0 : net;
   }
+
+  /// Spreads [amount] across [advances] oldest-first, returning
+  /// advanceId → amount recovered. Never takes more than an advance's
+  /// outstanding balance, and stops once [amount] is used up.
+  static Map<String, double> allocateAdvanceRecovery({
+    required double amount,
+    required List<CashAdvanceEntity> advances,
+  }) {
+    if (amount <= 0) return const {};
+    final open = advances.where((a) => a.isOpen && a.outstanding > 0).toList()
+      ..sort((a, b) => a.issuedAt.compareTo(b.issuedAt));
+
+    final out = <String, double>{};
+    var left = amount;
+    for (final advance in open) {
+      if (left <= 1e-9) break;
+      final take = left < advance.outstanding ? left : advance.outstanding;
+      // Round to halalas so repeated allocation can't drift.
+      final rounded = (take * 100).round() / 100.0;
+      if (rounded <= 0) continue;
+      out[advance.id] = rounded;
+      left -= rounded;
+    }
+    return out;
+  }
+
+  /// Total outstanding across [advances] that can still be recovered.
+  static double totalOutstanding(List<CashAdvanceEntity> advances) =>
+      advances.where((a) => a.isOpen).fold(0.0, (sum, a) => sum + a.outstanding);
 
   SalaryPaymentEntity copyWith({
     double? basicSalary,
     double? allowances,
     double? deductions,
     String? deductionNote,
+    double? advanceRecovery,
+    Map<String, double>? advanceRecoveries,
     double? netAmount,
     int? netAmountMinor,
     String? fundAccountId,
     String? fundAccountName,
+    String? paymentMethod,
+    String? expenseId,
     SalaryPaymentStatus? status,
     DateTime? paidAt,
     String? paidBy,
@@ -239,11 +300,15 @@ class SalaryPaymentEntity extends Equatable {
       allowances: allowances ?? this.allowances,
       deductions: deductions ?? this.deductions,
       deductionNote: deductionNote ?? this.deductionNote,
+      advanceRecovery: advanceRecovery ?? this.advanceRecovery,
+      advanceRecoveries: advanceRecoveries ?? this.advanceRecoveries,
       netAmount: netAmount ?? this.netAmount,
       netAmountMinor: netAmountMinor ?? this.netAmountMinor,
       currency: currency,
       fundAccountId: fundAccountId ?? this.fundAccountId,
       fundAccountName: fundAccountName ?? this.fundAccountName,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      expenseId: expenseId ?? this.expenseId,
       status: status ?? this.status,
       paidAt: paidAt ?? this.paidAt,
       paidBy: paidBy ?? this.paidBy,
@@ -265,8 +330,11 @@ class SalaryPaymentEntity extends Equatable {
         period,
         employeeId,
         netAmount,
+        advanceRecovery,
         status,
         fundAccountId,
+        paymentMethod,
         ledgerEntryId,
+        expenseId,
       ];
 }

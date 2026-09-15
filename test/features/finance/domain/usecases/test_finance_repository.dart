@@ -270,6 +270,8 @@ class FakeFinanceRepository implements FinanceRepository {
   /// Arguments of the last [paySalary] call, for assertions.
   String? lastPaidSalaryId;
   String? lastPaidFromAccountId;
+  String? lastPaidMethod;
+  Map<String, double> lastAdvanceRecoveries = const {};
 
   @override
   Future<List<SalaryStructureEntity>> getSalaryStructures() async {
@@ -355,10 +357,14 @@ class FakeFinanceRepository implements FinanceRepository {
     required String fundAccountId,
     required String actorName,
     String? actorUserId,
+    String paymentMethod = 'cash',
+    Map<String, double> advanceRecoveries = const {},
   }) async {
     if (salaryError != null) throw salaryError!;
     lastPaidSalaryId = paymentId;
     lastPaidFromAccountId = fundAccountId;
+    lastPaidMethod = paymentMethod;
+    lastAdvanceRecoveries = advanceRecoveries;
     return paySalaryResult!;
   }
 

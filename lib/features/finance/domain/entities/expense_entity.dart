@@ -118,6 +118,10 @@ class ExpenseEntity extends Equatable {
 
   final String? notes;
 
+  /// Set when this expense is the mirror of a salary payment, so payroll rows
+  /// stay identifiable (and linked back) in the expense list and reports.
+  final String? salaryPaymentId;
+
   const ExpenseEntity({
     required this.id,
     required this.referenceNumber,
@@ -165,6 +169,7 @@ class ExpenseEntity extends Equatable {
     this.voidReason,
     this.reverseLedgerEntryId,
     this.notes,
+    this.salaryPaymentId,
   });
 
   int get resolvedAmountMinor =>
@@ -233,6 +238,7 @@ class ExpenseEntity extends Equatable {
     String? voidReason,
     String? reverseLedgerEntryId,
     String? notes,
+    String? salaryPaymentId,
     bool clearDescription = false,
     bool clearPaymentDetails = false,
     bool clearEmployeeId = false,
@@ -307,6 +313,7 @@ class ExpenseEntity extends Equatable {
       voidReason: voidReason ?? this.voidReason,
       reverseLedgerEntryId: reverseLedgerEntryId ?? this.reverseLedgerEntryId,
       notes: clearNotes ? null : (notes ?? this.notes),
+      salaryPaymentId: salaryPaymentId ?? this.salaryPaymentId,
     );
   }
 
@@ -358,5 +365,6 @@ class ExpenseEntity extends Equatable {
         voidReason,
         reverseLedgerEntryId,
         notes,
+        salaryPaymentId,
       ];
 }

@@ -380,12 +380,16 @@ class FinanceRepositoryImpl implements FinanceRepository {
     required String fundAccountId,
     required String actorName,
     String? actorUserId,
+    String paymentMethod = 'cash',
+    Map<String, double> advanceRecoveries = const {},
   }) {
     return remoteDataSource.paySalary(
       paymentId: paymentId,
       fundAccountId: fundAccountId,
       actorName: actorName,
       actorUserId: actorUserId,
+      paymentMethod: paymentMethod,
+      advanceRecoveries: advanceRecoveries,
     );
   }
 

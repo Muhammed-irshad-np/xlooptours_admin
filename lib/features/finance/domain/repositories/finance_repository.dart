@@ -148,11 +148,16 @@ abstract class FinanceRepository {
 
   Future<SalaryPaymentEntity> saveSalaryPayment(SalaryPaymentEntity payment);
 
+  /// Pays the net salary, applying the same wallet rules as an expense
+  /// payment, recovering [advanceRecoveries] (advanceId → amount) against the
+  /// employee's cash advances, and mirroring the payment into `expenses`.
   Future<SalaryPaymentEntity> paySalary({
     required String paymentId,
     required String fundAccountId,
     required String actorName,
     String? actorUserId,
+    String paymentMethod = 'cash',
+    Map<String, double> advanceRecoveries = const {},
   });
 
   Future<void> deleteSalaryPayment(String paymentId);
