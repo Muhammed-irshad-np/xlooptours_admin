@@ -1412,15 +1412,22 @@ class _PettyCashPageState extends State<PettyCashPage> {
     final liveStcDep = live?.stcPayDeposits ?? session.stcPayDeposits;
     final liveCashExp = live?.cashExpenses ?? session.cashExpenses;
     final liveStcExp = live?.stcPayExpenses ?? session.stcPayExpenses;
-    final expectedCash = session.openingCashBalance + liveCashDep - liveCashExp;
-    final expectedStc = session.openingStcPayBalance + liveStcDep - liveStcExp;
-    final expectedTotal = expectedCash + expectedStc;
+    // Mutable so they can be recomputed after a bucket transfer
+    double expectedCash = session.openingCashBalance + liveCashDep - liveCashExp;
+    double expectedStc = session.openingStcPayBalance + liveStcDep - liveStcExp;
+    double expectedTotal = expectedCash + expectedStc;
     final cashCtrl = TextEditingController(text: expectedCash.toStringAsFixed(2));
     final digitalCtrl = TextEditingController(text: expectedStc.toStringAsFixed(2));
     final notesCtrl = TextEditingController();
     final formatter = NumberFormat('#,##0.00', 'en_US');
     String? closingSheetUrl;
     bool isSubmitting = false;
+
+    // Bucket transfer state
+    final transferAmtCtrl = TextEditingController();
+    bool isCashToStc = true; // true = Cash→STC, false = STC→Cash
+    bool isTransferring = false;
+    List<_BucketTransferRecord> appliedTransfers = [];
 
     showDialog(
       context: context,
@@ -1498,7 +1505,268 @@ class _PettyCashPageState extends State<PettyCashPage> {
                           ],
                         ),
                       ),
-                      SizedBox(height: 16.h),
+                      SizedBox(height: 12.h),
+
+                      // ─── Bucket Transfer Section ───
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(color: FinDT.border.withValues(alpha: 0.5)),
+                        ),
+                        child: Theme(
+                          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                          child: ExpansionTile(
+                            tilePadding: EdgeInsets.symmetric(horizontal: 12.w),
+                            childrenPadding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 12.h),
+                            leading: Container(
+                              padding: EdgeInsets.all(6.w),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.swap_horiz_rounded, size: 16.sp, color: const Color(0xFF7C3AED)),
+                            ),
+                            title: Text(
+                              'Adjust Cash ↔ STC Pay',
+                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
+                            ),
+                            subtitle: Text(
+                              appliedTransfers.isEmpty
+                                  ? 'Rebalance before closing'
+                                  : '${appliedTransfers.length} transfer${appliedTransfers.length > 1 ? 's' : ''} applied',
+                              style: GoogleFonts.inter(
+                                fontSize: 10.sp,
+                                color: appliedTransfers.isEmpty ? FinDT.textSecondary : const Color(0xFF059669),
+                                fontWeight: appliedTransfers.isNotEmpty ? FontWeight.w600 : FontWeight.w400,
+                              ),
+                            ),
+                            children: [
+                              // Direction toggle
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () => setStateDialog(() => isCashToStc = true),
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(vertical: 8.h),
+                                        decoration: BoxDecoration(
+                                          color: isCashToStc
+                                              ? const Color(0xFF7C3AED).withValues(alpha: 0.12)
+                                              : FinDT.bgPage,
+                                          borderRadius: BorderRadius.circular(8.r),
+                                          border: Border.all(
+                                            color: isCashToStc
+                                                ? const Color(0xFF7C3AED).withValues(alpha: 0.5)
+                                                : FinDT.border,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          children: [
+                                            Icon(Icons.payments_outlined, size: 14.sp,
+                                                color: isCashToStc ? const Color(0xFF7C3AED) : FinDT.textSecondary),
+                                            SizedBox(height: 2.h),
+                                            Text(
+                                              'Cash → STC Pay',
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 10.sp,
+                                                fontWeight: isCashToStc ? FontWeight.w700 : FontWeight.w500,
+                                                color: isCashToStc ? const Color(0xFF7C3AED) : FinDT.textSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: () => setStateDialog(() => isCashToStc = false),
+                                      child: Container(
+                                        padding: EdgeInsets.symmetric(vertical: 8.h),
+                                        decoration: BoxDecoration(
+                                          color: !isCashToStc
+                                              ? const Color(0xFF7C3AED).withValues(alpha: 0.12)
+                                              : FinDT.bgPage,
+                                          borderRadius: BorderRadius.circular(8.r),
+                                          border: Border.all(
+                                            color: !isCashToStc
+                                                ? const Color(0xFF7C3AED).withValues(alpha: 0.5)
+                                                : FinDT.border,
+                                          ),
+                                        ),
+                                        child: Column(
+                                          children: [
+                                            Icon(Icons.phone_android_outlined, size: 14.sp,
+                                                color: !isCashToStc ? const Color(0xFF7C3AED) : FinDT.textSecondary),
+                                            SizedBox(height: 2.h),
+                                            Text(
+                                              'STC Pay → Cash',
+                                              textAlign: TextAlign.center,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 10.sp,
+                                                fontWeight: !isCashToStc ? FontWeight.w700 : FontWeight.w500,
+                                                color: !isCashToStc ? const Color(0xFF7C3AED) : FinDT.textSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 10.h),
+                              // Amount + Apply
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: transferAmtCtrl,
+                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                                      ],
+                                      decoration: finDialogInputDecoration(
+                                        label: 'Amount',
+                                        hint: '0.00',
+                                        prefixIcon: Icons.attach_money_rounded,
+                                        suffixText: 'SAR',
+                                      ),
+                                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  SizedBox(
+                                    height: 48.h,
+                                    child: ElevatedButton(
+                                      onPressed: isTransferring
+                                          ? null
+                                          : () async {
+                                              final amt = double.tryParse(transferAmtCtrl.text.trim()) ?? 0;
+                                              if (amt <= 0) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: const Text('Enter a valid amount'),
+                                                    backgroundColor: FinDT.danger,
+                                                  ),
+                                                );
+                                                return;
+                                              }
+                                              final user = context.read<AuthProvider>().user;
+                                              setStateDialog(() => isTransferring = true);
+                                              try {
+                                                await provider.transferBucket(
+                                                  fundAccountId: session.fundAccountId,
+                                                  amountMajor: amt,
+                                                  fromBucket: isCashToStc ? FundBucket.cash : FundBucket.stcPay,
+                                                  toBucket: isCashToStc ? FundBucket.stcPay : FundBucket.cash,
+                                                  performedBy: user?.actorLabel ?? 'Unknown',
+                                                  performedByUserId: user?.id,
+                                                );
+                                                // Recompute expected values from refreshed totals
+                                                final newTotals = provider.previewTotals;
+                                                final newCashDep = newTotals?.cashDeposits ?? session.cashDeposits;
+                                                final newStcDep = newTotals?.stcPayDeposits ?? session.stcPayDeposits;
+                                                final newCashExp = newTotals?.cashExpenses ?? session.cashExpenses;
+                                                final newStcExp = newTotals?.stcPayExpenses ?? session.stcPayExpenses;
+                                                expectedCash = session.openingCashBalance + newCashDep - newCashExp;
+                                                expectedStc = session.openingStcPayBalance + newStcDep - newStcExp;
+                                                expectedTotal = expectedCash + expectedStc;
+                                                cashCtrl.text = expectedCash.toStringAsFixed(2);
+                                                digitalCtrl.text = expectedStc.toStringAsFixed(2);
+                                                appliedTransfers.add(_BucketTransferRecord(
+                                                  amount: amt,
+                                                  isCashToStc: isCashToStc,
+                                                ));
+                                                transferAmtCtrl.clear();
+                                                setStateDialog(() => isTransferring = false);
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        '${formatter.format(amt)} SAR moved: ${isCashToStc ? 'Cash → STC Pay' : 'STC Pay → Cash'}',
+                                                      ),
+                                                      backgroundColor: const Color(0xFF059669),
+                                                    ),
+                                                  );
+                                                }
+                                              } catch (e) {
+                                                setStateDialog(() => isTransferring = false);
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
+                                                  );
+                                                }
+                                              }
+                                            },
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF7C3AED),
+                                        foregroundColor: Colors.white,
+                                        elevation: 0,
+                                        padding: EdgeInsets.symmetric(horizontal: 16.w),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(8.r),
+                                        ),
+                                      ),
+                                      child: isTransferring
+                                          ? SizedBox(
+                                              width: 16.sp,
+                                              height: 16.sp,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : Text(
+                                              'Apply',
+                                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
+                                            ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              // Applied transfers list
+                              if (appliedTransfers.isNotEmpty) ...[
+                                SizedBox(height: 10.h),
+                                Container(
+                                  padding: EdgeInsets.all(8.w),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF059669).withValues(alpha: 0.06),
+                                    borderRadius: BorderRadius.circular(8.r),
+                                    border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.2)),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Applied Transfers:',
+                                        style: GoogleFonts.inter(fontSize: 10.sp, fontWeight: FontWeight.w600, color: const Color(0xFF065F46)),
+                                      ),
+                                      SizedBox(height: 4.h),
+                                      ...appliedTransfers.map((t) => Padding(
+                                            padding: EdgeInsets.only(bottom: 2.h),
+                                            child: Row(
+                                              children: [
+                                                Icon(Icons.check_circle_outline, size: 12.sp, color: const Color(0xFF059669)),
+                                                SizedBox(width: 4.w),
+                                                Text(
+                                                  '${formatter.format(t.amount)} SAR ${t.isCashToStc ? 'Cash → STC Pay' : 'STC Pay → Cash'}',
+                                                  style: GoogleFonts.inter(fontSize: 10.sp, color: const Color(0xFF065F46)),
+                                                ),
+                                              ],
+                                            ),
+                                          )),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 14.h),
 
                       // Count Input Fields
                       TextFormField(
@@ -3036,4 +3304,15 @@ class _PettyCashPageState extends State<PettyCashPage> {
       ),
     );
   }
+}
+
+/// Simple record to track bucket transfers applied during the closing dialog.
+class _BucketTransferRecord {
+  final double amount;
+  final bool isCashToStc;
+
+  const _BucketTransferRecord({
+    required this.amount,
+    required this.isCashToStc,
+  });
 }

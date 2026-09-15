@@ -82,6 +82,17 @@ abstract class FinanceRepository {
     FundBucket toBucket = FundBucket.total,
   });
 
+  /// Rebalances money between Cash and STC Pay buckets within the same
+  /// fund account. The total account balance remains unchanged.
+  Future<void> transferBucket({
+    required String fundAccountId,
+    required double amountMajor,
+    required FundBucket fromBucket,
+    required FundBucket toBucket,
+    required String performedBy,
+    required String? performedByUserId,
+  });
+
   Future<List<PettyCashSessionEntity>> getPettyCashSessions(String accountId);
   Future<PettyCashSessionEntity?> getOpenSession(String accountId);
   Future<void> openPettyCashSession(PettyCashSessionEntity session);

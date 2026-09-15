@@ -11,6 +11,8 @@ import '../../domain/usecases/close_petty_cash_session_usecase.dart';
 import '../../domain/usecases/verify_petty_cash_session_usecase.dart';
 import '../../domain/usecases/upload_closing_sheet_usecase.dart';
 import '../../domain/usecases/get_session_expenses_usecase.dart';
+import '../../domain/usecases/transfer_bucket_usecase.dart';
+import '../../domain/entities/fund_transaction_entity.dart';
 
 class PettyCashProvider with ChangeNotifier {
   final GetPettyCashSessionsUseCase getPettyCashSessionsUseCase;
@@ -20,6 +22,7 @@ class PettyCashProvider with ChangeNotifier {
   final VerifyPettyCashSessionUseCase verifyPettyCashSessionUseCase;
   final UploadClosingSheetUseCase uploadClosingSheetUseCase;
   final GetSessionExpensesUseCase getSessionExpensesUseCase;
+  final TransferBucketUseCase transferBucketUseCase;
   final FinanceRepository financeRepository;
 
   PettyCashProvider({
@@ -30,6 +33,7 @@ class PettyCashProvider with ChangeNotifier {
     required this.verifyPettyCashSessionUseCase,
     required this.uploadClosingSheetUseCase,
     required this.getSessionExpensesUseCase,
+    required this.transferBucketUseCase,
     required this.financeRepository,
   });
 
@@ -175,6 +179,29 @@ class PettyCashProvider with ChangeNotifier {
 
   Future<String> uploadClosingSheet(XFile file, String sessionId) async {
     return await uploadClosingSheetUseCase(file, sessionId);
+  }
+
+  /// Transfers money between Cash and STC Pay buckets within the same
+  /// fund account. After a successful transfer, refreshes the day totals
+  /// so the closing form picks up the updated expected balances.
+  Future<void> transferBucket({
+    required String fundAccountId,
+    required double amountMajor,
+    required FundBucket fromBucket,
+    required FundBucket toBucket,
+    required String performedBy,
+    required String? performedByUserId,
+  }) async {
+    await transferBucketUseCase(
+      fundAccountId: fundAccountId,
+      amountMajor: amountMajor,
+      fromBucket: fromBucket,
+      toBucket: toBucket,
+      performedBy: performedBy,
+      performedByUserId: performedByUserId,
+    );
+    // Refresh day totals so expected closing values update
+    await refreshDayTotals();
   }
 
   Future<void> refreshDayTotals() async {
