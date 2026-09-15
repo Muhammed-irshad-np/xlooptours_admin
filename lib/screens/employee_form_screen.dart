@@ -13,8 +13,12 @@ import '../features/employee/domain/entities/employee_contact.dart';
 import 'package:provider/provider.dart';
 import '../features/employee/domain/entities/employee_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
+import '../features/employee/domain/entities/external_vehicle_info.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
+import '../features/vehicle/domain/entities/vehicle_make_entity.dart';
+import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../widgets/custom_date_picker.dart';
+import 'vehicle_makes_screen.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
@@ -39,10 +43,29 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   late TextEditingController _idNumberController;
   late TextEditingController _nationalityController;
 
+  // External driver vehicle details (external drivers only). Make/model/year/
+  // color are picked from the same Vehicle Master used by the fleet form —
+  // only the plate number is free text.
+  late TextEditingController _plateNumberController;
+  final ValueNotifier<String?> _selectedVehicleMake = ValueNotifier(null);
+  final ValueNotifier<String?> _selectedVehicleModel = ValueNotifier(null);
+  final ValueNotifier<int?> _selectedVehicleYear = ValueNotifier(null);
+  final ValueNotifier<String?> _selectedVehicleColor = ValueNotifier(null);
+  final ValueNotifier<List<VehicleMakeEntity>> _allVehicleMakes =
+      ValueNotifier([]);
+  final ValueNotifier<List<VehicleModelDetailEntity>> _availableVehicleModels =
+      ValueNotifier([]);
+  final ValueNotifier<List<int>> _availableVehicleYears = ValueNotifier([]);
+  final ValueNotifier<List<String>> _availableVehicleColors = ValueNotifier(
+    [],
+  );
+
   final ValueNotifier<String> _selectedPosition = ValueNotifier('Driver');
   final ValueNotifier<String> _selectedIdType = ValueNotifier('Iqama');
   final ValueNotifier<String> _selectedGender = ValueNotifier('Male');
-  final ValueNotifier<String> _selectedDriverType = ValueNotifier('Internal');
+  final ValueNotifier<String> _employmentType = ValueNotifier(
+    EmploymentType.internal,
+  );
   final ValueNotifier<DateTime?> _joinDate = ValueNotifier(null);
   final ValueNotifier<DateTime?> _birthDate = ValueNotifier(null);
   final ValueNotifier<bool> _isActive = ValueNotifier(true);
@@ -144,7 +167,13 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   final List<String> _idTypes = ['Iqama', 'National ID', 'Passport'];
   final List<String> _genders = ['Male', 'Female'];
-  final List<String> _driverTypes = ['Internal', 'External'];
+
+  /// True when the current form selections describe a driver, so the external
+  /// vehicle block applies.
+  bool get _isDriverPosition =>
+      _selectedPosition.value.toLowerCase().contains('driver');
+
+  bool get _isExternal => _employmentType.value == EmploymentType.external;
 
   @override
   void initState() {
@@ -155,6 +184,22 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _phoneController = TextEditingController(text: e?.phoneNumber ?? '');
     _idNumberController = TextEditingController(text: e?.idNumber ?? '');
     _nationalityController = TextEditingController(text: e?.nationality ?? '');
+    _plateNumberController = TextEditingController(
+      text: e?.externalVehicle?.plateNumber ?? '',
+    );
+    _selectedVehicleMake.value = (e?.externalVehicle?.make.isNotEmpty ?? false)
+        ? e!.externalVehicle!.make
+        : null;
+    _selectedVehicleModel.value =
+        (e?.externalVehicle?.model.isNotEmpty ?? false)
+        ? e!.externalVehicle!.model
+        : null;
+    _selectedVehicleYear.value = e?.externalVehicle?.year;
+    _selectedVehicleColor.value =
+        (e?.externalVehicle?.vehicleColor.isNotEmpty ?? false)
+        ? e!.externalVehicle!.vehicleColor
+        : null;
+    _loadVehicleMakes();
     _primaryCountryCode = ValueNotifier(e?.countryCode ?? '+966');
 
     _iqamaNumberController = TextEditingController(
@@ -253,8 +298,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         _selectedGender.value = e.gender;
       }
 
-      if (e.driverType != null && _driverTypes.contains(e.driverType)) {
-        _selectedDriverType.value = e.driverType!;
+      if (EmploymentType.values.contains(e.employmentType)) {
+        _employmentType.value = e.employmentType;
       }
 
       _joinDate.value = e.joinDate;
@@ -264,7 +309,58 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     }
   }
 
+  /// Loads the Vehicle Master (same makes/models/colors as the fleet form) so
+  /// an external driver's car is picked, not typed.
+  Future<void> _loadVehicleMakes() async {
+    final provider = context.read<VehicleProvider>();
+    if (provider.vehicleMakes.isEmpty) {
+      await provider.fetchAllVehicleMakes();
+    }
+    if (!mounted) return;
+    _allVehicleMakes.value = provider.vehicleMakes;
+    _updateAvailableVehicleOptions(_selectedVehicleMake.value);
+  }
 
+  /// Cascades model/year/color options from the selected make, mirroring the
+  /// fleet Vehicle form. A value already on the record that isn't in the
+  /// master (legacy data, or the make hasn't been extended yet) is kept
+  /// selectable rather than silently dropped.
+  void _updateAvailableVehicleOptions(String? makeName) {
+    if (makeName == null) {
+      _availableVehicleModels.value = [];
+      _availableVehicleYears.value = [];
+      _availableVehicleColors.value = [];
+      return;
+    }
+
+    final make = _allVehicleMakes.value.firstWhere(
+      (m) => m.name == makeName,
+      orElse: () => const VehicleMakeEntity(id: '', name: ''),
+    );
+
+    final models = List<VehicleModelDetailEntity>.from(make.models);
+    final years = List<int>.from(make.years);
+    final colors = List<String>.from(make.colors);
+
+    if (_selectedVehicleModel.value != null &&
+        !models.any((m) => m.name == _selectedVehicleModel.value)) {
+      models.add(
+        VehicleModelDetailEntity(name: _selectedVehicleModel.value!, type: ''),
+      );
+    }
+    if (_selectedVehicleYear.value != null &&
+        !years.contains(_selectedVehicleYear.value)) {
+      years.add(_selectedVehicleYear.value!);
+    }
+    if (_selectedVehicleColor.value != null &&
+        !colors.contains(_selectedVehicleColor.value)) {
+      colors.add(_selectedVehicleColor.value!);
+    }
+
+    _availableVehicleModels.value = models;
+    _availableVehicleYears.value = years;
+    _availableVehicleColors.value = colors;
+  }
 
   @override
   void dispose() {
@@ -273,11 +369,20 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _phoneController.dispose();
     _idNumberController.dispose();
     _nationalityController.dispose();
+    _plateNumberController.dispose();
+    _selectedVehicleMake.dispose();
+    _selectedVehicleModel.dispose();
+    _selectedVehicleYear.dispose();
+    _selectedVehicleColor.dispose();
+    _allVehicleMakes.dispose();
+    _availableVehicleModels.dispose();
+    _availableVehicleYears.dispose();
+    _availableVehicleColors.dispose();
     _primaryCountryCode.dispose();
     _selectedPosition.dispose();
     _selectedIdType.dispose();
     _selectedGender.dispose();
-    _selectedDriverType.dispose();
+    _employmentType.dispose();
     _joinDate.dispose();
     _birthDate.dispose();
     _isActive.dispose();
@@ -356,8 +461,57 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     }
   }
 
+  /// Converting an existing internal employee to external discards their HR
+  /// record, so make that explicit before saving.
+  Future<bool> _confirmConversionToExternal() async {
+    final existing = widget.employee;
+    if (existing == null || !existing.isInternal || !_isExternal) return true;
+
+    final hasRecordToLose = existing.email.isNotEmpty ||
+        existing.idNumber.isNotEmpty ||
+        existing.joinDate != null ||
+        existing.birthDate != null ||
+        existing.contacts.isNotEmpty ||
+        existing.iqama != null ||
+        existing.bahrainResidence != null ||
+        existing.healthInsurance != null ||
+        existing.drivingLicense != null ||
+        existing.passport != null ||
+        existing.saudiVisa != null ||
+        existing.bahrainVisa != null ||
+        existing.dubaiVisa != null ||
+        existing.qatarVisa != null;
+    if (!hasRecordToLose) return true;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Convert to External?'),
+        content: Text(
+          '${existing.fullName} currently has a full internal record. '
+          'External staff keep only name, gender, phone and nationality — '
+          'their email, IDs, dates, SIM contacts and documents will be '
+          'removed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.orange[800]),
+            child: const Text('Convert'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
   Future<void> _saveEmployee() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!await _confirmConversionToExternal()) return;
 
     _isSaving.value = true;
 
@@ -371,7 +525,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         imageUrl = await provider.uploadEmployeeImage(_pickedImage.value!, id);
       }
 
-      // Upload document attachments if new files were picked
+      // Upload document attachments if new files were picked.
+      // External staff have no document section, so nothing is ever picked.
       String? iqamaUrl = _iqamaAttachmentUrl.value;
       if (_iqamaAttachment.value != null && mounted) {
         iqamaUrl = await provider.uploadDocumentAttachment(
@@ -453,112 +608,144 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         );
       }
 
+      final isExternal = _isExternal;
+
+      // External staff keep a minimal record — no company documents, no SIM
+      // contacts. Hoisted here so the rule is stated once.
+      final iqama = isExternal ||
+              _iqamaNumberController.text.isEmpty ||
+              _iqamaExpiryDate.value == null
+          ? null
+          : IqamaDocument(
+              number: _iqamaNumberController.text.trim(),
+              expiryDate: _iqamaExpiryDate.value!,
+              attachmentUrl: iqamaUrl,
+            );
+
+      final bahrainResidence = isExternal ||
+              _bahrainResidenceNumberController.text.isEmpty ||
+              _bahrainResidenceExpiryDate.value == null
+          ? null
+          : BahrainResidenceDocument(
+              number: _bahrainResidenceNumberController.text.trim(),
+              expiryDate: _bahrainResidenceExpiryDate.value!,
+              attachmentUrl: bahrainResidenceUrl,
+            );
+
+      final healthInsurance =
+          isExternal || _healthInsuranceExpiryDate.value == null
+              ? null
+              : HealthInsuranceDocument(
+                  expiryDate: _healthInsuranceExpiryDate.value!,
+                  attachmentUrl: healthInsuranceUrl,
+                );
+
+      final passport = isExternal ||
+              _passportNumberController.text.isEmpty ||
+              _passportExpiryDate.value == null
+          ? null
+          : PassportDocument(
+              nameOnPassport: _passportNameController.text.trim(),
+              number: _passportNumberController.text.trim(),
+              expiryDate: _passportExpiryDate.value!,
+              attachmentUrl: passportUrl,
+            );
+
+      final saudiVisa = isExternal ||
+              _saudiVisaNumberController.text.isEmpty ||
+              _saudiVisaExpiryDate.value == null
+          ? null
+          : VisaDocument(
+              number: _saudiVisaNumberController.text.trim(),
+              expiryDate: _saudiVisaExpiryDate.value!,
+              type: _selectedSaudiVisaType.value,
+              attachmentUrl: saudiVisaUrl,
+            );
+
+      final bahrainVisa = isExternal ||
+              _bahrainVisaNumberController.text.isEmpty ||
+              _bahrainVisaExpiryDate.value == null
+          ? null
+          : VisaDocument(
+              number: _bahrainVisaNumberController.text.trim(),
+              expiryDate: _bahrainVisaExpiryDate.value!,
+              type: _selectedBahrainVisaType.value,
+              attachmentUrl: bahrainVisaUrl,
+            );
+
+      final dubaiVisa = isExternal ||
+              _dubaiVisaNumberController.text.isEmpty ||
+              _dubaiVisaExpiryDate.value == null
+          ? null
+          : VisaDocument(
+              number: _dubaiVisaNumberController.text.trim(),
+              expiryDate: _dubaiVisaExpiryDate.value!,
+              type: _selectedDubaiVisaType.value,
+              attachmentUrl: dubaiVisaUrl,
+            );
+
+      final qatarVisa = isExternal ||
+              _qatarVisaNumberController.text.isEmpty ||
+              _qatarVisaExpiryDate.value == null
+          ? null
+          : VisaDocument(
+              number: _qatarVisaNumberController.text.trim(),
+              expiryDate: _qatarVisaExpiryDate.value!,
+              type: _selectedQatarVisaType.value,
+              attachmentUrl: qatarVisaUrl,
+            );
+
+      final drivingLicense = isExternal ||
+              _licenseNumberController.text.isEmpty ||
+              _licenseExpiryDate.value == null
+          ? null
+          : DrivingLicenseDocument(
+              countryOfOrigin: _licenseCountryController.text.trim(),
+              number: _licenseNumberController.text.trim(),
+              expiryDate: _licenseExpiryDate.value!,
+              type: _selectedLicenseType.value,
+              attachmentUrl: licenseUrl,
+            );
+
       final newEmployee = EmployeeEntity(
         id: id,
         fullName: _nameController.text.trim(),
         position: _selectedPosition.value,
-        email: _emailController.text.trim(),
+        // Everything below the minimal external set is deliberately blanked so
+        // an Internal → External switch does not leave stale data behind.
+        email: isExternal ? '' : _emailController.text.trim(),
         phoneNumber: _phoneController.text.trim(),
         countryCode: _primaryCountryCode.value,
         nationality: _nationalityController.text.trim(),
-        idType: _selectedIdType.value,
-        idNumber: _idNumberController.text.trim(),
-        joinDate: _joinDate.value,
-        birthDate: _birthDate.value,
+        idType: isExternal ? '' : _selectedIdType.value,
+        idNumber: isExternal ? '' : _idNumberController.text.trim(),
+        joinDate: isExternal ? null : _joinDate.value,
+        birthDate: isExternal ? null : _birthDate.value,
         gender: _selectedGender.value,
-        driverType: _selectedPosition.value == 'Driver'
-            ? _selectedDriverType.value
+        employmentType: _employmentType.value,
+        externalVehicle: isExternal && _isDriverPosition
+            ? ExternalVehicleInfo(
+                make: _selectedVehicleMake.value ?? '',
+                model: _selectedVehicleModel.value ?? '',
+                year: _selectedVehicleYear.value,
+                vehicleColor: _selectedVehicleColor.value ?? '',
+                plateNumber: _plateNumberController.text.trim(),
+              )
             : null,
         isActive: _isActive.value,
         imageUrl: imageUrl,
-        iqama:
-            _iqamaNumberController.text.isNotEmpty &&
-                _iqamaExpiryDate.value != null
-            ? IqamaDocument(
-                number: _iqamaNumberController.text.trim(),
-                expiryDate: _iqamaExpiryDate.value!,
-                attachmentUrl: iqamaUrl,
-              )
-            : null,
-        bahrainResidence:
-            _bahrainResidenceNumberController.text.isNotEmpty &&
-                _bahrainResidenceExpiryDate.value != null
-            ? BahrainResidenceDocument(
-                number: _bahrainResidenceNumberController.text.trim(),
-                expiryDate: _bahrainResidenceExpiryDate.value!,
-                attachmentUrl: bahrainResidenceUrl,
-              )
-            : null,
-        healthInsurance: _healthInsuranceExpiryDate.value != null
-            ? HealthInsuranceDocument(
-                expiryDate: _healthInsuranceExpiryDate.value!,
-                attachmentUrl: healthInsuranceUrl,
-              )
-            : null,
-        passport:
-            _passportNumberController.text.isNotEmpty &&
-                _passportExpiryDate.value != null
-            ? PassportDocument(
-                nameOnPassport: _passportNameController.text.trim(),
-                number: _passportNumberController.text.trim(),
-                expiryDate: _passportExpiryDate.value!,
-                attachmentUrl: passportUrl,
-              )
-            : null,
-        saudiVisa:
-            _saudiVisaNumberController.text.isNotEmpty &&
-                _saudiVisaExpiryDate.value != null
-            ? VisaDocument(
-                number: _saudiVisaNumberController.text.trim(),
-                expiryDate: _saudiVisaExpiryDate.value!,
-                type: _selectedSaudiVisaType.value,
-                attachmentUrl: saudiVisaUrl,
-              )
-            : null,
-        bahrainVisa:
-            _bahrainVisaNumberController.text.isNotEmpty &&
-                _bahrainVisaExpiryDate.value != null
-            ? VisaDocument(
-                number: _bahrainVisaNumberController.text.trim(),
-                expiryDate: _bahrainVisaExpiryDate.value!,
-                type: _selectedBahrainVisaType.value,
-                attachmentUrl: bahrainVisaUrl,
-              )
-            : null,
-        dubaiVisa:
-            _dubaiVisaNumberController.text.isNotEmpty &&
-                _dubaiVisaExpiryDate.value != null
-            ? VisaDocument(
-                number: _dubaiVisaNumberController.text.trim(),
-                expiryDate: _dubaiVisaExpiryDate.value!,
-                type: _selectedDubaiVisaType.value,
-                attachmentUrl: dubaiVisaUrl,
-              )
-            : null,
-        qatarVisa:
-            _qatarVisaNumberController.text.isNotEmpty &&
-                _qatarVisaExpiryDate.value != null
-            ? VisaDocument(
-                number: _qatarVisaNumberController.text.trim(),
-                expiryDate: _qatarVisaExpiryDate.value!,
-                type: _selectedQatarVisaType.value,
-                attachmentUrl: qatarVisaUrl,
-              )
-            : null,
-        drivingLicense:
-            _licenseNumberController.text.isNotEmpty &&
-                _licenseExpiryDate.value != null
-            ? DrivingLicenseDocument(
-                countryOfOrigin: _licenseCountryController.text.trim(),
-                number: _licenseNumberController.text.trim(),
-                expiryDate: _licenseExpiryDate.value!,
-                type: _selectedLicenseType.value,
-                attachmentUrl: licenseUrl,
-              )
-            : null,
-        contacts: _contactEntries.value
-            .map((entry) => entry.toContact())
-            .toList(),
+        iqama: iqama,
+        bahrainResidence: bahrainResidence,
+        healthInsurance: healthInsurance,
+        passport: passport,
+        saudiVisa: saudiVisa,
+        bahrainVisa: bahrainVisa,
+        dubaiVisa: dubaiVisa,
+        qatarVisa: qatarVisa,
+        drivingLicense: drivingLicense,
+        contacts: isExternal
+            ? const []
+            : _contactEntries.value.map((entry) => entry.toContact()).toList(),
       );
 
       if (mounted) {
@@ -716,963 +903,53 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                       ),
                     ],
                   ),
+                  SizedBox(height: 16.h),
                   ValueListenableBuilder<String>(
-                    valueListenable: _selectedPosition,
-                    builder: (context, selectedPosition, _) {
-                      if (selectedPosition == 'Driver') {
-                        return Column(
-                          children: [
-                            SizedBox(height: 16.h),
-                            ValueListenableBuilder<String>(
-                              valueListenable: _selectedDriverType,
-                              builder: (context, selectedDriverType, _) {
-                                return _buildDropdown(
-                                  label: 'Driver Type',
-                                  value: selectedDriverType,
-                                  items: _driverTypes,
-                                  onChanged: (val) =>
-                                      _selectedDriverType.value = val!,
-                                );
-                              },
+                    valueListenable: _employmentType,
+                    builder: (context, employmentType, _) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildDropdown(
+                            label: 'Employment Type',
+                            value: employmentType,
+                            items: EmploymentType.values,
+                            onChanged: (val) => _employmentType.value = val!,
+                          ),
+                          if (employmentType == EmploymentType.external) ...[
+                            SizedBox(height: 8.h),
+                            Text(
+                              'External staff are contracted third parties — '
+                              'only basic contact details are recorded.',
+                              style: TextStyle(
+                                fontSize: 12.sp,
+                                color: Colors.orange[800],
+                                fontStyle: FontStyle.italic,
+                              ),
                             ),
                           ],
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-
-                  SizedBox(height: 16.h),
-
-                  // Contact Info
-                  _buildSectionTitle('Contact Information'),
-                  SizedBox(height: 16.h),
-                  ValueListenableBuilder<String>(
-                    valueListenable: _selectedPosition,
-                    builder: (context, selectedPosition, _) {
-                      return ValueListenableBuilder<String>(
-                        valueListenable: _selectedDriverType,
-                        builder: (context, selectedDriverType, _) {
-                          return Row(
-                            children: [
-                              SizedBox(
-                                width: 120.w,
-                                child: ValueListenableBuilder<String>(
-                                  valueListenable: _primaryCountryCode,
-                                  builder: (context, code, _) {
-                                    return DropdownButtonFormField<String>(
-                                      value: code,
-                                      decoration: InputDecoration(
-                                        labelText: 'Code',
-                                        isDense: true,
-                                        contentPadding: EdgeInsets.symmetric(
-                                          horizontal: 8.w,
-                                          vertical: 10.h,
-                                        ),
-                                      ),
-                                      items: const [
-                                        DropdownMenuItem(
-                                          value: '+966',
-                                          child: Text('+966 🇸🇦'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: '+973',
-                                          child: Text('+973 🇧🇭'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: '+971',
-                                          child: Text('+971 🇦🇪'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: '+974',
-                                          child: Text('+974 🇶🇦'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: '+968',
-                                          child: Text('+968 🇴🇲'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: '+965',
-                                          child: Text('+965 🇰🇼'),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: '+91',
-                                          child: Text('+91 🇮🇳'),
-                                        ),
-                                      ],
-                                      onChanged: (val) {
-                                        if (val != null)
-                                          _primaryCountryCode.value = val;
-                                      },
-                                    );
-                                  },
-                                ),
-                              ),
-                              SizedBox(width: 8.w),
-                              Expanded(
-                                child: _buildTextField(
-                                  controller: _phoneController,
-                                  label: 'Primary Contact',
-                                  icon: Icons.phone,
-                                  validator: (v) => v!.isEmpty
-                                      ? 'Please enter phone number'
-                                      : null,
-                                ),
-                              ),
-                              if (!(selectedPosition == 'Driver' &&
-                                  selectedDriverType == 'External')) ...[
-                                SizedBox(width: 16.w),
-                                Expanded(
-                                  child: _buildTextField(
-                                    controller: _emailController,
-                                    label: 'Email',
-                                    icon: Icons.email,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          );
-                        },
-                      );
-                    },
-                  ),
-                  SizedBox(height: 16.h),
-                  _buildContactsSection(),
-                  SizedBox(height: 16.h),
-
-                  // Personal Details
-                  _buildSectionTitle('Personal Details'),
-                  SizedBox(height: 16.h),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ValueListenableBuilder<String>(
-                          valueListenable: _selectedGender,
-                          builder: (context, selectedGender, _) {
-                            return _buildDropdown(
-                              label: 'Gender',
-                              value: selectedGender,
-                              items: _genders,
-                              onChanged: (val) => _selectedGender.value = val!,
-                            );
-                          },
-                        ),
-                      ),
-                      SizedBox(width: 16.w),
-                      Expanded(
-                        child: _buildTextField(
-                          controller: _nationalityController,
-                          label: 'Nationality',
-                          icon: Icons.flag,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 16.h),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ValueListenableBuilder<String>(
-                          valueListenable: _selectedIdType,
-                          builder: (context, selectedIdType, _) {
-                            return _buildDropdown(
-                              label: 'ID Type',
-                              value: selectedIdType,
-                              items: _idTypes,
-                              onChanged: (val) => _selectedIdType.value = val!,
-                            );
-                          },
-                        ),
-                      ),
-                      SizedBox(width: 16.w),
-                      Expanded(
-                        child: _buildTextField(
-                          controller: _idNumberController,
-                          label: 'ID Number',
-                          icon: Icons.numbers,
-                        ),
-                      ),
-                    ],
-                  ),
-                  ValueListenableBuilder<String>(
-                    valueListenable: _selectedPosition,
-                    builder: (context, selectedPosition, _) {
-                      return ValueListenableBuilder<String>(
-                        valueListenable: _selectedDriverType,
-                        builder: (context, selectedDriverType, _) {
-                          if (!(selectedPosition == 'Driver' &&
-                              selectedDriverType == 'External')) {
-                            return Column(
-                              children: [
-                                SizedBox(height: 16.h),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: ValueListenableBuilder<DateTime?>(
-                                        valueListenable: _birthDate,
-                                        builder: (context, birthDate, _) {
-                                          return CustomDatePicker(
-                                            label: 'Birth Date',
-                                            date: birthDate,
-                                            onTap: () =>
-                                                _selectDate(context, false),
-                                            onClear: () =>
-                                                _birthDate.value = null,
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                    SizedBox(width: 16.w),
-                                    Expanded(
-                                      child: ValueListenableBuilder<DateTime?>(
-                                        valueListenable: _joinDate,
-                                        builder: (context, joinDate, _) {
-                                          return CustomDatePicker(
-                                            label: 'Join Date',
-                                            date: joinDate,
-                                            onTap: () =>
-                                                _selectDate(context, true),
-                                            onClear: () =>
-                                                _joinDate.value = null,
-                                          );
-                                        },
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            );
-                          }
-                          return const SizedBox.shrink();
-                        },
+                        ],
                       );
                     },
                   ),
 
-                  SizedBox(height: 24.h),
-                  Divider(),
-                  SizedBox(height: 16.h),
-                  _buildSectionTitle('Documents & Expiries'),
                   SizedBox(height: 16.h),
 
-                  // Iqama Card
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ExpansionTile(
-                      title: const Text(
-                        'Iqama Details',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      leading: const Icon(Icons.badge, color: Colors.blue),
-                      childrenPadding: const EdgeInsets.all(16),
-                      children: [
-                        _buildTextField(
-                          controller: _iqamaNumberController,
-                          label: 'Iqama Number',
-                          icon: Icons.numbers,
-                          keyboardType: TextInputType.number,
-                        ),
-                        SizedBox(height: 16.h),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ValueListenableBuilder<DateTime?>(
-                                valueListenable: _iqamaExpiryDate,
-                                builder: (context, date, _) {
-                                  return CustomDatePicker(
-                                    label: 'Iqama Expiry',
-                                    date: date,
-                                    onTap: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: date ?? DateTime.now(),
-                                        firstDate: DateTime(2000),
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (picked != null) {
-                                        _iqamaExpiryDate.value = picked;
-                                      }
-                                    },
-                                    onClear: () =>
-                                        _iqamaExpiryDate.value = null,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildAttachmentPicker(
-                          label: 'Iqama Scan / Copy',
-                          pickedFileNotifier: _iqamaAttachment,
-                          existingUrlNotifier: _iqamaAttachmentUrl,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Bahrain Residence Card
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ExpansionTile(
-                      title: const Text(
-                        'Bahrain Residence Details',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      leading: const Icon(Icons.badge, color: Colors.indigo),
-                      childrenPadding: const EdgeInsets.all(16),
-                      children: [
-                        _buildTextField(
-                          controller: _bahrainResidenceNumberController,
-                          label: 'Residence ID Number',
-                          icon: Icons.numbers,
-                          keyboardType: TextInputType.number,
-                        ),
-                        SizedBox(height: 16.h),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ValueListenableBuilder<DateTime?>(
-                                valueListenable: _bahrainResidenceExpiryDate,
-                                builder: (context, date, _) {
-                                  return CustomDatePicker(
-                                    label: 'ID Expiry',
-                                    date: date,
-                                    onTap: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: date ?? DateTime.now(),
-                                        firstDate: DateTime(2000),
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (picked != null) {
-                                        _bahrainResidenceExpiryDate.value =
-                                            picked;
-                                      }
-                                    },
-                                    onClear: () =>
-                                        _bahrainResidenceExpiryDate.value =
-                                            null,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildAttachmentPicker(
-                          label: 'Residence ID Scan / Copy',
-                          pickedFileNotifier: _bahrainResidenceAttachment,
-                          existingUrlNotifier: _bahrainResidenceAttachmentUrl,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Health Insurance Card
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ExpansionTile(
-                      title: const Text(
-                        'Health Insurance Details',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      leading: const Icon(
-                        Icons.health_and_safety,
-                        color: Colors.red,
-                      ),
-                      childrenPadding: const EdgeInsets.all(16),
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ValueListenableBuilder<DateTime?>(
-                                valueListenable: _healthInsuranceExpiryDate,
-                                builder: (context, date, _) {
-                                  return CustomDatePicker(
-                                    label: 'Health Insurance Expiry',
-                                    date: date,
-                                    onTap: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: date ?? DateTime.now(),
-                                        firstDate: DateTime(2000),
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (picked != null) {
-                                        _healthInsuranceExpiryDate.value =
-                                            picked;
-                                      }
-                                    },
-                                    onClear: () =>
-                                        _healthInsuranceExpiryDate.value = null,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildAttachmentPicker(
-                          label: 'Health Insurance Card Scan / Copy',
-                          pickedFileNotifier: _healthInsuranceAttachment,
-                          existingUrlNotifier: _healthInsuranceAttachmentUrl,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Passport Card
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ExpansionTile(
-                      title: const Text(
-                        'Passport Details',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      leading: const Icon(Icons.book, color: Colors.orange),
-                      childrenPadding: const EdgeInsets.all(16),
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _passportNumberController,
-                                label: 'Passport No.',
-                                icon: Icons.numbers,
-                              ),
-                            ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: ValueListenableBuilder<DateTime?>(
-                                valueListenable: _passportExpiryDate,
-                                builder: (context, date, _) {
-                                  return CustomDatePicker(
-                                    label: 'Expiry',
-                                    date: date,
-                                    onTap: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: date ?? DateTime.now(),
-                                        firstDate: DateTime(2000),
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (picked != null) {
-                                        _passportExpiryDate.value = picked;
-                                      }
-                                    },
-                                    onClear: () =>
-                                        _passportExpiryDate.value = null,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _passportNameController,
-                                label: 'Name on Passport',
-                                icon: Icons.person,
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildAttachmentPicker(
-                          label: 'Passport Scan / Copy',
-                          pickedFileNotifier: _passportAttachment,
-                          existingUrlNotifier: _passportAttachmentUrl,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Saudi Visa Card
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ExpansionTile(
-                      title: const Text(
-                        'Saudi Visa Details',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      leading: const Icon(
-                        Icons.airplane_ticket,
-                        color: Colors.green,
-                      ),
-                      childrenPadding: const EdgeInsets.all(16),
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _saudiVisaNumberController,
-                                label: 'Visa No.',
-                                icon: Icons.numbers,
-                              ),
-                            ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: ValueListenableBuilder<DateTime?>(
-                                valueListenable: _saudiVisaExpiryDate,
-                                builder: (context, date, _) {
-                                  return CustomDatePicker(
-                                    label: 'Expiry',
-                                    date: date,
-                                    onTap: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: date ?? DateTime.now(),
-                                        firstDate: DateTime(2000),
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (picked != null) {
-                                        _saudiVisaExpiryDate.value = picked;
-                                      }
-                                    },
-                                    onClear: () =>
-                                        _saudiVisaExpiryDate.value = null,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ValueListenableBuilder<VisaType>(
-                                valueListenable: _selectedSaudiVisaType,
-                                builder: (context, type, _) {
-                                  return _buildDropdown(
-                                    label: 'Visa Type',
-                                    value: type.toString().split('.').last,
-                                    items: VisaType.values
-                                        .map(
-                                          (e) => e.toString().split('.').last,
-                                        )
-                                        .toList(),
-                                    onChanged: (val) {
-                                      _selectedSaudiVisaType.value = VisaType
-                                          .values
-                                          .firstWhere(
-                                            (e) =>
-                                                e.toString().split('.').last ==
-                                                val,
-                                          );
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildAttachmentPicker(
-                          label: 'Saudi Visa Scan / Copy',
-                          pickedFileNotifier: _saudiVisaAttachment,
-                          existingUrlNotifier: _saudiVisaAttachmentUrl,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Bahrain Visa Card
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ExpansionTile(
-                      title: const Text(
-                        'Bahrain Visa Details',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      leading: const Icon(
-                        Icons.airplane_ticket_outlined,
-                        color: Colors.teal,
-                      ),
-                      childrenPadding: const EdgeInsets.all(16),
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _bahrainVisaNumberController,
-                                label: 'Visa No.',
-                                icon: Icons.numbers,
-                              ),
-                            ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: ValueListenableBuilder<DateTime?>(
-                                valueListenable: _bahrainVisaExpiryDate,
-                                builder: (context, date, _) {
-                                  return CustomDatePicker(
-                                    label: 'Expiry',
-                                    date: date,
-                                    onTap: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: date ?? DateTime.now(),
-                                        firstDate: DateTime(2000),
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (picked != null) {
-                                        _bahrainVisaExpiryDate.value = picked;
-                                      }
-                                    },
-                                    onClear: () =>
-                                        _bahrainVisaExpiryDate.value = null,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ValueListenableBuilder<VisaType>(
-                                valueListenable: _selectedBahrainVisaType,
-                                builder: (context, type, _) {
-                                  return _buildDropdown(
-                                    label: 'Visa Type',
-                                    value: type.toString().split('.').last,
-                                    items: VisaType.values
-                                        .map(
-                                          (e) => e.toString().split('.').last,
-                                        )
-                                        .toList(),
-                                    onChanged: (val) {
-                                      _selectedBahrainVisaType.value = VisaType
-                                          .values
-                                          .firstWhere(
-                                            (e) =>
-                                                e.toString().split('.').last ==
-                                                val,
-                                          );
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildAttachmentPicker(
-                          label: 'Bahrain Visa Scan / Copy',
-                          pickedFileNotifier: _bahrainVisaAttachment,
-                          existingUrlNotifier: _bahrainVisaAttachmentUrl,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Dubai Visa Card
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ExpansionTile(
-                      title: const Text(
-                        'Dubai Visa Details',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      leading: const Icon(
-                        Icons.flight_takeoff,
-                        color: Colors.amber,
-                      ),
-                      childrenPadding: const EdgeInsets.all(16),
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _dubaiVisaNumberController,
-                                label: 'Visa No.',
-                                icon: Icons.numbers,
-                              ),
-                            ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: ValueListenableBuilder<DateTime?>(
-                                valueListenable: _dubaiVisaExpiryDate,
-                                builder: (context, date, _) {
-                                  return CustomDatePicker(
-                                    label: 'Expiry',
-                                    date: date,
-                                    onTap: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: date ?? DateTime.now(),
-                                        firstDate: DateTime(2000),
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (picked != null) {
-                                        _dubaiVisaExpiryDate.value = picked;
-                                      }
-                                    },
-                                    onClear: () =>
-                                        _dubaiVisaExpiryDate.value = null,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ValueListenableBuilder<VisaType>(
-                                valueListenable: _selectedDubaiVisaType,
-                                builder: (context, type, _) {
-                                  return _buildDropdown(
-                                    label: 'Visa Type',
-                                    value: type.toString().split('.').last,
-                                    items: VisaType.values
-                                        .map(
-                                          (e) => e.toString().split('.').last,
-                                        )
-                                        .toList(),
-                                    onChanged: (val) {
-                                      _selectedDubaiVisaType.value = VisaType
-                                          .values
-                                          .firstWhere(
-                                            (e) =>
-                                                e.toString().split('.').last ==
-                                                val,
-                                          );
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildAttachmentPicker(
-                          label: 'Dubai Visa Scan / Copy',
-                          pickedFileNotifier: _dubaiVisaAttachment,
-                          existingUrlNotifier: _dubaiVisaAttachmentUrl,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Qatar Visa Card
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ExpansionTile(
-                      title: const Text(
-                        'Qatar Visa Details',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      leading: const Icon(
-                        Icons.flight_land,
-                        color: Colors.deepPurple,
-                      ),
-                      childrenPadding: const EdgeInsets.all(16),
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _qatarVisaNumberController,
-                                label: 'Visa No.',
-                                icon: Icons.numbers,
-                              ),
-                            ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: ValueListenableBuilder<DateTime?>(
-                                valueListenable: _qatarVisaExpiryDate,
-                                builder: (context, date, _) {
-                                  return CustomDatePicker(
-                                    label: 'Expiry',
-                                    date: date,
-                                    onTap: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: date ?? DateTime.now(),
-                                        firstDate: DateTime(2000),
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (picked != null) {
-                                        _qatarVisaExpiryDate.value = picked;
-                                      }
-                                    },
-                                    onClear: () =>
-                                        _qatarVisaExpiryDate.value = null,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ValueListenableBuilder<VisaType>(
-                                valueListenable: _selectedQatarVisaType,
-                                builder: (context, type, _) {
-                                  return _buildDropdown(
-                                    label: 'Visa Type',
-                                    value: type.toString().split('.').last,
-                                    items: VisaType.values
-                                        .map(
-                                          (e) => e.toString().split('.').last,
-                                        )
-                                        .toList(),
-                                    onChanged: (val) {
-                                      _selectedQatarVisaType.value = VisaType
-                                          .values
-                                          .firstWhere(
-                                            (e) =>
-                                                e.toString().split('.').last ==
-                                                val,
-                                          );
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildAttachmentPicker(
-                          label: 'Qatar Visa Scan / Copy',
-                          pickedFileNotifier: _qatarVisaAttachment,
-                          existingUrlNotifier: _qatarVisaAttachmentUrl,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Driving License Card
-                  Card(
-                    elevation: 1,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: ExpansionTile(
-                      title: const Text(
-                        'Driving License Details',
-                        style: TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      leading: const Icon(
-                        Icons.drive_eta,
-                        color: Colors.indigo,
-                      ),
-                      childrenPadding: const EdgeInsets.all(16),
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _licenseNumberController,
-                                label: 'License No.',
-                                icon: Icons.numbers,
-                              ),
-                            ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: ValueListenableBuilder<DateTime?>(
-                                valueListenable: _licenseExpiryDate,
-                                builder: (context, date, _) {
-                                  return CustomDatePicker(
-                                    label: 'Expiry',
-                                    date: date,
-                                    onTap: () async {
-                                      final picked = await showDatePicker(
-                                        context: context,
-                                        initialDate: date ?? DateTime.now(),
-                                        firstDate: DateTime(2000),
-                                        lastDate: DateTime(2100),
-                                      );
-                                      if (picked != null) {
-                                        _licenseExpiryDate.value = picked;
-                                      }
-                                    },
-                                    onClear: () =>
-                                        _licenseExpiryDate.value = null,
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: _buildTextField(
-                                controller: _licenseCountryController,
-                                label: 'Country',
-                                icon: Icons.public,
-                              ),
-                            ),
-                            SizedBox(width: 16.w),
-                            Expanded(
-                              child: ValueListenableBuilder<DrivingLicenseType>(
-                                valueListenable: _selectedLicenseType,
-                                builder: (context, type, _) {
-                                  return _buildDropdown(
-                                    label: 'License Type',
-                                    value: type.toString().split('.').last,
-                                    items: DrivingLicenseType.values
-                                        .map(
-                                          (e) => e.toString().split('.').last,
-                                        )
-                                        .toList(),
-                                    onChanged: (val) {
-                                      _selectedLicenseType.value =
-                                          DrivingLicenseType.values.firstWhere(
-                                            (e) =>
-                                                e.toString().split('.').last ==
-                                                val,
-                                          );
-                                    },
-                                  );
-                                },
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 16.h),
-                        _buildAttachmentPicker(
-                          label: 'Driving License Scan / Copy',
-                          pickedFileNotifier: _licenseAttachment,
-                          existingUrlNotifier: _licenseAttachmentUrl,
-                        ),
-                      ],
-                    ),
+                  // Internal staff carry the full HR record; external staff
+                  // only the handful of fields collected below.
+                  AnimatedBuilder(
+                    animation: Listenable.merge([
+                      _employmentType,
+                      _selectedPosition,
+                    ]),
+                    builder: (context, _) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: _isExternal
+                            ? _buildExternalSections()
+                            : _buildInternalSections(),
+                      );
+                    },
                   ),
 
                   SizedBox(height: 24.h),
@@ -1727,6 +1004,1144 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         ),
       ),
     );
+  }
+
+  /// Minimal record for contracted third parties: name, gender, phone and
+  /// nationality — plus the car details when the person is an external driver.
+  List<Widget> _buildExternalSections() {
+    return [
+      _buildSectionTitle('Contact Information'),
+      SizedBox(height: 16.h),
+      Row(
+        children: [
+          _buildCountryCodeDropdown(),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: _buildTextField(
+              controller: _phoneController,
+              label: 'Mobile No',
+              icon: Icons.phone,
+              validator: (v) =>
+                  v!.trim().isEmpty ? 'Please enter mobile number' : null,
+            ),
+          ),
+        ],
+      ),
+      SizedBox(height: 16.h),
+      _buildSectionTitle('Personal Details'),
+      SizedBox(height: 16.h),
+      Row(
+        children: [
+          Expanded(
+            child: ValueListenableBuilder<String>(
+              valueListenable: _selectedGender,
+              builder: (context, selectedGender, _) {
+                return _buildDropdown(
+                  label: 'Gender',
+                  value: selectedGender,
+                  items: _genders,
+                  onChanged: (val) => _selectedGender.value = val!,
+                );
+              },
+            ),
+          ),
+          SizedBox(width: 16.w),
+          Expanded(
+            child: _buildTextField(
+              controller: _nationalityController,
+              label: 'Nationality',
+              icon: Icons.flag,
+            ),
+          ),
+        ],
+      ),
+      if (_isDriverPosition) ...[
+        SizedBox(height: 24.h),
+        const Divider(),
+        SizedBox(height: 16.h),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildSectionTitle('Vehicle Details'),
+            TextButton.icon(
+              onPressed: _manageVehicleMakes,
+              icon: const Icon(Icons.settings, size: 16),
+              label: const Text('Manage Makes'),
+            ),
+          ],
+        ),
+        SizedBox(height: 8.h),
+        Card(
+          elevation: 1,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                ValueListenableBuilder<List<VehicleMakeEntity>>(
+                  valueListenable: _allVehicleMakes,
+                  builder: (context, makes, _) {
+                    if (makes.isEmpty) {
+                      return Text(
+                        'No vehicle makes configured yet. Tap "Manage '
+                        'Makes" above to add one.',
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      );
+                    }
+                    return Column(
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(child: _buildVehicleMakeDropdown()),
+                            SizedBox(width: 16.w),
+                            Expanded(child: _buildVehicleModelDropdown()),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                        Row(
+                          children: [
+                            Expanded(child: _buildVehicleYearDropdown()),
+                            SizedBox(width: 16.w),
+                            Expanded(child: _buildVehicleColorDropdown()),
+                          ],
+                        ),
+                        SizedBox(height: 16.h),
+                      ],
+                    );
+                  },
+                ),
+                _buildTextField(
+                  controller: _plateNumberController,
+                  label: 'Car Plate No',
+                  icon: Icons.confirmation_number,
+                  validator: (v) => v!.trim().isEmpty
+                      ? 'Please enter car plate number'
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    ];
+  }
+
+  Widget _buildCountryCodeDropdown() {
+    return SizedBox(
+      width: 120.w,
+      child: ValueListenableBuilder<String>(
+        valueListenable: _primaryCountryCode,
+        builder: (context, code, _) {
+          return DropdownButtonFormField<String>(
+            initialValue: code,
+            decoration: InputDecoration(
+              labelText: 'Code',
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 8.w,
+                vertical: 10.h,
+              ),
+            ),
+            items: const [
+              DropdownMenuItem(value: '+966', child: Text('+966 🇸🇦')),
+              DropdownMenuItem(value: '+973', child: Text('+973 🇧🇭')),
+              DropdownMenuItem(value: '+971', child: Text('+971 🇦🇪')),
+              DropdownMenuItem(value: '+974', child: Text('+974 🇶🇦')),
+              DropdownMenuItem(value: '+968', child: Text('+968 🇴🇲')),
+              DropdownMenuItem(value: '+965', child: Text('+965 🇰🇼')),
+              DropdownMenuItem(value: '+91', child: Text('+91 🇮🇳')),
+            ],
+            onChanged: (val) {
+              if (val != null) {
+                _primaryCountryCode.value = val;
+              }
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  /// Opens Vehicle Master's make/model manager and refreshes the local list
+  /// on return, so a make added there is available immediately.
+  Future<void> _manageVehicleMakes() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const VehicleMakesScreen()),
+    );
+    if (mounted) _loadVehicleMakes();
+  }
+
+  // External-driver vehicle pickers — same Vehicle Master and cascading
+  // make → model/year/color pattern as the fleet Vehicle form, so nothing is
+  // typed freely except the plate number.
+
+  Widget _buildVehicleMakeDropdown() {
+    return AnimatedBuilder(
+      animation: Listenable.merge([_selectedVehicleMake, _allVehicleMakes]),
+      builder: (context, _) {
+        return DropdownButtonFormField<String>(
+          initialValue: _selectedVehicleMake.value,
+          decoration: InputDecoration(
+            labelText: 'Make',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+          ),
+          items: _allVehicleMakes.value
+              .map((m) => DropdownMenuItem(value: m.name, child: Text(m.name)))
+              .toList(),
+          onChanged: (val) {
+            _selectedVehicleMake.value = val;
+            _selectedVehicleModel.value = null;
+            _selectedVehicleYear.value = null;
+            _selectedVehicleColor.value = null;
+            _updateAvailableVehicleOptions(val);
+          },
+          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildVehicleModelDropdown() {
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        _selectedVehicleMake,
+        _selectedVehicleModel,
+        _availableVehicleModels,
+      ]),
+      builder: (context, _) {
+        return DropdownButtonFormField<String>(
+          initialValue: _selectedVehicleModel.value,
+          decoration: InputDecoration(
+            labelText: 'Model',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            enabled: _selectedVehicleMake.value != null,
+          ),
+          items: _availableVehicleModels.value
+              .map((m) => DropdownMenuItem(value: m.name, child: Text(m.name)))
+              .toList(),
+          onChanged: _selectedVehicleMake.value == null
+              ? null
+              : (val) => _selectedVehicleModel.value = val,
+          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildVehicleYearDropdown() {
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        _selectedVehicleMake,
+        _selectedVehicleYear,
+        _availableVehicleYears,
+      ]),
+      builder: (context, _) {
+        return DropdownButtonFormField<int>(
+          initialValue: _selectedVehicleYear.value,
+          decoration: InputDecoration(
+            labelText: 'Year',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            enabled: _selectedVehicleMake.value != null,
+          ),
+          items: _availableVehicleYears.value
+              .map((y) => DropdownMenuItem(value: y, child: Text(y.toString())))
+              .toList(),
+          onChanged: _selectedVehicleMake.value == null
+              ? null
+              : (val) => _selectedVehicleYear.value = val,
+        );
+      },
+    );
+  }
+
+  Widget _buildVehicleColorDropdown() {
+    return AnimatedBuilder(
+      animation: Listenable.merge([
+        _selectedVehicleMake,
+        _selectedVehicleColor,
+        _availableVehicleColors,
+      ]),
+      builder: (context, _) {
+        return DropdownButtonFormField<String>(
+          initialValue: _selectedVehicleColor.value,
+          decoration: InputDecoration(
+            labelText: 'Color',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+            enabled: _selectedVehicleMake.value != null,
+          ),
+          items: _availableVehicleColors.value
+              .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+              .toList(),
+          onChanged: _selectedVehicleMake.value == null
+              ? null
+              : (val) => _selectedVehicleColor.value = val,
+          validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+        );
+      },
+    );
+  }
+
+  /// Full HR record: contacts, IDs, dates and every document card.
+  List<Widget> _buildInternalSections() {
+    return [
+                // Contact Info
+                _buildSectionTitle('Contact Information'),
+                SizedBox(height: 16.h),
+                Row(
+                  children: [
+                    _buildCountryCodeDropdown(),
+                    SizedBox(width: 8.w),
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _phoneController,
+                        label: 'Primary Contact',
+                        icon: Icons.phone,
+                        validator: (v) =>
+                            v!.isEmpty ? 'Please enter phone number' : null,
+                      ),
+                    ),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _emailController,
+                        label: 'Email',
+                        icon: Icons.email,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16.h),
+                _buildContactsSection(),
+                SizedBox(height: 16.h),
+
+                // Personal Details
+                _buildSectionTitle('Personal Details'),
+                SizedBox(height: 16.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ValueListenableBuilder<String>(
+                        valueListenable: _selectedGender,
+                        builder: (context, selectedGender, _) {
+                          return _buildDropdown(
+                            label: 'Gender',
+                            value: selectedGender,
+                            items: _genders,
+                            onChanged: (val) => _selectedGender.value = val!,
+                          );
+                        },
+                      ),
+                    ),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _nationalityController,
+                        label: 'Nationality',
+                        icon: Icons.flag,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ValueListenableBuilder<String>(
+                        valueListenable: _selectedIdType,
+                        builder: (context, selectedIdType, _) {
+                          return _buildDropdown(
+                            label: 'ID Type',
+                            value: selectedIdType,
+                            items: _idTypes,
+                            onChanged: (val) => _selectedIdType.value = val!,
+                          );
+                        },
+                      ),
+                    ),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: _buildTextField(
+                        controller: _idNumberController,
+                        label: 'ID Number',
+                        icon: Icons.numbers,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16.h),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ValueListenableBuilder<DateTime?>(
+                        valueListenable: _birthDate,
+                        builder: (context, birthDate, _) {
+                          return CustomDatePicker(
+                            label: 'Birth Date',
+                            date: birthDate,
+                            onTap: () => _selectDate(context, false),
+                            onClear: () => _birthDate.value = null,
+                          );
+                        },
+                      ),
+                    ),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: ValueListenableBuilder<DateTime?>(
+                        valueListenable: _joinDate,
+                        builder: (context, joinDate, _) {
+                          return CustomDatePicker(
+                            label: 'Join Date',
+                            date: joinDate,
+                            onTap: () => _selectDate(context, true),
+                            onClear: () => _joinDate.value = null,
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+
+                SizedBox(height: 24.h),
+                Divider(),
+                SizedBox(height: 16.h),
+                _buildSectionTitle('Documents & Expiries'),
+                SizedBox(height: 16.h),
+
+                // Iqama Card
+                Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ExpansionTile(
+                    title: const Text(
+                      'Iqama Details',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    leading: const Icon(Icons.badge, color: Colors.blue),
+                    childrenPadding: const EdgeInsets.all(16),
+                    children: [
+                      _buildTextField(
+                        controller: _iqamaNumberController,
+                        label: 'Iqama Number',
+                        icon: Icons.numbers,
+                        keyboardType: TextInputType.number,
+                      ),
+                      SizedBox(height: 16.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ValueListenableBuilder<DateTime?>(
+                              valueListenable: _iqamaExpiryDate,
+                              builder: (context, date, _) {
+                                return CustomDatePicker(
+                                  label: 'Iqama Expiry',
+                                  date: date,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: date ?? DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      _iqamaExpiryDate.value = picked;
+                                    }
+                                  },
+                                  onClear: () =>
+                                      _iqamaExpiryDate.value = null,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      _buildAttachmentPicker(
+                        label: 'Iqama Scan / Copy',
+                        pickedFileNotifier: _iqamaAttachment,
+                        existingUrlNotifier: _iqamaAttachmentUrl,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Bahrain Residence Card
+                Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ExpansionTile(
+                    title: const Text(
+                      'Bahrain Residence Details',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    leading: const Icon(Icons.badge, color: Colors.indigo),
+                    childrenPadding: const EdgeInsets.all(16),
+                    children: [
+                      _buildTextField(
+                        controller: _bahrainResidenceNumberController,
+                        label: 'Residence ID Number',
+                        icon: Icons.numbers,
+                        keyboardType: TextInputType.number,
+                      ),
+                      SizedBox(height: 16.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ValueListenableBuilder<DateTime?>(
+                              valueListenable: _bahrainResidenceExpiryDate,
+                              builder: (context, date, _) {
+                                return CustomDatePicker(
+                                  label: 'ID Expiry',
+                                  date: date,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: date ?? DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      _bahrainResidenceExpiryDate.value =
+                                          picked;
+                                    }
+                                  },
+                                  onClear: () =>
+                                      _bahrainResidenceExpiryDate.value =
+                                          null,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      _buildAttachmentPicker(
+                        label: 'Residence ID Scan / Copy',
+                        pickedFileNotifier: _bahrainResidenceAttachment,
+                        existingUrlNotifier: _bahrainResidenceAttachmentUrl,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Health Insurance Card
+                Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ExpansionTile(
+                    title: const Text(
+                      'Health Insurance Details',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    leading: const Icon(
+                      Icons.health_and_safety,
+                      color: Colors.red,
+                    ),
+                    childrenPadding: const EdgeInsets.all(16),
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ValueListenableBuilder<DateTime?>(
+                              valueListenable: _healthInsuranceExpiryDate,
+                              builder: (context, date, _) {
+                                return CustomDatePicker(
+                                  label: 'Health Insurance Expiry',
+                                  date: date,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: date ?? DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      _healthInsuranceExpiryDate.value =
+                                          picked;
+                                    }
+                                  },
+                                  onClear: () =>
+                                      _healthInsuranceExpiryDate.value = null,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      _buildAttachmentPicker(
+                        label: 'Health Insurance Card Scan / Copy',
+                        pickedFileNotifier: _healthInsuranceAttachment,
+                        existingUrlNotifier: _healthInsuranceAttachmentUrl,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Passport Card
+                Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ExpansionTile(
+                    title: const Text(
+                      'Passport Details',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    leading: const Icon(Icons.book, color: Colors.orange),
+                    childrenPadding: const EdgeInsets.all(16),
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _passportNumberController,
+                              label: 'Passport No.',
+                              icon: Icons.numbers,
+                            ),
+                          ),
+                          SizedBox(width: 16.w),
+                          Expanded(
+                            child: ValueListenableBuilder<DateTime?>(
+                              valueListenable: _passportExpiryDate,
+                              builder: (context, date, _) {
+                                return CustomDatePicker(
+                                  label: 'Expiry',
+                                  date: date,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: date ?? DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      _passportExpiryDate.value = picked;
+                                    }
+                                  },
+                                  onClear: () =>
+                                      _passportExpiryDate.value = null,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _passportNameController,
+                              label: 'Name on Passport',
+                              icon: Icons.person,
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      _buildAttachmentPicker(
+                        label: 'Passport Scan / Copy',
+                        pickedFileNotifier: _passportAttachment,
+                        existingUrlNotifier: _passportAttachmentUrl,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Saudi Visa Card
+                Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ExpansionTile(
+                    title: const Text(
+                      'Saudi Visa Details',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    leading: const Icon(
+                      Icons.airplane_ticket,
+                      color: Colors.green,
+                    ),
+                    childrenPadding: const EdgeInsets.all(16),
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _saudiVisaNumberController,
+                              label: 'Visa No.',
+                              icon: Icons.numbers,
+                            ),
+                          ),
+                          SizedBox(width: 16.w),
+                          Expanded(
+                            child: ValueListenableBuilder<DateTime?>(
+                              valueListenable: _saudiVisaExpiryDate,
+                              builder: (context, date, _) {
+                                return CustomDatePicker(
+                                  label: 'Expiry',
+                                  date: date,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: date ?? DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      _saudiVisaExpiryDate.value = picked;
+                                    }
+                                  },
+                                  onClear: () =>
+                                      _saudiVisaExpiryDate.value = null,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ValueListenableBuilder<VisaType>(
+                              valueListenable: _selectedSaudiVisaType,
+                              builder: (context, type, _) {
+                                return _buildDropdown(
+                                  label: 'Visa Type',
+                                  value: type.toString().split('.').last,
+                                  items: VisaType.values
+                                      .map(
+                                        (e) => e.toString().split('.').last,
+                                      )
+                                      .toList(),
+                                  onChanged: (val) {
+                                    _selectedSaudiVisaType.value = VisaType
+                                        .values
+                                        .firstWhere(
+                                          (e) =>
+                                              e.toString().split('.').last ==
+                                              val,
+                                        );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      _buildAttachmentPicker(
+                        label: 'Saudi Visa Scan / Copy',
+                        pickedFileNotifier: _saudiVisaAttachment,
+                        existingUrlNotifier: _saudiVisaAttachmentUrl,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Bahrain Visa Card
+                Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ExpansionTile(
+                    title: const Text(
+                      'Bahrain Visa Details',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    leading: const Icon(
+                      Icons.airplane_ticket_outlined,
+                      color: Colors.teal,
+                    ),
+                    childrenPadding: const EdgeInsets.all(16),
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _bahrainVisaNumberController,
+                              label: 'Visa No.',
+                              icon: Icons.numbers,
+                            ),
+                          ),
+                          SizedBox(width: 16.w),
+                          Expanded(
+                            child: ValueListenableBuilder<DateTime?>(
+                              valueListenable: _bahrainVisaExpiryDate,
+                              builder: (context, date, _) {
+                                return CustomDatePicker(
+                                  label: 'Expiry',
+                                  date: date,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: date ?? DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      _bahrainVisaExpiryDate.value = picked;
+                                    }
+                                  },
+                                  onClear: () =>
+                                      _bahrainVisaExpiryDate.value = null,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ValueListenableBuilder<VisaType>(
+                              valueListenable: _selectedBahrainVisaType,
+                              builder: (context, type, _) {
+                                return _buildDropdown(
+                                  label: 'Visa Type',
+                                  value: type.toString().split('.').last,
+                                  items: VisaType.values
+                                      .map(
+                                        (e) => e.toString().split('.').last,
+                                      )
+                                      .toList(),
+                                  onChanged: (val) {
+                                    _selectedBahrainVisaType.value = VisaType
+                                        .values
+                                        .firstWhere(
+                                          (e) =>
+                                              e.toString().split('.').last ==
+                                              val,
+                                        );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      _buildAttachmentPicker(
+                        label: 'Bahrain Visa Scan / Copy',
+                        pickedFileNotifier: _bahrainVisaAttachment,
+                        existingUrlNotifier: _bahrainVisaAttachmentUrl,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Dubai Visa Card
+                Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ExpansionTile(
+                    title: const Text(
+                      'Dubai Visa Details',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    leading: const Icon(
+                      Icons.flight_takeoff,
+                      color: Colors.amber,
+                    ),
+                    childrenPadding: const EdgeInsets.all(16),
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _dubaiVisaNumberController,
+                              label: 'Visa No.',
+                              icon: Icons.numbers,
+                            ),
+                          ),
+                          SizedBox(width: 16.w),
+                          Expanded(
+                            child: ValueListenableBuilder<DateTime?>(
+                              valueListenable: _dubaiVisaExpiryDate,
+                              builder: (context, date, _) {
+                                return CustomDatePicker(
+                                  label: 'Expiry',
+                                  date: date,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: date ?? DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      _dubaiVisaExpiryDate.value = picked;
+                                    }
+                                  },
+                                  onClear: () =>
+                                      _dubaiVisaExpiryDate.value = null,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ValueListenableBuilder<VisaType>(
+                              valueListenable: _selectedDubaiVisaType,
+                              builder: (context, type, _) {
+                                return _buildDropdown(
+                                  label: 'Visa Type',
+                                  value: type.toString().split('.').last,
+                                  items: VisaType.values
+                                      .map(
+                                        (e) => e.toString().split('.').last,
+                                      )
+                                      .toList(),
+                                  onChanged: (val) {
+                                    _selectedDubaiVisaType.value = VisaType
+                                        .values
+                                        .firstWhere(
+                                          (e) =>
+                                              e.toString().split('.').last ==
+                                              val,
+                                        );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      _buildAttachmentPicker(
+                        label: 'Dubai Visa Scan / Copy',
+                        pickedFileNotifier: _dubaiVisaAttachment,
+                        existingUrlNotifier: _dubaiVisaAttachmentUrl,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Qatar Visa Card
+                Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ExpansionTile(
+                    title: const Text(
+                      'Qatar Visa Details',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    leading: const Icon(
+                      Icons.flight_land,
+                      color: Colors.deepPurple,
+                    ),
+                    childrenPadding: const EdgeInsets.all(16),
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _qatarVisaNumberController,
+                              label: 'Visa No.',
+                              icon: Icons.numbers,
+                            ),
+                          ),
+                          SizedBox(width: 16.w),
+                          Expanded(
+                            child: ValueListenableBuilder<DateTime?>(
+                              valueListenable: _qatarVisaExpiryDate,
+                              builder: (context, date, _) {
+                                return CustomDatePicker(
+                                  label: 'Expiry',
+                                  date: date,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: date ?? DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      _qatarVisaExpiryDate.value = picked;
+                                    }
+                                  },
+                                  onClear: () =>
+                                      _qatarVisaExpiryDate.value = null,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ValueListenableBuilder<VisaType>(
+                              valueListenable: _selectedQatarVisaType,
+                              builder: (context, type, _) {
+                                return _buildDropdown(
+                                  label: 'Visa Type',
+                                  value: type.toString().split('.').last,
+                                  items: VisaType.values
+                                      .map(
+                                        (e) => e.toString().split('.').last,
+                                      )
+                                      .toList(),
+                                  onChanged: (val) {
+                                    _selectedQatarVisaType.value = VisaType
+                                        .values
+                                        .firstWhere(
+                                          (e) =>
+                                              e.toString().split('.').last ==
+                                              val,
+                                        );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      _buildAttachmentPicker(
+                        label: 'Qatar Visa Scan / Copy',
+                        pickedFileNotifier: _qatarVisaAttachment,
+                        existingUrlNotifier: _qatarVisaAttachmentUrl,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Driving License Card
+                Card(
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: ExpansionTile(
+                    title: const Text(
+                      'Driving License Details',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    leading: const Icon(
+                      Icons.drive_eta,
+                      color: Colors.indigo,
+                    ),
+                    childrenPadding: const EdgeInsets.all(16),
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _licenseNumberController,
+                              label: 'License No.',
+                              icon: Icons.numbers,
+                            ),
+                          ),
+                          SizedBox(width: 16.w),
+                          Expanded(
+                            child: ValueListenableBuilder<DateTime?>(
+                              valueListenable: _licenseExpiryDate,
+                              builder: (context, date, _) {
+                                return CustomDatePicker(
+                                  label: 'Expiry',
+                                  date: date,
+                                  onTap: () async {
+                                    final picked = await showDatePicker(
+                                      context: context,
+                                      initialDate: date ?? DateTime.now(),
+                                      firstDate: DateTime(2000),
+                                      lastDate: DateTime(2100),
+                                    );
+                                    if (picked != null) {
+                                      _licenseExpiryDate.value = picked;
+                                    }
+                                  },
+                                  onClear: () =>
+                                      _licenseExpiryDate.value = null,
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: _licenseCountryController,
+                              label: 'Country',
+                              icon: Icons.public,
+                            ),
+                          ),
+                          SizedBox(width: 16.w),
+                          Expanded(
+                            child: ValueListenableBuilder<DrivingLicenseType>(
+                              valueListenable: _selectedLicenseType,
+                              builder: (context, type, _) {
+                                return _buildDropdown(
+                                  label: 'License Type',
+                                  value: type.toString().split('.').last,
+                                  items: DrivingLicenseType.values
+                                      .map(
+                                        (e) => e.toString().split('.').last,
+                                      )
+                                      .toList(),
+                                  onChanged: (val) {
+                                    _selectedLicenseType.value =
+                                        DrivingLicenseType.values.firstWhere(
+                                          (e) =>
+                                              e.toString().split('.').last ==
+                                              val,
+                                        );
+                                  },
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                      SizedBox(height: 16.h),
+                      _buildAttachmentPicker(
+                        label: 'Driving License Scan / Copy',
+                        pickedFileNotifier: _licenseAttachment,
+                        existingUrlNotifier: _licenseAttachmentUrl,
+                      ),
+                    ],
+                  ),
+                ),
+    ];
   }
 
   Widget _buildSectionTitle(String title) {

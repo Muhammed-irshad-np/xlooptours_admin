@@ -11,6 +11,7 @@ import 'package:xloop_invoice/features/finance/domain/entities/fund_transaction_
 import 'package:xloop_invoice/features/finance/domain/entities/ledger_day_totals.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/petty_cash_session_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/post_fund_request.dart';
+import 'package:xloop_invoice/features/finance/domain/entities/session_expense_item.dart';
 import 'package:xloop_invoice/features/finance/domain/repositories/finance_repository.dart';
 
 /// Configurable fake repository for unit tests. Set the result/error
@@ -40,6 +41,10 @@ class FakeFinanceRepository implements FinanceRepository {
 
   // --- Transfer ---
   Object? transferError;
+
+  // --- Session Expenses ---
+  List<SessionExpenseItem> sessionExpensesResult = [];
+  Object? sessionExpensesError;
 
   @override
   Future<ExpenseEntity> approveAndPostExpense({
@@ -84,6 +89,7 @@ class FakeFinanceRepository implements FinanceRepository {
     required String sessionId,
     required String verifiedBy,
     required String? verifiedByUserId,
+    String? resolutionNotes,
   }) async {
     if (verifySessionError != null) throw verifySessionError!;
   }
@@ -121,6 +127,9 @@ class FakeFinanceRepository implements FinanceRepository {
     DocumentSnapshot? cursor,
     int pageSize = 150,
   }) async => (<ExpenseEntity>[], null);
+
+  @override
+  Future<List<ExpenseEntity>> getOutstandingExpenses() async => [];
 
   @override
   Future<List<ExpenseEntity>> getExpensesByDateRange(
@@ -169,6 +178,9 @@ class FakeFinanceRepository implements FinanceRepository {
   Future<void> deleteFundAccount(String id) async {}
 
   @override
+  Future<FundTransactionEntity?> getTransactionById(String id) async => null;
+
+  @override
   Future<List<FundTransactionEntity>> getTransactionsForAccount(
     String accountId,
   ) async => [];
@@ -177,6 +189,14 @@ class FakeFinanceRepository implements FinanceRepository {
   Future<List<PettyCashSessionEntity>> getPettyCashSessions(
     String accountId,
   ) async => [];
+
+  @override
+  Future<List<SessionExpenseItem>> getSessionExpenses(
+    PettyCashSessionEntity session,
+  ) async {
+    if (sessionExpensesError != null) throw sessionExpensesError!;
+    return sessionExpensesResult;
+  }
 
   @override
   Future<PettyCashSessionEntity?> getOpenSession(String accountId) async =>

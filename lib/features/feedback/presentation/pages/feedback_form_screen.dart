@@ -317,10 +317,9 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
                               Consumer<EmployeeProvider>(
                                 builder: (context, employeeProvider, _) {
                                   final allEmployees = employeeProvider.employees;
-                                  final drivers = allEmployees.where((e) =>
-                                      e.isActive &&
-                                      (e.position.toLowerCase().contains('driver') ||
-                                          e.driverType != null)).toList();
+                                  final drivers = allEmployees
+                                      .where((e) => e.isActive && e.isDriver)
+                                      .toList();
 
                                   return _buildTextField(
                                     controller: _driverNameController,

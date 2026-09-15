@@ -382,24 +382,6 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   }
 
   Widget _buildImageViewer() {
-    if (kIsWeb) {
-      return InteractiveViewer(
-        panEnabled: true,
-        boundaryMargin: const EdgeInsets.all(20),
-        minScale: 0.5,
-        maxScale: 4,
-        child: Image.network(
-          widget.attachmentUrl,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return const Center(child: CircularProgressIndicator());
-          },
-          errorBuilder: (context, error, stackTrace) =>
-              _buildFallbackView(),
-        ),
-      );
-    }
-
     return InteractiveViewer(
       panEnabled: true,
       boundaryMargin: const EdgeInsets.all(20),

@@ -141,6 +141,7 @@ import 'features/finance/domain/usecases/insert_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/update_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/delete_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/get_transactions_usecase.dart';
+import 'features/finance/domain/usecases/get_transaction_by_id_usecase.dart';
 import 'features/finance/domain/usecases/insert_transaction_usecase.dart';
 import 'features/finance/domain/usecases/post_fund_movement_usecase.dart';
 import 'features/finance/domain/usecases/transfer_funds_usecase.dart';
@@ -152,6 +153,7 @@ import 'features/finance/domain/usecases/open_petty_cash_session_usecase.dart';
 import 'features/finance/domain/usecases/close_petty_cash_session_usecase.dart';
 import 'features/finance/domain/usecases/verify_petty_cash_session_usecase.dart';
 import 'features/finance/domain/usecases/upload_closing_sheet_usecase.dart';
+import 'features/finance/domain/usecases/get_session_expenses_usecase.dart';
 import 'features/finance/domain/usecases/get_expense_categories_usecase.dart';
 import 'features/finance/domain/usecases/insert_expense_category_usecase.dart';
 import 'features/finance/domain/usecases/update_expense_category_usecase.dart';
@@ -568,6 +570,7 @@ Future<void> init() async {
       updateFundAccountUseCase: sl(),
       deleteFundAccountUseCase: sl(),
       getTransactionsUseCase: sl(),
+      getTransactionByIdUseCase: sl(),
       insertTransactionUseCase: sl(),
       postFundMovementUseCase: sl(),
       transferFundsUseCase: sl(),
@@ -586,6 +589,7 @@ Future<void> init() async {
       closePettyCashSessionUseCase: sl(),
       verifyPettyCashSessionUseCase: sl(),
       uploadClosingSheetUseCase: sl(),
+      getSessionExpensesUseCase: sl(),
       financeRepository: sl(),
     ),
   );
@@ -618,6 +622,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => UpdateFundAccountUseCase(sl()));
   sl.registerLazySingleton(() => DeleteFundAccountUseCase(sl()));
   sl.registerLazySingleton(() => GetTransactionsUseCase(sl()));
+  sl.registerLazySingleton(() => GetTransactionByIdUseCase(sl()));
   sl.registerLazySingleton(() => InsertTransactionUseCase(sl()));
   sl.registerLazySingleton(() => PostFundMovementUseCase(sl()));
   sl.registerLazySingleton(() => TransferFundsUseCase(sl()));
@@ -636,6 +641,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => ClosePettyCashSessionUseCase(sl()));
   sl.registerLazySingleton(() => VerifyPettyCashSessionUseCase(sl()));
   sl.registerLazySingleton(() => UploadClosingSheetUseCase(sl()));
+  sl.registerLazySingleton(() => GetSessionExpensesUseCase(sl()));
 
   // UseCases - Expense Categories
   sl.registerLazySingleton(() => GetExpenseCategoriesUseCase(sl()));

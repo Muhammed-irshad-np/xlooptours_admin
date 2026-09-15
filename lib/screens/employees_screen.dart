@@ -52,6 +52,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
       'Management',
       'Office',
       'Drivers',
+      'External',
     ]);
     if (_isAdmin) {
       _tabs.add('Master');
@@ -109,7 +110,10 @@ class _EmployeesScreenState extends State<EmployeesScreen>
             (e) =>
                 e.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                 e.position.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                e.phoneNumber.contains(_searchQuery),
+                e.phoneNumber.contains(_searchQuery) ||
+                (e.externalVehicle?.plateNumber ?? '')
+                    .toLowerCase()
+                    .contains(_searchQuery.toLowerCase()),
           )
           .toList();
     }
@@ -134,7 +138,9 @@ class _EmployeesScreenState extends State<EmployeesScreen>
             )
             .toList();
       } else if (selectedTab == 'Drivers') {
-        temp = temp.where((e) => e.position == 'Driver').toList();
+        temp = temp.where((e) => e.isDriver).toList();
+      } else if (selectedTab == 'External') {
+        temp = temp.where((e) => e.isExternal).toList();
       }
     }
 
@@ -460,8 +466,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                               fontWeight: FontWeight.w500,
                             ),
                           ),
-                          if (employee.position == 'Driver' &&
-                              employee.driverType != null) ...[
+                          if (employee.isExternal || employee.isDriver) ...[
                             SizedBox(width: 8.w),
                             Container(
                               padding: EdgeInsets.symmetric(
@@ -469,24 +474,24 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                                 vertical: 2.h,
                               ),
                               decoration: BoxDecoration(
-                                color: employee.driverType == 'Internal'
-                                    ? Colors.green.withValues(alpha: 0.1)
-                                    : Colors.orange.withValues(alpha: 0.1),
+                                color: employee.isExternal
+                                    ? Colors.orange.withValues(alpha: 0.1)
+                                    : Colors.green.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(4.r),
                                 border: Border.all(
-                                  color: employee.driverType == 'Internal'
-                                      ? Colors.green
-                                      : Colors.orange,
+                                  color: employee.isExternal
+                                      ? Colors.orange
+                                      : Colors.green,
                                   width: 0.5,
                                 ),
                               ),
                               child: Text(
-                                employee.driverType!,
+                                employee.employmentType,
                                 style: TextStyle(
                                   fontSize: 10.sp,
-                                  color: employee.driverType == 'Internal'
-                                      ? Colors.green
-                                      : Colors.orange,
+                                  color: employee.isExternal
+                                      ? Colors.orange
+                                      : Colors.green,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
@@ -599,6 +604,31 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                   Expanded(
                     child: Text(
                       employee.email,
+                      style: TextStyle(
+                        fontSize: 13.sp,
+                        color: Colors.grey[800],
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            if (employee.externalVehicle != null &&
+                !employee.externalVehicle!.isEmpty) ...[
+              SizedBox(height: 4.h),
+              Row(
+                children: [
+                  Icon(
+                    Icons.directions_car,
+                    size: 14.sp,
+                    color: Colors.grey,
+                  ),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: Text(
+                      employee.externalVehicle!.summary,
                       style: TextStyle(
                         fontSize: 13.sp,
                         color: Colors.grey[800],

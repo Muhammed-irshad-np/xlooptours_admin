@@ -23,10 +23,7 @@ import '../features/auth/presentation/providers/auth_provider.dart';
 
 class EmployeeDetailsScreen extends StatelessWidget {
   final EmployeeEntity employee;
-  const EmployeeDetailsScreen({
-    super.key,
-    required this.employee,
-  });
+  const EmployeeDetailsScreen({super.key, required this.employee});
 
   String _formatDate(DateTime? date) {
     if (date == null) return 'N/A';
@@ -72,8 +69,14 @@ class EmployeeDetailsScreen extends StatelessWidget {
                       _buildSectionHeader('Personal Information'),
                       _buildPersonalInfoCard(),
 
-                      _buildAuthorizedVehiclesCard(context),
-                      _buildTafweedHistorySection(context),
+                      // Fleet authorisation (tafweed) only applies to internal
+                      // staff; an external driver brings their own car.
+                      if (employee.isExternal) ...[
+                        if (employee.isDriver) _buildExternalVehicleCard(),
+                      ] else ...[
+                        _buildAuthorizedVehiclesCard(context),
+                        _buildTafweedHistorySection(context),
+                      ],
                     ],
                   ),
                 ),
@@ -85,7 +88,24 @@ class EmployeeDetailsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _buildSectionHeader('Documents & IDs'),
-                      _buildDocumentsSection(context),
+                      if (employee.isExternal)
+                        Padding(
+                          padding: EdgeInsets.symmetric(vertical: 40.h),
+                          child: Center(
+                            child: Text(
+                              'External staff do not have company documents '
+                              'on file.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16.sp,
+                                color: Colors.grey,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        _buildDocumentsSection(context),
                     ],
                   ),
                 ),
@@ -236,7 +256,9 @@ class EmployeeDetailsScreen extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (employee.driverType != null) ...[
+                      // Drivers always show their type; other staff only
+                      // when they are external.
+                      if (employee.isExternal || employee.isDriver) ...[
                         SizedBox(width: 8.w),
                         Container(
                           padding: EdgeInsets.symmetric(
@@ -244,24 +266,24 @@ class EmployeeDetailsScreen extends StatelessWidget {
                             vertical: 4.h,
                           ),
                           decoration: BoxDecoration(
-                            color: employee.driverType == 'Internal'
-                                ? Colors.blue.withValues(alpha: 0.1)
-                                : Colors.orange.withValues(alpha: 0.1),
+                            color: employee.isExternal
+                                ? Colors.orange.withValues(alpha: 0.1)
+                                : Colors.blue.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8.r),
                             border: Border.all(
-                              color: employee.driverType == 'Internal'
-                                  ? Colors.blue
-                                  : Colors.orange,
+                              color: employee.isExternal
+                                  ? Colors.orange
+                                  : Colors.blue,
                             ),
                           ),
                           child: Text(
-                            employee.driverType!,
+                            employee.employmentType,
                             style: TextStyle(
                               fontSize: 12.sp,
                               fontWeight: FontWeight.bold,
-                              color: employee.driverType == 'Internal'
-                                  ? Colors.blue
-                                  : Colors.orange,
+                              color: employee.isExternal
+                                  ? Colors.orange
+                                  : Colors.blue,
                             ),
                           ),
                         ),
@@ -285,14 +307,14 @@ class EmployeeDetailsScreen extends StatelessWidget {
         padding: EdgeInsets.all(20.w),
         child: Column(
           children: [
-            if (employee.driverType != 'External')
+            if (!employee.isExternal)
               _buildDetailRow('Email', employee.email, Icons.email),
             _buildDetailRow('Phone', employee.phoneNumber, Icons.phone),
             _buildDetailRow('Nationality', employee.nationality, Icons.flag),
             _buildDetailRow('Gender', employee.gender, Icons.person),
-            _buildDetailRow('ID Type', employee.idType, Icons.badge),
-            _buildDetailRow('ID Number', employee.idNumber, Icons.numbers),
-            if (employee.driverType != 'External') ...[
+            if (!employee.isExternal) ...[
+              _buildDetailRow('ID Type', employee.idType, Icons.badge),
+              _buildDetailRow('ID Number', employee.idNumber, Icons.numbers),
               _buildDetailRow(
                 'Join Date',
                 _formatDate(employee.joinDate),
@@ -310,9 +332,58 @@ class EmployeeDetailsScreen extends StatelessWidget {
     );
   }
 
+  /// External drivers use their own car, so the details live on the employee
+  /// record rather than in the fleet.
+  Widget _buildExternalVehicleCard() {
+    final vehicle = employee.externalVehicle;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(height: 24.h),
+        _buildSectionHeader('Vehicle Details'),
+        Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(20.w),
+            child: vehicle == null || vehicle.isEmpty
+                ? Text(
+                    'No vehicle details recorded for this driver.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+                  )
+                : Column(
+                    children: [
+                      _buildDetailRow(
+                        'Vehicle',
+                        vehicle.vehicleDescription,
+                        Icons.directions_car,
+                      ),
+                      _buildDetailRow(
+                        'Vehicle Color',
+                        vehicle.vehicleColor,
+                        Icons.palette,
+                      ),
+                      _buildDetailRow(
+                        'Car Plate No',
+                        vehicle.plateNumber,
+                        Icons.confirmation_number,
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildAuthorizedVehiclesCard(BuildContext context) {
     final vehicles = context.watch<VehicleProvider>().vehicles;
-    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
+    final isSuperAdmin =
+        context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     final authorizedVehicles = vehicles.where((v) {
       if (v.tafweeds == null) return false;
       return v.tafweeds!.any((t) => t.driverId == employee.id);
@@ -417,8 +488,14 @@ class EmployeeDetailsScreen extends StatelessWidget {
                                     style: TextStyle(
                                       fontSize: 14.sp,
                                       fontWeight: FontWeight.bold,
-                                      color: employeeTafweed.expiryDate
-                                              .isBefore(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day))
+                                      color:
+                                          employeeTafweed.expiryDate.isBefore(
+                                            DateTime(
+                                              DateTime.now().year,
+                                              DateTime.now().month,
+                                              DateTime.now().day,
+                                            ),
+                                          )
                                           ? Colors.red
                                           : Colors.green,
                                     ),
@@ -486,7 +563,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
           await ActivityLogger.log(
             context,
             title: 'Tafweed Deleted',
-            message: 'Tafweed authorization for vehicle ${vehicle.plateNumber} has been removed from employee ${employee.fullName}.',
+            message:
+                'Tafweed authorization for vehicle ${vehicle.plateNumber} has been removed from employee ${employee.fullName}.',
             relatedId: employee.id,
           );
           AppSnackBar.showSuccess(context, 'Tafweed deleted successfully');
@@ -502,7 +580,8 @@ class EmployeeDetailsScreen extends StatelessWidget {
   Widget _buildContactCard(EmployeeContact contact) {
     final _now = DateTime.now();
     final today = DateTime(_now.year, _now.month, _now.day);
-    final bool isExpired = contact.rechargeExpiryDate != null &&
+    final bool isExpired =
+        contact.rechargeExpiryDate != null &&
         contact.rechargeExpiryDate!.isBefore(today);
     final bool isSwapped =
         contact.currentHolderId != null &&
@@ -747,7 +826,9 @@ class EmployeeDetailsScreen extends StatelessWidget {
     int? notificationDays,
   }) {
     final _now = DateTime.now();
-    final bool isExpired = expiryDate.isBefore(DateTime(_now.year, _now.month, _now.day));
+    final bool isExpired = expiryDate.isBefore(
+      DateTime(_now.year, _now.month, _now.day),
+    );
 
     return Card(
       elevation: 1,
@@ -931,19 +1012,21 @@ class EmployeeDetailsScreen extends StatelessWidget {
 
     for (final vehicle in vehicles) {
       // Active records for this driver.
-      final active = vehicle.tafweeds
-              ?.where((t) => t.driverId == employee.id) ??
-          [];
+      final active =
+          vehicle.tafweeds?.where((t) => t.driverId == employee.id) ?? [];
       for (final t in active) {
-        entries.add(_TafweedHistoryEntry(record: t, vehicle: vehicle, isActive: true));
+        entries.add(
+          _TafweedHistoryEntry(record: t, vehicle: vehicle, isActive: true),
+        );
       }
 
       // Historical (archived) records for this driver.
-      final history = vehicle.tafweedHistory
-              ?.where((t) => t.driverId == employee.id) ??
-          [];
+      final history =
+          vehicle.tafweedHistory?.where((t) => t.driverId == employee.id) ?? [];
       for (final t in history) {
-        entries.add(_TafweedHistoryEntry(record: t, vehicle: vehicle, isActive: false));
+        entries.add(
+          _TafweedHistoryEntry(record: t, vehicle: vehicle, isActive: false),
+        );
       }
     }
 
@@ -1033,10 +1116,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
       margin: EdgeInsets.only(bottom: 10.h),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12.r),
-        side: BorderSide(
-          color: statusColor.withValues(alpha: 0.35),
-          width: 1,
-        ),
+        side: BorderSide(color: statusColor.withValues(alpha: 0.35), width: 1),
       ),
       child: Padding(
         padding: EdgeInsets.all(16.w),

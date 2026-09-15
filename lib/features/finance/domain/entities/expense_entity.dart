@@ -106,6 +106,10 @@ class ExpenseEntity extends Equatable {
   final String? paidByUserId;
   final DateTime? paidAt;
 
+  /// Fund account balance after this expense was paid.
+  final double? balanceAfter;
+  final int? balanceAfterMinor;
+
   final String? voidedBy;
   final String? voidedByUserId;
   final DateTime? voidedAt;
@@ -153,6 +157,8 @@ class ExpenseEntity extends Equatable {
     this.paidBy,
     this.paidByUserId,
     this.paidAt,
+    this.balanceAfter,
+    this.balanceAfterMinor,
     this.voidedBy,
     this.voidedByUserId,
     this.voidedAt,
@@ -219,6 +225,8 @@ class ExpenseEntity extends Equatable {
     String? paidBy,
     String? paidByUserId,
     DateTime? paidAt,
+    double? balanceAfter,
+    int? balanceAfterMinor,
     String? voidedBy,
     String? voidedByUserId,
     DateTime? voidedAt,
@@ -291,6 +299,8 @@ class ExpenseEntity extends Equatable {
       paidBy: paidBy ?? this.paidBy,
       paidByUserId: paidByUserId ?? this.paidByUserId,
       paidAt: paidAt ?? this.paidAt,
+      balanceAfter: balanceAfter ?? this.balanceAfter,
+      balanceAfterMinor: balanceAfterMinor ?? this.balanceAfterMinor,
       voidedBy: voidedBy ?? this.voidedBy,
       voidedByUserId: voidedByUserId ?? this.voidedByUserId,
       voidedAt: voidedAt ?? this.voidedAt,
@@ -340,6 +350,8 @@ class ExpenseEntity extends Equatable {
         paidBy,
         paidByUserId,
         paidAt,
+        balanceAfter,
+        balanceAfterMinor,
         voidedBy,
         voidedByUserId,
         voidedAt,

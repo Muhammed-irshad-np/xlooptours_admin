@@ -10,6 +10,7 @@ import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/entities/ledger_day_totals.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
 import '../../domain/entities/post_fund_request.dart';
+import '../../domain/entities/session_expense_item.dart';
 import '../../domain/repositories/finance_repository.dart';
 import '../datasources/finance_remote_data_source.dart';
 import '../models/cash_advance_model.dart';
@@ -39,6 +40,11 @@ class FinanceRepositoryImpl implements FinanceRepository {
       pageSize: pageSize,
     );
     return (List<ExpenseEntity>.from(models), lastDoc);
+  }
+
+  @override
+  Future<List<ExpenseEntity>> getOutstandingExpenses() async {
+    return List.from(await remoteDataSource.getOutstandingExpenses());
   }
 
   @override
@@ -148,6 +154,10 @@ class FinanceRepositoryImpl implements FinanceRepository {
       remoteDataSource.deleteFundAccount(id);
 
   @override
+  Future<FundTransactionEntity?> getTransactionById(String id) =>
+      remoteDataSource.getTransactionById(id);
+
+  @override
   Future<List<FundTransactionEntity>> getTransactionsForAccount(
     String accountId,
   ) async {
@@ -222,17 +232,25 @@ class FinanceRepositoryImpl implements FinanceRepository {
     required String sessionId,
     required String verifiedBy,
     required String? verifiedByUserId,
+    String? resolutionNotes,
   }) {
     return remoteDataSource.verifyPettyCashSession(
       sessionId: sessionId,
       verifiedBy: verifiedBy,
       verifiedByUserId: verifiedByUserId,
+      resolutionNotes: resolutionNotes,
     );
   }
 
   @override
   Future<String> uploadClosingSheet(XFile file, String sessionId) =>
       remoteDataSource.uploadClosingSheet(file, sessionId);
+
+  @override
+  Future<List<SessionExpenseItem>> getSessionExpenses(
+    PettyCashSessionEntity session,
+  ) =>
+      remoteDataSource.getSessionExpenses(session);
 
   @override
   Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt}) =>

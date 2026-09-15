@@ -1,8 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/petty_cash_session_entity.dart';
+import 'package:xloop_invoice/features/finance/domain/entities/fund_transaction_entity.dart';
+import 'package:xloop_invoice/features/finance/domain/entities/session_expense_item.dart';
 import 'package:xloop_invoice/features/finance/domain/usecases/close_petty_cash_session_usecase.dart';
 import 'package:xloop_invoice/features/finance/domain/usecases/open_petty_cash_session_usecase.dart';
 import 'package:xloop_invoice/features/finance/domain/usecases/verify_petty_cash_session_usecase.dart';
+import 'package:xloop_invoice/features/finance/domain/usecases/get_session_expenses_usecase.dart';
 
 import 'test_finance_repository.dart';
 
@@ -158,6 +161,41 @@ void main() {
       );
       expect(session.expectedClosingBalance, closeTo(900, 0.01));
       expect(session.discrepancy, closeTo(-50, 0.01));
+    });
+  });
+
+  group('GetSessionExpensesUseCase', () {
+    test('returns session expense items from repository', () async {
+      final session = openSession();
+      final item = SessionExpenseItem(
+        id: 'tx-123',
+        transactionId: 'tx-123',
+        referenceNumber: 'EXP-001',
+        title: 'Fuel refuel for Van 1',
+        category: 'Fuel',
+        expenseType: 'Gasoline',
+        amount: 150.0,
+        bucket: FundBucket.cash,
+        date: DateTime(2025, 1, 15, 10, 30),
+        performedBy: 'Driver Bob',
+      );
+
+      repo.sessionExpensesResult = [item];
+      final useCase = GetSessionExpensesUseCase(repo);
+
+      final result = await useCase(session);
+      expect(result.length, 1);
+      expect(result.first.referenceNumber, 'EXP-001');
+      expect(result.first.amount, 150.0);
+      expect(result.first.bucket, FundBucket.cash);
+    });
+
+    test('propagates error when repository fails', () async {
+      final session = openSession();
+      repo.sessionExpensesError = Exception('Network error');
+      final useCase = GetSessionExpensesUseCase(repo);
+
+      expect(() => useCase(session), throwsA(isA<Exception>()));
     });
   });
 }
