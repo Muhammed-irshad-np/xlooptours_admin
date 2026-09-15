@@ -10,6 +10,7 @@ import '../entities/fund_transaction_entity.dart';
 import '../entities/ledger_day_totals.dart';
 import '../entities/petty_cash_session_entity.dart';
 import '../entities/post_fund_request.dart';
+import '../entities/salary_entity.dart';
 import '../entities/session_expense_item.dart';
 
 abstract class FinanceRepository {
@@ -127,6 +128,40 @@ abstract class FinanceRepository {
     required String reason,
     required String actorName,
     required String actorUserId,
+  });
+
+  Future<List<SalaryStructureEntity>> getSalaryStructures();
+  Future<SalaryStructureEntity> saveSalaryStructure(
+    SalaryStructureEntity structure,
+  );
+  Future<void> deleteSalaryStructure(String employeeId);
+
+  Future<List<SalaryPaymentEntity>> getSalaryPayments({String? period});
+
+  /// Creates a pending salary row for every active salary structure that has
+  /// no row for [period] yet. Safe to rerun.
+  Future<List<SalaryPaymentEntity>> generateSalaryRun({
+    required String period,
+    required String actorName,
+    String? actorUserId,
+  });
+
+  Future<SalaryPaymentEntity> saveSalaryPayment(SalaryPaymentEntity payment);
+
+  Future<SalaryPaymentEntity> paySalary({
+    required String paymentId,
+    required String fundAccountId,
+    required String actorName,
+    String? actorUserId,
+  });
+
+  Future<void> deleteSalaryPayment(String paymentId);
+
+  Future<SalaryPaymentEntity> voidSalaryPayment({
+    required String paymentId,
+    required String reason,
+    required String actorName,
+    String? actorUserId,
   });
 
   Future<FinancePolicyEntity> getFinancePolicy();

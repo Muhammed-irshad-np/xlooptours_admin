@@ -995,6 +995,20 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                 finProv, updated, 'Cash advance permission updated');
           },
         ),
+        _buildPermissionConfigCard(
+          title: 'Salary Management',
+          description:
+              'Authorized to put employees on the payroll, set monthly salaries, and pay them out of a fund account.',
+          icon: Icons.badge_outlined,
+          color: const Color(0xFF0EA5E9),
+          config: policy.salaryManagement,
+          allRoles: userMgmt.roles,
+          allUsers: userMgmt.users,
+          onSave: (newConfig) async {
+            final updated = policy.copyWith(salaryManagement: newConfig);
+            await _savePolicy(finProv, updated, 'Salary permission updated');
+          },
+        ),
       ],
     );
   }

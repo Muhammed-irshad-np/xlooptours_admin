@@ -114,6 +114,17 @@ service cloud.firestore {
       allow delete: if isFinance();
     }
 
+    match /salary_structures/{id} {
+      allow read: if isManagerOrAbove();
+      allow create, update, delete: if isFinance();
+    }
+
+    match /salary_payments/{id} {
+      allow read: if isManagerOrAbove();
+      allow create, update: if isFinance();
+      allow delete: if isFinance();
+    }
+
     match /finance_settings/{id} {
       allow read: if isAllowedUser();
       allow write: if isFinance();

@@ -11,6 +11,7 @@ import 'package:xloop_invoice/features/finance/domain/entities/fund_transaction_
 import 'package:xloop_invoice/features/finance/domain/entities/ledger_day_totals.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/petty_cash_session_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/post_fund_request.dart';
+import 'package:xloop_invoice/features/finance/domain/entities/salary_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/session_expense_item.dart';
 import 'package:xloop_invoice/features/finance/domain/repositories/finance_repository.dart';
 
@@ -113,6 +114,18 @@ class FakeFinanceRepository implements FinanceRepository {
     required String performedByUserId,
     FundBucket fromBucket = FundBucket.total,
     FundBucket toBucket = FundBucket.total,
+  }) async {
+    if (transferError != null) throw transferError!;
+  }
+
+  @override
+  Future<void> transferBucket({
+    required String fundAccountId,
+    required double amountMajor,
+    required FundBucket fromBucket,
+    required FundBucket toBucket,
+    required String performedBy,
+    required String? performedByUserId,
   }) async {
     if (transferError != null) throw transferError!;
   }
@@ -247,6 +260,135 @@ class FakeFinanceRepository implements FinanceRepository {
     required String actorName,
     required String actorUserId,
   }) async => throw UnimplementedError();
+
+  // --- Salaries ---
+  List<SalaryStructureEntity> salaryStructures = [];
+  List<SalaryPaymentEntity> salaryPayments = [];
+  SalaryPaymentEntity? paySalaryResult;
+  Object? salaryError;
+
+  /// Arguments of the last [paySalary] call, for assertions.
+  String? lastPaidSalaryId;
+  String? lastPaidFromAccountId;
+
+  @override
+  Future<List<SalaryStructureEntity>> getSalaryStructures() async {
+    if (salaryError != null) throw salaryError!;
+    return salaryStructures;
+  }
+
+  @override
+  Future<SalaryStructureEntity> saveSalaryStructure(
+    SalaryStructureEntity structure,
+  ) async {
+    if (salaryError != null) throw salaryError!;
+    salaryStructures = [
+      ...salaryStructures.where((s) => s.employeeId != structure.employeeId),
+      structure,
+    ];
+    return structure;
+  }
+
+  @override
+  Future<void> deleteSalaryStructure(String employeeId) async {
+    if (salaryError != null) throw salaryError!;
+    salaryStructures =
+        salaryStructures.where((s) => s.employeeId != employeeId).toList();
+  }
+
+  @override
+  Future<List<SalaryPaymentEntity>> getSalaryPayments({String? period}) async {
+    if (salaryError != null) throw salaryError!;
+    if (period == null) return salaryPayments;
+    return salaryPayments.where((p) => p.period == period).toList();
+  }
+
+  @override
+  Future<List<SalaryPaymentEntity>> generateSalaryRun({
+    required String period,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    if (salaryError != null) throw salaryError!;
+    final existing = salaryPayments
+        .where((p) => p.period == period)
+        .map((p) => p.employeeId)
+        .toSet();
+    for (final s in salaryStructures.where((s) => s.isActive)) {
+      if (existing.contains(s.employeeId)) continue;
+      salaryPayments = [
+        ...salaryPayments,
+        SalaryPaymentEntity(
+          id: SalaryPaymentEntity.buildId(period, s.employeeId),
+          period: period,
+          employeeId: s.employeeId,
+          employeeName: s.employeeName,
+          basicSalary: s.basicSalary,
+          allowances: s.allowances,
+          netAmount: SalaryPaymentEntity.computeNet(
+            basicSalary: s.basicSalary,
+            allowances: s.allowances,
+          ),
+          currency: s.currency,
+          createdAt: DateTime(2026),
+        ),
+      ];
+    }
+    return salaryPayments.where((p) => p.period == period).toList();
+  }
+
+  @override
+  Future<SalaryPaymentEntity> saveSalaryPayment(
+    SalaryPaymentEntity payment,
+  ) async {
+    if (salaryError != null) throw salaryError!;
+    salaryPayments = [
+      ...salaryPayments.where((p) => p.id != payment.id),
+      payment,
+    ];
+    return payment;
+  }
+
+  @override
+  Future<SalaryPaymentEntity> paySalary({
+    required String paymentId,
+    required String fundAccountId,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    if (salaryError != null) throw salaryError!;
+    lastPaidSalaryId = paymentId;
+    lastPaidFromAccountId = fundAccountId;
+    return paySalaryResult!;
+  }
+
+  @override
+  Future<void> deleteSalaryPayment(String paymentId) async {
+    if (salaryError != null) throw salaryError!;
+    salaryPayments = salaryPayments.where((p) => p.id != paymentId).toList();
+  }
+
+  @override
+  Future<SalaryPaymentEntity> voidSalaryPayment({
+    required String paymentId,
+    required String reason,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    if (salaryError != null) throw salaryError!;
+    final payment = salaryPayments.firstWhere((p) => p.id == paymentId);
+    final voided = payment.copyWith(
+      status: SalaryPaymentStatus.voided,
+      voidReason: reason,
+      voidedBy: actorName,
+      voidedAt: DateTime(2026),
+    );
+    salaryPayments = [
+      ...salaryPayments.where((p) => p.id != paymentId),
+      voided,
+    ];
+    return voided;
+  }
 
   @override
   Future<FinancePolicyEntity> getFinancePolicy() async {
