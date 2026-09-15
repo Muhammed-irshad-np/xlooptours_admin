@@ -133,6 +133,19 @@ class _FiltersBar extends StatelessWidget {
             ),
             SizedBox(width: 12.w),
 
+            // Expense type filter
+            _FilterDropdown<String>(
+              hint: 'Expense Type',
+              value: provider.typeFilter,
+              items: provider.availableExpenseTypes
+                  .map(
+                    (t) => DropdownMenuItem(value: t, child: Text(t)),
+                  )
+                  .toList(),
+              onChanged: (t) => provider.setTypeFilter(t),
+            ),
+            SizedBox(width: 12.w),
+
             // Fund account filter
             _FilterDropdown<String>(
               hint: 'Account',
@@ -147,6 +160,7 @@ class _FiltersBar extends StatelessWidget {
 
             if (provider.statusFilter != null ||
                 provider.categoryFilter != null ||
+                provider.typeFilter != null ||
                 provider.accountFilter != null ||
                 provider.searchQuery != null ||
                 provider.dateFrom != null) ...[
@@ -240,6 +254,9 @@ class _FilterDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasMatch = value != null && items.any((item) => item.value == value);
+    final effectiveValue = hasMatch ? value : null;
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12.w),
       decoration: BoxDecoration(
@@ -248,13 +265,13 @@ class _FilterDropdown<T> extends StatelessWidget {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<T>(
-          value: value,
+          value: effectiveValue,
           hint: Text(
             hint,
             style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textMuted),
           ),
-          items: items,
-          onChanged: onChanged,
+          items: items.isEmpty ? null : items,
+          onChanged: items.isEmpty ? null : onChanged,
           style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
           icon: Icon(
             Icons.keyboard_arrow_down_rounded,

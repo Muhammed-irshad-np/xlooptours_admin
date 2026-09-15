@@ -75,6 +75,7 @@ class FinanceProvider with ChangeNotifier {
 
   ExpenseStatus? _statusFilter;
   String? _categoryFilter;
+  String? _typeFilter;
   String? _accountFilter;
   String? _searchQuery;
   DateTime? _dateFrom;
@@ -93,6 +94,7 @@ class FinanceProvider with ChangeNotifier {
   bool get hasMore => _hasMore;
   ExpenseStatus? get statusFilter => _statusFilter;
   String? get categoryFilter => _categoryFilter;
+  String? get typeFilter => _typeFilter;
   String? get accountFilter => _accountFilter;
   String? get searchQuery => _searchQuery;
   DateTime? get dateFrom => _dateFrom;
@@ -107,6 +109,12 @@ class FinanceProvider with ChangeNotifier {
     if (_categoryFilter != null && _categoryFilter!.isNotEmpty) {
       result =
           result.where((e) => e.expenseCategory == _categoryFilter).toList();
+    }
+    if (_typeFilter != null && _typeFilter!.isNotEmpty) {
+      final tf = _typeFilter!.trim().toLowerCase();
+      result = result
+          .where((e) => e.expenseType.trim().toLowerCase() == tf)
+          .toList();
     }
     if (_accountFilter != null && _accountFilter!.isNotEmpty) {
       result =
@@ -477,6 +485,19 @@ class FinanceProvider with ChangeNotifier {
 
   void setCategoryFilter(String? category) {
     _categoryFilter = category;
+    if (_typeFilter != null && category != null && category.isNotEmpty) {
+      final available = availableExpenseTypes;
+      if (!available.any(
+        (t) => t.trim().toLowerCase() == _typeFilter!.trim().toLowerCase(),
+      )) {
+        _typeFilter = null;
+      }
+    }
+    notifyListeners();
+  }
+
+  void setTypeFilter(String? type) {
+    _typeFilter = type;
     notifyListeners();
   }
 
@@ -493,6 +514,7 @@ class FinanceProvider with ChangeNotifier {
   void clearFilters() {
     _statusFilter = null;
     _categoryFilter = null;
+    _typeFilter = null;
     _accountFilter = null;
     _searchQuery = null;
     _dateFrom = null;
@@ -584,6 +606,49 @@ class FinanceProvider with ChangeNotifier {
     );
     if (index == -1) return [];
     return _categories[index].expenseTypes.where((t) => t.isActive).toList();
+  }
+
+  /// Available expense types for filtering.
+  /// If a category filter is active, returns types under that category plus
+  /// any types found on existing expenses in that category.
+  /// If no category filter is active, returns all configured active types
+  /// across categories plus types found on existing expenses.
+  List<String> get availableExpenseTypes {
+    final types = <String>{};
+
+    if (_categoryFilter != null && _categoryFilter!.isNotEmpty) {
+      final categoryTypes = getTypesForCategory(_categoryFilter!);
+      for (final t in categoryTypes) {
+        final trimmed = t.name.trim();
+        if (trimmed.isNotEmpty) types.add(trimmed);
+      }
+      final catLower = _categoryFilter!.trim().toLowerCase();
+      for (final e in _expenses) {
+        if (e.expenseCategory.trim().toLowerCase() == catLower &&
+            e.expenseType.trim().isNotEmpty) {
+          types.add(e.expenseType.trim());
+        }
+      }
+    } else {
+      for (final cat in _categories) {
+        for (final t in cat.expenseTypes) {
+          final trimmed = t.name.trim();
+          if (t.isActive && trimmed.isNotEmpty) {
+            types.add(trimmed);
+          }
+        }
+      }
+      for (final e in _expenses) {
+        final trimmed = e.expenseType.trim();
+        if (trimmed.isNotEmpty) {
+          types.add(trimmed);
+        }
+      }
+    }
+
+    final list = types.toList();
+    list.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
   }
 
   Future<void> fetchFinancePolicy() async {
