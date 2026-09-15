@@ -154,6 +154,7 @@ import 'features/finance/domain/usecases/close_petty_cash_session_usecase.dart';
 import 'features/finance/domain/usecases/verify_petty_cash_session_usecase.dart';
 import 'features/finance/domain/usecases/upload_closing_sheet_usecase.dart';
 import 'features/finance/domain/usecases/get_session_expenses_usecase.dart';
+import 'features/finance/domain/usecases/transfer_bucket_usecase.dart';
 import 'features/finance/domain/usecases/get_expense_categories_usecase.dart';
 import 'features/finance/domain/usecases/insert_expense_category_usecase.dart';
 import 'features/finance/domain/usecases/update_expense_category_usecase.dart';
@@ -590,6 +591,7 @@ Future<void> init() async {
       verifyPettyCashSessionUseCase: sl(),
       uploadClosingSheetUseCase: sl(),
       getSessionExpensesUseCase: sl(),
+      transferBucketUseCase: sl(),
       financeRepository: sl(),
     ),
   );
@@ -642,6 +644,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => VerifyPettyCashSessionUseCase(sl()));
   sl.registerLazySingleton(() => UploadClosingSheetUseCase(sl()));
   sl.registerLazySingleton(() => GetSessionExpensesUseCase(sl()));
+  sl.registerLazySingleton(() => TransferBucketUseCase(sl()));
 
   // UseCases - Expense Categories
   sl.registerLazySingleton(() => GetExpenseCategoriesUseCase(sl()));

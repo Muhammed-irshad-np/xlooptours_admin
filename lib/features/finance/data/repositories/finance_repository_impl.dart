@@ -197,6 +197,25 @@ class FinanceRepositoryImpl implements FinanceRepository {
   }
 
   @override
+  Future<void> transferBucket({
+    required String fundAccountId,
+    required double amountMajor,
+    required FundBucket fromBucket,
+    required FundBucket toBucket,
+    required String performedBy,
+    required String? performedByUserId,
+  }) {
+    return remoteDataSource.transferBucket(
+      fundAccountId: fundAccountId,
+      amountMajor: amountMajor,
+      fromBucket: fromBucket,
+      toBucket: toBucket,
+      performedBy: performedBy,
+      performedByUserId: performedByUserId,
+    );
+  }
+
+  @override
   Future<List<PettyCashSessionEntity>> getPettyCashSessions(
     String accountId,
   ) async {

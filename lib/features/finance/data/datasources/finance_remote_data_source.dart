@@ -89,6 +89,17 @@ abstract class FinanceRemoteDataSource {
     FundBucket toBucket = FundBucket.total,
   });
 
+  /// Rebalances money between Cash and STC Pay buckets within the same
+  /// fund account (total balance unchanged).
+  Future<void> transferBucket({
+    required String fundAccountId,
+    required double amountMajor,
+    required FundBucket fromBucket,
+    required FundBucket toBucket,
+    required String performedBy,
+    required String? performedByUserId,
+  });
+
   // Petty cash + day lock
   Future<List<PettyCashSessionModel>> getPettyCashSessions(String accountId);
   Future<PettyCashSessionModel?> getOpenSession(String accountId);
@@ -1092,6 +1103,111 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         'stcPayBalance': toStc < 0 ? 0.0 : toStc,
       });
     });
+  }
+
+  // ─── Bucket rebalance ───────────────────────────────────────
+
+  @override
+  Future<void> transferBucket({
+    required String fundAccountId,
+    required double amountMajor,
+    required FundBucket fromBucket,
+    required FundBucket toBucket,
+    required String performedBy,
+    required String? performedByUserId,
+  }) async {
+    if (fromBucket == toBucket) {
+      throw ArgumentError('Source and destination buckets must differ');
+    }
+    if (amountMajor <= 0) {
+      throw ArgumentError('Amount must be positive');
+    }
+    final now = DateTime.now();
+    await _throwIfDayLocked(fundAccountId, now);
+
+    await firestore.runTransaction((txn) async {
+      final accountRef = _accounts.doc(fundAccountId);
+      final accSnap = await txn.get(accountRef);
+      if (!accSnap.exists || accSnap.data() == null) {
+        throw StateError('Fund account not found');
+      }
+      final account = FundAccountModel.fromJson(accSnap.data()!);
+      if (!account.isActive) {
+        throw StateError('Fund account is inactive');
+      }
+
+      final amountMinor = (amountMajor * 100).round();
+      final amount = amountMinor / 100.0;
+
+      double cash = account.cashBalance;
+      double stc = account.stcPayBalance;
+
+      // Deduct from source bucket
+      if (fromBucket == FundBucket.cash) {
+        if (cash + 1e-9 < amount) {
+          throw StateError('Insufficient Physical Cash balance');
+        }
+        cash -= amount;
+      } else if (fromBucket == FundBucket.stcPay) {
+        if (stc + 1e-9 < amount) {
+          throw StateError('Insufficient STC Pay balance');
+        }
+        stc -= amount;
+      }
+
+      // Credit to destination bucket
+      if (toBucket == FundBucket.cash) {
+        cash += amount;
+      } else if (toBucket == FundBucket.stcPay) {
+        stc += amount;
+      }
+
+      // Create an adjustment transaction for audit trail.
+      // Balance total stays the same so balanceBefore == balanceAfter.
+      final totalBalance = account.currentBalanceMinor / 100.0;
+      final txId = _uuid.v4();
+      final adjustTx = FundTransactionModel(
+        id: txId,
+        fundAccountId: fundAccountId,
+        type: FundTransactionType.adjustment,
+        amount: amount,
+        amountMinor: amountMinor,
+        currency: account.currency,
+        description:
+            'Bucket rebalance: ${fromBucket.displayName} → ${toBucket.displayName}',
+        performedBy: performedBy,
+        performedByUserId: performedByUserId,
+        date: now,
+        createdAt: now,
+        balanceBefore: totalBalance,
+        balanceAfter: totalBalance,
+        bucket: fromBucket,
+        auditNote:
+            'Intra-account bucket transfer: ${amount.toStringAsFixed(2)} ${account.currency}',
+      );
+
+      txn.set(_txs.doc(txId), adjustTx.toJson());
+
+      final cashMinor = ((cash < 0 ? 0.0 : cash) * 100).round();
+      final stcMinor = ((stc < 0 ? 0.0 : stc) * 100).round();
+      txn.update(accountRef, {
+        'cashBalanceMinor': cashMinor,
+        'stcPayBalanceMinor': stcMinor,
+        'cashBalance': cash < 0 ? 0.0 : cash,
+        'stcPayBalance': stc < 0 ? 0.0 : stc,
+        // currentBalanceMinor stays the same
+      });
+    });
+
+    await _writeAudit(
+      action: 'fund.bucket_transfer',
+      entityType: 'fund_account',
+      entityId: fundAccountId,
+      actorUserId: performedByUserId,
+      actorName: performedBy,
+      detail:
+          '${amountMajor.toStringAsFixed(2)} ${fromBucket.displayName} → ${toBucket.displayName}',
+    );
   }
 
   // ─── Petty cash ─────────────────────────────────────────────
