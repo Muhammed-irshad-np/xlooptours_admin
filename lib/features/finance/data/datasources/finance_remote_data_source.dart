@@ -24,6 +24,12 @@ import '../models/expense_category_model.dart';
 import '../../domain/entities/fund_account_type_entity.dart';
 import '../models/fund_account_type_model.dart';
 
+/// Category and type stamped on the `expenses` mirror of a salary payment.
+/// Matching the seeded EMPLOYEES category keeps payroll inside the normal
+/// expense reports and filters.
+const String salaryExpenseCategory = 'EMPLOYEES';
+const String salaryExpenseType = 'Salary';
+
 abstract class FinanceRemoteDataSource {
   // Expenses
   Future<List<ExpenseModel>> getAllExpenses();
@@ -166,11 +172,18 @@ abstract class FinanceRemoteDataSource {
   Future<SalaryPaymentModel> saveSalaryPayment(SalaryPaymentModel payment);
 
   /// Posts the net salary out of [fundAccountId] and marks the row paid.
+  ///
+  /// Enforces the same wallet rules as an expense payment (day locks, an open
+  /// petty cash session, per-bucket balances), recovers any [advanceRecoveries]
+  /// against the employee's cash advances, and mirrors the payment into the
+  /// `expenses` collection so payroll appears in expense reports.
   Future<SalaryPaymentModel> paySalary({
     required String paymentId,
     required String fundAccountId,
     required String actorName,
     String? actorUserId,
+    String paymentMethod = 'cash',
+    Map<String, double> advanceRecoveries = const {},
   });
 
   Future<void> deleteSalaryPayment(String paymentId);
@@ -713,6 +726,16 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       if (expense.status == ExpenseStatus.voided) return expense;
       if (!expense.status.canVoid) {
         throw StateError('Only paid expenses can be voided');
+      }
+      // Payroll mirrors are owned by the salary record — voiding here alone
+      // would refund the wallet while the salary still reads as paid.
+      if (expense.salaryPaymentId != null &&
+          expense.salaryPaymentId!.isNotEmpty) {
+        throw StateError(
+          'This is a salary payment. Void it from the Salaries tab so the '
+          'payroll record, the wallet and any advance recovery all reverse '
+          'together.',
+        );
       }
 
       final now = DateTime.now();
@@ -2052,6 +2075,8 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     required String fundAccountId,
     required String actorName,
     String? actorUserId,
+    String paymentMethod = 'cash',
+    Map<String, double> advanceRecoveries = const {},
   }) async {
     final snap = await _salaryPayments.doc(paymentId).get();
     if (!snap.exists || snap.data() == null) {
@@ -2063,15 +2088,15 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         'Salary is already ${payment.status.displayName.toLowerCase()}',
       );
     }
-    if (payment.netAmount <= 0) {
-      throw StateError('Net salary must be greater than zero');
-    }
 
     final accSnap = await _accounts.doc(fundAccountId).get();
     if (!accSnap.exists || accSnap.data() == null) {
       throw StateError('Fund account not found');
     }
     final account = FundAccountModel.fromJson(accSnap.data()!);
+    if (!account.isActive) {
+      throw StateError('Fund account is inactive');
+    }
     if (account.currency != payment.currency) {
       throw StateError(
         'Account currency ${account.currency} does not match salary currency '
@@ -2079,32 +2104,191 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       );
     }
 
-    final tx = await postFundMovement(
-      PostFundRequest(
-        fundAccountId: fundAccountId,
-        type: FundTransactionType.withdrawal,
-        amountMajor: payment.netAmount,
-        currency: payment.currency,
-        description:
-            'Salary ${payment.period} — ${payment.employeeName}',
-        performedBy: actorName,
-        performedByUserId: actorUserId,
-        bucket: FundBucket.total,
-        credit: false,
-        auditNote: 'salary:${payment.id}',
-      ),
-    );
-
     final now = DateTime.now();
+
+    // ── Petty cash rules ───────────────────────────────────────
+    // Same gates an expense payment goes through: the day must not be locked
+    // by a verified session, and a petty cash wallet must have a session open.
+    await _throwIfDayLocked(fundAccountId, now);
+    if (account.isPettyCash) {
+      final openSession = await getOpenSession(account.id);
+      if (openSession == null) {
+        throw StateError(
+          'Cannot pay salary from Petty Cash account "${account.name}" because '
+          'no petty cash session is currently open. Open today\'s session in '
+          'the Petty Cash tab first.',
+        );
+      }
+    }
+
+    // ── Advance recovery ───────────────────────────────────────
+    // Validate every advance before any money moves, so a bad entry cannot
+    // leave a half-applied payment behind.
+    final recoveries = <String, double>{};
+    var totalRecovery = 0.0;
+    for (final entry in advanceRecoveries.entries) {
+      final amount = (entry.value * 100).round() / 100.0;
+      if (amount <= 0) continue;
+      final advSnap = await _advances.doc(entry.key).get();
+      if (!advSnap.exists || advSnap.data() == null) {
+        throw StateError('Cash advance ${entry.key} not found');
+      }
+      final advance = CashAdvanceModel.fromJson(advSnap.data()!);
+      if (advance.employeeId != payment.employeeId) {
+        throw StateError(
+          'Advance ${advance.id} belongs to ${advance.employeeName}, '
+          'not ${payment.employeeName}',
+        );
+      }
+      if (!advance.isOpen) {
+        throw StateError(
+          'Advance for ${advance.employeeName} is already '
+          '${advance.status.displayName.toLowerCase()}',
+        );
+      }
+      if (amount > advance.outstanding + 1e-9) {
+        throw StateError(
+          'Recovery ${amount.toStringAsFixed(2)} exceeds the outstanding '
+          '${advance.outstanding.toStringAsFixed(2)} on this advance',
+        );
+      }
+      recoveries[entry.key] = amount;
+      totalRecovery += amount;
+    }
+
+    // Net is always recomputed here — never trusted from the UI.
+    final net = SalaryPaymentEntity.computeNet(
+      basicSalary: payment.basicSalary,
+      allowances: payment.allowances,
+      deductions: payment.deductions,
+      advanceRecovery: totalRecovery,
+    );
+    if (net <= 0 && totalRecovery <= 0) {
+      throw StateError('Net salary must be greater than zero');
+    }
+    if (payment.grossSalary - payment.deductions - totalRecovery < -1e-9) {
+      throw StateError('Deductions and advance recovery exceed gross pay');
+    }
+
+    final netMinor = (net * 100).round();
+    FundTransactionModel? tx;
+    String? expenseId;
+
+    // Net can legitimately be zero when the whole salary goes to repaying an
+    // advance — then no cash moves and there is nothing to post.
+    if (netMinor > 0) {
+      final bucket = _resolvePaymentBucket(
+        paymentMethod: paymentMethod,
+        cashBalance: account.cashBalance,
+        stcPayBalance: account.stcPayBalance,
+      );
+      if (account.currentBalanceMinor - netMinor < 0) {
+        throw StateError(
+          'Insufficient fund balance '
+          '(have ${account.currentBalance.toStringAsFixed(2)}, '
+          'need ${net.toStringAsFixed(2)} ${payment.currency})',
+        );
+      }
+      if (bucket == FundBucket.cash && account.cashBalance + 1e-9 < net) {
+        throw StateError(
+          'Insufficient cash balance '
+          '(have ${account.cashBalance.toStringAsFixed(2)}, '
+          'need ${net.toStringAsFixed(2)}). '
+          'Deposit cash into this wallet first, or pay by STC Pay.',
+        );
+      }
+      if (bucket == FundBucket.stcPay && account.stcPayBalance + 1e-9 < net) {
+        throw StateError(
+          'Insufficient STC Pay balance '
+          '(have ${account.stcPayBalance.toStringAsFixed(2)}, '
+          'need ${net.toStringAsFixed(2)}). '
+          'Top up STC Pay first, or pay in cash.',
+        );
+      }
+
+      tx = await postFundMovement(
+        PostFundRequest(
+          fundAccountId: fundAccountId,
+          type: FundTransactionType.expensePayment,
+          amountMajor: net,
+          currency: payment.currency,
+          description: _salaryLabel(payment),
+          performedBy: actorName,
+          performedByUserId: actorUserId,
+          bucket: bucket,
+          credit: false,
+          date: now,
+          auditNote: 'salary:${payment.id}',
+        ),
+      );
+
+      // Mirror the salary into `expenses` so payroll shows up in the expense
+      // list, category reports and petty cash session sheets. The shared
+      // ledgerEntryId is what stops it being counted twice.
+      expenseId = _uuid.v4();
+      final expense = ExpenseModel(
+        id: expenseId,
+        referenceNumber: await generateReferenceNumber(),
+        date: now,
+        createdAt: now,
+        submittedBy: actorName,
+        submittedByRole: 'ADMIN',
+        submittedByUserId: actorUserId,
+        expenseCategory: salaryExpenseCategory,
+        expenseType: salaryExpenseType,
+        description: _salaryLabel(payment),
+        paymentMethod: paymentMethod,
+        amount: net,
+        currency: payment.currency,
+        amountMinor: netMinor,
+        fundAccountId: fundAccountId,
+        fundAccountName: account.name,
+        status: ExpenseStatus.paid,
+        employeeId: payment.employeeId,
+        employeeName: payment.employeeName,
+        approvedBy: actorName,
+        approvedByUserId: actorUserId,
+        approvedAt: now,
+        ledgerEntryId: tx.id,
+        paidBy: actorName,
+        paidByUserId: actorUserId,
+        paidAt: now,
+        balanceAfter: tx.balanceAfter,
+        balanceAfterMinor: (tx.balanceAfter * 100).round(),
+        notes: _salaryBreakdownNote(payment, totalRecovery),
+        salaryPaymentId: payment.id,
+      );
+      await _expenses.doc(expenseId).set(_stripNulls(expense.toJson()));
+    }
+
+    // Settle the advances only after the money side succeeded.
+    for (final entry in recoveries.entries) {
+      await settleCashAdvance(
+        advanceId: entry.key,
+        settleAmountMajor: entry.value,
+        actorName: actorName,
+        actorUserId: actorUserId ?? '',
+        // The cash never left the fund — it was withheld from this salary —
+        // so no deposit is posted back.
+        returnToFund: false,
+      );
+    }
+
     final updated = SalaryPaymentModel.fromEntity(
       payment.copyWith(
         status: SalaryPaymentStatus.paid,
+        advanceRecovery: totalRecovery,
+        advanceRecoveries: recoveries,
+        netAmount: net,
+        netAmountMinor: netMinor,
         fundAccountId: fundAccountId,
         fundAccountName: account.name,
+        paymentMethod: paymentMethod,
+        expenseId: expenseId,
         paidAt: now,
         paidBy: actorName,
         paidByUserId: actorUserId,
-        ledgerEntryId: tx.id,
+        ledgerEntryId: tx?.id,
       ),
     );
     await _salaryPayments.doc(paymentId).set(
@@ -2118,7 +2302,8 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       actorUserId: actorUserId,
       actorName: actorName,
       detail:
-          '${payment.employeeName} ${payment.netAmount} ${payment.currency} from ${account.name}',
+          '${payment.employeeName} net=$net ${payment.currency} '
+          'advanceRecovery=$totalRecovery from ${account.name} ($paymentMethod)',
     );
     return updated;
   }
@@ -2143,31 +2328,71 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       throw StateError('Only paid salaries can be voided');
     }
 
+    final now = DateTime.now();
     String? reverseId;
-    if (payment.fundAccountId != null && payment.fundAccountId!.isNotEmpty) {
+
+    if (payment.ledgerEntryId != null &&
+        payment.fundAccountId != null &&
+        payment.fundAccountId!.isNotEmpty &&
+        payment.netAmount > 0) {
       final tx = await postFundMovement(
         PostFundRequest(
           fundAccountId: payment.fundAccountId!,
           type: FundTransactionType.reversal,
           amountMajor: payment.netAmount,
           currency: payment.currency,
-          description:
-              'Void salary ${payment.period} — ${payment.employeeName}: $trimmed',
+          description: 'Void ${_salaryLabel(payment)}: $trimmed',
           performedBy: actorName,
           performedByUserId: actorUserId,
           reversesTransactionId: payment.ledgerEntryId,
-          bucket: FundBucket.total,
+          bucket: _bucketFromPaymentMethod(payment.paymentMethod),
           credit: true,
+          date: now,
           auditNote: 'salary_void:${payment.id}',
         ),
       );
       reverseId = tx.id;
     }
 
+    // Put any recovered amounts back on the advances they came off.
+    for (final entry in payment.advanceRecoveries.entries) {
+      final advSnap = await _advances.doc(entry.key).get();
+      if (!advSnap.exists || advSnap.data() == null) continue;
+      final advance = CashAdvanceModel.fromJson(advSnap.data()!);
+      final restored = advance.settledAmount - entry.value;
+      final newSettled = restored < 0 ? 0.0 : restored;
+      final newStatus = newSettled <= 1e-9
+          ? CashAdvanceStatus.open
+          : (newSettled + 1e-9 >= advance.amount
+              ? CashAdvanceStatus.settled
+              : CashAdvanceStatus.partiallySettled);
+      await _advances.doc(entry.key).update({
+        'settledAmount': newSettled,
+        'status': newStatus.name,
+        if (newStatus != CashAdvanceStatus.settled)
+          'settledAt': FieldValue.delete(),
+      });
+    }
+
+    // Void the mirrored expense so the expense list agrees with payroll.
+    if (payment.expenseId != null && payment.expenseId!.isNotEmpty) {
+      await _expenses.doc(payment.expenseId!).set(
+        _stripNulls({
+          'status': ExpenseStatus.voided.name,
+          'voidedBy': actorName,
+          'voidedByUserId': actorUserId,
+          'voidedAt': now.toIso8601String(),
+          'voidReason': trimmed,
+          'reverseLedgerEntryId': reverseId,
+        }),
+        SetOptions(merge: true),
+      );
+    }
+
     final updated = SalaryPaymentModel.fromEntity(
       payment.copyWith(
         status: SalaryPaymentStatus.voided,
-        voidedAt: DateTime.now(),
+        voidedAt: now,
         voidedBy: actorName,
         voidReason: trimmed,
         reverseLedgerEntryId: reverseId,
@@ -2186,6 +2411,44 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       detail: '${payment.employeeName} reason=$trimmed',
     );
     return updated;
+  }
+
+  static const _monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  /// "Salary Sep 2026 — Ahmed Ali", falling back to the raw period.
+  String _salaryLabel(SalaryPaymentEntity payment) {
+    final parts = payment.period.split('-');
+    if (parts.length == 2) {
+      final month = int.tryParse(parts[1]);
+      if (month != null && month >= 1 && month <= 12) {
+        return 'Salary ${_monthNames[month - 1]} ${parts[0]} — '
+            '${payment.employeeName}';
+      }
+    }
+    return 'Salary ${payment.period} — ${payment.employeeName}';
+  }
+
+  String _salaryBreakdownNote(
+    SalaryPaymentEntity payment,
+    double advanceRecovery,
+  ) {
+    final parts = <String>[
+      'Basic ${payment.basicSalary.toStringAsFixed(2)}',
+      'Allowances ${payment.allowances.toStringAsFixed(2)}',
+    ];
+    if (payment.deductions > 0) {
+      parts.add(
+        'Deductions -${payment.deductions.toStringAsFixed(2)}'
+        '${payment.deductionNote != null ? ' (${payment.deductionNote})' : ''}',
+      );
+    }
+    if (advanceRecovery > 0) {
+      parts.add('Advance recovery -${advanceRecovery.toStringAsFixed(2)}');
+    }
+    return parts.join(' · ');
   }
 
   // ─── Policy (with 5-minute memory cache) ───────────────────

@@ -48,6 +48,7 @@ class ExpenseModel extends ExpenseEntity {
     super.voidReason,
     super.reverseLedgerEntryId,
     super.notes,
+    super.salaryPaymentId,
   });
 
   Map<String, dynamic> toJson() {
@@ -98,6 +99,7 @@ class ExpenseModel extends ExpenseEntity {
       'voidReason': voidReason,
       'reverseLedgerEntryId': reverseLedgerEntryId,
       'notes': notes,
+      'salaryPaymentId': salaryPaymentId,
     };
   }
 
@@ -154,6 +156,7 @@ class ExpenseModel extends ExpenseEntity {
       voidReason: json['voidReason'] as String?,
       reverseLedgerEntryId: json['reverseLedgerEntryId'] as String?,
       notes: json['notes'] as String?,
+      salaryPaymentId: json['salaryPaymentId'] as String?,
     );
   }
 
@@ -218,6 +221,7 @@ class ExpenseModel extends ExpenseEntity {
       voidReason: entity.voidReason,
       reverseLedgerEntryId: entity.reverseLedgerEntryId,
       notes: entity.notes,
+      salaryPaymentId: entity.salaryPaymentId,
     );
   }
 

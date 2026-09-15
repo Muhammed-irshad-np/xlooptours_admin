@@ -182,6 +182,8 @@ class SalaryProvider with ChangeNotifier {
     required String fundAccountId,
     required String actorName,
     String? actorUserId,
+    String paymentMethod = 'cash',
+    Map<String, double> advanceRecoveries = const {},
   }) async {
     _error = null;
     try {
@@ -190,6 +192,8 @@ class SalaryProvider with ChangeNotifier {
         fundAccountId: fundAccountId,
         actorName: actorName,
         actorUserId: actorUserId,
+        paymentMethod: paymentMethod,
+        advanceRecoveries: advanceRecoveries,
       );
       _upsert(updated);
       notifyListeners();

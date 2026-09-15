@@ -7,10 +7,12 @@ import 'package:provider/provider.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../employee/domain/entities/employee_entity.dart';
 import '../../../employee/presentation/providers/employee_provider.dart';
+import '../../domain/entities/cash_advance_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../../domain/entities/salary_entity.dart';
 import '../../domain/services/finance_export_service.dart';
 import '../../domain/services/finance_permission_service.dart';
+import '../providers/cash_advance_provider.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../providers/salary_provider.dart';
@@ -34,12 +36,14 @@ class _PayrollRow {
     this.payment,
   });
 
-  /// No salary row generated for the selected month yet.
-  bool get isNotGenerated => payment == null;
-
   double get basic => payment?.basicSalary ?? structure?.basicSalary ?? 0;
   double get allowances => payment?.allowances ?? structure?.allowances ?? 0;
   double get deductions => payment?.deductions ?? 0;
+  double get advanceRecovery => payment?.advanceRecovery ?? 0;
+
+  /// Everything held back from gross pay: manual deductions plus any amount
+  /// recovered against outstanding advances.
+  double get withheld => deductions + advanceRecovery;
   double get net =>
       payment?.netAmount ??
       SalaryPaymentEntity.computeNet(
@@ -49,8 +53,8 @@ class _PayrollRow {
   String get currency => payment?.currency ?? structure?.currency ?? 'SAR';
 }
 
-/// Monthly staff payroll: set a salary per employee, generate the month, and
-/// pay each salary out of a fund account.
+/// Monthly staff payroll: set a salary per employee, then pay each one out of
+/// a fund account for the selected month.
 class SalariesPage extends StatefulWidget {
   const SalariesPage({super.key});
 
@@ -69,6 +73,8 @@ class _SalariesPageState extends State<SalariesPage> {
       context.read<SalaryProvider>().load();
       context.read<EmployeeProvider>().fetchAllEmployees();
       context.read<FundAccountProvider>().fetchAllAccounts();
+      // Needed to offer advance recovery when paying a salary.
+      context.read<CashAdvanceProvider>().load();
     });
   }
 
@@ -137,16 +143,15 @@ class _SalariesPageState extends State<SalariesPage> {
   List<_PayrollRow> _filterRows(List<_PayrollRow> rows) {
     return rows.where((r) {
       final status = r.payment?.status;
-      if (_statusFilter == 'PENDING' && status != SalaryPaymentStatus.pending) {
-        return false;
-      }
+      // No payment row yet counts as pending — it hasn't been paid.
+      final isPending = status == null || status == SalaryPaymentStatus.pending;
+      if (_statusFilter == 'PENDING' && !isPending) return false;
       if (_statusFilter == 'PAID' && status != SalaryPaymentStatus.paid) {
         return false;
       }
       if (_statusFilter == 'VOIDED' && status != SalaryPaymentStatus.voided) {
         return false;
       }
-      if (_statusFilter == 'NOT_GENERATED' && !r.isNotGenerated) return false;
 
       final q = _searchCtrl.text.trim().toLowerCase();
       if (q.isNotEmpty) {
@@ -347,12 +352,6 @@ class _SalariesPageState extends State<SalariesPage> {
               ),
             ),
           ),
-          SizedBox(width: 8.w),
-          finDialogActionButton(
-            onPressed: () => _generateMonth(context, provider),
-            label: 'Generate Month',
-            icon: Icons.playlist_add_check_rounded,
-          ),
         ],
       ),
     );
@@ -363,7 +362,13 @@ class _SalariesPageState extends State<SalariesPage> {
     List<_PayrollRow> rows,
     NumberFormat fmt,
   ) {
-    final notGenerated = rows.where((r) => r.isNotGenerated).length;
+    // "Pending" is computed live from the payroll list, not from generated
+    // rows — an employee who hasn't been paid yet this month counts as
+    // pending whether or not a salary_payments row exists for them.
+    final unpaidRows = rows
+        .where((r) => r.payment?.status != SalaryPaymentStatus.paid)
+        .toList();
+    final totalPending = unpaidRows.fold(0.0, (sum, r) => sum + r.net);
     final currency = rows.isEmpty ? 'SAR' : rows.first.currency;
 
     return SizedBox(
@@ -394,20 +399,10 @@ class _SalariesPageState extends State<SalariesPage> {
           Expanded(
             child: _buildKpiCard(
               title: 'Pending',
-              value: fmt.format(provider.totalPending),
-              subtitle: '${provider.pendingPayments.length} awaiting payment',
+              value: fmt.format(totalPending),
+              subtitle: '${unpaidRows.length} awaiting payment',
               icon: Icons.schedule_outlined,
               color: FinDT.warning,
-            ),
-          ),
-          SizedBox(width: 12.w),
-          Expanded(
-            child: _buildKpiCard(
-              title: 'Not Generated',
-              value: '$notGenerated',
-              subtitle: 'no salary row for this month',
-              icon: Icons.pending_actions_outlined,
-              color: FinDT.textSecondary,
             ),
           ),
         ],
@@ -492,6 +487,12 @@ class _SalariesPageState extends State<SalariesPage> {
   Widget _buildFilterBar(List<_PayrollRow> rows) {
     int countOf(SalaryPaymentStatus status) =>
         rows.where((r) => r.payment?.status == status).length;
+    // No payment row yet also counts as pending.
+    final pendingCount = rows
+        .where((r) =>
+            r.payment == null ||
+            r.payment!.status == SalaryPaymentStatus.pending)
+        .length;
 
     return Container(
       padding: EdgeInsets.all(12.w),
@@ -525,7 +526,7 @@ class _SalariesPageState extends State<SalariesPage> {
                   SizedBox(width: 8.w),
                   _buildStatusPill(
                     label: 'Pending',
-                    count: countOf(SalaryPaymentStatus.pending),
+                    count: pendingCount,
                     value: 'PENDING',
                     color: FinDT.warning,
                   ),
@@ -542,13 +543,6 @@ class _SalariesPageState extends State<SalariesPage> {
                     count: countOf(SalaryPaymentStatus.voided),
                     value: 'VOIDED',
                     color: FinDT.danger,
-                  ),
-                  SizedBox(width: 8.w),
-                  _buildStatusPill(
-                    label: 'Not generated',
-                    count: rows.where((r) => r.isNotGenerated).length,
-                    value: 'NOT_GENERATED',
-                    color: FinDT.textSecondary,
                   ),
                 ],
               ),
@@ -657,14 +651,13 @@ class _SalariesPageState extends State<SalariesPage> {
   ) {
     final payment = row.payment;
     final status = payment?.status;
-    final statusColor = status == null
-        ? FinDT.textMuted
-        : switch (status) {
-            SalaryPaymentStatus.pending => FinDT.warning,
-            SalaryPaymentStatus.paid => FinDT.success,
-            SalaryPaymentStatus.voided => FinDT.danger,
-          };
-    final statusLabel = status?.displayName ?? 'Not generated';
+    // No payment row yet reads the same as pending — it just hasn't been paid.
+    final statusColor = switch (status) {
+      null || SalaryPaymentStatus.pending => FinDT.warning,
+      SalaryPaymentStatus.paid => FinDT.success,
+      SalaryPaymentStatus.voided => FinDT.danger,
+    };
+    final statusLabel = status?.displayName ?? 'Pending';
 
     return Container(
       padding: EdgeInsets.all(14.w),
@@ -727,10 +720,13 @@ class _SalariesPageState extends State<SalariesPage> {
           Expanded(
             flex: 2,
             child: _amountCell(
-              'Deductions',
-              fmt.format(row.deductions),
+              'Withheld',
+              fmt.format(row.withheld),
               row.currency,
-              color: row.deductions > 0 ? FinDT.danger : null,
+              color: row.withheld > 0 ? FinDT.danger : null,
+              note: row.advanceRecovery > 0
+                  ? 'incl. ${fmt.format(row.advanceRecovery)} advance'
+                  : null,
             ),
           ),
           Expanded(
@@ -789,6 +785,7 @@ class _SalariesPageState extends State<SalariesPage> {
     String currency, {
     bool emphasize = false,
     Color? color,
+    String? note,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -806,6 +803,11 @@ class _SalariesPageState extends State<SalariesPage> {
             color: color ?? FinDT.textPrimary,
           ),
         ),
+        if (note != null)
+          Text(
+            note,
+            style: GoogleFonts.inter(fontSize: 9.sp, color: FinDT.warning),
+          ),
       ],
     );
   }
@@ -879,54 +881,6 @@ class _SalariesPageState extends State<SalariesPage> {
   }
 
   // ─── Actions ────────────────────────────────────────────────
-
-  Future<void> _generateMonth(
-    BuildContext context,
-    SalaryProvider provider,
-  ) async {
-    if (!_guardPermission(context)) return;
-    if (provider.activeStructures.isEmpty) {
-      _snack(
-        context,
-        'No one is on the payroll yet. Add an employee salary first.',
-        FinDT.danger,
-      );
-      return;
-    }
-
-    final monthLabel = DateFormat('MMMM y').format(provider.periodDate);
-    final confirmed = await showFinConfirmationDialog(
-      context: context,
-      title: 'Generate $monthLabel Payroll',
-      icon: Icons.playlist_add_check_rounded,
-      message:
-          'This creates a pending salary row for every employee on the payroll '
-          'who does not already have one for $monthLabel. No money moves until '
-          'each salary is paid.',
-      confirmLabel: 'Generate',
-    );
-    if (confirmed != true || !context.mounted) return;
-
-    final user = context.read<AuthProvider>().user;
-    try {
-      final created = await provider.generateRun(
-        actorName: user?.actorLabel ?? 'Admin',
-        actorUserId: user?.id,
-      );
-      if (!context.mounted) return;
-      _snack(
-        context,
-        created == 0
-            ? '$monthLabel payroll is already generated.'
-            : '$created salary row(s) generated for $monthLabel.',
-        created == 0 ? FinDT.textSecondary : FinDT.success,
-      );
-    } catch (e) {
-      if (context.mounted) {
-        _snack(context, 'Failed to generate payroll: $e', FinDT.danger);
-      }
-    }
-  }
 
   Future<void> _deletePendingPayment(
     BuildContext context,
@@ -1254,7 +1208,8 @@ class _SalariesPageState extends State<SalariesPage> {
     );
   }
 
-  /// Pay one salary: pick the account, optionally deduct, then post the money.
+  /// Pay one salary: pick the account and bucket, optionally deduct and
+  /// recover outstanding advances, then post the money.
   Future<void> _showPayDialog(
     BuildContext context,
     SalaryProvider provider,
@@ -1274,17 +1229,29 @@ class _SalariesPageState extends State<SalariesPage> {
       return;
     }
 
+    // Outstanding advances this employee still owes back.
+    final openAdvances = context
+        .read<CashAdvanceProvider>()
+        .advances
+        .where((a) => a.employeeId == row.employeeId && a.isOpen)
+        .toList()
+      ..sort((a, b) => a.issuedAt.compareTo(b.issuedAt));
+    final totalOutstanding =
+        SalaryPaymentEntity.totalOutstanding(openAdvances);
+
     final formKey = GlobalKey<FormState>();
     final deductionCtrl = TextEditingController(
       text: row.deductions > 0 ? row.deductions.toStringAsFixed(2) : '',
     );
     final deductionNoteCtrl =
         TextEditingController(text: row.payment?.deductionNote ?? '');
+    final recoveryCtrl = TextEditingController();
 
     String accountId = row.payment?.fundAccountId ??
         row.structure?.defaultFundAccountId ??
         accounts.first.id;
     if (accounts.every((a) => a.id != accountId)) accountId = accounts.first.id;
+    String paymentMethod = row.payment?.paymentMethod ?? 'cash';
     bool isPaying = false;
 
     final fmt = NumberFormat('#,##0.00');
@@ -1299,12 +1266,47 @@ class _SalariesPageState extends State<SalariesPage> {
             (a) => a.id == accountId,
             orElse: () => accounts.first,
           );
+          // Petty cash wallets track physical cash and STC Pay separately, so
+          // the payer has to say which one the salary came out of.
+          final usesBuckets = account.isPettyCash ||
+              account.cashBalance > 0 ||
+              account.stcPayBalance > 0;
+          final effectiveMethod = usesBuckets ? paymentMethod : 'bank';
+
           final deduction = double.tryParse(deductionCtrl.text.trim()) ?? 0;
+          final requestedRecovery =
+              double.tryParse(recoveryCtrl.text.trim()) ?? 0;
+          final gross = row.basic + row.allowances;
+          // Never recover more than is owed, nor more than what is left after
+          // manual deductions.
+          final maxRecovery = [
+            totalOutstanding,
+            gross - deduction,
+          ].reduce((a, b) => a < b ? a : b);
+          final recovery = requestedRecovery <= 0
+              ? 0.0
+              : (requestedRecovery > maxRecovery ? maxRecovery : requestedRecovery);
           final net = SalaryPaymentEntity.computeNet(
             basicSalary: row.basic,
             allowances: row.allowances,
             deductions: deduction,
+            advanceRecovery: recovery,
           );
+          // Mirrors the server's bucket resolution: a wallet whose cash and
+          // STC buckets are both empty is spent from the total balance, so
+          // validating against an empty bucket would block it wrongly.
+          final usesSplitBalances =
+              account.cashBalance > 0 || account.stcPayBalance > 0;
+          final bucketBalance = !usesSplitBalances
+              ? account.currentBalance
+              : switch (effectiveMethod) {
+                  'cash' => account.cashBalance,
+                  'stcPay' => account.stcPayBalance,
+                  _ => account.currentBalance,
+                };
+          final balanceLabel = usesSplitBalances
+              ? _methodLabel(effectiveMethod)
+              : 'Account';
 
           return AlertDialog(
             backgroundColor: Colors.white,
@@ -1315,7 +1317,7 @@ class _SalariesPageState extends State<SalariesPage> {
               icon: Icons.payments_outlined,
             ),
             content: SizedBox(
-              width: 420.w,
+              width: 460.w,
               child: SingleChildScrollView(
                 child: Form(
                   key: formKey,
@@ -1356,6 +1358,26 @@ class _SalariesPageState extends State<SalariesPage> {
                             ? null
                             : (v) => setInner(() => accountId = v!),
                       ),
+                      if (usesBuckets) ...[
+                        SizedBox(height: 14.h),
+                        _buildMethodSelector(
+                          selected: effectiveMethod,
+                          account: account,
+                          fmt: fmt,
+                          enabled: !isPaying,
+                          onChanged: (m) =>
+                              setInner(() => paymentMethod = m),
+                        ),
+                        if (account.isPettyCash) ...[
+                          SizedBox(height: 8.h),
+                          _buildInfoStrip(
+                            'Petty cash rules apply: the day\'s session must be '
+                            'open and not yet verified, or the payment is rejected.',
+                            Icons.info_outline,
+                            FinDT.brand,
+                          ),
+                        ],
+                      ],
                       SizedBox(height: 14.h),
                       TextFormField(
                         controller: deductionCtrl,
@@ -1367,7 +1389,7 @@ class _SalariesPageState extends State<SalariesPage> {
                         onChanged: (_) => setInner(() {}),
                         decoration: finDialogInputDecoration(
                           label: 'Deductions',
-                          hint: 'Absences, loan instalment, advance recovery',
+                          hint: 'Absences, fines, other withholdings',
                           prefixIcon: Icons.remove_circle_outline,
                           suffixText: row.currency,
                         ),
@@ -1379,9 +1401,7 @@ class _SalariesPageState extends State<SalariesPage> {
                           if (v == null || v.trim().isEmpty) return null;
                           final n = double.tryParse(v);
                           if (n == null || n < 0) return 'Enter a valid amount';
-                          if (n > row.basic + row.allowances) {
-                            return 'Deductions exceed gross pay';
-                          }
+                          if (n > gross) return 'Deductions exceed gross pay';
                           return null;
                         },
                       ),
@@ -1404,8 +1424,35 @@ class _SalariesPageState extends State<SalariesPage> {
                               : null,
                         ),
                       ],
+                      if (openAdvances.isNotEmpty) ...[
+                        SizedBox(height: 16.h),
+                        _buildAdvancePanel(
+                          advances: openAdvances,
+                          totalOutstanding: totalOutstanding,
+                          maxRecovery: maxRecovery,
+                          controller: recoveryCtrl,
+                          currency: row.currency,
+                          fmt: fmt,
+                          enabled: !isPaying,
+                          onChanged: () => setInner(() {}),
+                          onRecoverAll: () => setInner(() {
+                            recoveryCtrl.text = maxRecovery <= 0
+                                ? ''
+                                : maxRecovery.toStringAsFixed(2);
+                          }),
+                        ),
+                      ],
                       SizedBox(height: 16.h),
-                      _buildPaySummary(row, deduction, net, account, fmt),
+                      _buildPaySummary(
+                        row: row,
+                        deduction: deduction,
+                        recovery: recovery,
+                        net: net,
+                        account: account,
+                        balanceLabel: balanceLabel,
+                        bucketBalance: bucketBalance,
+                        fmt: fmt,
+                      ),
                     ],
                   ),
                 ),
@@ -1415,18 +1462,20 @@ class _SalariesPageState extends State<SalariesPage> {
               finDialogCancelButton(ctx, onPressed: isPaying ? () {} : null),
               finDialogActionButton(
                 isLoading: isPaying,
-                label: 'Pay ${fmt.format(net)} ${row.currency}',
+                label: net <= 0 && recovery > 0
+                    ? 'Settle Against Advance'
+                    : 'Pay ${fmt.format(net)} ${row.currency}',
                 onPressed: () async {
                   if (!formKey.currentState!.validate()) return;
-                  if (net <= 0) {
+                  if (net <= 0 && recovery <= 0) {
                     _snack(context, 'Net salary must be above zero.', FinDT.danger);
                     return;
                   }
-                  if (net > account.currentBalance + 1e-9) {
+                  if (net > bucketBalance + 1e-9) {
                     _snack(
                       context,
-                      'Net pay exceeds the ${account.name} balance '
-                      '(${fmt.format(account.currentBalance)} ${account.currency}).',
+                      'Net pay exceeds the available $balanceLabel balance '
+                      '(${fmt.format(bucketBalance)} ${account.currency}).',
                       FinDT.danger,
                     );
                     return;
@@ -1435,6 +1484,7 @@ class _SalariesPageState extends State<SalariesPage> {
                   final user = context.read<AuthProvider>().user;
                   final actorName = user?.actorLabel ?? 'Admin';
                   final fundProv = context.read<FundAccountProvider>();
+                  final advanceProv = context.read<CashAdvanceProvider>();
 
                   setInner(() => isPaying = true);
                   try {
@@ -1463,6 +1513,7 @@ class _SalariesPageState extends State<SalariesPage> {
                       currency: row.currency,
                       fundAccountId: account.id,
                       fundAccountName: account.name,
+                      paymentMethod: effectiveMethod,
                       status: SalaryPaymentStatus.pending,
                       notes: base?.notes,
                       createdAt: base?.createdAt ?? DateTime.now(),
@@ -1474,15 +1525,28 @@ class _SalariesPageState extends State<SalariesPage> {
                       fundAccountId: account.id,
                       actorName: actorName,
                       actorUserId: user?.id,
+                      paymentMethod: effectiveMethod,
+                      advanceRecoveries:
+                          SalaryPaymentEntity.allocateAdvanceRecovery(
+                        amount: recovery,
+                        advances: openAdvances,
+                      ),
                     );
-                    await fundProv.fetchAllAccounts();
+                    await Future.wait([
+                      fundProv.fetchAllAccounts(),
+                      if (recovery > 0) advanceProv.load(),
+                    ]);
 
                     if (ctx.mounted) finSafePop(ctx);
                     if (context.mounted) {
                       _snack(
                         context,
-                        'Paid ${fmt.format(net)} ${row.currency} to '
-                        '${row.employeeName} from ${account.name}.',
+                        recovery > 0
+                            ? 'Paid ${fmt.format(net)} ${row.currency} to '
+                                '${row.employeeName}, recovering '
+                                '${fmt.format(recovery)} against advances.'
+                            : 'Paid ${fmt.format(net)} ${row.currency} to '
+                                '${row.employeeName} from ${account.name}.',
                         FinDT.success,
                       );
                     }
@@ -1501,13 +1565,247 @@ class _SalariesPageState extends State<SalariesPage> {
     );
   }
 
-  Widget _buildPaySummary(
-    _PayrollRow row,
-    double deduction,
-    double net,
-    FundAccountEntity account,
-    NumberFormat fmt,
-  ) {
+  static String _methodLabel(String method) => switch (method) {
+        'cash' => 'Cash',
+        'stcPay' => 'STC Pay',
+        _ => 'Account',
+      };
+
+  /// Cash vs STC Pay picker for split (petty cash style) wallets.
+  Widget _buildMethodSelector({
+    required String selected,
+    required FundAccountEntity account,
+    required NumberFormat fmt,
+    required bool enabled,
+    required ValueChanged<String> onChanged,
+  }) {
+    Widget option(String value, String label, IconData icon, double balance) {
+      final isSelected = selected == value;
+      return Expanded(
+        child: InkWell(
+          onTap: enabled ? () => onChanged(value) : null,
+          borderRadius: BorderRadius.circular(10.r),
+          child: Container(
+            padding: EdgeInsets.symmetric(vertical: 10.h, horizontal: 12.w),
+            decoration: BoxDecoration(
+              color: isSelected ? FinDT.brandLight : FinDT.bgPage,
+              borderRadius: BorderRadius.circular(10.r),
+              border: Border.all(
+                color: isSelected ? FinDT.brand : FinDT.border,
+                width: isSelected ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  icon,
+                  size: 16.sp,
+                  color: isSelected ? FinDT.brand : FinDT.textSecondary,
+                ),
+                SizedBox(width: 8.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          fontWeight:
+                              isSelected ? FontWeight.w700 : FontWeight.w500,
+                          color: isSelected ? FinDT.brand : FinDT.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        '${fmt.format(balance)} available',
+                        style: GoogleFonts.inter(
+                          fontSize: 10.sp,
+                          color: FinDT.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Paid From *',
+          style: GoogleFonts.inter(
+            fontSize: 11.sp,
+            fontWeight: FontWeight.w600,
+            color: FinDT.textSecondary,
+          ),
+        ),
+        SizedBox(height: 6.h),
+        Row(
+          children: [
+            option('cash', 'Physical Cash', Icons.payments_outlined,
+                account.cashBalance),
+            SizedBox(width: 8.w),
+            option('stcPay', 'STC Pay', Icons.phone_iphone_outlined,
+                account.stcPayBalance),
+          ],
+        ),
+      ],
+    );
+  }
+
+  /// Outstanding advances for this employee, with how much to recover now.
+  Widget _buildAdvancePanel({
+    required List<CashAdvanceEntity> advances,
+    required double totalOutstanding,
+    required double maxRecovery,
+    required TextEditingController controller,
+    required String currency,
+    required NumberFormat fmt,
+    required bool enabled,
+    required VoidCallback onChanged,
+    required VoidCallback onRecoverAll,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: FinDT.warning.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: FinDT.warning.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.account_balance_outlined,
+                  size: 16.sp, color: FinDT.warning),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Text(
+                  'Outstanding advances: ${fmt.format(totalOutstanding)} $currency',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w700,
+                    color: FinDT.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: enabled && maxRecovery > 0 ? onRecoverAll : null,
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.symmetric(horizontal: 8.w),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(
+                  'Recover max',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w700,
+                    color: FinDT.brand,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 6.h),
+          ...advances.take(3).map(
+                (a) => Padding(
+                  padding: EdgeInsets.only(bottom: 3.h),
+                  child: Text(
+                    '• ${a.purpose} — ${fmt.format(a.outstanding)} $currency left '
+                    '(issued ${DateFormat('d MMM y').format(a.issuedAt)})',
+                    style: GoogleFonts.inter(
+                      fontSize: 10.sp,
+                      color: FinDT.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+          if (advances.length > 3)
+            Text(
+              '• +${advances.length - 3} more',
+              style: GoogleFonts.inter(
+                fontSize: 10.sp,
+                color: FinDT.textMuted,
+              ),
+            ),
+          SizedBox(height: 10.h),
+          TextFormField(
+            controller: controller,
+            enabled: enabled,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+            ],
+            onChanged: (_) => onChanged(),
+            decoration: finDialogInputDecoration(
+              label: 'Recover From This Salary',
+              hint: 'Leave blank to skip. Oldest advance settles first.',
+              prefixIcon: Icons.undo_rounded,
+              suffixText: currency,
+            ),
+            style: GoogleFonts.inter(
+              fontSize: 12.sp,
+              color: FinDT.textPrimary,
+            ),
+            validator: (v) {
+              if (v == null || v.trim().isEmpty) return null;
+              final n = double.tryParse(v);
+              if (n == null || n < 0) return 'Enter a valid amount';
+              if (n > maxRecovery + 1e-9) {
+                return 'At most ${fmt.format(maxRecovery)} can be recovered now';
+              }
+              return null;
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoStrip(String message, IconData icon, Color color) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 14.sp, color: color),
+          SizedBox(width: 8.w),
+          Expanded(
+            child: Text(
+              message,
+              style: GoogleFonts.inter(
+                fontSize: 10.sp,
+                color: FinDT.textSecondary,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaySummary({
+    required _PayrollRow row,
+    required double deduction,
+    required double recovery,
+    required double net,
+    required FundAccountEntity account,
+    required String balanceLabel,
+    required double bucketBalance,
+    required NumberFormat fmt,
+  }) {
     Widget line(String label, String value, {bool bold = false, Color? color}) {
       return Padding(
         padding: EdgeInsets.symmetric(vertical: 3.h),
@@ -1552,18 +1850,36 @@ class _SalariesPageState extends State<SalariesPage> {
             '− ${fmt.format(deduction)} ${row.currency}',
             color: deduction > 0 ? FinDT.danger : null,
           ),
+          line(
+            'Advance recovery',
+            '− ${fmt.format(recovery)} ${row.currency}',
+            color: recovery > 0 ? FinDT.warning : null,
+          ),
           Divider(height: 14.h, color: FinDT.border),
           line('Net pay', '${fmt.format(net)} ${row.currency}', bold: true),
           SizedBox(height: 6.h),
           line(
-            '${account.name} balance after',
-            '${fmt.format(account.currentBalance - net)} ${account.currency}',
-            color: account.currentBalance - net < 0 ? FinDT.danger : null,
+            '$balanceLabel balance after',
+            '${fmt.format(bucketBalance - net)} ${account.currency}',
+            color: bucketBalance - net < 0 ? FinDT.danger : null,
           ),
+          if (recovery > 0) ...[
+            SizedBox(height: 8.h),
+            Text(
+              'The recovered amount never leaves the wallet — it settles the '
+              'advance instead.',
+              style: GoogleFonts.inter(
+                fontSize: 10.sp,
+                color: FinDT.textMuted,
+                height: 1.4,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
+
 
   Future<void> _showVoidDialog(
     BuildContext context,

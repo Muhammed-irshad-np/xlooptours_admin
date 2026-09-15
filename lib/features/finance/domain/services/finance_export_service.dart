@@ -102,7 +102,8 @@ class FinanceExportService {
     final buf = StringBuffer();
     buf.writeln(
       'id,period,employeeName,position,basicSalary,allowances,deductions,'
-      'netAmount,currency,status,fundAccountName,paidAt,paidBy,notes',
+      'advanceRecovery,netAmount,currency,status,fundAccountName,paymentMethod,'
+      'expenseId,paidAt,paidBy,notes',
     );
     for (final p in payments) {
       buf.writeln([
@@ -113,10 +114,13 @@ class FinanceExportService {
         p.basicSalary.toStringAsFixed(2),
         p.allowances.toStringAsFixed(2),
         p.deductions.toStringAsFixed(2),
+        p.advanceRecovery.toStringAsFixed(2),
         p.netAmount.toStringAsFixed(2),
         p.currency,
         p.status.name,
         _csvEscape(p.fundAccountName),
+        _csvEscape(p.paymentMethod),
+        _csvEscape(p.expenseId),
         p.paidAt?.toIso8601String() ?? '',
         _csvEscape(p.paidBy),
         _csvEscape(p.notes),

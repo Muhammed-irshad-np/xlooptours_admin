@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xloop_invoice/features/finance/domain/entities/cash_advance_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/salary_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/usecases/salary_usecases.dart';
 import 'test_finance_repository.dart';
@@ -17,6 +18,30 @@ SalaryStructureEntity _structure({
     allowances: allowances,
     isActive: isActive,
     updatedAt: DateTime(2026, 9, 1),
+  );
+}
+
+CashAdvanceEntity _advance({
+  required String id,
+  required double amount,
+  double settled = 0,
+  int issuedDaysAgo = 30,
+  CashAdvanceStatus status = CashAdvanceStatus.open,
+}) {
+  final issued = DateTime(2026, 9, 1).subtract(Duration(days: issuedDaysAgo));
+  return CashAdvanceEntity(
+    id: id,
+    fundAccountId: 'acc1',
+    employeeId: 'emp1',
+    employeeName: 'Ali',
+    amount: amount,
+    settledAmount: settled,
+    currency: 'SAR',
+    purpose: 'Fuel float',
+    status: status,
+    issuedBy: 'Admin',
+    issuedAt: issued,
+    createdAt: issued,
   );
 }
 
@@ -44,9 +69,128 @@ void main() {
       );
     });
 
+    test('advance recovery reduces net pay like a deduction', () {
+      expect(
+        SalaryPaymentEntity.computeNet(
+          basicSalary: 3000,
+          allowances: 500,
+          deductions: 200,
+          advanceRecovery: 800,
+        ),
+        2500,
+      );
+    });
+
+    test('net floors at zero when an advance swallows the whole salary', () {
+      expect(
+        SalaryPaymentEntity.computeNet(
+          basicSalary: 2000,
+          allowances: 0,
+          advanceRecovery: 2500,
+        ),
+        0,
+      );
+    });
+
     test('period key and document id are deterministic', () {
       expect(SalaryPaymentEntity.periodOf(DateTime(2026, 9, 15)), '2026-09');
       expect(SalaryPaymentEntity.buildId('2026-09', 'emp1'), '2026-09_emp1');
+    });
+  });
+
+  group('Advance recovery allocation', () {
+    test('settles the oldest advance first', () {
+      final result = SalaryPaymentEntity.allocateAdvanceRecovery(
+        amount: 400,
+        advances: [
+          _advance(id: 'new', amount: 1000, issuedDaysAgo: 5),
+          _advance(id: 'old', amount: 1000, issuedDaysAgo: 90),
+        ],
+      );
+
+      expect(result, {'old': 400.0});
+    });
+
+    test('spills over into the next advance once the first is cleared', () {
+      final result = SalaryPaymentEntity.allocateAdvanceRecovery(
+        amount: 1200,
+        advances: [
+          _advance(id: 'old', amount: 1000, issuedDaysAgo: 90),
+          _advance(id: 'new', amount: 1000, issuedDaysAgo: 5),
+        ],
+      );
+
+      expect(result, {'old': 1000.0, 'new': 200.0});
+    });
+
+    test('respects what is already settled on an advance', () {
+      final result = SalaryPaymentEntity.allocateAdvanceRecovery(
+        amount: 500,
+        advances: [
+          _advance(
+            id: 'part',
+            amount: 1000,
+            settled: 700,
+            status: CashAdvanceStatus.partiallySettled,
+          ),
+        ],
+      );
+
+      expect(result, {'part': 300.0});
+    });
+
+    test('skips advances that are already settled or written off', () {
+      final result = SalaryPaymentEntity.allocateAdvanceRecovery(
+        amount: 500,
+        advances: [
+          _advance(
+            id: 'done',
+            amount: 1000,
+            settled: 1000,
+            status: CashAdvanceStatus.settled,
+          ),
+          _advance(
+            id: 'gone',
+            amount: 500,
+            status: CashAdvanceStatus.writtenOff,
+          ),
+        ],
+      );
+
+      expect(result, isEmpty);
+    });
+
+    test('allocates nothing for a zero or negative amount', () {
+      final advances = [_advance(id: 'a1', amount: 1000)];
+      expect(
+        SalaryPaymentEntity.allocateAdvanceRecovery(
+          amount: 0,
+          advances: advances,
+        ),
+        isEmpty,
+      );
+      expect(
+        SalaryPaymentEntity.allocateAdvanceRecovery(
+          amount: -50,
+          advances: advances,
+        ),
+        isEmpty,
+      );
+    });
+
+    test('totalOutstanding only counts open advances', () {
+      expect(
+        SalaryPaymentEntity.totalOutstanding([
+          _advance(id: 'a1', amount: 1000, settled: 250),
+          _advance(
+            id: 'a2',
+            amount: 500,
+            settled: 500,
+            status: CashAdvanceStatus.settled,
+          ),
+        ]),
+        750,
+      );
     });
   });
 
@@ -147,6 +291,25 @@ void main() {
       expect(fakeRepo.lastPaidFromAccountId, 'acc1');
       expect(paid.status, SalaryPaymentStatus.paid);
       expect(paid.ledgerEntryId, 'tx1');
+    });
+
+    test('paying forwards the wallet bucket and advance recoveries', () async {
+      await saveStructure(_structure(employeeId: 'emp1'));
+      final run = await generateRun(period: '2026-09', actorName: 'Admin');
+      final pending = run.first;
+      fakeRepo.paySalaryResult =
+          pending.copyWith(status: SalaryPaymentStatus.paid);
+
+      await paySalary(
+        paymentId: pending.id,
+        fundAccountId: 'acc1',
+        actorName: 'Admin',
+        paymentMethod: 'stcPay',
+        advanceRecoveries: const {'adv1': 300},
+      );
+
+      expect(fakeRepo.lastPaidMethod, 'stcPay');
+      expect(fakeRepo.lastAdvanceRecoveries, {'adv1': 300.0});
     });
 
     test('voiding a paid salary records the reason', () async {
