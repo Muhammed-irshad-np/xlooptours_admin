@@ -29,6 +29,7 @@ import 'features/finance/presentation/providers/finance_provider.dart';
 import 'features/finance/presentation/providers/fund_account_provider.dart';
 import 'features/finance/presentation/providers/petty_cash_provider.dart';
 import 'features/finance/presentation/providers/cash_advance_provider.dart';
+import 'features/finance/presentation/providers/salary_provider.dart';
 
 import 'screens/invoice_form_screen.dart';
 import 'screens/pdf_preview_screen.dart';
@@ -318,6 +319,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => di.sl<FundAccountProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<PettyCashProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<CashAdvanceProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<SalaryProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<UserManagementProvider>()),
       ],
       child: ScreenUtilInit(

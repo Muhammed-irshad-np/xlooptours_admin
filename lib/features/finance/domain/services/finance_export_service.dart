@@ -3,6 +3,7 @@ import 'package:share_plus/share_plus.dart';
 import '../entities/cash_advance_entity.dart';
 import '../entities/expense_entity.dart';
 import '../entities/fund_transaction_entity.dart';
+import '../entities/salary_entity.dart';
 
 /// Builds CSV files for the external accountant (they do not use this app).
 class FinanceExportService {
@@ -92,6 +93,33 @@ class FinanceExportService {
         _csvEscape(a.purpose),
         _csvEscape(a.issuedBy),
         _csvEscape(a.notes),
+      ].join(','));
+    }
+    return buf.toString();
+  }
+
+  static String salariesToCsv(List<SalaryPaymentEntity> payments) {
+    final buf = StringBuffer();
+    buf.writeln(
+      'id,period,employeeName,position,basicSalary,allowances,deductions,'
+      'netAmount,currency,status,fundAccountName,paidAt,paidBy,notes',
+    );
+    for (final p in payments) {
+      buf.writeln([
+        _csvEscape(p.id),
+        p.period,
+        _csvEscape(p.employeeName),
+        _csvEscape(p.position),
+        p.basicSalary.toStringAsFixed(2),
+        p.allowances.toStringAsFixed(2),
+        p.deductions.toStringAsFixed(2),
+        p.netAmount.toStringAsFixed(2),
+        p.currency,
+        p.status.name,
+        _csvEscape(p.fundAccountName),
+        p.paidAt?.toIso8601String() ?? '',
+        _csvEscape(p.paidBy),
+        _csvEscape(p.notes),
       ].join(','));
     }
     return buf.toString();

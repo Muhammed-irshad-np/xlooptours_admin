@@ -8,6 +8,7 @@ import 'package:xloop_invoice/features/finance/presentation/pages/expense_form_p
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../providers/cash_advance_provider.dart';
+import '../providers/salary_provider.dart';
 import '../widgets/expense_summary_card.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import '../widgets/finance_nav_tabs.dart';
@@ -15,6 +16,7 @@ import 'expense_list_page.dart';
 import 'fund_accounts_page.dart';
 import 'petty_cash_page.dart';
 import 'cash_advances_page.dart';
+import 'salaries_page.dart';
 import 'finance_master_data_page.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
@@ -80,6 +82,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
     final financeProvider = context.read<FinanceProvider>();
     final accountProvider = context.read<FundAccountProvider>();
     final advanceProvider = context.read<CashAdvanceProvider>();
+    final salaryProvider = context.read<SalaryProvider>();
 
     await Future.wait([
       financeProvider.fetchAllExpenses(),
@@ -88,6 +91,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
       accountProvider.fetchAllAccounts(),
       accountProvider.fetchAccountTypes(),
       advanceProvider.load(),
+      salaryProvider.load(),
     ]);
 
     if (mounted) {
@@ -168,7 +172,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
           '• Fund accounts & balances\n'
           '• Ledger transaction history\n'
           '• Petty cash sessions & day locks\n'
-          '• Cash advances\n\n'
+          '• Cash advances\n'
+          '• Salary payments\n\n'
           'Are you sure you want to wipe all finance test data and start fresh?',
       confirmLabel: 'Wipe & Reset All',
       confirmColor: FinDT.danger,
@@ -348,6 +353,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
       case 4:
         return const CashAdvancesPage(key: ValueKey('advances'));
       case 5:
+        return const SalariesPage(key: ValueKey('salaries'));
+      case 6:
         return const FinanceMasterDataPage(key: ValueKey('master_data'));
       default:
         return const SizedBox.shrink();

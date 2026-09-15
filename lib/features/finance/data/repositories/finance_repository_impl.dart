@@ -10,6 +10,7 @@ import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/entities/ledger_day_totals.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
 import '../../domain/entities/post_fund_request.dart';
+import '../../domain/entities/salary_entity.dart';
 import '../../domain/entities/session_expense_item.dart';
 import '../../domain/repositories/finance_repository.dart';
 import '../datasources/finance_remote_data_source.dart';
@@ -18,6 +19,7 @@ import '../models/expense_model.dart';
 import '../models/fund_account_model.dart';
 import '../models/fund_account_type_model.dart';
 import '../models/petty_cash_session_model.dart';
+import '../models/salary_models.dart';
 import '../models/expense_category_model.dart';
 
 class FinanceRepositoryImpl implements FinanceRepository {
@@ -321,6 +323,85 @@ class FinanceRepositoryImpl implements FinanceRepository {
   }) {
     return remoteDataSource.writeOffCashAdvance(
       advanceId: advanceId,
+      reason: reason,
+      actorName: actorName,
+      actorUserId: actorUserId,
+    );
+  }
+
+  @override
+  Future<List<SalaryStructureEntity>> getSalaryStructures() async {
+    return List.from(await remoteDataSource.getSalaryStructures());
+  }
+
+  @override
+  Future<SalaryStructureEntity> saveSalaryStructure(
+    SalaryStructureEntity structure,
+  ) {
+    return remoteDataSource.saveSalaryStructure(
+      SalaryStructureModel.fromEntity(structure),
+    );
+  }
+
+  @override
+  Future<void> deleteSalaryStructure(String employeeId) =>
+      remoteDataSource.deleteSalaryStructure(employeeId);
+
+  @override
+  Future<List<SalaryPaymentEntity>> getSalaryPayments({String? period}) async {
+    return List.from(await remoteDataSource.getSalaryPayments(period: period));
+  }
+
+  @override
+  Future<List<SalaryPaymentEntity>> generateSalaryRun({
+    required String period,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    return List.from(
+      await remoteDataSource.generateSalaryRun(
+        period: period,
+        actorName: actorName,
+        actorUserId: actorUserId,
+      ),
+    );
+  }
+
+  @override
+  Future<SalaryPaymentEntity> saveSalaryPayment(SalaryPaymentEntity payment) {
+    return remoteDataSource.saveSalaryPayment(
+      SalaryPaymentModel.fromEntity(payment),
+    );
+  }
+
+  @override
+  Future<SalaryPaymentEntity> paySalary({
+    required String paymentId,
+    required String fundAccountId,
+    required String actorName,
+    String? actorUserId,
+  }) {
+    return remoteDataSource.paySalary(
+      paymentId: paymentId,
+      fundAccountId: fundAccountId,
+      actorName: actorName,
+      actorUserId: actorUserId,
+    );
+  }
+
+  @override
+  Future<void> deleteSalaryPayment(String paymentId) =>
+      remoteDataSource.deleteSalaryPayment(paymentId);
+
+  @override
+  Future<SalaryPaymentEntity> voidSalaryPayment({
+    required String paymentId,
+    required String reason,
+    required String actorName,
+    String? actorUserId,
+  }) {
+    return remoteDataSource.voidSalaryPayment(
+      paymentId: paymentId,
       reason: reason,
       actorName: actorName,
       actorUserId: actorUserId,

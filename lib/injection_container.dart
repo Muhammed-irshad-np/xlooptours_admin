@@ -146,6 +146,7 @@ import 'features/finance/domain/usecases/insert_transaction_usecase.dart';
 import 'features/finance/domain/usecases/post_fund_movement_usecase.dart';
 import 'features/finance/domain/usecases/transfer_funds_usecase.dart';
 import 'features/finance/domain/usecases/cash_advance_usecases.dart';
+import 'features/finance/domain/usecases/salary_usecases.dart';
 import 'features/finance/domain/usecases/finance_policy_usecases.dart';
 import 'features/finance/domain/usecases/get_petty_cash_sessions_usecase.dart';
 import 'features/finance/domain/usecases/get_open_session_usecase.dart';
@@ -167,6 +168,7 @@ import 'features/finance/presentation/providers/finance_provider.dart';
 import 'features/finance/presentation/providers/fund_account_provider.dart';
 import 'features/finance/presentation/providers/petty_cash_provider.dart';
 import 'features/finance/presentation/providers/cash_advance_provider.dart';
+import 'features/finance/presentation/providers/salary_provider.dart';
 
 import 'features/user_management/data/datasources/user_management_remote_data_source.dart';
 import 'features/user_management/data/repositories/user_management_repository_impl.dart';
@@ -603,6 +605,19 @@ Future<void> init() async {
       writeOffCashAdvanceUseCase: sl(),
     ),
   );
+  sl.registerFactory(
+    () => SalaryProvider(
+      getSalaryStructuresUseCase: sl(),
+      saveSalaryStructureUseCase: sl(),
+      deleteSalaryStructureUseCase: sl(),
+      getSalaryPaymentsUseCase: sl(),
+      generateSalaryRunUseCase: sl(),
+      saveSalaryPaymentUseCase: sl(),
+      paySalaryUseCase: sl(),
+      deleteSalaryPaymentUseCase: sl(),
+      voidSalaryPaymentUseCase: sl(),
+    ),
+  );
 
   // UseCases - Expenses
   sl.registerLazySingleton(() => GetAllExpensesUseCase(sl()));
@@ -632,6 +647,17 @@ Future<void> init() async {
   sl.registerLazySingleton(() => IssueCashAdvanceUseCase(sl()));
   sl.registerLazySingleton(() => SettleCashAdvanceUseCase(sl()));
   sl.registerLazySingleton(() => WriteOffCashAdvanceUseCase(sl()));
+
+  // UseCases - Salaries
+  sl.registerLazySingleton(() => GetSalaryStructuresUseCase(sl()));
+  sl.registerLazySingleton(() => SaveSalaryStructureUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteSalaryStructureUseCase(sl()));
+  sl.registerLazySingleton(() => GetSalaryPaymentsUseCase(sl()));
+  sl.registerLazySingleton(() => GenerateSalaryRunUseCase(sl()));
+  sl.registerLazySingleton(() => SaveSalaryPaymentUseCase(sl()));
+  sl.registerLazySingleton(() => PaySalaryUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteSalaryPaymentUseCase(sl()));
+  sl.registerLazySingleton(() => VoidSalaryPaymentUseCase(sl()));
   sl.registerLazySingleton(() => GetFinancePolicyUseCase(sl()));
   sl.registerLazySingleton(() => SaveFinancePolicyUseCase(sl()));
   sl.registerLazySingleton(() => GetLedgerDayTotalsUseCase(sl()));

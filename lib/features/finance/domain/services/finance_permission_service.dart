@@ -172,6 +172,14 @@ class FinancePermissionService {
     return _check(user, policy.cashAdvanceManagement);
   }
 
+  /// Can [user] set up salaries and pay staff?
+  static bool canManageSalaries({
+    required UserEntity? user,
+    required FinancePolicyEntity policy,
+  }) {
+    return _check(user, policy.salaryManagement);
+  }
+
   // ─── View Access ─────────────────────────────────────────────
 
   /// Can [user] view the finance module at all?
@@ -197,6 +205,7 @@ class FinancePermissionService {
       policy.accountManagement,
       policy.masterDataManagement,
       policy.cashAdvanceManagement,
+      policy.salaryManagement,
     ];
     return configs.any((c) => c.isAuthorized(roleId, user.id));
   }

@@ -82,6 +82,9 @@ class FinancePolicyEntity extends Equatable {
   /// Who can issue/settle cash advances.
   final WorkflowPermissionConfig cashAdvanceManagement;
 
+  /// Who can set up salaries and pay staff salaries.
+  final WorkflowPermissionConfig salaryManagement;
+
   const FinancePolicyEntity({
     // Legacy approval limits
     this.approvalLimits = const {
@@ -141,6 +144,9 @@ class FinancePolicyEntity extends Equatable {
     this.cashAdvanceManagement = const WorkflowPermissionConfig(
       allowedRoles: ['finance', 'admin', 'super_admin'],
     ),
+    this.salaryManagement = const WorkflowPermissionConfig(
+      allowedRoles: ['finance', 'admin', 'super_admin'],
+    ),
   });
 
   // ─── Query Helpers ──────────────────────────────────────────
@@ -189,6 +195,7 @@ class FinancePolicyEntity extends Equatable {
     WorkflowPermissionConfig? accountManagement,
     WorkflowPermissionConfig? masterDataManagement,
     WorkflowPermissionConfig? cashAdvanceManagement,
+    WorkflowPermissionConfig? salaryManagement,
   }) {
     return FinancePolicyEntity(
       approvalLimits: approvalLimits ?? this.approvalLimits,
@@ -213,6 +220,7 @@ class FinancePolicyEntity extends Equatable {
       masterDataManagement: masterDataManagement ?? this.masterDataManagement,
       cashAdvanceManagement:
           cashAdvanceManagement ?? this.cashAdvanceManagement,
+      salaryManagement: salaryManagement ?? this.salaryManagement,
     );
   }
 
@@ -235,6 +243,7 @@ class FinancePolicyEntity extends Equatable {
         'accountManagement': accountManagement.toJson(),
         'masterDataManagement': masterDataManagement.toJson(),
         'cashAdvanceManagement': cashAdvanceManagement.toJson(),
+        'salaryManagement': salaryManagement.toJson(),
       };
 
   factory FinancePolicyEntity.fromJson(Map<String, dynamic>? json) {
@@ -315,6 +324,10 @@ class FinancePolicyEntity extends Equatable {
           ? WorkflowPermissionConfig.fromJson(
               json['cashAdvanceManagement'] as Map<String, dynamic>?)
           : const FinancePolicyEntity().cashAdvanceManagement,
+      salaryManagement: json['salaryManagement'] != null
+          ? WorkflowPermissionConfig.fromJson(
+              json['salaryManagement'] as Map<String, dynamic>?)
+          : const FinancePolicyEntity().salaryManagement,
     );
   }
 
@@ -338,5 +351,6 @@ class FinancePolicyEntity extends Equatable {
         accountManagement,
         masterDataManagement,
         cashAdvanceManagement,
+        salaryManagement,
       ];
 }

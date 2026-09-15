@@ -12,12 +12,14 @@ import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/entities/ledger_day_totals.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
 import '../../domain/entities/post_fund_request.dart';
+import '../../domain/entities/salary_entity.dart';
 import '../../domain/entities/session_expense_item.dart';
 import '../models/cash_advance_model.dart';
 import '../models/expense_model.dart';
 import '../models/fund_account_model.dart';
 import '../models/fund_transaction_model.dart';
 import '../models/petty_cash_session_model.dart';
+import '../models/salary_models.dart';
 import '../models/expense_category_model.dart';
 import '../../domain/entities/fund_account_type_entity.dart';
 import '../models/fund_account_type_model.dart';
@@ -143,6 +145,44 @@ abstract class FinanceRemoteDataSource {
     required String actorUserId,
   });
 
+  // Salaries
+  Future<List<SalaryStructureModel>> getSalaryStructures();
+  Future<SalaryStructureModel> saveSalaryStructure(
+    SalaryStructureModel structure,
+  );
+  Future<void> deleteSalaryStructure(String employeeId);
+
+  Future<List<SalaryPaymentModel>> getSalaryPayments({String? period});
+
+  /// Creates a pending salary row for every active salary structure that has
+  /// no row for [period] yet. Rerunning the same month is a no-op.
+  Future<List<SalaryPaymentModel>> generateSalaryRun({
+    required String period,
+    required String actorName,
+    String? actorUserId,
+  });
+
+  /// Upsert of an unpaid salary row (amounts, deductions, notes).
+  Future<SalaryPaymentModel> saveSalaryPayment(SalaryPaymentModel payment);
+
+  /// Posts the net salary out of [fundAccountId] and marks the row paid.
+  Future<SalaryPaymentModel> paySalary({
+    required String paymentId,
+    required String fundAccountId,
+    required String actorName,
+    String? actorUserId,
+  });
+
+  Future<void> deleteSalaryPayment(String paymentId);
+
+  /// Reverses a paid salary; the money goes back to the fund account.
+  Future<SalaryPaymentModel> voidSalaryPayment({
+    required String paymentId,
+    required String reason,
+    required String actorName,
+    String? actorUserId,
+  });
+
   // Policy
   Future<FinancePolicyEntity> getFinancePolicy();
   Future<void> saveFinancePolicy(FinancePolicyEntity policy);
@@ -187,6 +227,10 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       firestore.collection('finance_day_locks');
   CollectionReference<Map<String, dynamic>> get _advances =>
       firestore.collection('cash_advances');
+  CollectionReference<Map<String, dynamic>> get _salaryStructures =>
+      firestore.collection('salary_structures');
+  CollectionReference<Map<String, dynamic>> get _salaryPayments =>
+      firestore.collection('salary_payments');
   DocumentReference<Map<String, dynamic>> get _policyDoc =>
       firestore.collection('finance_settings').doc('policy');
 
@@ -1841,6 +1885,309 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     return updated;
   }
 
+  // ─── Salaries ───────────────────────────────────────────────
+
+  @override
+  Future<List<SalaryStructureModel>> getSalaryStructures() async {
+    final snap = await _salaryStructures.get();
+    final list =
+        snap.docs.map((d) => SalaryStructureModel.fromJson(d.data())).toList();
+    list.sort((a, b) => a.employeeName.compareTo(b.employeeName));
+    return list;
+  }
+
+  @override
+  Future<SalaryStructureModel> saveSalaryStructure(
+    SalaryStructureModel structure,
+  ) async {
+    if (structure.employeeId.isEmpty) {
+      throw ArgumentError('Employee is required');
+    }
+    if (structure.basicSalary < 0 || structure.allowances < 0) {
+      throw ArgumentError('Salary amounts cannot be negative');
+    }
+    if (structure.grossSalary <= 0) {
+      throw ArgumentError('Monthly salary must be greater than zero');
+    }
+    await _salaryStructures
+        .doc(structure.employeeId)
+        .set(structure.toJson(), SetOptions(merge: true));
+    await _writeAudit(
+      action: 'salary.structure_save',
+      entityType: 'salary_structure',
+      entityId: structure.employeeId,
+      actorName: structure.updatedBy,
+      detail:
+          '${structure.employeeName} gross=${structure.grossSalary} ${structure.currency}',
+    );
+    return structure;
+  }
+
+  @override
+  Future<void> deleteSalaryStructure(String employeeId) async {
+    await _salaryStructures.doc(employeeId).delete();
+    await _writeAudit(
+      action: 'salary.structure_delete',
+      entityType: 'salary_structure',
+      entityId: employeeId,
+    );
+  }
+
+  @override
+  Future<List<SalaryPaymentModel>> getSalaryPayments({String? period}) async {
+    QuerySnapshot<Map<String, dynamic>> snap;
+    if (period != null && period.isNotEmpty) {
+      snap = await _salaryPayments.where('period', isEqualTo: period).get();
+    } else {
+      snap = await _salaryPayments.get();
+    }
+    final list =
+        snap.docs.map((d) => SalaryPaymentModel.fromJson(d.data())).toList();
+    list.sort((a, b) {
+      final byPeriod = b.period.compareTo(a.period);
+      if (byPeriod != 0) return byPeriod;
+      return a.employeeName.compareTo(b.employeeName);
+    });
+    return list;
+  }
+
+  @override
+  Future<List<SalaryPaymentModel>> generateSalaryRun({
+    required String period,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    final structures =
+        (await getSalaryStructures()).where((s) => s.isActive).toList();
+    final existing = await getSalaryPayments(period: period);
+    final existingEmployeeIds = existing.map((p) => p.employeeId).toSet();
+
+    final now = DateTime.now();
+    final created = <SalaryPaymentModel>[];
+    final batch = firestore.batch();
+
+    for (final s in structures) {
+      if (existingEmployeeIds.contains(s.employeeId)) continue;
+      final net = SalaryPaymentEntity.computeNet(
+        basicSalary: s.basicSalary,
+        allowances: s.allowances,
+      );
+      final payment = SalaryPaymentModel(
+        id: SalaryPaymentEntity.buildId(period, s.employeeId),
+        period: period,
+        employeeId: s.employeeId,
+        employeeName: s.employeeName,
+        position: s.position,
+        basicSalary: s.basicSalary,
+        allowances: s.allowances,
+        netAmount: net,
+        netAmountMinor: (net * 100).round(),
+        currency: s.currency,
+        fundAccountId: s.defaultFundAccountId,
+        status: SalaryPaymentStatus.pending,
+        createdAt: now,
+        createdBy: actorName,
+      );
+      batch.set(_salaryPayments.doc(payment.id), payment.toJson());
+      created.add(payment);
+    }
+
+    if (created.isNotEmpty) {
+      await batch.commit();
+      await _writeAudit(
+        action: 'salary.run_generate',
+        entityType: 'salary_run',
+        entityId: period,
+        actorUserId: actorUserId,
+        actorName: actorName,
+        detail: '${created.length} salaries generated',
+      );
+    }
+
+    return getSalaryPayments(period: period);
+  }
+
+  @override
+  Future<SalaryPaymentModel> saveSalaryPayment(
+    SalaryPaymentModel payment,
+  ) async {
+    if (payment.netAmount < 0) {
+      throw ArgumentError('Net salary cannot be negative');
+    }
+    final ref = _salaryPayments.doc(payment.id);
+    final snap = await ref.get();
+    if (snap.exists && snap.data() != null) {
+      final existing = SalaryPaymentModel.fromJson(snap.data()!);
+      if (!existing.status.canPay) {
+        throw StateError(
+          'Cannot edit a ${existing.status.displayName.toLowerCase()} salary. '
+          'Void it first.',
+        );
+      }
+    }
+    await ref.set(payment.toJson(), SetOptions(merge: true));
+    return payment;
+  }
+
+  @override
+  Future<void> deleteSalaryPayment(String paymentId) async {
+    final snap = await _salaryPayments.doc(paymentId).get();
+    if (!snap.exists || snap.data() == null) return;
+    final payment = SalaryPaymentModel.fromJson(snap.data()!);
+    if (!payment.status.canDelete) {
+      throw StateError('Only pending salaries can be removed. Void instead.');
+    }
+    await _salaryPayments.doc(paymentId).delete();
+    await _writeAudit(
+      action: 'salary.delete_pending',
+      entityType: 'salary_payment',
+      entityId: paymentId,
+      detail: '${payment.employeeName} ${payment.period}',
+    );
+  }
+
+  @override
+  Future<SalaryPaymentModel> paySalary({
+    required String paymentId,
+    required String fundAccountId,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    final snap = await _salaryPayments.doc(paymentId).get();
+    if (!snap.exists || snap.data() == null) {
+      throw StateError('Salary record not found');
+    }
+    final payment = SalaryPaymentModel.fromJson(snap.data()!);
+    if (!payment.status.canPay) {
+      throw StateError(
+        'Salary is already ${payment.status.displayName.toLowerCase()}',
+      );
+    }
+    if (payment.netAmount <= 0) {
+      throw StateError('Net salary must be greater than zero');
+    }
+
+    final accSnap = await _accounts.doc(fundAccountId).get();
+    if (!accSnap.exists || accSnap.data() == null) {
+      throw StateError('Fund account not found');
+    }
+    final account = FundAccountModel.fromJson(accSnap.data()!);
+    if (account.currency != payment.currency) {
+      throw StateError(
+        'Account currency ${account.currency} does not match salary currency '
+        '${payment.currency}',
+      );
+    }
+
+    final tx = await postFundMovement(
+      PostFundRequest(
+        fundAccountId: fundAccountId,
+        type: FundTransactionType.withdrawal,
+        amountMajor: payment.netAmount,
+        currency: payment.currency,
+        description:
+            'Salary ${payment.period} — ${payment.employeeName}',
+        performedBy: actorName,
+        performedByUserId: actorUserId,
+        bucket: FundBucket.total,
+        credit: false,
+        auditNote: 'salary:${payment.id}',
+      ),
+    );
+
+    final now = DateTime.now();
+    final updated = SalaryPaymentModel.fromEntity(
+      payment.copyWith(
+        status: SalaryPaymentStatus.paid,
+        fundAccountId: fundAccountId,
+        fundAccountName: account.name,
+        paidAt: now,
+        paidBy: actorName,
+        paidByUserId: actorUserId,
+        ledgerEntryId: tx.id,
+      ),
+    );
+    await _salaryPayments.doc(paymentId).set(
+          _stripNulls(updated.toJson()),
+          SetOptions(merge: true),
+        );
+    await _writeAudit(
+      action: 'salary.pay',
+      entityType: 'salary_payment',
+      entityId: paymentId,
+      actorUserId: actorUserId,
+      actorName: actorName,
+      detail:
+          '${payment.employeeName} ${payment.netAmount} ${payment.currency} from ${account.name}',
+    );
+    return updated;
+  }
+
+  @override
+  Future<SalaryPaymentModel> voidSalaryPayment({
+    required String paymentId,
+    required String reason,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    final trimmed = reason.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('Void reason is required');
+    }
+    final snap = await _salaryPayments.doc(paymentId).get();
+    if (!snap.exists || snap.data() == null) {
+      throw StateError('Salary record not found');
+    }
+    final payment = SalaryPaymentModel.fromJson(snap.data()!);
+    if (!payment.status.canVoid) {
+      throw StateError('Only paid salaries can be voided');
+    }
+
+    String? reverseId;
+    if (payment.fundAccountId != null && payment.fundAccountId!.isNotEmpty) {
+      final tx = await postFundMovement(
+        PostFundRequest(
+          fundAccountId: payment.fundAccountId!,
+          type: FundTransactionType.reversal,
+          amountMajor: payment.netAmount,
+          currency: payment.currency,
+          description:
+              'Void salary ${payment.period} — ${payment.employeeName}: $trimmed',
+          performedBy: actorName,
+          performedByUserId: actorUserId,
+          reversesTransactionId: payment.ledgerEntryId,
+          bucket: FundBucket.total,
+          credit: true,
+          auditNote: 'salary_void:${payment.id}',
+        ),
+      );
+      reverseId = tx.id;
+    }
+
+    final updated = SalaryPaymentModel.fromEntity(
+      payment.copyWith(
+        status: SalaryPaymentStatus.voided,
+        voidedAt: DateTime.now(),
+        voidedBy: actorName,
+        voidReason: trimmed,
+        reverseLedgerEntryId: reverseId,
+      ),
+    );
+    await _salaryPayments.doc(paymentId).set(
+          _stripNulls(updated.toJson()),
+          SetOptions(merge: true),
+        );
+    await _writeAudit(
+      action: 'salary.void',
+      entityType: 'salary_payment',
+      entityId: paymentId,
+      actorUserId: actorUserId,
+      actorName: actorName,
+      detail: '${payment.employeeName} reason=$trimmed',
+    );
+    return updated;
+  }
+
   // ─── Policy (with 5-minute memory cache) ───────────────────
 
   FinancePolicyEntity? _cachedPolicy;
@@ -2076,6 +2423,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       _dayLocks,
       firestore.collection('petty_cash_sessions'),
       firestore.collection('finance_audits'),
+      _salaryPayments,
     ];
 
     for (final col in collections) {
