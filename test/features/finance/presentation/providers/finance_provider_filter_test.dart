@@ -126,6 +126,62 @@ void main() {
       fundAccountId: 'acc-2',
       status: ExpenseStatus.paid,
     ),
+    // Company-borne employee cost, attributed to Ahmed.
+    ExpenseEntity(
+      id: 'e-4',
+      referenceNumber: '#1004',
+      date: DateTime(2025, 1, 4),
+      createdAt: DateTime(2025, 1, 4),
+      submittedBy: 'Admin',
+      submittedByRole: 'admin',
+      expenseCategory: 'EMPLOYEES',
+      expenseType: 'Iqama Renewal',
+      paymentMethod: 'cash',
+      amount: 650,
+      currency: 'SAR',
+      fundAccountId: 'acc-1',
+      status: ExpenseStatus.pending,
+      employeeId: 'emp-ahmed',
+      employeeName: 'Ahmed Khan',
+      submittedByEmployeeId: 'emp-admin',
+    ),
+    // Payroll mirror for the same employee — also an attributed row.
+    ExpenseEntity(
+      id: 'e-5',
+      referenceNumber: '#1005',
+      date: DateTime(2025, 1, 5),
+      createdAt: DateTime(2025, 1, 5),
+      submittedBy: 'Admin',
+      submittedByRole: 'admin',
+      expenseCategory: 'EMPLOYEES',
+      expenseType: 'Salary',
+      paymentMethod: 'cash',
+      amount: 3000,
+      currency: 'SAR',
+      fundAccountId: 'acc-1',
+      status: ExpenseStatus.paid,
+      employeeId: 'emp-ahmed',
+      employeeName: 'Ahmed Khan',
+      salaryPaymentId: 'pay-1',
+    ),
+    // Legacy row: employeeId here is the *submitter*, so it must not show up
+    // as a cost carried for that person.
+    ExpenseEntity(
+      id: 'e-6',
+      referenceNumber: '#1006',
+      date: DateTime(2025, 1, 6),
+      createdAt: DateTime(2025, 1, 6),
+      submittedBy: 'Sara',
+      submittedByRole: 'coordinator',
+      expenseCategory: 'OFFICE',
+      expenseType: 'Courier',
+      paymentMethod: 'cash',
+      amount: 25,
+      currency: 'SAR',
+      fundAccountId: 'acc-2',
+      status: ExpenseStatus.paid,
+      employeeId: 'emp-sara',
+    ),
   ];
 
   setUp(() async {
@@ -201,7 +257,7 @@ void main() {
       expect(provider.typeFilter, isNull);
       expect(provider.categoryFilter, isNull);
       expect(provider.statusFilter, isNull);
-      expect(provider.filteredExpenses.length, equals(3));
+      expect(provider.filteredExpenses.length, equals(sampleExpenses.length));
     });
 
     test('setCategoryFilter clears incompatible typeFilter', () {
@@ -227,6 +283,49 @@ void main() {
       expect(types, contains('Fuel'));
       expect(types, contains('Car Wash'));
       expect(types.contains('Stationery'), isFalse);
+    });
+  });
+
+  group('Employee Attribution Filter Tests', () {
+    test('setEmployeeFilter narrows to costs carried for that employee', () {
+      provider.setEmployeeFilter('emp-ahmed');
+
+      final ids = provider.filteredExpenses.map((e) => e.id).toList();
+      expect(ids, containsAll(['e-4', 'e-5']));
+      expect(ids.length, equals(2));
+    });
+
+    test('a legacy submitter id never matches the employee filter', () {
+      // e-6 stores emp-sara in employeeId, but she filed it rather than
+      // being the one it was spent on.
+      provider.setEmployeeFilter('emp-sara');
+
+      expect(provider.filteredExpenses, isEmpty);
+    });
+
+    test('employee filter combines with category', () {
+      provider.setEmployeeFilter('emp-ahmed');
+      provider.setCategoryFilter('EMPLOYEES');
+      provider.setTypeFilter('Iqama Renewal');
+
+      expect(provider.filteredExpenses.length, equals(1));
+      expect(provider.filteredExpenses.first.id, equals('e-4'));
+    });
+
+    test('expenseBeneficiaries lists only attributed employees', () {
+      final beneficiaries = provider.expenseBeneficiaries;
+
+      expect(beneficiaries, containsPair('emp-ahmed', 'Ahmed Khan'));
+      expect(beneficiaries.containsKey('emp-sara'), isFalse);
+      expect(beneficiaries.length, equals(1));
+    });
+
+    test('clearFilters clears the employee filter', () {
+      provider.setEmployeeFilter('emp-ahmed');
+      provider.clearFilters();
+
+      expect(provider.employeeFilter, isNull);
+      expect(provider.filteredExpenses.length, equals(sampleExpenses.length));
     });
   });
 }

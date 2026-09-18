@@ -22,9 +22,15 @@ import 'finance_dashboard_page.dart';
 
 /// Full-featured expense entry/edit form.
 class ExpenseFormPage extends StatefulWidget {
+  /// Existing row to edit. Null for a new expense.
   final ExpenseEntity? expense;
 
-  const ExpenseFormPage({super.key, this.expense});
+  /// Seed values for a *new* expense, used when another screen already knows
+  /// most of the answer — e.g. the document-expiry alert handing over a
+  /// renewal cost. Ignored when [expense] is set.
+  final ExpenseEntity? prefill;
+
+  const ExpenseFormPage({super.key, this.expense, this.prefill});
 
   @override
   State<ExpenseFormPage> createState() => _ExpenseFormPageState();
@@ -41,8 +47,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   late TextEditingController _paymentDetailsController;
   late TextEditingController _notesController;
   late TextEditingController _mileageController;
-  late TextEditingController _srvNumberController;
-  late TextEditingController _tripsController;
 
   // Selections
   DateTime _selectedDate = DateTime.now();
@@ -53,7 +57,14 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   String _selectedCurrency = 'SAR';
   String _submittedBy = '';
   String _submittedByRole = 'ADMIN';
-  String? _selectedEmployeeId;
+
+  /// Employee record of the person submitting the claim.
+  String? _submittedByEmployeeId;
+
+  /// Employee the company is bearing this cost for.
+  String? _beneficiaryEmployeeId;
+  String? _beneficiaryEmployeeName;
+
   String? _selectedVehicleId;
   String? _selectedVehicleName;
   List<String> _receiptUrls = [];
@@ -104,13 +115,53 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     return false;
   }
 
+  /// Costs the company carries on a named employee's behalf: document
+  /// renewals, visas, payroll. These must be attributed to someone, otherwise
+  /// there is no way to report what a given employee costs.
+  bool get _isEmployeeRelated {
+    final cat = (_selectedCategory ?? '').trim().toUpperCase();
+    final type = (_selectedType ?? '').trim().toUpperCase();
+
+    if (cat.contains('EMPLOYEE') ||
+        cat.contains('STAFF') ||
+        cat.contains('PAYROLL') ||
+        cat.contains('HR')) {
+      return true;
+    }
+
+    const employeeKeywords = [
+      'IQAMA',
+      'PASSPORT',
+      'VISA',
+      'RESIDENCE',
+      'WORK PERMIT',
+      'TAFWEED',
+      'AUTHORIZATION',
+      'HEALTH INSURANCE',
+      'MEDICAL',
+      'SALARY',
+      'ALLOWANCE',
+      'BONUS',
+      'GOSI',
+      'EXIT RE-ENTRY',
+      'RECHARGE',
+      'LICENSE RENEWAL',
+    ];
+
+    for (final kw in employeeKeywords) {
+      if (type.contains(kw)) return true;
+    }
+
+    return false;
+  }
+
   @override
   void initState() {
     super.initState();
     _isEditing = widget.expense != null;
-    final e = widget.expense;
+    final e = widget.expense ?? widget.prefill;
     _amountController = TextEditingController(
-      text: e != null ? e.amount.toString() : '',
+      text: (e != null && e.amount > 0) ? e.amount.toString() : '',
     );
     _descriptionController = TextEditingController(
       text: e?.description ?? '',
@@ -121,12 +172,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     _notesController = TextEditingController(text: e?.notes ?? '');
     _mileageController = TextEditingController(
       text: e?.mileageKm?.toString() ?? '',
-    );
-    _srvNumberController = TextEditingController(
-      text: e?.srvNumber ?? '',
-    );
-    _tripsController = TextEditingController(
-      text: e?.numberOfTrips?.toString() ?? '',
     );
 
     _amountController.addListener(_onAmountChanged);
@@ -153,14 +198,20 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
     if (e != null) {
       _selectedDate = e.date;
-      _selectedCategory = e.expenseCategory;
-      _selectedType = e.expenseType;
-      _selectedAccountId = e.fundAccountId;
+      _selectedCategory =
+          e.expenseCategory.isEmpty ? null : e.expenseCategory;
+      _selectedType = e.expenseType.isEmpty ? null : e.expenseType;
+      _selectedAccountId =
+          e.fundAccountId.isEmpty ? null : e.fundAccountId;
       _paymentMethod = e.paymentMethod;
       _selectedCurrency = e.currency;
       _submittedBy = e.submittedBy;
       _submittedByRole = e.submittedByRole;
-      _selectedEmployeeId = e.employeeId;
+      // Legacy rows kept the submitter in employeeId; the getters sort out
+      // which meaning this row was written with.
+      _submittedByEmployeeId = e.resolvedSubmittedByEmployeeId;
+      _beneficiaryEmployeeId = e.beneficiaryEmployeeId;
+      _beneficiaryEmployeeName = e.beneficiaryEmployeeName;
       _selectedVehicleId = e.vehicleId;
       _selectedVehicleName = e.vehicleName;
       _receiptUrls = List.from(e.receiptUrls);
@@ -179,8 +230,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     _paymentDetailsController.dispose();
     _notesController.dispose();
     _mileageController.dispose();
-    _srvNumberController.dispose();
-    _tripsController.dispose();
     super.dispose();
   }
 
@@ -232,6 +281,18 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                   ),
                   SizedBox(height: 20.h),
 
+                  // ── Employee attribution ──────────────────────
+                  _buildFormCard(
+                    title: _isEmployeeRelated
+                        ? 'Employee Attribution *'
+                        : 'Employee Attribution',
+                    icon: Icons.badge_outlined,
+                    children: [
+                      _buildBeneficiaryField(empProv),
+                    ],
+                  ),
+                  SizedBox(height: 20.h),
+
                   // ── Vehicle (mandatory for vehicle-related expenses) ───────────
                   if (_isVehicleRelated) ...[
                     _buildFormCard(
@@ -245,6 +306,22 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                     ),
                     SizedBox(height: 20.h),
                   ],
+
+                  // ── Description / notes ───────────────────────
+                  _buildFormCard(
+                    title: 'Additional Details',
+                    icon: Icons.notes_outlined,
+                    children: [
+                      _buildDescriptionField(),
+                      if (_paymentMethod != 'cash') ...[
+                        SizedBox(height: 16.h),
+                        _buildPaymentDetailsField(),
+                      ],
+                      SizedBox(height: 16.h),
+                      _buildNotesField(),
+                    ],
+                  ),
+                  SizedBox(height: 20.h),
 
                   // ── Receipt Upload ────────────────────────────
                   _buildFormCard(
@@ -457,16 +534,16 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
   Widget _buildSubmittedByField(EmployeeProvider empProv) {
     EmployeeEntity? selectedEmp;
-    if (_selectedEmployeeId != null && _selectedEmployeeId!.isNotEmpty) {
-      final matches = empProv.employees.where((e) => e.id == _selectedEmployeeId);
+    if (_submittedByEmployeeId != null && _submittedByEmployeeId!.isNotEmpty) {
+      final matches = empProv.employees.where((e) => e.id == _submittedByEmployeeId);
       if (matches.isNotEmpty) selectedEmp = matches.first;
     }
 
     return _FieldWrapper(
       label: 'Submitted By *',
       child: FormField<String>(
-        initialValue: _selectedEmployeeId,
-        validator: (v) => (_selectedEmployeeId == null || _selectedEmployeeId!.isEmpty)
+        initialValue: _submittedByEmployeeId,
+        validator: (v) => (_submittedByEmployeeId == null || _submittedByEmployeeId!.isEmpty)
             ? 'Required'
             : null,
         builder: (state) {
@@ -480,7 +557,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
               InkWell(
                 onTap: () => _showEmployeeSearchDialog(context, empProv, (selected) {
                   setState(() {
-                    _selectedEmployeeId = selected.id;
+                    _submittedByEmployeeId = selected.id;
                     _submittedBy = selected.fullName;
                     _submittedByRole = selected.position;
                   });
@@ -539,6 +616,184 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                   ),
                 ),
               ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Picker for the employee this cost is *for* — distinct from the submitter.
+  /// Required for employee-related categories, optional elsewhere so a shared
+  /// cost (a team SIM, an office item) can still be attributed when it helps.
+  /// Shown on the expense row and in the approval dialog, so it is the line
+  /// that explains the spend to whoever reviews it.
+  Widget _buildDescriptionField() {
+    return _FieldWrapper(
+      label: 'Description',
+      child: TextFormField(
+        controller: _descriptionController,
+        decoration: _inputDecoration(
+          hint: 'What was this spent on?',
+        ),
+        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+      ),
+    );
+  }
+
+  /// Only meaningful for non-cash payments, where there is a transfer or
+  /// reference number worth recording.
+  Widget _buildPaymentDetailsField() {
+    return _FieldWrapper(
+      label: 'Payment Details',
+      child: TextFormField(
+        controller: _paymentDetailsController,
+        decoration: _inputDecoration(
+          hint: 'Transfer or reference number',
+        ),
+        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+      ),
+    );
+  }
+
+  Widget _buildNotesField() {
+    return _FieldWrapper(
+      label: 'Notes',
+      child: TextFormField(
+        controller: _notesController,
+        maxLines: 3,
+        decoration: _inputDecoration(
+          hint: 'Anything the approver should know',
+        ),
+        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+      ),
+    );
+  }
+
+  Widget _buildBeneficiaryField(EmployeeProvider empProv) {
+    EmployeeEntity? selected;
+    if (_beneficiaryEmployeeId != null && _beneficiaryEmployeeId!.isNotEmpty) {
+      final matches =
+          empProv.employees.where((e) => e.id == _beneficiaryEmployeeId);
+      if (matches.isNotEmpty) selected = matches.first;
+    }
+    final display = selected?.fullName ?? (_beneficiaryEmployeeName ?? '');
+    final required = _isEmployeeRelated;
+
+    return _FieldWrapper(
+      label: required ? 'Expense For *' : 'Expense For',
+      child: FormField<String>(
+        key: ValueKey('beneficiary_$_beneficiaryEmployeeId'),
+        initialValue: _beneficiaryEmployeeId,
+        validator: (v) {
+          if (required &&
+              (_beneficiaryEmployeeId == null ||
+                  _beneficiaryEmployeeId!.isEmpty)) {
+            return 'Select the employee this expense is for';
+          }
+          return null;
+        },
+        builder: (state) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              InkWell(
+                onTap: () =>
+                    _showEmployeeSearchDialog(context, empProv, (emp) {
+                  setState(() {
+                    _beneficiaryEmployeeId = emp.id;
+                    _beneficiaryEmployeeName = emp.fullName;
+                  });
+                  state.didChange(emp.id);
+                }),
+                borderRadius: BorderRadius.circular(10.r),
+                child: Container(
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+                  decoration: BoxDecoration(
+                    color: FinDT.bgPage,
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(
+                      color: state.hasError ? FinDT.danger : FinDT.border,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.badge_outlined,
+                        size: 16.sp,
+                        color: FinDT.brand,
+                      ),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          display.isNotEmpty
+                              ? display
+                              : 'Search & select employee...',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: display.isNotEmpty
+                                ? FinDT.textPrimary
+                                : FinDT.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (selected != null) ...[
+                        SizedBox(width: 8.w),
+                        _EmploymentTypeChip(employee: selected),
+                      ],
+                      if (_beneficiaryEmployeeId != null &&
+                          _beneficiaryEmployeeId!.isNotEmpty)
+                        InkWell(
+                          onTap: () {
+                            setState(() {
+                              _beneficiaryEmployeeId = null;
+                              _beneficiaryEmployeeName = null;
+                            });
+                            state.didChange(null);
+                          },
+                          child: Padding(
+                            padding: EdgeInsets.only(left: 6.w),
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 16.sp,
+                              color: FinDT.textSecondary,
+                            ),
+                          ),
+                        )
+                      else
+                        Icon(
+                          Icons.arrow_drop_down_rounded,
+                          size: 20.sp,
+                          color: FinDT.textSecondary,
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              if (state.hasError) ...[
+                SizedBox(height: 4.h),
+                Padding(
+                  padding: EdgeInsets.only(left: 4.w),
+                  child: Text(
+                    state.errorText!,
+                    style: GoogleFonts.inter(
+                      fontSize: 10.sp,
+                      color: FinDT.danger,
+                    ),
+                  ),
+                ),
+              ],
+              SizedBox(height: 6.h),
+              Text(
+                'The company bears this cost on their behalf. They are not paying it.',
+                style: GoogleFonts.inter(
+                  fontSize: 10.sp,
+                  color: FinDT.textSecondary,
+                ),
+              ),
             ],
           );
         },
@@ -1820,6 +2075,19 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       return;
     }
 
+    if (_isEmployeeRelated &&
+        (_beneficiaryEmployeeId == null || _beneficiaryEmployeeId!.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please select the employee this expense is for',
+          ),
+          backgroundColor: FinDT.danger,
+        ),
+      );
+      return;
+    }
+
     final policy = finProv.policy;
     final amountVal = double.tryParse(_amountController.text) ?? 0.0;
     if (amountVal >= policy.receiptRequiredAbove && _receiptUrls.isEmpty) {
@@ -1879,19 +2147,20 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         status: _isEditing
             ? widget.expense!.status
             : ExpenseStatus.pending,
-        employeeId: _selectedEmployeeId,
+        employeeId: _beneficiaryEmployeeId,
+        employeeName: _beneficiaryEmployeeName,
+        submittedByEmployeeId: _submittedByEmployeeId,
+
         vehicleId: _isVehicleRelated ? _selectedVehicleId : null,
         vehicleName: _isVehicleRelated ? _selectedVehicleName : null,
         mileageKm: _isVehicleRelated && _mileageController.text.isNotEmpty
             ? double.tryParse(_mileageController.text)
             : null,
         receiptUrls: _receiptUrls,
-        srvNumber: _srvNumberController.text.isEmpty
-            ? null
-            : _srvNumberController.text,
-        numberOfTrips: _tripsController.text.isNotEmpty
-            ? int.tryParse(_tripsController.text)
-            : null,
+        // No UI writes these; carry through whatever a legacy row already has
+        // so editing it does not silently blank them.
+        srvNumber: widget.expense?.srvNumber,
+        numberOfTrips: widget.expense?.numberOfTrips,
         notes:
             _notesController.text.isEmpty ? null : _notesController.text,
       );
@@ -1942,6 +2211,37 @@ class _FieldWrapper extends StatelessWidget {
         SizedBox(height: 6.h),
         child,
       ],
+    );
+  }
+}
+
+/// Marks whether the attributed employee is on payroll or a contracted third
+/// party, so the cost lands under the right heading at a glance.
+class _EmploymentTypeChip extends StatelessWidget {
+  final EmployeeEntity employee;
+
+  const _EmploymentTypeChip({required this.employee});
+
+  @override
+  Widget build(BuildContext context) {
+    final isExternal = employee.isExternal;
+    final color = isExternal ? FinDT.warning : FinDT.brand;
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(6.r),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        isExternal ? 'External' : 'Internal',
+        style: GoogleFonts.inter(
+          fontSize: 9.sp,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
     );
   }
 }
