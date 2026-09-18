@@ -77,6 +77,7 @@ class FinanceProvider with ChangeNotifier {
   String? _categoryFilter;
   String? _typeFilter;
   String? _accountFilter;
+  String? _employeeFilter;
   String? _searchQuery;
   DateTime? _dateFrom;
   DateTime? _dateTo;
@@ -89,6 +90,11 @@ class FinanceProvider with ChangeNotifier {
   bool get isLoadingMore => _isLoadingMore;
   bool get isCategoriesLoading => _isCategoriesLoading;
   bool get isPolicyLoading => _isPolicyLoading;
+
+  /// False while [policy] is still the built-in default rather than the
+  /// org's configured one. Callers that enforce policy thresholds outside the
+  /// finance screens should fetch first.
+  bool get isPolicyLoaded => _policy != null;
   String? get error => _error;
   /// Whether more pages are available to load.
   bool get hasMore => _hasMore;
@@ -96,6 +102,7 @@ class FinanceProvider with ChangeNotifier {
   String? get categoryFilter => _categoryFilter;
   String? get typeFilter => _typeFilter;
   String? get accountFilter => _accountFilter;
+  String? get employeeFilter => _employeeFilter;
   String? get searchQuery => _searchQuery;
   DateTime? get dateFrom => _dateFrom;
   DateTime? get dateTo => _dateTo;
@@ -119,6 +126,11 @@ class FinanceProvider with ChangeNotifier {
     if (_accountFilter != null && _accountFilter!.isNotEmpty) {
       result =
           result.where((e) => e.fundAccountId == _accountFilter).toList();
+    }
+    if (_employeeFilter != null && _employeeFilter!.isNotEmpty) {
+      result = result
+          .where((e) => e.beneficiaryEmployeeId == _employeeFilter)
+          .toList();
     }
     if (_searchQuery != null && _searchQuery!.isNotEmpty) {
       final query = _searchQuery!.toLowerCase();
@@ -506,6 +518,32 @@ class FinanceProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Employees that appear as the beneficiary on at least one loaded expense,
+  /// as `id -> display name`, sorted by name. Drives the employee filter so it
+  /// only ever offers people who actually have costs against them.
+  Map<String, String> get expenseBeneficiaries {
+    final result = <String, String>{};
+    for (final e in _expenses) {
+      final id = e.beneficiaryEmployeeId;
+      if (id == null || id.isEmpty) continue;
+      final name = e.beneficiaryEmployeeName;
+      if (name != null && name.isNotEmpty) {
+        result[id] = name;
+      } else {
+        result.putIfAbsent(id, () => 'Unnamed employee');
+      }
+    }
+    final entries = result.entries.toList()
+      ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+    return Map.fromEntries(entries);
+  }
+
+  /// Narrows the list to costs the company carried for one employee.
+  void setEmployeeFilter(String? employeeId) {
+    _employeeFilter = employeeId;
+    notifyListeners();
+  }
+
   void setSearchQuery(String? query) {
     _searchQuery = query;
     notifyListeners();
@@ -516,6 +554,7 @@ class FinanceProvider with ChangeNotifier {
     _categoryFilter = null;
     _typeFilter = null;
     _accountFilter = null;
+    _employeeFilter = null;
     _searchQuery = null;
     _dateFrom = null;
     _dateTo = null;

@@ -187,6 +187,19 @@ class ExpenseCategoriesPage extends StatelessWidget {
             defaultDuration: 'MONTHLY',
             submittedByRole: 'ADMIN',
           ),
+          // Company document costs, logged straight from the vault alerts.
+          ExpenseTypeEntity(
+            id: 'cr_renewal',
+            name: 'Commercial Registration (CR) Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'vat_certificate',
+            name: 'VAT Certificate Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
         ],
       ),
       ExpenseCategoryEntity(
@@ -218,6 +231,25 @@ class ExpenseCategoriesPage extends StatelessWidget {
             defaultDuration: 'YEARLY',
             submittedByRole: 'ADMIN',
           ),
+          // Vehicle document costs, logged straight from the expiry alerts.
+          ExpenseTypeEntity(
+            id: 'istimara_renewal',
+            name: 'Istimara Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'fahas_mvpi',
+            name: 'Fahas / MVPI',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'vehicle_authorization',
+            name: 'Vehicle Authorization (Tafweed)',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
         ],
       ),
       ExpenseCategoryEntity(
@@ -241,6 +273,70 @@ class ExpenseCategoriesPage extends StatelessWidget {
             id: 'bonus',
             name: 'Performance Bonus',
             defaultDuration: 'MONTHLY',
+            submittedByRole: 'ADMIN',
+          ),
+          // Company-borne document costs. These are attributed to the
+          // employee they were spent on, not paid by them.
+          ExpenseTypeEntity(
+            id: 'iqama_renewal',
+            name: 'Iqama Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'passport_renewal',
+            name: 'Passport Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'visa_renewal',
+            name: 'Visa Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'residence_renewal',
+            name: 'Residence Permit Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'driving_license_renewal',
+            name: 'Driving License Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'health_insurance',
+            name: 'Health Insurance',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'authorization_renewal',
+            name: 'Tafweed (Authorization) Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'phone_recharge',
+            name: 'Phone Recharge',
+            defaultDuration: 'MONTHLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'medical_exam',
+            name: 'Medical Examination',
+            defaultDuration: 'ONE_TIME',
+            priority: 'IF_REQUIRED',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'exit_reentry',
+            name: 'Exit Re-entry Visa',
+            defaultDuration: 'ONE_TIME',
+            priority: 'IF_REQUIRED',
             submittedByRole: 'ADMIN',
           ),
         ],

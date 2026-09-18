@@ -84,8 +84,17 @@ class ExpenseEntity extends Equatable {
 
   final ExpenseStatus status;
 
+  /// Employee this expense is *spent on* — the company bears the cost on their
+  /// behalf (iqama renewal, passport, visa, phone recharge, salary). Not the
+  /// person who submitted the claim; that is [submittedByEmployeeId].
   final String? employeeId;
   final String? employeeName;
+
+  /// Employee record of the person who submitted this expense.
+  ///
+  /// Rows written before the submitter/beneficiary split have this null and
+  /// stored the *submitter* in [employeeId]; see [beneficiaryEmployeeId].
+  final String? submittedByEmployeeId;
   final String? vehicleId;
   final String? vehicleName;
   final double? mileageKm;
@@ -145,6 +154,7 @@ class ExpenseEntity extends Equatable {
     this.status = ExpenseStatus.pending,
     this.employeeId,
     this.employeeName,
+    this.submittedByEmployeeId,
     this.vehicleId,
     this.vehicleName,
     this.mileageKm,
@@ -174,6 +184,33 @@ class ExpenseEntity extends Equatable {
 
   int get resolvedAmountMinor =>
       amountMinor ?? (amount * 100).round();
+
+  /// Whether [employeeId] on this row means the beneficiary.
+  ///
+  /// The manual expense form used to write the *submitter* into [employeeId]
+  /// and never wrote [employeeName] at all, while payroll mirrors wrote the
+  /// beneficiary into both. Any of the three markers below means the row was
+  /// written with beneficiary semantics; anything else is a legacy manual row
+  /// whose [employeeId] is a submitter.
+  bool get _employeeIdIsBeneficiary =>
+      submittedByEmployeeId != null ||
+      salaryPaymentId != null ||
+      (employeeName != null && employeeName!.isNotEmpty);
+
+  /// Employee the company bore this cost for, or null if unattributed.
+  String? get beneficiaryEmployeeId =>
+      _employeeIdIsBeneficiary ? employeeId : null;
+
+  String? get beneficiaryEmployeeName =>
+      _employeeIdIsBeneficiary ? employeeName : null;
+
+  /// Employee record of the submitter, falling back to the legacy [employeeId].
+  String? get resolvedSubmittedByEmployeeId =>
+      submittedByEmployeeId ?? (_employeeIdIsBeneficiary ? null : employeeId);
+
+  /// True when this cost is tracked against a specific employee.
+  bool get hasEmployeeAttribution =>
+      (beneficiaryEmployeeId ?? '').isNotEmpty;
 
   factory ExpenseEntity.empty() {
     return ExpenseEntity(
@@ -214,6 +251,7 @@ class ExpenseEntity extends Equatable {
     ExpenseStatus? status,
     String? employeeId,
     String? employeeName,
+    String? submittedByEmployeeId,
     String? vehicleId,
     String? vehicleName,
     double? mileageKm,
@@ -243,6 +281,7 @@ class ExpenseEntity extends Equatable {
     bool clearPaymentDetails = false,
     bool clearEmployeeId = false,
     bool clearEmployeeName = false,
+    bool clearSubmittedByEmployeeId = false,
     bool clearVehicleId = false,
     bool clearVehicleName = false,
     bool clearMileageKm = false,
@@ -284,6 +323,9 @@ class ExpenseEntity extends Equatable {
       employeeId: clearEmployeeId ? null : (employeeId ?? this.employeeId),
       employeeName:
           clearEmployeeName ? null : (employeeName ?? this.employeeName),
+      submittedByEmployeeId: clearSubmittedByEmployeeId
+          ? null
+          : (submittedByEmployeeId ?? this.submittedByEmployeeId),
       vehicleId: clearVehicleId ? null : (vehicleId ?? this.vehicleId),
       vehicleName:
           clearVehicleName ? null : (vehicleName ?? this.vehicleName),
@@ -341,6 +383,7 @@ class ExpenseEntity extends Equatable {
         status,
         employeeId,
         employeeName,
+        submittedByEmployeeId,
         vehicleId,
         vehicleName,
         mileageKm,

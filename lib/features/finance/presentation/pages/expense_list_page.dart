@@ -146,6 +146,19 @@ class _FiltersBar extends StatelessWidget {
             ),
             SizedBox(width: 12.w),
 
+            // Employee attribution filter
+            _FilterDropdown<String>(
+              hint: 'Employee',
+              value: provider.employeeFilter,
+              items: provider.expenseBeneficiaries.entries
+                  .map(
+                    (e) => DropdownMenuItem(value: e.key, child: Text(e.value)),
+                  )
+                  .toList(),
+              onChanged: (id) => provider.setEmployeeFilter(id),
+            ),
+            SizedBox(width: 12.w),
+
             // Fund account filter
             _FilterDropdown<String>(
               hint: 'Account',
@@ -162,6 +175,7 @@ class _FiltersBar extends StatelessWidget {
                 provider.categoryFilter != null ||
                 provider.typeFilter != null ||
                 provider.accountFilter != null ||
+                provider.employeeFilter != null ||
                 provider.searchQuery != null ||
                 provider.dateFrom != null) ...[
               SizedBox(width: 12.w),
@@ -863,10 +877,13 @@ class _ExpenseDataTable extends StatelessWidget {
                       ),
                       SizedBox(height: 6.h),
                       _detailRow('Fund Account', accountName),
-                      if (expense.employeeName != null &&
-                          expense.employeeName!.isNotEmpty) ...[
+                      if (expense.beneficiaryEmployeeName != null &&
+                          expense.beneficiaryEmployeeName!.isNotEmpty) ...[
                         SizedBox(height: 6.h),
-                        _detailRow('Employee', expense.employeeName!),
+                        _detailRow(
+                          'Expense For',
+                          expense.beneficiaryEmployeeName!,
+                        ),
                       ],
                       if (expense.vehicleName != null &&
                           expense.vehicleName!.isNotEmpty) ...[
