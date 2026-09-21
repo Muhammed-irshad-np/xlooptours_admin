@@ -36,6 +36,16 @@ import 'features/employee/domain/usecases/upload_document_attachment_usecase.dar
 import 'features/employee/domain/usecases/upload_employee_image_usecase.dart';
 import 'features/employee/presentation/providers/employee_provider.dart';
 
+import 'features/vehicle/data/datasources/odometer_remote_data_source.dart';
+import 'features/vehicle/data/repositories/odometer_repository_impl.dart';
+import 'features/vehicle/domain/entities/odometer_policy.dart';
+import 'features/vehicle/domain/repositories/odometer_repository.dart';
+import 'features/vehicle/domain/usecases/get_odometer_readings_usecase.dart';
+import 'features/vehicle/domain/usecases/get_odometer_review_queue_usecase.dart';
+import 'features/vehicle/domain/usecases/record_odometer_reading_usecase.dart';
+import 'features/vehicle/domain/usecases/review_odometer_reading_usecase.dart';
+import 'features/vehicle/domain/usecases/validate_odometer_reading_usecase.dart';
+import 'features/vehicle/presentation/providers/odometer_provider.dart';
 import 'features/vehicle/data/datasources/vehicle_remote_data_source.dart';
 import 'features/vehicle/data/repositories/vehicle_repository_impl.dart';
 import 'features/vehicle/domain/repositories/vehicle_repository.dart';
@@ -412,6 +422,61 @@ Future<void> init() async {
   // Data sources
   sl.registerLazySingleton<VehicleRemoteDataSource>(
     () => VehicleRemoteDataSourceImpl(firestore: sl(), storage: sl()),
+  );
+
+  //! Features - Vehicle / Odometer
+  //
+  // The odometer reading log. Every odometer value in the app is written
+  // through RecordOdometerReadingUseCase so validation, attribution and the
+  // audit trail cannot be bypassed.
+
+  // Policy: all plausibility thresholds live in one tunable object.
+  sl.registerLazySingleton<OdometerPolicy>(() => const OdometerPolicy());
+
+  // State Management (Provider)
+  sl.registerFactory(
+    () => OdometerProvider(
+      getReadingsUseCase: sl(),
+      recordReadingUseCase: sl(),
+      reviewReadingUseCase: sl(),
+      getReviewQueueUseCase: sl(),
+      getFleetDailyMedianUseCase: sl(),
+      validator: sl(),
+      repository: sl(),
+      policy: sl(),
+    ),
+  );
+
+  // UseCases
+  sl.registerLazySingleton(
+    () => ValidateOdometerReadingUseCase(policy: sl()),
+  );
+  sl.registerLazySingleton(
+    () => RecordOdometerReadingUseCase(
+      odometerRepository: sl(),
+      vehicleRepository: sl(),
+      validator: sl(),
+      policy: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => ReviewOdometerReadingUseCase(
+      odometerRepository: sl(),
+      vehicleRepository: sl(),
+    ),
+  );
+  sl.registerLazySingleton(() => GetOdometerReviewQueueUseCase(policy: sl()));
+  sl.registerLazySingleton(() => GetOdometerReadingsUseCase(sl()));
+  sl.registerLazySingleton(() => GetFleetDailyMedianUseCase(sl()));
+
+  // Repository
+  sl.registerLazySingleton<OdometerRepository>(
+    () => OdometerRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data source
+  sl.registerLazySingleton<OdometerRemoteDataSource>(
+    () => OdometerRemoteDataSourceImpl(firestore: sl(), storage: sl()),
   );
 
   //! Features - Invoice

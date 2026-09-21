@@ -12,6 +12,8 @@ import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/domain/entities/shop_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../features/vehicle/presentation/providers/odometer_provider.dart';
+import '../features/vehicle/domain/entities/odometer_reading_entity.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
@@ -390,6 +392,7 @@ class _AddMaintenanceRecordDialogState
 
     try {
       final provider = context.read<VehicleProvider>();
+      final odometerProvider = context.read<OdometerProvider>();
 
       final List<({String typeId, MaintenanceRecord record})> recordsToAdd = [];
 
@@ -504,6 +507,26 @@ class _AddMaintenanceRecordDialogState
 
       await provider.updateVehicle(updatedVehicle);
 
+      // Every service mileage typed here is an odometer observation. Logging
+      // them gives the plausibility engine a second, independent source to
+      // check the weekly readings against — and vice versa.
+      var vehicleForOdometer = updatedVehicle;
+      for (final e in recordsToAdd) {
+        if (e.record.mileage <= 0) continue;
+        final result = await odometerProvider.recordSilently(
+          vehicle: vehicleForOdometer,
+          value: e.record.mileage,
+          source: OdometerSource.maintenance,
+          readingAt: e.record.date,
+          enteredByUid: user?.id,
+          enteredByName: username,
+          note: 'Captured while logging ${e.record.serviceType}.',
+        );
+        // Carry the refreshed vehicle forward so several records in one save
+        // validate against each other rather than against a stale odometer.
+        vehicleForOdometer = result?.updatedVehicle ?? vehicleForOdometer;
+      }
+
       if (mounted) {
         await ActivityLogger.log(
           context,
@@ -528,6 +551,29 @@ class _AddMaintenanceRecordDialogState
         });
       }
     }
+  }
+
+  /// What the system currently believes, shown so the entrant is comparing
+  /// against something rather than typing into a vacuum.
+  String? get _odometerHelperText {
+    final last = widget.vehicle.currentOdometer;
+    return last == null ? null : 'Last recorded: $last km';
+  }
+
+  /// Catches the one error that is unambiguous at this point: a service
+  /// mileage below what the vehicle has already covered. Subtler slips are
+  /// caught by the plausibility engine when the reading reaches the odometer
+  /// log, where the full history is available.
+  String? _validateServiceOdometer(String? v) {
+    if (v == null || v.isEmpty) return 'Required';
+    final parsed = int.tryParse(v);
+    if (parsed == null) return 'Invalid';
+
+    final last = widget.vehicle.currentOdometer;
+    if (last != null && parsed < last) {
+      return 'Below last recorded ($last km)';
+    }
+    return null;
   }
 
   /// Maps a [typeId] to the correct named field on [VehicleMaintenance].
@@ -807,6 +853,7 @@ class _AddMaintenanceRecordDialogState
                                   decoration: InputDecoration(
                                     labelText: 'Current Odometer *',
                                     suffixText: 'km',
+                                    helperText: _odometerHelperText,
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8.r),
                                     ),
@@ -815,11 +862,7 @@ class _AddMaintenanceRecordDialogState
                                   inputFormatters: [
                                     FilteringTextInputFormatter.digitsOnly,
                                   ],
-                                  validator: (v) {
-                                    if (v == null || v.isEmpty) return 'Required';
-                                    if (int.tryParse(v) == null) return 'Invalid';
-                                    return null;
-                                  },
+                                  validator: _validateServiceOdometer,
                                 ),
                               ),
                               SizedBox(width: 16.w),
