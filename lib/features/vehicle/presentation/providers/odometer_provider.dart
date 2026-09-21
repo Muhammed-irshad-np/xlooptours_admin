@@ -46,11 +46,25 @@ class OdometerProvider extends ChangeNotifier {
   bool _isSaving = false;
   String? _errorMessage;
 
+  String? _queueError;
+  bool _queueLoaded = false;
+
   List<OdometerReviewItem> get reviewQueue => _reviewQueue;
   double? get fleetDailyMedian => _fleetDailyMedian;
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   String? get errorMessage => _errorMessage;
+
+  /// Why the review queue could not be built, if it could not be.
+  ///
+  /// Kept distinct from an empty queue so the screen can say "could not load"
+  /// instead of "nothing to review" — the two look identical to a user and mean
+  /// opposite things.
+  String? get queueError => _queueError;
+
+  /// True once a queue build has actually completed, successfully or not.
+  bool get queueLoaded => _queueLoaded;
+
   int get pendingReviewCount => _reviewQueue
       .where((i) => i.reason != OdometerReviewReason.stale)
       .length;
@@ -241,32 +255,57 @@ class OdometerProvider extends ChangeNotifier {
 
   Future<void> loadReviewQueue(List<VehicleEntity> vehicles) async {
     _setLoading(true);
-    try {
-      final quarantined = await repository.getQuarantinedReadings();
+    _queueError = null;
 
-      // Only fetch full history for vehicles that actually have something to
-      // look at, plus any that look stale — not the whole fleet.
-      final vehicleIds = quarantined.map((r) => r.vehicleId).toSet();
-      for (final id in vehicleIds) {
-        await loadReadings(id, force: true);
-      }
+    try {
+      final active = vehicles.where((v) => v.isActive).toList();
+
+      // Read every active vehicle's log directly.
+      //
+      // An earlier version drove this from a single collection-group query for
+      // quarantined readings. That query needs a composite index, and when the
+      // index is missing it throws — which left the queue empty and the screen
+      // claiming there was nothing to review. It also meant one failing query
+      // suppressed stale and cross-source detection, neither of which needs it.
+      //
+      // Per-vehicle subcollection reads need no index at all and cannot fail
+      // that way. This runs on an admin screen, not a hot path, so the extra
+      // reads are worth the reliability. They are issued in parallel.
+      final results = await Future.wait(
+        active.map((v) => _fetchReadings(v.id)),
+      );
 
       final map = <String, List<OdometerReadingEntity>>{};
-      for (final v in vehicles) {
-        map[v.id] = _readingsByVehicle[v.id] ?? const [];
+      for (var i = 0; i < active.length; i++) {
+        _readingsByVehicle[active[i].id] = results[i];
+        map[active[i].id] = results[i];
       }
 
       _reviewQueue = getReviewQueueUseCase(
-        vehicles: vehicles,
+        vehicles: active,
         readingsByVehicle: map,
       );
       _errorMessage = null;
     } catch (e) {
-      _errorMessage = 'Failed to build odometer review queue: $e';
-      debugPrint(_errorMessage);
+      // Surfaced to the UI, not just the console: an empty queue and a failed
+      // load must never look the same to whoever is reviewing.
+      _queueError = 'Could not load odometer readings: $e';
+      _reviewQueue = [];
+      debugPrint(_queueError);
     } finally {
+      _queueLoaded = true;
       _setLoading(false);
     }
+  }
+
+  /// Fetches one vehicle's readings without touching shared loading state.
+  ///
+  /// Used when loading many vehicles at once, so the queue build notifies
+  /// listeners once at the end rather than once per vehicle.
+  Future<List<OdometerReadingEntity>> _fetchReadings(String vehicleId) async {
+    final readings = await getReadingsUseCase(vehicleId);
+    readings.sort((a, b) => a.readingAt.compareTo(b.readingAt));
+    return readings;
   }
 
   Future<VehicleEntity?> acceptReading({
