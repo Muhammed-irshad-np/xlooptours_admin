@@ -101,6 +101,8 @@ class _OdometerReviewScreenState extends State<OdometerReviewScreen> {
       ),
       body: provider.isLoading && items.isEmpty
           ? const Center(child: CircularProgressIndicator())
+          : provider.queueError != null
+          ? _loadFailed(provider.queueError!)
           : items.isEmpty
           ? _empty()
           : RefreshIndicator(
@@ -118,6 +120,73 @@ class _OdometerReviewScreenState extends State<OdometerReviewScreen> {
                 ),
               ),
             ),
+    );
+  }
+
+  /// Shown when the readings could not be fetched at all.
+  ///
+  /// Distinct from [_empty] on purpose: "nothing to review" and "we could not
+  /// check" look identical to a reviewer but mean opposite things, and quietly
+  /// showing the former while the latter is true is how a flagged reading goes
+  /// unnoticed.
+  Widget _loadFailed(String error) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(28.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_rounded, size: 44.sp, color: _T.danger),
+            SizedBox(height: 12.h),
+            Text(
+              'Could not load the readings',
+              style: GoogleFonts.inter(
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w600,
+                color: _T.textPrimary,
+              ),
+            ),
+            SizedBox(height: 6.h),
+            Text(
+              'This is not the same as having nothing to review — flagged '
+              'readings may exist but could not be fetched.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 12.sp,
+                height: 1.5,
+                color: _T.textSecondary,
+              ),
+            ),
+            SizedBox(height: 14.h),
+            Container(
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: _T.dangerBg,
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Text(
+                error,
+                style: GoogleFonts.inter(
+                  fontSize: 11.sp,
+                  color: _T.danger,
+                  height: 1.4,
+                ),
+              ),
+            ),
+            SizedBox(height: 16.h),
+            ElevatedButton.icon(
+              onPressed: _load,
+              icon: Icon(Icons.refresh_rounded, size: 16.sp),
+              label: const Text('Try again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _T.brand,
+                foregroundColor: Colors.white,
+                elevation: 0,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

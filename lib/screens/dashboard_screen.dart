@@ -850,6 +850,15 @@ class _DashboardScreenState extends State<DashboardScreen>
     } else {
       AppSnackBar.showSuccess(context, 'Odometer updated successfully');
     }
+
+    // Rebuild the queue so the Review badge reflects what was just saved.
+    // Without this the count stays at whatever it was when the dashboard
+    // loaded, and a reading the user was just told is "held for review" shows
+    // up nowhere until the app is restarted.
+    if (!mounted) return;
+    unawaited(
+      odometer.loadReviewQueue(context.read<VehicleProvider>().vehicles),
+    );
   }
 }
 

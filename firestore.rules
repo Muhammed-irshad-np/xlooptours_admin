@@ -169,6 +169,14 @@ service cloud.firestore {
                ]);
     }
 
+    // Fleet-wide (collection-group) reads need their own rule. A rule matching
+    // /vehicles/{id}/odometerReadings/{rid} does NOT authorize a collectionGroup
+    // query — Firestore requires a recursive-wildcard match for those, and
+    // without it the query is denied no matter what indexes exist.
+    match /{path=**}/odometerReadings/{readingId} {
+      allow read: if request.auth != null;
+    }
+
     match /vehicles/{vehicleId}/odometerReadings/{readingId} {
       allow read: if isAllowedUser();
 
