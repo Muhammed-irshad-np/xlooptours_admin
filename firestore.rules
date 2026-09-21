@@ -174,7 +174,7 @@ service cloud.firestore {
     // query — Firestore requires a recursive-wildcard match for those, and
     // without it the query is denied no matter what indexes exist.
     match /{path=**}/odometerReadings/{readingId} {
-      allow read: if request.auth != null;
+      allow read: if isAllowedUser();
     }
 
     match /vehicles/{vehicleId}/odometerReadings/{readingId} {
