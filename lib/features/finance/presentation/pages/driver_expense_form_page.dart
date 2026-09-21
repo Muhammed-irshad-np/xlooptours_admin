@@ -9,6 +9,8 @@ import 'package:image_picker/image_picker.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../../../vehicle/presentation/providers/vehicle_provider.dart';
+import '../../../vehicle/domain/entities/odometer_reading_entity.dart';
+import '../../../vehicle/presentation/providers/odometer_provider.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../pages/finance_dashboard_page.dart';
@@ -397,6 +399,27 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
       );
 
       await provider.insertExpense(expense);
+
+      // The driver read this off the cluster to fill the mileage field, so it
+      // is a genuine odometer observation — log it as one instead of letting
+      // it sit unused on the expense. Best-effort: a failure here must never
+      // cost the driver their submission.
+      if (mounted) {
+        final mileage = expense.mileageKm;
+        if (mileage != null && mileage > 0) {
+          await context.read<OdometerProvider>().recordSilently(
+            vehicle: selectedVehicle,
+            value: mileage.round(),
+            source: OdometerSource.expense,
+            readingAt: expense.date,
+            sourceRefId: expense.id,
+            enteredByName: expense.submittedBy,
+            note:
+                'From driver ${expense.expenseType} expense '
+                '${expense.referenceNumber}.',
+          );
+        }
+      }
 
       if (mounted) {
         _showSuccessDialog();

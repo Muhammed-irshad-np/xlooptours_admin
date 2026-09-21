@@ -834,6 +834,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                                   _purchaseOdometerController,
                                   isNumber: true,
                                   required: false,
+                                  extraValidator: _validatePurchaseOdometer,
                                 ),
                               ),
                             ],
@@ -844,6 +845,8 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                             _currentOdometerController,
                             isNumber: true,
                             required: false,
+                            helperText: _currentOdometerHelper,
+                            extraValidator: _validateCurrentOdometer,
                           ),
                         ],
 
@@ -1382,6 +1385,8 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     TextEditingController controller, {
     bool isNumber = false,
     bool required = true,
+    String? helperText,
+    String? Function(String?)? extraValidator,
   }) {
     return TextFormField(
       controller: controller,
@@ -1391,17 +1396,68 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           : null,
       decoration: InputDecoration(
         labelText: label,
+        helperText: helperText,
+        helperMaxLines: 2,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
       ),
-      validator: required
-          ? (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter $label';
-              }
-              return null;
-            }
-          : null,
+      validator: (value) {
+        if (required && (value == null || value.isEmpty)) {
+          return 'Please enter $label';
+        }
+        return extraValidator?.call(value);
+      },
     );
+  }
+
+  // ── Odometer sanity on the master form ───────────────────────────────────
+  //
+  // This screen can set the odometer to anything, which makes it the easiest
+  // way to bypass the plausibility engine entirely. These checks cover what is
+  // decidable here: the two fields must agree with each other, and neither may
+  // rewrite history downwards once readings exist.
+
+  /// Hard ceiling shared with [OdometerPolicy], repeated here because the form
+  /// validates before any repository is reached.
+  static const int _lifetimeMaxKm = 2000000;
+
+  String? _validatePurchaseOdometer(String? value) {
+    if (value == null || value.isEmpty) return null;
+    final parsed = int.tryParse(value);
+    if (parsed == null) return 'Invalid odometer';
+    if (parsed > _lifetimeMaxKm) return 'Beyond any vehicle lifetime';
+
+    final current = int.tryParse(_currentOdometerController.text);
+    if (current != null && parsed > current) {
+      return 'Cannot exceed the current odometer';
+    }
+    return null;
+  }
+
+  String? _validateCurrentOdometer(String? value) {
+    if (value == null || value.isEmpty) return null;
+    final parsed = int.tryParse(value);
+    if (parsed == null) return 'Invalid odometer';
+    if (parsed > _lifetimeMaxKm) return 'Beyond any vehicle lifetime';
+
+    final purchase = int.tryParse(_purchaseOdometerController.text);
+    if (purchase != null && parsed < purchase) {
+      return 'Cannot be below the purchase odometer';
+    }
+
+    // On an existing vehicle the stored value is the latest accepted reading.
+    // Editing it downwards here would contradict the log, so it is refused;
+    // a genuine cluster replacement goes through the odometer review screen.
+    final existing = widget.vehicle?.currentOdometer;
+    if (existing != null && parsed < existing) {
+      return 'Below the recorded $existing km. Use Odometer Review to correct.';
+    }
+    return null;
+  }
+
+  String? get _currentOdometerHelper {
+    final existing = widget.vehicle?.currentOdometer;
+    if (existing == null) return 'Sets the starting point for all future checks';
+    return 'Recorded: $existing km. Weekly readings are validated against this.';
   }
 
 

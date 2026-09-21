@@ -14,6 +14,7 @@ import 'features/notifications/presentation/providers/notification_provider.dart
 import 'features/company/presentation/providers/company_provider.dart';
 import 'features/customer/presentation/providers/customer_provider.dart';
 import 'features/employee/presentation/providers/employee_provider.dart';
+import 'features/vehicle/presentation/providers/odometer_provider.dart';
 import 'features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'features/invoice/presentation/providers/invoice_provider.dart';
 import 'features/analytics/presentation/providers/analytics_provider.dart';
@@ -307,6 +308,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => di.sl<CustomerProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<EmployeeProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<VehicleProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<OdometerProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<InvoiceProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<AnalyticsProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<VaultProvider>()),

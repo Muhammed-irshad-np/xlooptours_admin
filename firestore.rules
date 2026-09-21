@@ -9,6 +9,59 @@ service cloud.firestore {
              get(/databases/$(database)/documents/allowed_users/$(request.auth.token.email.lower())).data.isAdmin == true;
     }
 
+    // ── Odometer readings ──────────────────────────────────────────────────
+    //
+    // The reading log is append-only. A reading is an observation of what a
+    // cluster showed at a moment in time; it is never edited and never deleted.
+    // A wrong reading is superseded by a correction, which keeps the series
+    // intact so downstream maintenance maths can be recomputed rather than
+    // guessed at.
+    //
+    // These rules are the last line of defence. The client-side plausibility
+    // engine (ValidateOdometerReadingUseCase) does the nuanced, history-aware
+    // work; what is enforced here is only what can be checked from the document
+    // itself, so that a client that skips the engine still cannot write
+    // nonsense.
+
+    function odometerFieldsValid(data) {
+      return data.value is int
+             && data.value >= 0
+             && data.value <= 2000000
+             && data.vehicleId is string
+             && data.readingAt is string
+             && data.source is string
+             && data.status in ['accepted', 'quarantined', 'rejected', 'superseded'];
+    }
+
+    // The observation itself is immutable. Only the review verdict may change,
+    // and only into the fields listed here.
+    function onlyReviewFieldsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly([
+                 'status',
+                 'supersededByReadingId',
+                 'reviewedByUid',
+                 'reviewedByName',
+                 'reviewedAt',
+                 'reviewNote'
+               ]);
+    }
+
+    match /vehicles/{vehicleId}/odometerReadings/{readingId} {
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+                    && odometerFieldsValid(request.resource.data)
+                    && request.resource.data.vehicleId == vehicleId;
+
+      // Review verdicts only — never the value, date, source or entrant.
+      allow update: if request.auth != null && onlyReviewFieldsChanged();
+
+      // Nothing deletes a reading, not even an admin. Reject it instead: it
+      // stops counting immediately but stays answerable for audit.
+      allow delete: if false;
+    }
+
     match /{document=**} {
       allow read, create, update: if true;
       allow delete: if isAdmin();

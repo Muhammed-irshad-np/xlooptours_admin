@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -16,6 +17,10 @@ import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.
 import 'package:xloop_invoice/features/employee/presentation/providers/employee_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
+import 'package:xloop_invoice/features/vehicle/presentation/providers/odometer_provider.dart';
+import 'package:xloop_invoice/features/vehicle/presentation/widgets/odometer_entry_dialog.dart';
+import 'package:xloop_invoice/features/vehicle/presentation/pages/odometer_review_screen.dart';
+import 'package:xloop_invoice/features/vehicle/domain/entities/odometer_reading_entity.dart';
 import 'package:xloop_invoice/features/customer/presentation/providers/customer_provider.dart';
 import 'package:xloop_invoice/features/feedback/presentation/providers/feedback_provider.dart';
 import 'package:xloop_invoice/features/notifications/presentation/providers/notification_provider.dart';
@@ -142,6 +147,15 @@ class _DashboardScreenState extends State<DashboardScreen>
       ]);
 
       if (!mounted) return;
+      final odometerProvider = context.read<OdometerProvider>();
+
+      // The fleet baseline feeds the plausibility bands; the review queue
+      // surfaces readings that are currently excluded from those bands.
+      // Neither blocks the dashboard, so they are not awaited together with
+      // the critical data above.
+      unawaited(odometerProvider.loadFleetBaseline());
+      unawaited(odometerProvider.loadReviewQueue(vehicleProvider.vehicles));
+
       await context.read<NotificationProvider>().refreshAlerts(
         vehicles: vehicleProvider.vehicles,
         maintenanceTypes: vehicleProvider.maintenanceTypes,
@@ -717,10 +731,46 @@ class _DashboardScreenState extends State<DashboardScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionLabel(
-          label: 'Weekly Odometer Updates',
-          icon: Icons.speed_rounded,
-          iconColor: _DT.warning,
+        Row(
+          children: [
+            Expanded(
+              child: _SectionLabel(
+                label: 'Weekly Odometer Updates',
+                icon: Icons.speed_rounded,
+                iconColor: _DT.warning,
+              ),
+            ),
+            // Readings held back from the maintenance maths until a human
+            // settles them. Surfaced here so they cannot pile up unseen.
+            Consumer<OdometerProvider>(
+              builder: (context, odometer, _) {
+                final pending = odometer.pendingReviewCount;
+                return TextButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const OdometerReviewScreen(),
+                    ),
+                  ),
+                  icon: Icon(
+                    pending > 0
+                        ? Icons.error_outline_rounded
+                        : Icons.fact_check_outlined,
+                    size: 16.sp,
+                    color: pending > 0 ? _DT.danger : _DT.textSecondary,
+                  ),
+                  label: Text(
+                    pending > 0 ? 'Review ($pending)' : 'Review',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                      color: pending > 0 ? _DT.danger : _DT.textSecondary,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
         SizedBox(height: 16.h),
         Consumer<VehicleProvider>(
@@ -753,35 +803,53 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   // ── Odometer dialog ──────────────────────────────────────────────────────────
-  void _showOdometerDialog(VehicleEntity vehicle) {
-    final controller = TextEditingController(
-      text: vehicle.currentOdometer?.toString() ?? '',
+  Future<void> _showOdometerDialog(VehicleEntity vehicle) async {
+    final oldKm = vehicle.currentOdometer ?? 0;
+
+    // OdometerEntryDialog validates against the vehicle's reading history,
+    // attaches evidence and writes through the append-only log. It returns the
+    // reading it recorded, or null if the entrant backed out.
+    final reading = await OdometerEntryDialog.show(
+      context,
+      vehicle: vehicle,
+      source: OdometerSource.weeklyUpdate,
     );
-    showDialog(
-      context: context,
-      builder: (ctx) => _OdometerDialog(
-        vehicle: vehicle,
-        controller: controller,
-        onConfirm: (km) async {
-          final oldKm = vehicle.currentOdometer ?? 0;
-          context.read<VehicleProvider>().updateVehicleOdometer(vehicle.id, km);
-          if (context.mounted) {
-            await ActivityLogger.log(
-              context,
-              title: 'Odometer Updated',
-              message:
-                  'Odometer updated for ${vehicle.make} ${vehicle.model} (${vehicle.plateNumber}): '
-                  '$oldKm KM → $km KM.',
-              relatedId: vehicle.id,
-            );
-          }
-          if (ctx.mounted) Navigator.pop(ctx);
-          if (context.mounted) {
-            AppSnackBar.showSuccess(context, 'Odometer updated successfully');
-          }
-        },
-      ),
+    if (reading == null || !mounted) return;
+
+    // Keep the in-memory vehicle list in step with what the log just derived.
+    final odometer = context.read<OdometerProvider>();
+    final latest = odometer.lastAcceptedFor(vehicle);
+    if (latest != null) {
+      context.read<VehicleProvider>().applyVehicleLocally(
+        vehicle.copyWith(
+          currentOdometer: latest.value,
+          lastOdometerUpdateDate: latest.readingAt,
+        ),
+      );
+    }
+
+    if (!mounted) return;
+    await ActivityLogger.log(
+      context,
+      title: reading.needsReview
+          ? 'Odometer Flagged for Review'
+          : 'Odometer Updated',
+      message:
+          'Odometer recorded for ${vehicle.make} ${vehicle.model} '
+          '(${vehicle.plateNumber}): $oldKm KM → ${reading.value} KM.'
+          '${reading.needsReview ? ' Outside the plausible range — held for review.' : ''}',
+      relatedId: vehicle.id,
     );
+
+    if (!mounted) return;
+    if (reading.needsReview) {
+      AppSnackBar.showError(
+        context,
+        'Saved, but held for review before it affects maintenance alerts',
+      );
+    } else {
+      AppSnackBar.showSuccess(context, 'Odometer updated successfully');
+    }
   }
 }
 
@@ -1870,153 +1938,6 @@ class _ActionButtonState extends State<_ActionButton> {
               fontWeight: FontWeight.w600,
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════════════════════
-//  Odometer Dialog
-// ═══════════════════════════════════════════════════════════════════════════════
-class _OdometerDialog extends StatelessWidget {
-  final VehicleEntity vehicle;
-  final TextEditingController controller;
-  final void Function(int km) onConfirm;
-  const _OdometerDialog({
-    required this.vehicle,
-    required this.controller,
-    required this.onConfirm,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.r)),
-      child: Padding(
-        padding: EdgeInsets.all(28.w),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(10.w),
-                  decoration: BoxDecoration(
-                    color: _DT.warning.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10.r),
-                  ),
-                  child: Icon(
-                    Icons.speed_rounded,
-                    color: _DT.warning,
-                    size: 22.sp,
-                  ),
-                ),
-                SizedBox(width: 14.w),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Update Odometer',
-                        style: GoogleFonts.inter(
-                          fontSize: 18.sp,
-                          fontWeight: FontWeight.w700,
-                          color: _DT.textPrimary,
-                        ),
-                      ),
-                      Text(
-                        '${vehicle.make} ${vehicle.model} · ${vehicle.plateNumber}',
-                        style: GoogleFonts.inter(
-                          fontSize: 13.sp,
-                          color: _DT.textSecondary,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 24.h),
-            Text(
-              'Current mileage (km)',
-              style: GoogleFonts.inter(
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w600,
-                color: _DT.textPrimary,
-              ),
-            ),
-            SizedBox(height: 10.h),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              autofocus: true,
-              style: GoogleFonts.inter(
-                fontSize: 16.sp,
-                color: _DT.textPrimary,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-              decoration: InputDecoration(
-                hintText: 'e.g. 45000',
-                suffixText: 'km',
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: const BorderSide(color: _DT.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
-                  borderSide: const BorderSide(color: _DT.brand, width: 2),
-                ),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 16.w,
-                  vertical: 14.h,
-                ),
-              ),
-            ),
-            SizedBox(height: 24.h),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: Text(
-                    'Cancel',
-                    style: GoogleFonts.inter(
-                      color: _DT.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12.w),
-                ElevatedButton(
-                  onPressed: () {
-                    final km = int.tryParse(controller.text);
-                    if (km != null) onConfirm(km);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _DT.brand,
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 24.w,
-                      vertical: 14.h,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.r),
-                    ),
-                  ),
-                  child: Text(
-                    'Save',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ),
       ),
     );

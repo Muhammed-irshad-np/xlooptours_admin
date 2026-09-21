@@ -6,6 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import '../../../vehicle/domain/entities/odometer_reading_entity.dart';
+import '../../../vehicle/presentation/providers/odometer_provider.dart';
+import '../../../vehicle/presentation/providers/vehicle_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
@@ -884,6 +887,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         await finProv.insertExpense(expense);
       }
 
+      await _logOdometerReading(expense);
+
       if (mounted) {
         AppSnackBar.showInfo(context, _isEditing ? 'Expense updated!' : 'Expense saved!',);
         Navigator.pop(context);
@@ -894,6 +899,42 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  /// Feeds the mileage typed onto an expense into the odometer log.
+  ///
+  /// It used to be stored on the expense and never looked at again. As a
+  /// reading it becomes a second, independent observation the plausibility
+  /// engine can check the weekly updates against — a fuel receipt showing
+  /// 46,100 km three days before a weekly update of 44,800 km is a
+  /// contradiction worth surfacing, and neither number alone reveals it.
+  ///
+  /// Best-effort by design: never blocks or fails the expense save, because a
+  /// reading that cannot be logged must not cost the user their entry.
+  Future<void> _logOdometerReading(ExpenseEntity expense) async {
+    final vehicleId = expense.vehicleId;
+    final mileage = expense.mileageKm;
+    if (vehicleId == null || mileage == null || mileage <= 0) return;
+    if (!mounted) return;
+
+    try {
+      final vehicles = context.read<VehicleProvider>().vehicles;
+      final odometer = context.read<OdometerProvider>();
+      final vehicle = vehicles.where((v) => v.id == vehicleId).firstOrNull;
+      if (vehicle == null) return;
+
+      await odometer.recordSilently(
+        vehicle: vehicle,
+        value: mileage.round(),
+        source: OdometerSource.expense,
+        readingAt: expense.date,
+        sourceRefId: expense.id,
+        enteredByName: expense.submittedBy,
+        note: 'From ${expense.expenseType} expense ${expense.referenceNumber}.',
+      );
+    } catch (_) {
+      // Swallowed on purpose: see the doc comment above.
     }
   }
 }
@@ -926,4 +967,6 @@ class _FieldWrapper extends StatelessWidget {
       ],
     );
   }
+
+
 }

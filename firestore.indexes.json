@@ -48,6 +48,14 @@
   // ]
   "indexes": [
     {
+      "collectionGroup": "odometerReadings",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "status", "mode": "ASCENDING" },
+        { "fieldPath": "readingAt", "mode": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "evaluations",
       "queryScope": "COLLECTION",
       "fields": [
