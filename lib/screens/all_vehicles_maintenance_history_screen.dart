@@ -37,6 +37,7 @@ class _AllVehiclesMaintenanceHistoryScreenState
   String _selectedFilter = 'All'; // 'All', 'Follow-ups', 'Extensions'
   String _selectedVehicleFilter = 'All Vehicles';
   String _selectedShopFilter = 'All Shops';
+  DateTimeRange? _selectedDateRange;
 
   // Pagination states
   int _currentPage = 1;
@@ -185,6 +186,28 @@ class _AllVehiclesMaintenanceHistoryScreenState
             return false;
           }
 
+          // Date range filter
+          if (_selectedDateRange != null) {
+            final recordDate = DateTime(
+              r.date.year,
+              r.date.month,
+              r.date.day,
+            );
+            final start = DateTime(
+              _selectedDateRange!.start.year,
+              _selectedDateRange!.start.month,
+              _selectedDateRange!.start.day,
+            );
+            final end = DateTime(
+              _selectedDateRange!.end.year,
+              _selectedDateRange!.end.month,
+              _selectedDateRange!.end.day,
+            );
+            if (recordDate.isBefore(start) || recordDate.isAfter(end)) {
+              return false;
+            }
+          }
+
           // Search query filter
           if (_searchQuery.trim().isNotEmpty) {
             final query = _searchQuery.trim().toLowerCase();
@@ -272,7 +295,8 @@ class _AllVehiclesMaintenanceHistoryScreenState
                             if (_searchQuery.isNotEmpty ||
                                 _selectedFilter != 'All' ||
                                 _selectedVehicleFilter != 'All Vehicles' ||
-                                _selectedShopFilter != 'All Shops') ...[
+                                _selectedShopFilter != 'All Shops' ||
+                                _selectedDateRange != null) ...[
                               SizedBox(height: 8.h),
                               TextButton.icon(
                                 onPressed: () {
@@ -282,6 +306,7 @@ class _AllVehiclesMaintenanceHistoryScreenState
                                     _selectedFilter = 'All';
                                     _selectedVehicleFilter = 'All Vehicles';
                                     _selectedShopFilter = 'All Shops';
+                                    _selectedDateRange = null;
                                     _currentPage = 1;
                                   });
                                 },
@@ -516,9 +541,120 @@ class _AllVehiclesMaintenanceHistoryScreenState
               ],
             ],
           ),
+          SizedBox(height: 6.h),
+          _buildDateRangeFilterRow(),
           SizedBox(height: 4.h),
         ],
       ),
+    );
+  }
+
+  Widget _buildDateRangeFilterRow() {
+    final hasDateFilter = _selectedDateRange != null;
+    final dateFormat = DateFormat('MMM dd, yyyy');
+    final label = hasDateFilter
+        ? '${dateFormat.format(_selectedDateRange!.start)} – ${dateFormat.format(_selectedDateRange!.end)}'
+        : 'All Dates';
+
+    return Row(
+      children: [
+        Expanded(
+          child: InkWell(
+            onTap: () async {
+              final now = DateTime.now();
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(2020),
+                lastDate: now,
+                initialDateRange: _selectedDateRange ??
+                    DateTimeRange(
+                      start: now.subtract(const Duration(days: 30)),
+                      end: now,
+                    ),
+                builder: (context, child) {
+                  return Theme(
+                    data: Theme.of(context).copyWith(
+                      colorScheme: ColorScheme.light(
+                        primary: Colors.blue.shade700,
+                        onPrimary: Colors.white,
+                        surface: Colors.white,
+                        onSurface: Colors.black87,
+                      ),
+                    ),
+                    child: child!,
+                  );
+                },
+              );
+              if (picked != null) {
+                setState(() {
+                  _selectedDateRange = picked;
+                  _currentPage = 1;
+                });
+              }
+            },
+            borderRadius: BorderRadius.circular(8.r),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+              decoration: BoxDecoration(
+                color: hasDateFilter
+                    ? Colors.blue.withValues(alpha: 0.08)
+                    : Colors.grey[100],
+                borderRadius: BorderRadius.circular(8.r),
+                border: Border.all(
+                  color: hasDateFilter
+                      ? Colors.blue.shade400
+                      : Colors.grey.shade300,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.date_range,
+                    size: 16.sp,
+                    color: hasDateFilter
+                        ? Colors.blue.shade700
+                        : Colors.grey[600],
+                  ),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 11.sp,
+                        color: hasDateFilter
+                            ? Colors.blue.shade800
+                            : Colors.grey[700],
+                        fontWeight: hasDateFilter
+                            ? FontWeight.w600
+                            : FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (hasDateFilter)
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _selectedDateRange = null;
+                          _currentPage = 1;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(12.r),
+                      child: Padding(
+                        padding: EdgeInsets.all(2.w),
+                        child: Icon(
+                          Icons.close,
+                          size: 16.sp,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
