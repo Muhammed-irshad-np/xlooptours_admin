@@ -934,10 +934,12 @@ class _Sidebar extends StatelessWidget {
           SizedBox(height: 4.h),
           // Nav items
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
-              itemCount: items.length,
-              itemBuilder: (context, index) {
+            child: Scrollbar(
+              thumbVisibility: true,
+              child: ListView.builder(
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                itemCount: items.length,
+                itemBuilder: (context, index) {
                 final item = items[index];
                 final isSelected = selectedIndex == index;
 
@@ -969,6 +971,7 @@ class _Sidebar extends StatelessWidget {
                   onTap: () => onItemSelected(index),
                 );
               },
+              ),
             ),
           ),
           // Bottom divider
