@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -876,7 +877,7 @@ class _NavItem {
   });
 }
 
-class _Sidebar extends StatelessWidget {
+class _Sidebar extends StatefulWidget {
   final int selectedIndex;
   final List<_NavItem> items;
   final Color sidebarBg;
@@ -902,10 +903,23 @@ class _Sidebar extends StatelessWidget {
   });
 
   @override
+  State<_Sidebar> createState() => _SidebarState();
+}
+
+class _SidebarState extends State<_Sidebar> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       width: 220.w,
-      color: sidebarBg,
+      color: widget.sidebarBg,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -914,7 +928,7 @@ class _Sidebar extends StatelessWidget {
           // Divider
           Container(
             height: 1,
-            color: dividerColor,
+            color: widget.dividerColor,
             margin: EdgeInsets.symmetric(horizontal: 16.w),
           ),
           SizedBox(height: 12.h),
@@ -925,59 +939,103 @@ class _Sidebar extends StatelessWidget {
               'MAIN MENU',
               style: GoogleFonts.notoSans(
                 fontSize: 9.sp,
-                color: inactiveText.withOpacity(0.6),
+                color: widget.inactiveText.withValues(alpha: 0.6),
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.8,
               ),
             ),
           ),
           SizedBox(height: 4.h),
-          // Nav items
+          // Nav items with high-contrast visible scrollbar
           Expanded(
-            child: Scrollbar(
-              thumbVisibility: true,
-              child: ListView.builder(
-                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                final item = items[index];
-                final isSelected = selectedIndex == index;
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                scrollbarTheme: ScrollbarThemeData(
+                  thumbVisibility: const WidgetStatePropertyAll(true),
+                  trackVisibility: const WidgetStatePropertyAll(true),
+                  interactive: true,
+                  thickness: WidgetStatePropertyAll(6.w),
+                  radius: Radius.circular(4.r),
+                  crossAxisMargin: 2.w,
+                  thumbColor: WidgetStateProperty.resolveWith((states) {
+                    if (states.contains(WidgetState.dragged)) {
+                      return widget.brandBlue;
+                    }
+                    if (states.contains(WidgetState.hovered)) {
+                      return Colors.white.withValues(alpha: 0.7);
+                    }
+                    return Colors.white.withValues(alpha: 0.35);
+                  }),
+                  trackColor: WidgetStatePropertyAll(
+                    Colors.white.withValues(alpha: 0.07),
+                  ),
+                  trackBorderColor: const WidgetStatePropertyAll(
+                    Colors.transparent,
+                  ),
+                ),
+              ),
+              child: Scrollbar(
+                controller: _scrollController,
+                thumbVisibility: true,
+                trackVisibility: true,
+                interactive: true,
+                child: ScrollConfiguration(
+                  behavior: ScrollConfiguration.of(context).copyWith(
+                    scrollbars: false,
+                    dragDevices: {
+                      PointerDeviceKind.touch,
+                      PointerDeviceKind.mouse,
+                      PointerDeviceKind.trackpad,
+                      PointerDeviceKind.stylus,
+                      PointerDeviceKind.unknown,
+                    },
+                  ),
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 4.h),
+                    itemCount: widget.items.length,
+                    itemBuilder: (context, index) {
+                      final item = widget.items[index];
+                      final isSelected = widget.selectedIndex == index;
 
-                // Special badge handling for notifications
-                if (item.hasBadge) {
-                  return Consumer<NotificationProvider>(
-                    builder: (context, provider, _) {
+                      // Special badge handling for notifications
+                      if (item.hasBadge) {
+                        return Consumer<NotificationProvider>(
+                          builder: (context, provider, _) {
+                            return _NavTile(
+                              item: item,
+                              isSelected: isSelected,
+                              brandBlue: widget.brandBlue,
+                              activeBg: widget.activeBg,
+                              inactiveText: widget.inactiveText,
+                              badgeCount: provider.unreadCount,
+                              isAdmin: widget.isAdmin,
+                              onTap: () => widget.onItemSelected(index),
+                            );
+                          },
+                        );
+                      }
+
                       return _NavTile(
                         item: item,
                         isSelected: isSelected,
-                        brandBlue: brandBlue,
-                        activeBg: activeBg,
-                        inactiveText: inactiveText,
-                        badgeCount: provider.unreadCount,
-                        isAdmin: isAdmin,
-                        onTap: () => onItemSelected(index),
+                        brandBlue: widget.brandBlue,
+                        activeBg: widget.activeBg,
+                        inactiveText: widget.inactiveText,
+                        isAdmin: widget.isAdmin,
+                        onTap: () => widget.onItemSelected(index),
                       );
                     },
-                  );
-                }
-
-                return _NavTile(
-                  item: item,
-                  isSelected: isSelected,
-                  brandBlue: brandBlue,
-                  activeBg: activeBg,
-                  inactiveText: inactiveText,
-                  isAdmin: isAdmin,
-                  onTap: () => onItemSelected(index),
-                );
-              },
+                  ),
+                ),
               ),
             ),
           ),
           // Bottom divider
           Container(
             height: 1,
-            color: dividerColor,
+            color: widget.dividerColor,
             margin: EdgeInsets.symmetric(horizontal: 16.w),
           ),
           // Logged-in user profile
@@ -1004,15 +1062,15 @@ class _Sidebar extends StatelessWidget {
       child: Container(
         padding: EdgeInsets.all(12.w),
         decoration: BoxDecoration(
-          color: activeBg,
+          color: widget.activeBg,
           borderRadius: BorderRadius.circular(12.r),
-          border: Border.all(color: dividerColor),
+          border: Border.all(color: widget.dividerColor),
         ),
         child: Row(
           children: [
             CircleAvatar(
               radius: 20.r,
-              backgroundColor: brandBlue.withValues(alpha: 0.2),
+              backgroundColor: widget.brandBlue.withValues(alpha: 0.2),
               backgroundImage: hasPhoto ? NetworkImage(photoUrl) : null,
               onBackgroundImageError: hasPhoto ? (_, __) {} : null,
               child: hasPhoto
@@ -1020,7 +1078,7 @@ class _Sidebar extends StatelessWidget {
                   : Text(
                       initial,
                       style: GoogleFonts.notoSans(
-                        color: brandBlue,
+                        color: widget.brandBlue,
                         fontWeight: FontWeight.bold,
                         fontSize: 14.sp,
                       ),
@@ -1046,7 +1104,7 @@ class _Sidebar extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.notoSans(
-                      color: inactiveText,
+                      color: widget.inactiveText,
                       fontSize: 10.sp,
                     ),
                   ),
@@ -1060,7 +1118,7 @@ class _Sidebar extends StatelessWidget {
   }
 
   void _handleLogoClick(BuildContext context) {
-    if (isAdmin && context.mounted) {
+    if (widget.isAdmin && context.mounted) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const VaultScreen()),
@@ -1080,7 +1138,7 @@ class _Sidebar extends StatelessWidget {
               width: 36.w,
               height: 36.h,
               decoration: BoxDecoration(
-                color: brandBlue.withOpacity(0.15),
+                color: widget.brandBlue.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10.r),
               ),
               child: ClipRRect(
@@ -1090,7 +1148,7 @@ class _Sidebar extends StatelessWidget {
                   fit: BoxFit.contain,
                   errorBuilder: (c, o, s) => Icon(
                     Icons.directions_car_rounded,
-                    color: brandBlue,
+                    color: widget.brandBlue,
                     size: 20.sp,
                   ),
                 ),
@@ -1115,7 +1173,7 @@ class _Sidebar extends StatelessWidget {
                     'Admin Panel',
                     style: GoogleFonts.notoSans(
                       fontSize: 9.sp,
-                      color: brandBlue,
+                      color: widget.brandBlue,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.8,
                     ),
@@ -1135,23 +1193,23 @@ class _Sidebar extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: onLogout,
+          onTap: widget.onLogout,
           borderRadius: BorderRadius.circular(10.r),
           child: Container(
             padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10.r),
-              border: Border.all(color: dividerColor),
+              border: Border.all(color: widget.dividerColor),
             ),
             child: Row(
               children: [
-                Icon(Icons.logout_rounded, color: inactiveText, size: 18.sp),
+                Icon(Icons.logout_rounded, color: widget.inactiveText, size: 18.sp),
                 SizedBox(width: 12.w),
                 Text(
                   'Sign Out',
                   style: GoogleFonts.notoSans(
                     fontSize: 12.sp,
-                    color: inactiveText,
+                    color: widget.inactiveText,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
