@@ -61,6 +61,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
 
   // Restored state variables
   final ValueNotifier<bool> _isLoading = ValueNotifier(false);
+  String _loadingMessage = 'Saving details...';
   final ValueNotifier<bool> _isUploadingImage = ValueNotifier(false);
   final ValueNotifier<double> _uploadProgress = ValueNotifier(0.0);
   final ValueNotifier<XFile?> _selectedImage = ValueNotifier(null);
@@ -161,6 +162,9 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   }
 
   Future<void> _loadData() async {
+    _loadingMessage = widget.vehicle != null
+        ? 'Loading Edit Vehicle page...'
+        : 'Loading Add Vehicle page...';
     _isLoading.value = true;
     try {
       await Future.wait([_loadDrivers(), _loadVehicleMasterData()]);
@@ -357,6 +361,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   Future<void> _saveVehicle() async {
     if (!_formKey.currentState!.validate()) return;
 
+    _loadingMessage = 'Saving details...';
     _isLoading.value = true;
     _isUploadingImage.value =
         _selectedImage.value != null; // Set uploading flag
@@ -671,7 +676,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                               const CircularProgressIndicator(),
                               SizedBox(height: 16.h),
                               Text(
-                                'Saving details...',
+                                _loadingMessage,
                                 style: TextStyle(fontSize: 16.sp),
                               ),
                             ],
