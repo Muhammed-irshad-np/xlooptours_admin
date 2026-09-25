@@ -13,6 +13,7 @@ import '../features/invoice/domain/entities/line_item_entity.dart';
 import '../widgets/line_item_row_widget.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/custom_date_picker.dart';
+import '../core/widgets/confirm_save_dialog.dart';
 
 class InvoiceFormScreen extends StatefulWidget {
   final InvoiceEntity? invoiceToEdit;
@@ -287,6 +288,86 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       AppSnackBar.showInfo(context, 'Please add at least one line item');
       return;
     }
+
+    // Show confirmation dialog with invoice details
+    final subtotal = validItems.fold<double>(
+      0,
+      (sum, item) => sum + item.subtotalAmount,
+    );
+    final taxRate = double.tryParse(_taxRateController.text) ?? 5.0;
+    final discount = double.tryParse(_discountController.text) ?? 0.0;
+    final paymentTerms = _useCustomPaymentTerms.value
+        ? _paymentTermsController.text
+        : _selectedPaymentTermsOption.value;
+
+    final sections = <ConfirmDetailSection>[
+      ConfirmDetailSection(
+        title: 'Invoice Details',
+        icon: Icons.receipt_long_outlined,
+        entries: [
+          ConfirmDetailEntry(
+            label: 'Company',
+            value: _selectedCompany.value?.companyName,
+          ),
+          ConfirmDetailEntry(
+            label: 'Date',
+            value: formatDateForConfirmation(_selectedDate.value),
+          ),
+          ConfirmDetailEntry(
+            label: 'Contract Ref.',
+            value: _contractRefController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Payment Terms',
+            value: paymentTerms,
+          ),
+        ],
+      ),
+      ConfirmDetailSection(
+        title: 'Line Items (${validItems.length})',
+        icon: Icons.list_alt_outlined,
+        entries: [
+          for (final item in validItems)
+            ConfirmDetailEntry(
+              label: item.description.length > 30
+                  ? '${item.description.substring(0, 30)}...'
+                  : item.description,
+              value:
+                  '${item.unit} ${item.unitType} = ${item.subtotalAmount.toStringAsFixed(2)}',
+            ),
+        ],
+      ),
+      ConfirmDetailSection(
+        title: 'Totals',
+        icon: Icons.calculate_outlined,
+        entries: [
+          ConfirmDetailEntry(
+            label: 'Subtotal',
+            value: subtotal.toStringAsFixed(2),
+          ),
+          ConfirmDetailEntry(
+            label: 'WHT Rate',
+            value: '${taxRate.toStringAsFixed(1)}%',
+          ),
+          if (discount > 0)
+            ConfirmDetailEntry(
+              label: 'Discount',
+              value: discount.toStringAsFixed(2),
+            ),
+        ],
+      ),
+    ];
+
+    final confirmed = await showConfirmSaveDialog(
+      context: context,
+      title: widget.invoiceToEdit == null
+          ? 'Confirm Generate Invoice'
+          : 'Confirm Update Invoice',
+      entityName: _selectedCompany.value?.companyName,
+      sections: sections,
+      confirmButtonText: 'Confirm & Generate',
+    );
+    if (confirmed != true) return;
 
     try {
       final invoiceProvider = context.read<InvoiceProvider>();

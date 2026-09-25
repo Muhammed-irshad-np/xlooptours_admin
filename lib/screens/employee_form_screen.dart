@@ -22,6 +22,7 @@ import 'vehicle_makes_screen.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
+import '../core/widgets/confirm_save_dialog.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
   // ... (rest of class)
@@ -512,6 +513,127 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   Future<void> _saveEmployee() async {
     if (!_formKey.currentState!.validate()) return;
     if (!await _confirmConversionToExternal()) return;
+
+    // Show confirmation dialog with entered details
+    final sections = <ConfirmDetailSection>[
+      ConfirmDetailSection(
+        title: 'Basic Information',
+        icon: Icons.person_outline,
+        entries: [
+          ConfirmDetailEntry(label: 'Name', value: _nameController.text.trim()),
+          ConfirmDetailEntry(label: 'Position', value: _selectedPosition.value),
+          ConfirmDetailEntry(
+            label: 'Type',
+            value: _isExternal ? 'External' : 'Internal',
+          ),
+          ConfirmDetailEntry(label: 'Gender', value: _selectedGender.value),
+          ConfirmDetailEntry(
+            label: 'Phone',
+            value: _phoneController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Email',
+            value: _emailController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Nationality',
+            value: _nationalityController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'ID Type',
+            value: _selectedIdType.value,
+          ),
+          ConfirmDetailEntry(
+            label: 'ID Number',
+            value: _idNumberController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Join Date',
+            value: formatDateForConfirmation(_joinDate.value),
+          ),
+          ConfirmDetailEntry(
+            label: 'Date of Birth',
+            value: formatDateForConfirmation(_birthDate.value),
+          ),
+          ConfirmDetailEntry(
+            label: 'Status',
+            value: _isActive.value ? 'Active' : 'Inactive',
+          ),
+        ],
+      ),
+      if (!_isExternal)
+        ConfirmDetailSection(
+          title: 'Documents',
+          icon: Icons.description_outlined,
+          entries: [
+            ConfirmDetailEntry(
+              label: 'Iqama No.',
+              value: _iqamaNumberController.text.trim(),
+            ),
+            ConfirmDetailEntry(
+              label: 'Iqama Expiry',
+              value: formatDateForConfirmation(_iqamaExpiryDate.value),
+            ),
+            ConfirmDetailEntry(
+              label: 'Passport Name',
+              value: _passportNameController.text.trim(),
+            ),
+            ConfirmDetailEntry(
+              label: 'Passport No.',
+              value: _passportNumberController.text.trim(),
+            ),
+            ConfirmDetailEntry(
+              label: 'Passport Expiry',
+              value: formatDateForConfirmation(_passportExpiryDate.value),
+            ),
+            ConfirmDetailEntry(
+              label: 'License No.',
+              value: _licenseNumberController.text.trim(),
+            ),
+            ConfirmDetailEntry(
+              label: 'License Expiry',
+              value: formatDateForConfirmation(_licenseExpiryDate.value),
+            ),
+          ],
+        ),
+      if (_isExternal && _isDriverPosition)
+        ConfirmDetailSection(
+          title: 'External Vehicle',
+          icon: Icons.directions_car_outlined,
+          entries: [
+            ConfirmDetailEntry(
+              label: 'Make',
+              value: _selectedVehicleMake.value,
+            ),
+            ConfirmDetailEntry(
+              label: 'Model',
+              value: _selectedVehicleModel.value,
+            ),
+            ConfirmDetailEntry(
+              label: 'Year',
+              value: _selectedVehicleYear.value?.toString(),
+            ),
+            ConfirmDetailEntry(
+              label: 'Color',
+              value: _selectedVehicleColor.value,
+            ),
+            ConfirmDetailEntry(
+              label: 'Plate No.',
+              value: _plateNumberController.text.trim(),
+            ),
+          ],
+        ),
+    ];
+
+    final confirmed = await showConfirmSaveDialog(
+      context: context,
+      title: widget.employee == null
+          ? 'Confirm Add Employee'
+          : 'Confirm Update Employee',
+      entityName: _nameController.text.trim(),
+      sections: sections,
+    );
+    if (confirmed != true) return;
 
     _isSaving.value = true;
 

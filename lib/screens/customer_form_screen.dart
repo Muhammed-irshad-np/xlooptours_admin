@@ -10,6 +10,7 @@ import '../features/customer/presentation/providers/customer_provider.dart';
 import '../widgets/responsive_layout.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
+import '../core/widgets/confirm_save_dialog.dart';
 
 class CustomerFormScreen extends StatefulWidget {
   final CustomerEntity? customer;
@@ -145,6 +146,50 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
 
   Future<void> _saveCustomer() async {
     if (_formKey.currentState!.validate() && !_isSaving.value) {
+      // Show confirmation dialog with entered details
+      final sections = <ConfirmDetailSection>[
+        ConfirmDetailSection(
+          title: 'Customer Details',
+          icon: Icons.person_outline,
+          entries: [
+            ConfirmDetailEntry(
+              label: 'Name',
+              value: _nameController.text.trim(),
+            ),
+            ConfirmDetailEntry(
+              label: 'Phone',
+              value: '$_countryCode ${_phoneController.text.trim()}',
+            ),
+          ],
+        ),
+        ConfirmDetailSection(
+          title: 'Company',
+          icon: Icons.business_outlined,
+          entries: [
+            ConfirmDetailEntry(
+              label: 'Company',
+              value: _selectedCompany.value?.companyName,
+            ),
+            if (_selectedCompany.value?.usesCaseCode == true &&
+                _assignedCaseCodes.value.isNotEmpty)
+              ConfirmDetailEntry(
+                label: 'Case Codes',
+                value: _assignedCaseCodes.value.join(', '),
+              ),
+          ],
+        ),
+      ];
+
+      final confirmed = await showConfirmSaveDialog(
+        context: context,
+        title: widget.customer == null
+            ? 'Confirm Add Customer'
+            : 'Confirm Update Customer',
+        entityName: _nameController.text.trim(),
+        sections: sections,
+      );
+      if (confirmed != true) return;
+
       _isSaving.value = true;
 
       try {
