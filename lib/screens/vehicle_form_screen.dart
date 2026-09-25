@@ -41,6 +41,18 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   final ValueNotifier<int?> _selectedYear = ValueNotifier(null);
   final ValueNotifier<String?> _selectedColor = ValueNotifier(null);
 
+  // GlobalKeys for mandatory fields (used for scroll-to-error)
+  final _makeFieldKey = GlobalKey();
+  final _modelFieldKey = GlobalKey();
+  final _yearFieldKey = GlobalKey();
+  final _colorFieldKey = GlobalKey();
+  final _plateNumberFieldKey = GlobalKey();
+  final _typeFieldKey = GlobalKey();
+
+  // FocusNodes for mandatory text fields
+  final _plateNumberFocusNode = FocusNode();
+  final _typeFocusNode = FocusNode();
+
   // Controllers for free-text fields
   final _plateNumberController = TextEditingController();
   final _typeController = TextEditingController();
@@ -120,6 +132,8 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _availableColors.dispose();
     _plateNumberController.dispose();
     _typeController.dispose();
+    _plateNumberFocusNode.dispose();
+    _typeFocusNode.dispose();
 
     _departmentController.dispose();
     _vinNumberController.dispose();
@@ -355,8 +369,57 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     }
   }
 
+  /// Scrolls to and focuses the first mandatory field that is invalid.
+  /// Returns true if a missing field was found (and scrolled to), false otherwise.
+  Future<bool> _scrollToFirstError() async {
+    // Check mandatory fields in display order
+    final fieldsToCheck = <MapEntry<GlobalKey, FocusNode?>>[
+      MapEntry(_makeFieldKey, null),
+      MapEntry(_modelFieldKey, null),
+      MapEntry(_yearFieldKey, null),
+      MapEntry(_colorFieldKey, null),
+      MapEntry(_plateNumberFieldKey, _plateNumberFocusNode),
+      MapEntry(_typeFieldKey, _typeFocusNode),
+    ];
+
+    final valuesToCheck = <bool>[
+      _selectedMake.value == null || _selectedMake.value!.isEmpty,
+      _selectedModel.value == null || _selectedModel.value!.isEmpty,
+      _selectedYear.value == null,
+      _selectedColor.value == null || _selectedColor.value!.isEmpty,
+      _plateNumberController.text.isEmpty,
+      _typeController.text.isEmpty,
+    ];
+
+    for (int i = 0; i < fieldsToCheck.length; i++) {
+      if (valuesToCheck[i]) {
+        final key = fieldsToCheck[i].key;
+        final focusNode = fieldsToCheck[i].value;
+        final context = key.currentContext;
+        if (context != null) {
+          await Scrollable.ensureVisible(
+            context,
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeInOut,
+            alignment: 0.3,
+          );
+          // Focus the field if it has a FocusNode (text fields)
+          if (focusNode != null) {
+            focusNode.requestFocus();
+          }
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<void> _saveVehicle() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      // Scroll to and focus the first invalid field
+      await _scrollToFirstError();
+      return;
+    }
 
     // Show confirmation dialog with entered details
     final sections = <ConfirmDetailSection>[
@@ -803,34 +866,62 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                         // Make & Model Row
                         Row(
                           children: [
-                            Expanded(child: _buildMakeDropdown()),
+                            Expanded(
+                              child: Container(
+                                key: _makeFieldKey,
+                                child: _buildMakeDropdown(),
+                              ),
+                            ),
                             SizedBox(width: 16.w),
-                            Expanded(child: _buildModelDropdown()),
+                            Expanded(
+                              child: Container(
+                                key: _modelFieldKey,
+                                child: _buildModelDropdown(),
+                              ),
+                            ),
                           ],
                         ),
                         SizedBox(height: 16.h),
                         // Year & Color Row
                         Row(
                           children: [
-                            Expanded(child: _buildYearDropdown()),
+                            Expanded(
+                              child: Container(
+                                key: _yearFieldKey,
+                                child: _buildYearDropdown(),
+                              ),
+                            ),
                             SizedBox(width: 16.w),
-                            Expanded(child: _buildColorDropdown()),
+                            Expanded(
+                              child: Container(
+                                key: _colorFieldKey,
+                                child: _buildColorDropdown(),
+                              ),
+                            ),
                           ],
                         ),
                         SizedBox(height: 16.h),
                         Row(
                           children: [
                             Expanded(
-                              child: _buildTextField(
-                                'Plate Number',
-                                _plateNumberController,
+                              child: Container(
+                                key: _plateNumberFieldKey,
+                                child: _buildTextField(
+                                  'Plate Number',
+                                  _plateNumberController,
+                                  focusNode: _plateNumberFocusNode,
+                                ),
                               ),
                             ),
                             SizedBox(width: 16.w),
                             Expanded(
-                              child: _buildTextField(
-                                'Type (e.g. SUV)',
-                                _typeController,
+                              child: Container(
+                                key: _typeFieldKey,
+                                child: _buildTextField(
+                                  'Type (e.g. SUV)',
+                                  _typeController,
+                                  focusNode: _typeFocusNode,
+                                ),
                               ),
                             ),
                           ],
@@ -1493,11 +1584,13 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     TextEditingController controller, {
     bool isNumber = false,
     bool required = true,
+    FocusNode? focusNode,
     String? helperText,
     String? Function(String?)? extraValidator,
   }) {
     return TextFormField(
       controller: controller,
+      focusNode: focusNode,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       inputFormatters: isNumber
           ? [FilteringTextInputFormatter.digitsOnly]
