@@ -385,7 +385,30 @@ class VehicleProvider extends ChangeNotifier {
     }
   }
 
+  /// Checks whether the vehicle make with the given [id] is currently
+  /// being used by any vehicle in the fleet.
+  ///
+  /// Returns `true` if at least one vehicle references this make name.
+  bool isVehicleMakeInUse(String id) {
+    final make = _vehicleMakes.cast<VehicleMakeEntity?>().firstWhere(
+      (m) => m!.id == id,
+      orElse: () => null,
+    );
+    if (make == null) return false;
+
+    return _vehicles.any(
+      (v) => v.make.toLowerCase() == make.name.toLowerCase(),
+    );
+  }
+
   Future<void> deleteVehicleMake(String id) async {
+    // Guard: prevent deletion if the make is in use by any vehicle.
+    if (isVehicleMakeInUse(id)) {
+      throw Exception(
+        'This vehicle make cannot be deleted because it is already in use.',
+      );
+    }
+
     _setLoading(true);
     try {
       await deleteVehicleMakeUseCase(id);
