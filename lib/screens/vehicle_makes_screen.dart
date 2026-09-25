@@ -30,9 +30,14 @@ class _VehicleMakesScreenState extends State<VehicleMakesScreen> {
     _isLoading.value = true;
     try {
       if (mounted) {
-        await context.read<VehicleProvider>().fetchAllVehicleMakes();
+        final provider = context.read<VehicleProvider>();
+        // Fetch both makes and vehicles so the in-use check works correctly.
+        await Future.wait([
+          provider.fetchAllVehicleMakes(),
+          provider.fetchAllVehicles(),
+        ]);
         if (!mounted) return;
-        _makes.value = context.read<VehicleProvider>().vehicleMakes;
+        _makes.value = provider.vehicleMakes;
         _isLoading.value = false;
       }
     } catch (e) {
@@ -206,31 +211,54 @@ class _VehicleMakesScreenState extends State<VehicleMakesScreen> {
                               IconButton(
                                 icon: const Icon(Icons.delete, color: Colors.red),
                                 onPressed: () async {
-                                final confirm = await showDialog<bool>(
-                                  context: context,
-                                  builder: (c) => AlertDialog(
-                                    title: const Text('Delete Make'),
-                                    content: Text(
-                                      'Are you sure you want to delete ${make.name}?',
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.pop(c, false),
-                                        child: const Text('Cancel'),
-                                      ),
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(c, true),
-                                        child: const Text(
-                                          'Delete',
-                                          style: TextStyle(color: Colors.red),
+                                  final provider = context.read<VehicleProvider>();
+
+                                  // Check if the make is currently used by any vehicle.
+                                  if (provider.isVehicleMakeInUse(make.id)) {
+                                    if (!mounted) return;
+                                    showDialog(
+                                      context: context,
+                                      builder: (c) => AlertDialog(
+                                        title: const Text('Cannot Delete'),
+                                        content: Text(
+                                          'The vehicle make "${make.name}" cannot be deleted because it is currently in use by one or more vehicles.',
                                         ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () => Navigator.pop(c),
+                                            child: const Text('OK'),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                );
-                                if (confirm == true) _deleteMake(make.id);
-                              },
+                                    );
+                                    return;
+                                  }
+
+                                  final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (c) => AlertDialog(
+                                      title: const Text('Delete Make'),
+                                      content: Text(
+                                        'Are you sure you want to delete ${make.name}?',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(c, false),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () => Navigator.pop(c, true),
+                                          child: const Text(
+                                            'Delete',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (confirm == true) _deleteMake(make.id);
+                                },
                               tooltip: 'Delete',
                             ),
                           ],
