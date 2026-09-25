@@ -22,6 +22,7 @@ import '../services/image_service.dart';
 import 'document_viewer_screen.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
+import '../core/widgets/confirm_save_dialog.dart';
 
 class VehicleFormScreen extends StatefulWidget {
   final VehicleEntity? vehicle;
@@ -356,6 +357,113 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
 
   Future<void> _saveVehicle() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Show confirmation dialog with entered details
+    final sections = <ConfirmDetailSection>[
+      ConfirmDetailSection(
+        title: 'Vehicle Details',
+        icon: Icons.directions_car_outlined,
+        entries: [
+          ConfirmDetailEntry(label: 'Make', value: _selectedMake.value),
+          ConfirmDetailEntry(label: 'Model', value: _selectedModel.value),
+          ConfirmDetailEntry(
+            label: 'Year',
+            value: _selectedYear.value?.toString(),
+          ),
+          ConfirmDetailEntry(label: 'Color', value: _selectedColor.value),
+          ConfirmDetailEntry(
+            label: 'Plate Number',
+            value: _plateNumberController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Type',
+            value: _typeController.text.trim(),
+          ),
+          ConfirmDetailEntry(label: 'Fuel Type', value: _fuelType.value),
+          ConfirmDetailEntry(
+            label: 'Transmission',
+            value: _transmission.value,
+          ),
+          ConfirmDetailEntry(label: 'Status', value: _status.value),
+        ],
+      ),
+      ConfirmDetailSection(
+        title: 'Specifications',
+        icon: Icons.build_outlined,
+        entries: [
+          ConfirmDetailEntry(
+            label: 'VIN Number',
+            value: _vinNumberController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Engine No.',
+            value: _engineNumberController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Department',
+            value: _departmentController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'GVWR',
+            value: _gvwrController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Tire Size',
+            value: _tireSizeController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Purchase Price',
+            value: _purchasePriceController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Purchase Date',
+            value: formatDateForConfirmation(_purchaseDate.value),
+          ),
+          ConfirmDetailEntry(
+            label: 'Current Odometer',
+            value: _currentOdometerController.text.trim(),
+          ),
+        ],
+      ),
+      ConfirmDetailSection(
+        title: 'Documents',
+        icon: Icons.description_outlined,
+        entries: [
+          ConfirmDetailEntry(
+            label: 'Insurance Expiry',
+            value: formatDateForConfirmation(_insuranceExpiryDate.value),
+          ),
+          ConfirmDetailEntry(
+            label: 'Isthimara Expiry',
+            value: formatDateForConfirmation(_registrationExpiryDate.value),
+          ),
+          ConfirmDetailEntry(
+            label: 'Fahas Expiry',
+            value: formatDateForConfirmation(_fahasExpiryDate.value),
+          ),
+          ConfirmDetailEntry(
+            label: 'Bahrain Ins. Expiry',
+            value: formatDateForConfirmation(
+              _bahrainInsuranceExpiryDate.value,
+            ),
+          ),
+        ],
+      ),
+    ];
+
+    final vehicleLabel =
+        '${_selectedMake.value ?? ''} ${_selectedModel.value ?? ''} - ${_plateNumberController.text.trim()}'
+            .trim();
+
+    final confirmed = await showConfirmSaveDialog(
+      context: context,
+      title: widget.vehicle == null
+          ? 'Confirm Add Vehicle'
+          : 'Confirm Update Vehicle',
+      entityName: vehicleLabel.isNotEmpty ? vehicleLabel : null,
+      sections: sections,
+    );
+    if (confirmed != true) return;
 
     _isLoading.value = true;
     _isUploadingImage.value =

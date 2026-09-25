@@ -9,6 +9,7 @@ import '../../../employee/domain/entities/employee_entity.dart';
 import '../../../employee/presentation/providers/employee_provider.dart';
 import '../../domain/entities/managed_user_entity.dart';
 import '../providers/user_management_provider.dart';
+import '../../../../core/widgets/confirm_save_dialog.dart';
 
 class UserFormDialog extends StatefulWidget {
   final ManagedUserEntity? userToEdit;
@@ -104,49 +105,66 @@ class _UserFormDialogState extends State<UserFormDialog> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (widget.userToEdit == null) {
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.r),
-          ),
-          title: Text(
-            'Confirm User Creation',
-            style: GoogleFonts.notoSans(
-              fontWeight: FontWeight.bold,
-              color: const Color(0xFF0F172A),
-            ),
-          ),
-          content: Text(
-            'Are you sure you want to create a new user with the provided details?',
-            style: GoogleFonts.notoSans(color: const Color(0xFF475569)),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF13B1F2),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Confirm'),
-            ),
-          ],
-        ),
-      );
-      if (confirm != true) return;
+    // Build role name for display
+    final roles = context.read<UserManagementProvider>().roles;
+    String roleName = _selectedRoleId ?? '';
+    for (final r in roles) {
+      if (r.id == _selectedRoleId) {
+        roleName = r.name;
+        break;
+      }
     }
+
+    final employees = context.read<EmployeeProvider>().employees;
+    final empName = _employeeName(employees);
+
+    // Show confirmation dialog with user details
+    final sections = <ConfirmDetailSection>[
+      ConfirmDetailSection(
+        title: 'User Details',
+        icon: Icons.person_outline,
+        entries: [
+          ConfirmDetailEntry(
+            label: 'Display Name',
+            value: _nameController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Login Email',
+            value: widget.userToEdit?.email ?? _emailController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Role',
+            value: roleName,
+          ),
+          if (empName != null)
+            ConfirmDetailEntry(
+              label: 'Linked Employee',
+              value: empName,
+            ),
+          if (widget.userToEdit != null)
+            ConfirmDetailEntry(
+              label: 'Status',
+              value: _isActive ? 'Active' : 'Inactive',
+            ),
+        ],
+      ),
+    ];
+
+    final confirmed = await showConfirmSaveDialog(
+      context: context,
+      title: widget.userToEdit == null
+          ? 'Confirm Create User'
+          : 'Confirm Update User',
+      entityName: _nameController.text.trim(),
+      sections: sections,
+    );
+    if (confirmed != true) return;
 
     if (!mounted) return;
     setState(() => _isSubmitting = true);
 
     final provider = context.read<UserManagementProvider>();
-    final employees = context.read<EmployeeProvider>().employees;
-    final employeeName = _employeeName(employees);
+    final employeeName = empName;
     bool success;
 
     if (widget.userToEdit != null) {

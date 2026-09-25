@@ -9,6 +9,7 @@ import '../features/vehicle/domain/entities/maintenance_type_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
+import '../core/widgets/confirm_save_dialog.dart';
 
 class MaintenanceTypeMasterScreen extends StatefulWidget {
   const MaintenanceTypeMasterScreen({super.key});
@@ -235,10 +236,53 @@ class _AddEditMaintenanceTypeDialogState
     super.dispose();
   }
 
-  void _save() {
+  void _save() async {
     if (!_formKey.currentState!.validate()) return;
 
     final isDate = _triggerType == 'date';
+
+    // Show confirmation dialog with entered details
+    final sections = <ConfirmDetailSection>[
+      ConfirmDetailSection(
+        title: 'Maintenance Type',
+        icon: Icons.build_outlined,
+        entries: [
+          ConfirmDetailEntry(
+            label: 'Name',
+            value: _nameController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Trigger Type',
+            value: _triggerType == 'odometer' ? 'Odometer (KM)' : 'Date Based',
+          ),
+          if (!isDate)
+            ConfirmDetailEntry(
+              label: 'SUV Interval',
+              value: '${_suvIntervalController.text.trim()} km',
+            ),
+          if (!isDate)
+            ConfirmDetailEntry(
+              label: 'Sedan Interval',
+              value: '${_sedanIntervalController.text.trim()} km',
+            ),
+          if (isDate)
+            ConfirmDetailEntry(
+              label: 'Notification Days',
+              value: '${_notificationDaysController.text.trim()} days',
+            ),
+        ],
+      ),
+    ];
+
+    final confirmed = await showConfirmSaveDialog(
+      context: context,
+      title: widget.type == null
+          ? 'Confirm Add Maintenance Type'
+          : 'Confirm Update Maintenance Type',
+      entityName: _nameController.text.trim(),
+      sections: sections,
+    );
+    if (confirmed != true) return;
 
     final newType = MaintenanceTypeEntity(
       id: widget.type?.id ?? const Uuid().v4(),
