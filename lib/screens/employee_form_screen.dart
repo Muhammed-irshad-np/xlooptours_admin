@@ -814,6 +814,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                                   controller: _phoneController,
                                   label: 'Primary Contact',
                                   icon: Icons.phone,
+                                  keyboardType: TextInputType.phone,
                                   validator: (v) => v!.isEmpty
                                       ? 'Please enter phone number'
                                       : null,
