@@ -34,7 +34,6 @@ class NotificationProvider extends ChangeNotifier {
 
   List<NotificationEntity> _dbNotifications = [];
   List<NotificationEntity> _computedNotifications = [];
-  List<NotificationEntity> _notifications = [];
   Set<String> _readVirtualIds = {};
   bool _isLoading = false;
   String? _errorMessage;
@@ -93,8 +92,49 @@ class NotificationProvider extends ChangeNotifier {
     );
   }
 
+  /// Extracts an urgency score from a notification message.
+  /// Negative values = expired/overdue (more negative = more overdue).
+  /// Positive values = upcoming (smaller = sooner).
+  /// Returns [double.maxFinite] if no urgency info is found (least urgent).
+  double _extractUrgencyScore(NotificationEntity notification) {
+    final msg = notification.message;
+
+    // "X days ago" → expired, return negative value
+    final daysAgoMatch = RegExp(r'\((\d+)\s+days?\s+ago\)').firstMatch(msg);
+    if (daysAgoMatch != null) {
+      return -int.parse(daysAgoMatch.group(1)!).toDouble();
+    }
+
+    // "X days left" → upcoming, return positive value
+    final daysLeftMatch = RegExp(r'\((\d+)\s+days?\s+left\)').firstMatch(msg);
+    if (daysLeftMatch != null) {
+      return int.parse(daysLeftMatch.group(1)!).toDouble();
+    }
+
+    // "X days overdue" → overdue maintenance (date trigger)
+    final daysOverdueMatch =
+        RegExp(r'(\d+)\s+days?\s+overdue').firstMatch(msg);
+    if (daysOverdueMatch != null) {
+      return -int.parse(daysOverdueMatch.group(1)!).toDouble();
+    }
+
+    // "X km overdue" → overdue maintenance (odometer trigger)
+    final kmOverdueMatch = RegExp(r'(\d+)\s+km\s+overdue').firstMatch(msg);
+    if (kmOverdueMatch != null) {
+      // Normalize km to a comparable scale; use negative for overdue
+      return -int.parse(kmOverdueMatch.group(1)!).toDouble();
+    }
+
+    // Follow-up alerts or unrecognized patterns — treat as moderate urgency
+    return double.maxFinite;
+  }
+
   void _combineAndSort() {
-    _computedNotifications.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    _computedNotifications.sort((a, b) {
+      final scoreA = _extractUrgencyScore(a);
+      final scoreB = _extractUrgencyScore(b);
+      return scoreA.compareTo(scoreB);
+    });
     notifyListeners();
   }
 
