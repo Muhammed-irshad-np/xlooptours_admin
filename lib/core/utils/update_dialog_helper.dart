@@ -1449,7 +1449,7 @@ class UpdateDialogHelper {
 
     // Map doc type to internal field
     final Map<String, String> docKeys = {
-      'Istimara': 'istimara',
+      'Isthimara': 'isthimara',
       'Insurance': 'insurance',
       'Fahas': 'fahas',
       'Bahrain Insurance': 'bahrain_insurance',
@@ -1772,7 +1772,7 @@ class UpdateDialogHelper {
                             String? url(String? existing) => newUrl ?? existing;
 
                             switch (documentType) {
-                              case 'Istimara':
+                              case 'Isthimara':
                                 if (selectedDate == null) {
                                   updatedVehicle = vehicle.copyWith(
                                     clearRegistration: true,
@@ -2055,7 +2055,7 @@ class UpdateDialogHelper {
                                 // Find old expiry for the changed doc type
                                 DateTime? oldExpiry;
                                 switch (documentType) {
-                                  case 'Istimara':
+                                  case 'Isthimara':
                                     oldExpiry =
                                         vehicle.registration?.expiryDate;
                                   case 'Insurance':
