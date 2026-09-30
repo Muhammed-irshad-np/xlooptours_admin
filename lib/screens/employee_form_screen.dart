@@ -457,13 +457,28 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   }
 
   Future<void> _selectDate(BuildContext context, bool isJoinDate) async {
+    final today = DateUtils.dateOnly(DateTime.now());
+    // Join Date: any past date, never in the future.
+    // Date of Birth: the employee must be 18 to 70 years old today.
+    final firstDate = isJoinDate
+        ? DateTime(1950)
+        : DateTime(today.year - 71, today.month, today.day + 1);
+    final lastDate = isJoinDate
+        ? today
+        : DateTime(today.year - 18, today.month, today.day);
+    // A saved date may fall outside the range; showDatePicker asserts the
+    // initial date is inside it.
+    var initialDate = isJoinDate
+        ? (_joinDate.value ?? today)
+        : (_birthDate.value ?? DateTime(1990));
+    if (initialDate.isBefore(firstDate)) initialDate = firstDate;
+    if (initialDate.isAfter(lastDate)) initialDate = lastDate;
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: isJoinDate
-          ? (_joinDate.value ?? DateTime.now())
-          : (_birthDate.value ?? DateTime(1990)),
-      firstDate: DateTime(1950),
-      lastDate: DateTime(2100),
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
     );
     if (picked != null) {
       if (isJoinDate) {
