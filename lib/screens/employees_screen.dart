@@ -108,7 +108,6 @@ class _EmployeesScreenState extends State<EmployeesScreen>
           .where(
             (e) =>
                 e.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                e.position.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                 e.phoneNumber.contains(_searchQuery),
           )
           .toList();
