@@ -309,7 +309,13 @@ class EmployeeDetailsScreen extends StatelessWidget {
           children: [
             if (!employee.isExternal)
               _buildDetailRow('Email', employee.email, Icons.email),
-            _buildDetailRow('Phone', employee.phoneNumber, Icons.phone),
+            _buildDetailRow(
+              'Phone',
+              employee.phoneNumber.isEmpty
+                  ? ''
+                  : '${employee.countryCode ?? '+966'} ${employee.phoneNumber}',
+              Icons.phone,
+            ),
             _buildDetailRow('Nationality', employee.nationality, Icons.flag),
             _buildDetailRow('Gender', employee.gender, Icons.person),
             if (!employee.isExternal) ...[
