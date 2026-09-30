@@ -1250,6 +1250,16 @@ class _NavTile extends StatefulWidget {
 class _NavTileState extends State<_NavTile> {
   bool _hovered = false;
 
+  /// Whether the selected module's sub-options are shown. Tapping the
+  /// already-selected module toggles this; selecting a module re-expands it.
+  bool _expanded = true;
+
+  @override
+  void didUpdateWidget(covariant _NavTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isSelected && !oldWidget.isSelected) _expanded = true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isSelected = widget.isSelected;
@@ -1267,6 +1277,7 @@ class _NavTileState extends State<_NavTile> {
         ?.where((sub) => widget.isAdmin || !sub.adminOnly)
         .toList();
     final hasSubItems = filteredSubItems != null && filteredSubItems.isNotEmpty;
+    final showSubItems = hasSubItems && isSelected && _expanded;
 
     return Column(
       children: [
@@ -1274,7 +1285,9 @@ class _NavTileState extends State<_NavTile> {
           onEnter: (_) => setState(() => _hovered = true),
           onExit: (_) => setState(() => _hovered = false),
           child: GestureDetector(
-            onTap: widget.onTap,
+            onTap: hasSubItems && isSelected
+                ? () => setState(() => _expanded = !_expanded)
+                : widget.onTap,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               curve: Curves.easeInOut,
@@ -1337,6 +1350,16 @@ class _NavTileState extends State<_NavTile> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  if (hasSubItems)
+                    AnimatedRotation(
+                      turns: showSubItems ? 0.5 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      child: Icon(
+                        Icons.keyboard_arrow_down,
+                        color: textColor,
+                        size: 18.sp,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -1347,7 +1370,7 @@ class _NavTileState extends State<_NavTile> {
           AnimatedSize(
             duration: const Duration(milliseconds: 200),
             curve: Curves.easeInOut,
-            child: isSelected
+            child: showSubItems
                 ? Container(
                     margin: EdgeInsets.only(left: 36.w, bottom: 8.h),
                     child: Column(
