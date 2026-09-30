@@ -17,6 +17,7 @@ import '../features/vehicle/domain/entities/odometer_reading_entity.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
+import '../core/utils/capitalize_first_letter_formatter.dart';
 
 /// Special sentinel IDs for built-in extras that are not part of the
 /// Firestore-managed maintenance-type master list.
@@ -132,6 +133,7 @@ class _AddMaintenanceRecordDialogState
                           prefixIcon: Icon(Icons.storefront),
                         ),
                         textCapitalization: TextCapitalization.words,
+                        inputFormatters: const [CapitalizeFirstLetterFormatter()],
                         validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                       ),
                       SizedBox(height: 12.h),

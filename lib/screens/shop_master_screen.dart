@@ -10,6 +10,7 @@ import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../core/widgets/confirm_save_dialog.dart';
+import '../core/utils/capitalize_first_letter_formatter.dart';
 
 class ShopMasterScreen extends StatefulWidget {
   const ShopMasterScreen({super.key});
@@ -457,6 +458,7 @@ class _AddEditShopDialogState extends State<_AddEditShopDialog> {
                   prefixIcon: Icon(Icons.storefront),
                 ),
                 textCapitalization: TextCapitalization.words,
+                inputFormatters: const [CapitalizeFirstLetterFormatter()],
                 validator: (v) =>
                     v == null || v.trim().isEmpty ? 'Required' : null,
               ),

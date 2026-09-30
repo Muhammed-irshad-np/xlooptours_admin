@@ -11,6 +11,7 @@ import '../widgets/responsive_layout.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
 import '../core/widgets/confirm_save_dialog.dart';
+import '../core/utils/capitalize_first_letter_formatter.dart';
 
 class CustomerFormScreen extends StatefulWidget {
   final CustomerEntity? customer;
@@ -396,6 +397,8 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _nameController,
+              textCapitalization: TextCapitalization.words,
+              inputFormatters: const [CapitalizeFirstLetterFormatter()],
               decoration: const InputDecoration(
                 labelText: 'Full Name *',
                 border: OutlineInputBorder(),
