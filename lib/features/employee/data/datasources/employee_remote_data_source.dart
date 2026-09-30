@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/utils/network_timeout.dart';
 import '../models/employee_model.dart';
 import '../models/employee_settings_model.dart';
 
@@ -50,7 +51,8 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     await firestore
         .collection('employees')
         .doc(employee.id)
-        .set(employee.toJson());
+        .set(employee.toJson())
+        .withNetworkTimeout();
   }
 
   @override
@@ -58,12 +60,17 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     await firestore
         .collection('employees')
         .doc(employee.id)
-        .update(employee.toJson());
+        .update(employee.toJson())
+        .withNetworkTimeout();
   }
 
   @override
   Future<void> deleteEmployee(String id) async {
-    await firestore.collection('employees').doc(id).delete();
+    await firestore
+        .collection('employees')
+        .doc(id)
+        .delete()
+        .withNetworkTimeout();
   }
 
   String _getMimeType(String ext) {
@@ -94,15 +101,15 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     final metadata = SettableMetadata(contentType: 'image/jpeg');
 
     if (kIsWeb) {
-      await storageRef.putData(
+      await awaitUpload(storageRef.putData(
         await image.readAsBytes(),
         metadata,
-      );
+      ));
     } else {
-      await storageRef.putFile(File(image.path), metadata);
+      await awaitUpload(storageRef.putFile(File(image.path), metadata));
     }
 
-    return await storageRef.getDownloadURL();
+    return await storageRef.getDownloadURL().withNetworkTimeout();
   }
 
   @override
@@ -121,15 +128,15 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     final metadata = SettableMetadata(contentType: _getMimeType(ext));
 
     if (kIsWeb) {
-      await storageRef.putData(
+      await awaitUpload(storageRef.putData(
         await file.readAsBytes(),
         metadata,
-      );
+      ));
     } else {
-      await storageRef.putFile(File(file.path), metadata);
+      await awaitUpload(storageRef.putFile(File(file.path), metadata));
     }
 
-    return await storageRef.getDownloadURL();
+    return await storageRef.getDownloadURL().withNetworkTimeout();
   }
 
   @override
@@ -146,6 +153,7 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     await firestore
         .collection('Settings')
         .doc('employee_settings')
-        .set(settings.toJson(), SetOptions(merge: true));
+        .set(settings.toJson(), SetOptions(merge: true))
+        .withNetworkTimeout();
   }
 }
