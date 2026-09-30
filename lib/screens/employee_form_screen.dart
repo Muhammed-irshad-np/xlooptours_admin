@@ -22,6 +22,8 @@ import 'vehicle_makes_screen.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
+import '../core/constants/nationalities.dart';
+import '../widgets/searchable_dropdown.dart';
 import '../core/widgets/confirm_save_dialog.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
@@ -1170,11 +1172,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
           ),
           SizedBox(width: 16.w),
           Expanded(
-            child: _buildTextField(
-              controller: _nationalityController,
-              label: 'Nationality',
-              icon: Icons.flag,
-            ),
+            child: _buildNationalityDropdown(),
           ),
         ],
       ),
@@ -1473,11 +1471,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                     ),
                     SizedBox(width: 16.w),
                     Expanded(
-                      child: _buildTextField(
-                        controller: _nationalityController,
-                        label: 'Nationality',
-                        icon: Icons.flag,
-                      ),
+                      child: _buildNationalityDropdown(),
                     ),
                   ],
                 ),
@@ -2276,6 +2270,25 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         fontWeight: FontWeight.bold,
         color: Colors.blue[900],
       ),
+    );
+  }
+
+  /// Nationality is picked from a fixed list so spelling stays consistent.
+  /// A legacy free-text value is matched to its list entry ignoring case,
+  /// and kept as-is when it isn't in the list.
+  Widget _buildNationalityDropdown() {
+    final current = _nationalityController.text.trim();
+    final value = kNationalities.firstWhere(
+      (n) => n.toLowerCase() == current.toLowerCase(),
+      orElse: () => current,
+    );
+    return SearchableDropdown<String>(
+      items: kNationalities,
+      value: value.isEmpty ? null : value,
+      labelText: 'Nationality',
+      searchHint: 'Search nationality…',
+      itemToString: (n) => n,
+      onChanged: (val) => _nationalityController.text = val ?? '',
     );
   }
 
