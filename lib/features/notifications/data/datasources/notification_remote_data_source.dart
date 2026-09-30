@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/error/exceptions.dart';
+import '../../../../core/utils/network_timeout.dart';
 import '../models/notification_model.dart';
 
 abstract class NotificationRemoteDataSource {
@@ -33,7 +34,10 @@ class NotificationRemoteDataSourceImpl implements NotificationRemoteDataSource {
       await firestore
           .collection('notifications')
           .doc(notification.id)
-          .set(notification.toJson());
+          .set(notification.toJson())
+          .withNetworkTimeout();
+    } on NetworkException {
+      rethrow;
     } catch (e) {
       throw ServerException('Failed to insert notification: $e');
     }
