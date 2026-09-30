@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:xloop_invoice/features/vehicle/data/models/vehicle_settings_model.dart';
 
+import '../../../../core/utils/network_timeout.dart';
 import '../models/vehicle_model.dart';
 import '../models/vehicle_make_model.dart';
 import '../models/maintenance_type_model.dart';
@@ -251,6 +252,7 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
     await firestore
         .collection('settings')
         .doc('vehicle_alerts')
-        .set(settings.toJson());
+        .set(settings.toJson())
+        .withNetworkTimeout();
   }
 }

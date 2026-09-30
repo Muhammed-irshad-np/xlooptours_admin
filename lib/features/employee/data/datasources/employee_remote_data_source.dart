@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/utils/network_timeout.dart';
 import '../models/employee_model.dart';
 import '../models/employee_settings_model.dart';
 
@@ -146,6 +147,7 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     await firestore
         .collection('Settings')
         .doc('employee_settings')
-        .set(settings.toJson(), SetOptions(merge: true));
+        .set(settings.toJson(), SetOptions(merge: true))
+        .withNetworkTimeout();
   }
 }
