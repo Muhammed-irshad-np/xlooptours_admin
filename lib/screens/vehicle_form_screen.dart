@@ -1681,7 +1681,12 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   }
 
   String? _validateCurrentOdometer(String? value) {
-    if (value == null || value.isEmpty) return null;
+    if (value == null || value.isEmpty) {
+      // Clearing would erase the latest accepted reading, same as lowering it.
+      return widget.vehicle?.currentOdometer != null
+          ? 'Cannot be cleared. Use Odometer Review to correct.'
+          : null;
+    }
     final parsed = int.tryParse(value);
     if (parsed == null) return 'Invalid odometer';
     if (parsed > _lifetimeMaxKm) return 'Beyond any vehicle lifetime';
