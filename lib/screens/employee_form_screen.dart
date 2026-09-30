@@ -52,6 +52,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   // Document Specific Controllers
   late TextEditingController _iqamaNumberController;
+  // ID Number the Iqama Number was last synced from; see _syncIqamaNumber.
+  String _lastSyncedIdNumber = '';
   final ValueNotifier<DateTime?> _iqamaExpiryDate = ValueNotifier(null);
 
   late TextEditingController _bahrainResidenceNumberController;
@@ -262,6 +264,23 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       _isActive.value = e.isActive;
       _currentImageUrl.value = e.imageUrl;
     }
+
+    _lastSyncedIdNumber = _idNumberController.text;
+    _idNumberController.addListener(_syncIqamaNumber);
+    _selectedIdType.addListener(_syncIqamaNumber);
+  }
+
+  /// While ID Type is Iqama, the Iqama Number mirrors the ID Number so it
+  /// isn't typed twice. Once the user enters a different Iqama Number it is
+  /// left alone; a mirrored value is cleared if ID Type moves off Iqama.
+  void _syncIqamaNumber() {
+    final idNumber = _idNumberController.text;
+    final iqamaNumber = _iqamaNumberController.text;
+    if (iqamaNumber.isEmpty || iqamaNumber == _lastSyncedIdNumber) {
+      final synced = _selectedIdType.value == 'Iqama' ? idNumber : '';
+      if (iqamaNumber != synced) _iqamaNumberController.text = synced;
+    }
+    _lastSyncedIdNumber = idNumber;
   }
 
 
