@@ -418,10 +418,58 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     return false;
   }
 
+  bool _hasAttachment(
+    ValueNotifier<XFile?> picked,
+    ValueNotifier<String?> existingUrl,
+  ) =>
+      picked.value != null || (existingUrl.value?.isNotEmpty ?? false);
+
+  /// The document to save when editing. Returns null when the expiry date was
+  /// cleared (pair with the matching `clear…` flag on [VehicleEntity.copyWith]),
+  /// and drops the stored file when the attachment was removed.
+  VehicleDocument? _editedDocument(
+    VehicleDocument? existing,
+    DateTime? expiryDate,
+    String? attachmentUrl,
+  ) {
+    if (expiryDate == null) return null;
+    return existing?.copyWith(
+          expiryDate: expiryDate,
+          attachmentUrl: attachmentUrl,
+          clearAttachment: attachmentUrl == null,
+        ) ??
+        VehicleDocument(expiryDate: expiryDate, attachmentUrl: attachmentUrl);
+  }
+
   Future<void> _saveVehicle() async {
     if (!_formKey.currentState!.validate()) {
       // Scroll to and focus the first invalid field
       await _scrollToFirstError();
+      return;
+    }
+
+    final missingExpiry = [
+      if (_hasAttachment(_isthimaraAttachment, _isthimaraAttachmentUrl) &&
+          _registrationExpiryDate.value == null)
+        'Isthimara',
+      if (_hasAttachment(_insuranceAttachment, _insuranceAttachmentUrl) &&
+          _insuranceExpiryDate.value == null)
+        'Insurance',
+      if (_hasAttachment(_fahasAttachment, _fahasAttachmentUrl) &&
+          _fahasExpiryDate.value == null)
+        'Fahas',
+      if (_hasAttachment(
+            _bahrainInsuranceAttachment,
+            _bahrainInsuranceAttachmentUrl,
+          ) &&
+          _bahrainInsuranceExpiryDate.value == null)
+        'Bahrain Insurance',
+    ];
+    if (missingExpiry.isNotEmpty) {
+      AppSnackBar.showError(
+        context,
+        'Add an expiry date for ${missingExpiry.join(', ')} or remove the attached file.',
+      );
       return;
     }
 
@@ -638,36 +686,24 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           plateNumber: _plateNumberController.text,
           type: _typeController.text,
           imageUrl: imageUrl,
-          insurance: _insuranceExpiryDate.value != null
-              ? (widget.vehicle?.insurance?.copyWith(
-                    expiryDate: _insuranceExpiryDate.value!,
-                    attachmentUrl: insuranceUrl,
-                  ) ??
-                  VehicleDocument(
-                    expiryDate: _insuranceExpiryDate.value!,
-                    attachmentUrl: insuranceUrl,
-                  ))
-              : null,
-          registration: _registrationExpiryDate.value != null
-              ? (widget.vehicle?.registration?.copyWith(
-                    expiryDate: _registrationExpiryDate.value!,
-                    attachmentUrl: registrationUrl,
-                  ) ??
-                  VehicleDocument(
-                    expiryDate: _registrationExpiryDate.value!,
-                    attachmentUrl: registrationUrl,
-                  ))
-              : null,
-          fahas: _fahasExpiryDate.value != null
-              ? (widget.vehicle?.fahas?.copyWith(
-                    expiryDate: _fahasExpiryDate.value!,
-                    attachmentUrl: fahasUrl,
-                  ) ??
-                  VehicleDocument(
-                    expiryDate: _fahasExpiryDate.value!,
-                    attachmentUrl: fahasUrl,
-                  ))
-              : null,
+          insurance: _editedDocument(
+            widget.vehicle!.insurance,
+            _insuranceExpiryDate.value,
+            insuranceUrl,
+          ),
+          clearInsurance: _insuranceExpiryDate.value == null,
+          registration: _editedDocument(
+            widget.vehicle!.registration,
+            _registrationExpiryDate.value,
+            registrationUrl,
+          ),
+          clearRegistration: _registrationExpiryDate.value == null,
+          fahas: _editedDocument(
+            widget.vehicle!.fahas,
+            _fahasExpiryDate.value,
+            fahasUrl,
+          ),
+          clearFahas: _fahasExpiryDate.value == null,
           vinNumber: _vinNumberController.text.isNotEmpty
               ? _vinNumberController.text
               : null,
@@ -677,6 +713,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           fuelType: _fuelType.value,
           transmission: _transmission.value,
           purchaseDate: _purchaseDate.value,
+          clearPurchaseDate: _purchaseDate.value == null,
           purchasePrice: double.tryParse(_purchasePriceController.text),
           purchaseOdometer: int.tryParse(_purchaseOdometerController.text),
           currentOdometer: int.tryParse(_currentOdometerController.text),
@@ -688,16 +725,12 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
               ? _departmentController.text
               : null,
           status: _status.value,
-          bahrainInsurance: _bahrainInsuranceExpiryDate.value != null
-              ? (widget.vehicle?.bahrainInsurance?.copyWith(
-                    expiryDate: _bahrainInsuranceExpiryDate.value!,
-                    attachmentUrl: bahrainInsuranceUrl,
-                  ) ??
-                  VehicleDocument(
-                    expiryDate: _bahrainInsuranceExpiryDate.value!,
-                    attachmentUrl: bahrainInsuranceUrl,
-                  ))
-              : null,
+          bahrainInsurance: _editedDocument(
+            widget.vehicle!.bahrainInsurance,
+            _bahrainInsuranceExpiryDate.value,
+            bahrainInsuranceUrl,
+          ),
+          clearBahrainInsurance: _bahrainInsuranceExpiryDate.value == null,
         );
       } else {
         // When creating new, set maintenance to null and history to empty
@@ -1254,7 +1287,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                         icon: Icon(
                           Icons.close,
                           size: 16.sp,
-                          color: Colors.white.withValues(alpha: 0.9),
+                          color: Colors.redAccent,
                         ),
                         tooltip: 'Remove attachment',
                         constraints: const BoxConstraints(),

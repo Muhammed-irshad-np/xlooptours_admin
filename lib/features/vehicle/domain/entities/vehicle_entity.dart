@@ -144,6 +144,7 @@ class VehicleEntity extends Equatable {
     bool clearBahrainInsurance = false,
     bool clearRegistration = false,
     bool clearFahas = false,
+    bool clearPurchaseDate = false,
   }) {
     return VehicleEntity(
       id: id ?? this.id,
@@ -170,7 +171,8 @@ class VehicleEntity extends Equatable {
       engineNumber: engineNumber ?? this.engineNumber,
       fuelType: fuelType ?? this.fuelType,
       transmission: transmission ?? this.transmission,
-      purchaseDate: purchaseDate ?? this.purchaseDate,
+      purchaseDate:
+          clearPurchaseDate ? null : (purchaseDate ?? this.purchaseDate),
       purchasePrice: purchasePrice ?? this.purchasePrice,
       purchaseOdometer: purchaseOdometer ?? this.purchaseOdometer,
       currentOdometer: currentOdometer ?? this.currentOdometer,
