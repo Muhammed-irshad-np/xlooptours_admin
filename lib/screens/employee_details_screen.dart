@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
@@ -7,7 +6,6 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'document_viewer_screen.dart';
 import 'package:xloop_invoice/core/utils/share_helper.dart';
-import '../core/utils/activity_logger.dart';
 
 import '../features/employee/domain/entities/employee_contact.dart';
 import '../features/employee/domain/entities/employee_documents.dart';
@@ -19,7 +17,6 @@ import 'package:provider/provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
 import 'tafweed_history_view_all_screen.dart';
-import '../features/auth/presentation/providers/auth_provider.dart';
 
 class EmployeeDetailsScreen extends StatelessWidget {
   final EmployeeEntity employee;
@@ -312,7 +309,6 @@ class EmployeeDetailsScreen extends StatelessWidget {
 
   Widget _buildAuthorizedVehiclesCard(BuildContext context) {
     final vehicles = context.watch<VehicleProvider>().vehicles;
-    final isSuperAdmin = context.watch<AuthProvider>().user?.isSuperAdmin ?? false;
     final authorizedVehicles = vehicles.where((v) {
       if (v.tafweeds == null) return false;
       return v.tafweeds!.any((t) => t.driverId == employee.id);
@@ -429,20 +425,6 @@ class EmployeeDetailsScreen extends StatelessWidget {
                           ],
                         ),
                       ),
-                      if (employeeTafweed != null && isSuperAdmin)
-                        IconButton(
-                          icon: Icon(
-                            Icons.delete_outline,
-                            color: Colors.red[400],
-                            size: 24.sp,
-                          ),
-                          tooltip: 'Delete Tafweed',
-                          onPressed: () => _confirmDeleteTafweed(
-                            context,
-                            vehicle,
-                            employeeTafweed,
-                          ),
-                        ),
                     ],
                   ),
                 ],
@@ -452,51 +434,6 @@ class EmployeeDetailsScreen extends StatelessWidget {
         }),
       ],
     );
-  }
-
-  Future<void> _confirmDeleteTafweed(
-    BuildContext context,
-    VehicleEntity vehicle,
-    TafweedRecord record,
-  ) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Tafweed'),
-        content: const Text(
-          'Are you sure you want to delete this authorization? This will completely remove it from active and history records.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed == true && context.mounted) {
-      try {
-        await context.read<VehicleProvider>().deleteTafweed(vehicle, record);
-        if (context.mounted) {
-          await ActivityLogger.log(
-            context,
-            title: 'Tafweed Deleted',
-            message: 'Tafweed authorization for vehicle ${vehicle.plateNumber} has been removed from employee ${employee.fullName}.',
-            relatedId: employee.id,
-          );
-          AppSnackBar.showSuccess(context, 'Tafweed deleted successfully');
-        }
-      } catch (e) {
-        if (context.mounted) {
-          AppSnackBar.showError(context, 'Failed to delete Tafweed: $e');
-        }
-      }
-    }
   }
 
   Widget _buildContactCard(EmployeeContact contact) {
