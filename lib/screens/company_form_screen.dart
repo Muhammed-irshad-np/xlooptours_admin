@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../features/company/domain/entities/company_entity.dart';
 import '../features/company/presentation/providers/company_provider.dart';
 import '../widgets/responsive_layout.dart';
+import '../core/utils/capitalize_first_letter_formatter.dart';
 
 class CompanyFormScreen extends StatefulWidget {
   final CompanyEntity? company;
@@ -279,6 +280,8 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _companyNameController,
+              textCapitalization: TextCapitalization.words,
+              inputFormatters: const [CapitalizeFirstLetterFormatter()],
               decoration: const InputDecoration(
                 labelText: 'Company Name *',
                 border: OutlineInputBorder(),
