@@ -707,23 +707,31 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           vinNumber: _vinNumberController.text.isNotEmpty
               ? _vinNumberController.text
               : null,
+          clearVinNumber: _vinNumberController.text.isEmpty,
           engineNumber: _engineNumberController.text.isNotEmpty
               ? _engineNumberController.text
               : null,
+          clearEngineNumber: _engineNumberController.text.isEmpty,
           fuelType: _fuelType.value,
           transmission: _transmission.value,
           purchaseDate: _purchaseDate.value,
           clearPurchaseDate: _purchaseDate.value == null,
           purchasePrice: double.tryParse(_purchasePriceController.text),
+          clearPurchasePrice: _purchasePriceController.text.isEmpty,
           purchaseOdometer: int.tryParse(_purchaseOdometerController.text),
+          clearPurchaseOdometer: _purchaseOdometerController.text.isEmpty,
+          // Not clearable: it is the latest accepted odometer reading.
           currentOdometer: int.tryParse(_currentOdometerController.text),
           gvwr: _gvwrController.text.isNotEmpty ? _gvwrController.text : null,
+          clearGvwr: _gvwrController.text.isEmpty,
           tireSize: _tireSizeController.text.isNotEmpty
               ? _tireSizeController.text
               : null,
+          clearTireSize: _tireSizeController.text.isEmpty,
           department: _departmentController.text.isNotEmpty
               ? _departmentController.text
               : null,
+          clearDepartment: _departmentController.text.isEmpty,
           status: _status.value,
           bahrainInsurance: _editedDocument(
             widget.vehicle!.bahrainInsurance,
