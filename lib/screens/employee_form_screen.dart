@@ -167,6 +167,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   late final String _employeeId = widget.employee?.id ?? const Uuid().v4();
   late final ValueNotifier<String> _primaryCountryCode;
 
+  // What the form held when it opened, to tell whether leaving loses edits.
+  late final List<Object?> _initialFormValues;
+
   final List<String> _positions = [
     'CEO',
     'COO',
@@ -323,6 +326,112 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _lastSyncedIdNumber = _idNumberController.text;
     _idNumberController.addListener(_syncIqamaNumber);
     _selectedIdType.addListener(_syncIqamaNumber);
+
+    _initialFormValues = _formValues;
+  }
+
+  /// Every value the user can edit on this form.
+  List<Object?> get _formValues => [
+    _nameController.text,
+    _emailController.text,
+    _phoneController.text,
+    _idNumberController.text,
+    _nationalityController.text,
+    _primaryCountryCode.value,
+    _selectedPosition.value,
+    _selectedIdType.value,
+    _selectedGender.value,
+    _employmentType.value,
+    _plateNumberController.text,
+    _selectedVehicleMake.value,
+    _selectedVehicleModel.value,
+    _selectedVehicleYear.value,
+    _selectedVehicleColor.value,
+    _joinDate.value,
+    _birthDate.value,
+    _isActive.value,
+    _currentImageUrl.value,
+    _pickedImage.value,
+    _iqamaNumberController.text,
+    _iqamaExpiryDate.value,
+    _iqamaAttachment.value,
+    _iqamaAttachmentUrl.value,
+    _bahrainResidenceNumberController.text,
+    _bahrainResidenceExpiryDate.value,
+    _bahrainResidenceAttachment.value,
+    _bahrainResidenceAttachmentUrl.value,
+    _healthInsuranceExpiryDate.value,
+    _healthInsuranceAttachment.value,
+    _healthInsuranceAttachmentUrl.value,
+    _passportNameController.text,
+    _passportNumberController.text,
+    _passportExpiryDate.value,
+    _passportAttachment.value,
+    _passportAttachmentUrl.value,
+    _saudiVisaNumberController.text,
+    _saudiVisaExpiryDate.value,
+    _selectedSaudiVisaType.value,
+    _saudiVisaAttachment.value,
+    _saudiVisaAttachmentUrl.value,
+    _bahrainVisaNumberController.text,
+    _bahrainVisaExpiryDate.value,
+    _selectedBahrainVisaType.value,
+    _bahrainVisaAttachment.value,
+    _bahrainVisaAttachmentUrl.value,
+    _dubaiVisaNumberController.text,
+    _dubaiVisaExpiryDate.value,
+    _selectedDubaiVisaType.value,
+    _dubaiVisaAttachment.value,
+    _dubaiVisaAttachmentUrl.value,
+    _qatarVisaNumberController.text,
+    _qatarVisaExpiryDate.value,
+    _selectedQatarVisaType.value,
+    _qatarVisaAttachment.value,
+    _qatarVisaAttachmentUrl.value,
+    _licenseCountryController.text,
+    _licenseNumberController.text,
+    _licenseExpiryDate.value,
+    _selectedLicenseType.value,
+    _licenseAttachment.value,
+    _licenseAttachmentUrl.value,
+    _contactEntries.value.length,
+    for (final c in _contactEntries.value) ...[
+      c.phoneController.text,
+      c.labelController.text,
+      c.countryCode.value,
+      c.rechargeExpiry.value,
+    ],
+  ];
+
+  /// Back navigation (app bar, system back) asks before throwing away edits.
+  /// Saving pops with [Navigator.pop], which PopScope doesn't intercept.
+  Future<void> _onPopInvoked(bool didPop, Object? result) async {
+    if (didPop) return;
+    if (!_isSaving.value && !listEquals(_formValues, _initialFormValues)) {
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Discard changes?'),
+          content: const Text(
+            'You have unsaved employee details. If you leave now, they will '
+            'be lost.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Keep Editing'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Discard'),
+            ),
+          ],
+        ),
+      );
+      if (discard != true) return;
+    }
+    if (mounted) Navigator.pop(context);
   }
 
   /// While ID Type is Iqama, the Iqama Number mirrors the ID Number so it
@@ -982,6 +1091,14 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: _onPopInvoked,
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       appBar: ModernAppBar(
         title: widget.employee == null ? 'Add New Employee' : 'Edit Employee',
