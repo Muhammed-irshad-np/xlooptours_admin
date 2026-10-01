@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
@@ -10,6 +9,7 @@ import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 
 import '../widgets/responsive_layout.dart';
+import '../widgets/web_safe_image.dart';
 import 'employee_details_screen.dart';
 import 'employee_form_screen.dart';
 import 'employee_master_screen.dart';
@@ -402,10 +402,12 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                     child:
                         (employee.imageUrl != null &&
                             employee.imageUrl!.isNotEmpty)
-                        ? CachedNetworkImage(
+                        ? WebSafeImage(
                             imageUrl: employee.imageUrl!,
                             fit: BoxFit.cover,
-                            placeholder: (context, url) => const Center(
+                            width: 56,
+                            height: 56,
+                            placeholder: const Center(
                               child: SizedBox(
                                 width: 24, // Increased slightly
                                 height: 24, // Increased slightly
@@ -414,7 +416,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                                 ),
                               ),
                             ),
-                            errorWidget: (context, url, error) => const Icon(
+                            errorWidget: const Icon(
                               Icons.broken_image,
                               color: Colors.red,
                               size: 28,
