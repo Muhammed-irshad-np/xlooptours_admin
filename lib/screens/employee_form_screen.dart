@@ -1,9 +1,7 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter/services.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -19,6 +17,7 @@ import '../features/vehicle/domain/entities/vehicle_make_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../widgets/custom_date_picker.dart';
 import 'vehicle_makes_screen.dart';
+import '../widgets/web_safe_image.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
@@ -76,6 +75,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   final ValueNotifier<bool> _isActive = ValueNotifier(true);
   final ValueNotifier<String?> _currentImageUrl = ValueNotifier(null);
   final ValueNotifier<XFile?> _pickedImage = ValueNotifier(null);
+  Uint8List? _pickedImageBytes;
   final ImagePicker _picker = ImagePicker();
 
   // Document Specific Controllers
@@ -481,15 +481,15 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
-        // On web the picked file is only a blob URL that is read again at
-        // save time, which fails with "Could not load Blob from its URL" if
-        // the browser has dropped it by then. Hold the bytes instead.
+        // Read the bytes before notifying so the preview can show them; a
+        // web blob path doesn't load reliably as a NetworkImage. Upload from
+        // the same bytes too: the blob URL is read again at save time, which
+        // fails with "Could not load Blob from its URL" if the browser has
+        // dropped it by then.
+        final bytes = await image.readAsBytes();
+        _pickedImageBytes = bytes;
         _pickedImage.value = kIsWeb
-            ? XFile.fromData(
-                await image.readAsBytes(),
-                name: image.name,
-                mimeType: image.mimeType,
-              )
+            ? XFile.fromData(bytes, name: image.name, mimeType: image.mimeType)
             : image;
       }
     } catch (e) {
@@ -1076,28 +1076,39 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                             return ValueListenableBuilder<String?>(
                               valueListenable: _currentImageUrl,
                               builder: (context, currentImageUrl, _) {
-                                return CircleAvatar(
-                                  radius: 50.r,
-                                  backgroundColor: Colors.grey[200],
-                                  backgroundImage: pickedImage != null
-                                      ? (kIsWeb
-                                            ? NetworkImage(pickedImage.path)
-                                            : FileImage(File(pickedImage.path))
-                                                  as ImageProvider)
-                                      : (currentImageUrl != null
-                                            ? CachedNetworkImageProvider(
-                                                currentImageUrl,
-                                              )
-                                            : null),
-                                  child:
-                                      (pickedImage == null &&
-                                          currentImageUrl == null)
-                                      ? Icon(
-                                          Icons.person,
-                                          size: 50.sp,
-                                          color: Colors.grey[400],
-                                        )
-                                      : null,
+                                final pickedBytes = pickedImage != null
+                                    ? _pickedImageBytes
+                                    : null;
+                                return Container(
+                                  width: 100.r,
+                                  height: 100.r,
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[200],
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: ClipOval(
+                                    // A newly picked image replaces the saved one.
+                                    child: pickedBytes != null
+                                        ? Image.memory(
+                                            pickedBytes,
+                                            fit: BoxFit.cover,
+                                            width: 100.r,
+                                            height: 100.r,
+                                          )
+                                        : (currentImageUrl != null &&
+                                              currentImageUrl.isNotEmpty)
+                                        ? WebSafeImage(
+                                            imageUrl: currentImageUrl,
+                                            fit: BoxFit.cover,
+                                            width: 100.r,
+                                            height: 100.r,
+                                          )
+                                        : Icon(
+                                            Icons.person,
+                                            size: 50.sp,
+                                            color: Colors.grey[400],
+                                          ),
+                                  ),
                                 );
                               },
                             );
