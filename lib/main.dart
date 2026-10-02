@@ -14,6 +14,7 @@ import 'features/notifications/presentation/providers/notification_provider.dart
 import 'features/company/presentation/providers/company_provider.dart';
 import 'features/customer/presentation/providers/customer_provider.dart';
 import 'features/employee/presentation/providers/employee_provider.dart';
+import 'features/vehicle/presentation/providers/odometer_provider.dart';
 import 'features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'features/invoice/presentation/providers/invoice_provider.dart';
 import 'features/analytics/presentation/providers/analytics_provider.dart';
@@ -28,6 +29,8 @@ import 'features/finance/presentation/pages/driver_expense_form_page.dart';
 import 'features/finance/presentation/providers/finance_provider.dart';
 import 'features/finance/presentation/providers/fund_account_provider.dart';
 import 'features/finance/presentation/providers/petty_cash_provider.dart';
+import 'features/finance/presentation/providers/cash_advance_provider.dart';
+import 'features/finance/presentation/providers/salary_provider.dart';
 
 import 'screens/invoice_form_screen.dart';
 import 'screens/pdf_preview_screen.dart';
@@ -54,7 +57,7 @@ import 'features/feedback/presentation/pages/feedback_form_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  setPathUrlStrategy(); // Remove hash (#) from URL
+  setPathUrlStrategy(); // Remove hash (#) from url
 
   // Global Error Handling
   FlutterError.onError = (FlutterErrorDetails details) {
@@ -67,7 +70,7 @@ void main() async {
     // Catch asynchronous errors
     debugPrint('Async Error: $error');
     debugPrint('Stacktrace: $stack');
-    return true; // Prevent default error handling
+    return true; // Prevent default error handlings
   };
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
@@ -307,6 +310,7 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => di.sl<CustomerProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<EmployeeProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<VehicleProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<OdometerProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<InvoiceProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<AnalyticsProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<VaultProvider>()),
@@ -316,6 +320,8 @@ class _MyAppState extends State<MyApp> {
         ChangeNotifierProvider(create: (_) => di.sl<FinanceProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<FundAccountProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<PettyCashProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<CashAdvanceProvider>()),
+        ChangeNotifierProvider(create: (_) => di.sl<SalaryProvider>()),
         ChangeNotifierProvider(create: (_) => di.sl<UserManagementProvider>()),
       ],
       child: ScreenUtilInit(

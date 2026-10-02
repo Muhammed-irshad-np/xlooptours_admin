@@ -8,6 +8,7 @@ enum AppPermission {
   manageInvoices,
   manageCustomers,
   manageCompanies,
+  manageFinance,
   viewAnalytics,
   viewVault,
   viewActivityLogs,
@@ -37,6 +38,8 @@ extension AppPermissionExtension on AppPermission {
         return 'manage_customers';
       case AppPermission.manageCompanies:
         return 'manage_companies';
+      case AppPermission.manageFinance:
+        return 'manage_finance';
       case AppPermission.viewAnalytics:
         return 'view_analytics';
       case AppPermission.viewVault:
@@ -72,6 +75,8 @@ extension AppPermissionExtension on AppPermission {
         return 'Manage Customers';
       case AppPermission.manageCompanies:
         return 'Manage Companies';
+      case AppPermission.manageFinance:
+        return 'Manage Finance';
       case AppPermission.viewAnalytics:
         return 'View Analytics';
       case AppPermission.viewVault:

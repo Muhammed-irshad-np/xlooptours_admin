@@ -1,81 +1,295 @@
-import 'dart:typed_data';
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
-import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
+import '../../domain/entities/cash_advance_entity.dart';
+import '../../domain/entities/day_lock_entity.dart';
+import '../../domain/entities/expense_entity.dart';
+import '../../domain/entities/finance_policy_entity.dart';
+import '../../domain/entities/fund_account_entity.dart';
+import '../../domain/entities/fund_transaction_entity.dart';
+import '../../domain/entities/ledger_day_totals.dart';
+import '../../domain/entities/petty_cash_session_entity.dart';
+import '../../domain/entities/post_fund_request.dart';
+import '../../domain/entities/salary_entity.dart';
+import '../../domain/entities/session_expense_item.dart';
+import '../models/cash_advance_model.dart';
 import '../models/expense_model.dart';
 import '../models/fund_account_model.dart';
 import '../models/fund_transaction_model.dart';
 import '../models/petty_cash_session_model.dart';
+import '../models/salary_models.dart';
 import '../models/expense_category_model.dart';
+import '../../domain/entities/fund_account_type_entity.dart';
+import '../models/fund_account_type_model.dart';
 
-/// Abstract data source interface for finance remote operations.
+/// Category and type stamped on the `expenses` mirror of a salary payment.
+/// Matching the seeded EMPLOYEES category keeps payroll inside the normal
+/// expense reports and filters.
+const String salaryExpenseCategory = 'EMPLOYEES';
+const String salaryExpenseType = 'Salary';
+
 abstract class FinanceRemoteDataSource {
-  // ─── Expenses ───────────────────────────────────────────────
+  // Expenses
   Future<List<ExpenseModel>> getAllExpenses();
-  Future<List<ExpenseModel>> getExpensesByDateRange(
-    DateTime start,
-    DateTime end,
-  );
+  /// Paginated fetch. Pass [cursor] from the previous page's last doc.
+  /// Returns at most [pageSize] results (default 150).
+  Future<(List<ExpenseModel>, DocumentSnapshot?)> getExpensesPage({
+    DocumentSnapshot? cursor,
+    int pageSize = 150,
+  });
+
+  /// Expenses that are committed but not yet posted to a wallet
+  /// (status pending / approved). Used to project future balances.
+  Future<List<ExpenseModel>> getOutstandingExpenses();
+  Future<List<ExpenseModel>> getExpensesByDateRange(DateTime start, DateTime end);
   Future<List<ExpenseModel>> getExpensesByAccount(String fundAccountId);
+  Future<ExpenseModel?> getExpenseById(String id);
   Future<void> insertExpense(ExpenseModel expense);
   Future<void> updateExpense(ExpenseModel expense);
   Future<void> deleteExpense(String id);
   Future<String> generateReferenceNumber();
   Future<String> uploadReceipt(XFile file, String expenseId);
 
-  // ─── Fund Accounts ──────────────────────────────────────────
+  Future<ExpenseModel> approveAndPostExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String actorRole,
+    bool allowSelfApprove = false,
+  });
+
+  Future<ExpenseModel> rejectExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String reason,
+  });
+
+  Future<ExpenseModel> voidPaidExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String reason,
+  });
+
+  // Fund accounts
   Future<List<FundAccountModel>> getAllFundAccounts();
   Future<void> insertFundAccount(FundAccountModel account);
   Future<void> updateFundAccount(FundAccountModel account);
+  Future<void> deactivateFundAccount(String id);
   Future<void> deleteFundAccount(String id);
 
-  // ─── Fund Transactions ──────────────────────────────────────
-  Future<List<FundTransactionModel>> getTransactionsForAccount(
-    String accountId,
-  );
-  Future<void> insertTransaction(FundTransactionModel transaction);
+  // Fund transactions
+  Future<FundTransactionModel?> getTransactionById(String id);
+  Future<List<FundTransactionModel>> getTransactionsForAccount(String accountId);
+  Future<FundTransactionModel> postFundMovement(PostFundRequest request);
+  Future<void> transferBetweenAccounts({
+    required String fromAccountId,
+    required String toAccountId,
+    required double amountMajor,
+    required String currency,
+    required String description,
+    required String performedBy,
+    required String performedByUserId,
+    FundBucket fromBucket = FundBucket.total,
+    FundBucket toBucket = FundBucket.total,
+  });
 
-  // ─── Petty Cash Sessions ────────────────────────────────────
-  Future<List<PettyCashSessionModel>> getPettyCashSessions(
-    String accountId,
-  );
+  /// Rebalances money between Cash and STC Pay buckets within the same
+  /// fund account (total balance unchanged).
+  Future<void> transferBucket({
+    required String fundAccountId,
+    required double amountMajor,
+    required FundBucket fromBucket,
+    required FundBucket toBucket,
+    required String performedBy,
+    required String? performedByUserId,
+  });
+
+  // Petty cash + day lock
+  Future<List<PettyCashSessionModel>> getPettyCashSessions(String accountId);
   Future<PettyCashSessionModel?> getOpenSession(String accountId);
   Future<void> openPettyCashSession(PettyCashSessionModel session);
-  Future<void> closePettyCashSession(PettyCashSessionModel session);
-  Future<void> verifyPettyCashSession(String sessionId, String verifiedBy);
+  /// Recomputes day ledger totals then closes.
+  Future<PettyCashSessionModel> closePettyCashSession({
+    required PettyCashSessionModel session,
+    required String closedBy,
+    required String? closedByUserId,
+  });
+  Future<void> verifyPettyCashSession({
+    required String sessionId,
+    required String verifiedBy,
+    required String? verifiedByUserId,
+    String? resolutionNotes,
+  });
   Future<String> uploadClosingSheet(XFile file, String sessionId);
+  Future<List<SessionExpenseItem>> getSessionExpenses(PettyCashSessionEntity session);
+  Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt});
+  Future<bool> isDayLocked(String fundAccountId, DateTime day);
 
-  // ─── Expense Categories ─────────────────────────────────────
+  // Advances
+  Future<List<CashAdvanceModel>> getCashAdvances({String? fundAccountId});
+  Future<CashAdvanceModel> issueCashAdvance({
+    required CashAdvanceModel advance,
+  });
+  Future<CashAdvanceModel> settleCashAdvance({
+    required String advanceId,
+    required double settleAmountMajor,
+    required String actorName,
+    required String actorUserId,
+    required bool returnToFund,
+  });
+
+  /// Closes outstanding advance as a loss. No cash returns to the fund
+  /// (money already left when the advance was issued).
+  Future<CashAdvanceModel> writeOffCashAdvance({
+    required String advanceId,
+    required String reason,
+    required String actorName,
+    required String actorUserId,
+  });
+
+  // Salaries
+  Future<List<SalaryStructureModel>> getSalaryStructures();
+  Future<SalaryStructureModel> saveSalaryStructure(
+    SalaryStructureModel structure,
+  );
+  Future<void> deleteSalaryStructure(String employeeId);
+
+  Future<List<SalaryPaymentModel>> getSalaryPayments({String? period});
+
+  /// Creates a pending salary row for every active salary structure that has
+  /// no row for [period] yet. Rerunning the same month is a no-op.
+  Future<List<SalaryPaymentModel>> generateSalaryRun({
+    required String period,
+    required String actorName,
+    String? actorUserId,
+  });
+
+  /// Upsert of an unpaid salary row (amounts, deductions, notes).
+  Future<SalaryPaymentModel> saveSalaryPayment(SalaryPaymentModel payment);
+
+  /// Posts the net salary out of [fundAccountId] and marks the row paid.
+  ///
+  /// Enforces the same wallet rules as an expense payment (day locks, an open
+  /// petty cash session, per-bucket balances), recovers any [advanceRecoveries]
+  /// against the employee's cash advances, and mirrors the payment into the
+  /// `expenses` collection so payroll appears in expense reports.
+  Future<SalaryPaymentModel> paySalary({
+    required String paymentId,
+    required String fundAccountId,
+    required String actorName,
+    String? actorUserId,
+    String paymentMethod = 'cash',
+    Map<String, double> advanceRecoveries = const {},
+  });
+
+  Future<void> deleteSalaryPayment(String paymentId);
+
+  /// Reverses a paid salary; the money goes back to the fund account.
+  Future<SalaryPaymentModel> voidSalaryPayment({
+    required String paymentId,
+    required String reason,
+    required String actorName,
+    String? actorUserId,
+  });
+
+  // Policy
+  Future<FinancePolicyEntity> getFinancePolicy();
+  Future<void> saveFinancePolicy(FinancePolicyEntity policy);
+
+  // Categories
   Future<List<ExpenseCategoryModel>> getExpenseCategories();
   Future<void> insertExpenseCategory(ExpenseCategoryModel category);
   Future<void> updateExpenseCategory(ExpenseCategoryModel category);
   Future<void> deleteExpenseCategory(String id);
+
+  // Account Types
+  Future<List<FundAccountTypeModel>> getFundAccountTypes();
+  Future<void> insertFundAccountType(FundAccountTypeModel type);
+  Future<void> updateFundAccountType(FundAccountTypeModel type);
+  Future<void> deleteFundAccountType(String id);
+
+  /// Development-only tool: wipes test data across all finance collections.
+  Future<void> resetFinanceModuleData();
 }
 
-/// Firestore implementation of [FinanceRemoteDataSource].
 class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   final FirebaseFirestore firestore;
   final FirebaseStorage storage;
+  final _uuid = const Uuid();
 
   FinanceRemoteDataSourceImpl({
     required this.firestore,
     required this.storage,
   });
 
-  // ═══════════════════════════════════════════════════════════
-  // EXPENSES
-  // ═══════════════════════════════════════════════════════════
+  CollectionReference<Map<String, dynamic>> get _expenses =>
+      firestore.collection('expenses');
+  CollectionReference<Map<String, dynamic>> get _accounts =>
+      firestore.collection('fund_accounts');
+  CollectionReference<Map<String, dynamic>> get _txs =>
+      firestore.collection('fund_transactions');
+  CollectionReference<Map<String, dynamic>> get _counters =>
+      firestore.collection('counters');
+  CollectionReference<Map<String, dynamic>> get _audit =>
+      firestore.collection('finance_audit_log');
+  CollectionReference<Map<String, dynamic>> get _dayLocks =>
+      firestore.collection('finance_day_locks');
+  CollectionReference<Map<String, dynamic>> get _advances =>
+      firestore.collection('cash_advances');
+  CollectionReference<Map<String, dynamic>> get _salaryStructures =>
+      firestore.collection('salary_structures');
+  CollectionReference<Map<String, dynamic>> get _salaryPayments =>
+      firestore.collection('salary_payments');
+  DocumentReference<Map<String, dynamic>> get _policyDoc =>
+      firestore.collection('finance_settings').doc('policy');
+
+  // ─── Expenses ───────────────────────────────────────────────
 
   @override
   Future<List<ExpenseModel>> getAllExpenses() async {
-    final snapshot = await firestore
-        .collection('expenses')
+    // Unbounded fetch — use getExpensesPage() for large datasets.
+    final snapshot = await _expenses.orderBy('date', descending: true).get();
+    return snapshot.docs.map((d) => ExpenseModel.fromJson(d.data())).toList();
+  }
+
+  @override
+  Future<(List<ExpenseModel>, DocumentSnapshot?)> getExpensesPage({
+    DocumentSnapshot? cursor,
+    int pageSize = 150,
+  }) async {
+    Query<Map<String, dynamic>> q = _expenses
         .orderBy('date', descending: true)
-        .get();
-    return snapshot.docs
-        .map((doc) => ExpenseModel.fromJson(doc.data()))
+        .limit(pageSize);
+    if (cursor != null) {
+      q = q.startAfterDocument(cursor);
+    }
+    final snapshot = await q.get();
+    final docs = snapshot.docs
+        .map((d) => ExpenseModel.fromJson(d.data()))
         .toList();
+    final lastDoc = snapshot.docs.isNotEmpty ? snapshot.docs.last : null;
+    return (docs, lastDoc);
+  }
+
+  @override
+  Future<List<ExpenseModel>> getOutstandingExpenses() async {
+    // Single-field `whereIn` — no composite index required. Sorting happens
+    // client-side so this keeps working without a Firestore index deploy.
+    final snapshot = await _expenses
+        .where('status', whereIn: [
+          ExpenseStatus.pending.name,
+          ExpenseStatus.approved.name,
+        ])
+        .get();
+    final docs = snapshot.docs
+        .map((d) => ExpenseModel.fromJson(d.data()))
+        .toList();
+    docs.sort((a, b) => b.date.compareTo(a.date));
+    return docs;
   }
 
   @override
@@ -83,160 +297,987 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     DateTime start,
     DateTime end,
   ) async {
-    final snapshot = await firestore
-        .collection('expenses')
+    final snapshot = await _expenses
         .where('date', isGreaterThanOrEqualTo: start.toIso8601String())
         .where('date', isLessThanOrEqualTo: end.toIso8601String())
         .orderBy('date', descending: true)
         .get();
-    return snapshot.docs
-        .map((doc) => ExpenseModel.fromJson(doc.data()))
-        .toList();
+    return snapshot.docs.map((d) => ExpenseModel.fromJson(d.data())).toList();
   }
 
   @override
-  Future<List<ExpenseModel>> getExpensesByAccount(
-    String fundAccountId,
-  ) async {
-    final snapshot = await firestore
-        .collection('expenses')
+  Future<List<ExpenseModel>> getExpensesByAccount(String fundAccountId) async {
+    // Equality-only query (no composite index required); sort client-side.
+    final snapshot = await _expenses
         .where('fundAccountId', isEqualTo: fundAccountId)
-        .orderBy('date', descending: true)
         .get();
-    return snapshot.docs
-        .map((doc) => ExpenseModel.fromJson(doc.data()))
-        .toList();
+    final list =
+        snapshot.docs.map((d) => ExpenseModel.fromJson(d.data())).toList();
+    list.sort((a, b) => b.date.compareTo(a.date));
+    return list;
+  }
+
+  @override
+  Future<ExpenseModel?> getExpenseById(String id) async {
+    final doc = await _expenses.doc(id).get();
+    if (!doc.exists || doc.data() == null) return null;
+    return ExpenseModel.fromJson(doc.data()!);
   }
 
   @override
   Future<void> insertExpense(ExpenseModel expense) async {
-    await firestore
-        .collection('expenses')
-        .doc(expense.id)
-        .set(expense.toJson());
+    final data = expense.toJson();
+    data['amountMinor'] = expense.resolvedAmountMinor;
+    await _expenses.doc(expense.id).set(data);
+    await _writeAudit(
+      action: 'expense.insert',
+      entityType: 'expense',
+      entityId: expense.id,
+      actorUserId: expense.submittedByUserId,
+      actorName: expense.submittedBy,
+      detail: expense.referenceNumber,
+    );
   }
 
   @override
   Future<void> updateExpense(ExpenseModel expense) async {
-    await firestore
-        .collection('expenses')
+    // Only allow field updates for non-posted expenses at data layer when status is editable.
+    final existing = await getExpenseById(expense.id);
+    if (existing != null && !existing.status.canEdit) {
+      throw StateError(
+        'Cannot edit expense in status ${existing.status.name}. Void or reverse instead.',
+      );
+    }
+    await _expenses
         .doc(expense.id)
-        .update(expense.toJson());
+        .set(_stripNulls(expense.toJson()), SetOptions(merge: true));
   }
 
   @override
   Future<void> deleteExpense(String id) async {
-    await firestore.collection('expenses').doc(id).delete();
+    final existing = await getExpenseById(id);
+    if (existing == null) return;
+    if (!existing.status.canHardDelete) {
+      throw StateError(
+        'Cannot delete posted/closed expense. Void it instead.',
+      );
+    }
+    await _expenses.doc(id).delete();
+    await _writeAudit(
+      action: 'expense.delete_draft',
+      entityType: 'expense',
+      entityId: id,
+      actorName: 'system',
+      detail: existing.referenceNumber,
+    );
   }
 
   @override
   Future<String> generateReferenceNumber() async {
-    // Get the latest expense to determine the next reference number.
-    final snapshot = await firestore
-        .collection('expenses')
-        .orderBy('referenceNumber', descending: true)
-        .limit(1)
-        .get();
-
-    if (snapshot.docs.isEmpty) {
-      return '#10001';
-    }
-
-    final lastRef = snapshot.docs.first.data()['referenceNumber'] as String;
-    // Parse the numeric portion (e.g., "#10001" → 10001).
-    final numericPart = int.tryParse(lastRef.replaceAll('#', '')) ?? 10000;
-    return '#${numericPart + 1}';
+    final counterRef = _counters.doc('expense_reference');
+    return firestore.runTransaction((txn) async {
+      final snap = await txn.get(counterRef);
+      int next = 10001;
+      if (snap.exists) {
+        next = ((snap.data()?['value'] as num?)?.toInt() ?? 10000) + 1;
+      }
+      txn.set(counterRef, {'value': next}, SetOptions(merge: true));
+      return '#$next';
+    });
   }
 
   @override
   Future<String> uploadReceipt(XFile file, String expenseId) async {
     final ext = file.name.split('.').last;
-    final ref = storage.ref('expenses/$expenseId/receipt_${DateTime.now().millisecondsSinceEpoch}.$ext');
-
-    final Uint8List bytes = await file.readAsBytes();
+    final ref = storage.ref(
+      'expenses/$expenseId/receipt_${DateTime.now().millisecondsSinceEpoch}.$ext',
+    );
+    final bytes = await file.readAsBytes();
     final metadata = SettableMetadata(contentType: _getMimeType(ext));
     await ref.putData(bytes, metadata);
-    return await ref.getDownloadURL();
+    return ref.getDownloadURL();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // FUND ACCOUNTS
-  // ═══════════════════════════════════════════════════════════
+  @override
+  Future<ExpenseModel> approveAndPostExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String actorRole,
+    bool allowSelfApprove = false,
+  }) async {
+    // Validate OUTSIDE the transaction so Flutter web surfaces real messages
+    // (exceptions inside runTransaction become "Dart exception thrown…").
+    final policy = await getFinancePolicy();
+    final existing = await getExpenseById(expenseId);
+    if (existing == null) {
+      throw StateError('Expense not found');
+    }
+    if (existing.status == ExpenseStatus.paid) {
+      return existing;
+    }
+    if (existing.status != ExpenseStatus.pending &&
+        existing.status != ExpenseStatus.approved) {
+      throw StateError(
+        'Expense cannot be paid from status ${existing.status.name}',
+      );
+    }
+    if (policy.blockSelfApprove &&
+        !allowSelfApprove &&
+        existing.submittedByUserId != null &&
+        existing.submittedByUserId == actorUserId &&
+        actorUserId.isNotEmpty) {
+      throw StateError('Cannot approve your own expense');
+    }
+    if (policy.multiLevelApprovalEnabled && policy.approvalChain.isNotEmpty) {
+      final stage = policy.stageForAmount(existing.amount);
+      if (stage != null &&
+          !stage.isUserAuthorized(actorRole.toLowerCase(), actorUserId) &&
+          !allowSelfApprove) {
+        throw StateError(
+          'Approval for ${existing.amount} SAR requires "${stage.name}". Your account is not authorized for this stage.',
+        );
+      }
+    } else if (!policy.canApproveAmount(actorRole, existing.amount) &&
+        !allowSelfApprove) {
+      final limit = policy.limitForRole(actorRole);
+      throw StateError(
+        'Amount ${existing.amount} exceeds your approval limit'
+        '${limit != null ? ' ($limit)' : ''}. Your role: $actorRole',
+      );
+    }
+    _assertExpensePolicy(existing, policy);
+
+    if (!existing.isNonWallet && existing.fundAccountId.isNotEmpty) {
+      // Parallelize day lock check and single target account document fetch
+      final results = await Future.wait([
+        isDayLocked(existing.fundAccountId, existing.date),
+        _accounts.doc(existing.fundAccountId).get(),
+      ]);
+      final dayLocked = results[0] as bool;
+      final accSnap = results[1] as DocumentSnapshot<Map<String, dynamic>>;
+
+      if (dayLocked) {
+        throw StateError(
+          'Day ${DayLockEntity.dayKeyFrom(existing.date)} is locked '
+          'for this fund account after petty cash verification.',
+        );
+      }
+      if (!accSnap.exists || accSnap.data() == null) {
+        throw StateError(
+          'Fund account not found (${existing.fundAccountId}). '
+          'Pick a valid wallet on the expense.',
+        );
+      }
+      final account = FundAccountModel.fromJson(accSnap.data()!);
+      if (!account.isActive) {
+        throw StateError('Fund account is inactive');
+      }
+      if (account.type == FundAccountType.pettyCash) {
+        final openSession = await getOpenSession(account.id);
+        if (openSession == null) {
+          throw StateError(
+            'Cannot pay from Petty Cash account "${account.name}" because no petty cash session is currently open. '
+            'Please open a session first in the Petty Cash tab.',
+          );
+        }
+      }
+      final amountMinor = existing.resolvedAmountMinor;
+      final amountMajor = amountMinor / 100.0;
+      final balAfterMinor = account.currentBalanceMinor - amountMinor;
+      if (balAfterMinor < 0) {
+        throw StateError(
+          'Insufficient fund balance '
+          '(have ${account.currentBalance.toStringAsFixed(2)}, '
+          'need ${amountMajor.toStringAsFixed(2)} ${existing.currency})',
+        );
+      }
+      final bucket = _resolvePaymentBucket(
+        paymentMethod: existing.paymentMethod,
+        cashBalance: account.cashBalance,
+        stcPayBalance: account.stcPayBalance,
+      );
+      if (bucket == FundBucket.cash &&
+          account.cashBalance + 1e-9 < amountMajor) {
+        throw StateError(
+          'Insufficient cash balance '
+          '(have ${account.cashBalance.toStringAsFixed(2)}, '
+          'need ${amountMajor.toStringAsFixed(2)}). '
+          'Deposit cash into this wallet first, or use STC Pay.',
+        );
+      }
+      if (bucket == FundBucket.stcPay &&
+          account.stcPayBalance + 1e-9 < amountMajor) {
+        throw StateError(
+          'Insufficient STC Pay balance '
+          '(have ${account.stcPayBalance.toStringAsFixed(2)}, '
+          'need ${amountMajor.toStringAsFixed(2)})',
+        );
+      }
+    }
+
+    try {
+      final result = await firestore.runTransaction((txn) async {
+        final expRef = _expenses.doc(expenseId);
+        final expSnap = await txn.get(expRef);
+        if (!expSnap.exists || expSnap.data() == null) {
+          throw Exception('Expense not found');
+        }
+        final expense = ExpenseModel.fromJson(expSnap.data()!);
+
+        if (expense.status == ExpenseStatus.paid) {
+          return expense;
+        }
+        if (expense.status != ExpenseStatus.pending &&
+            expense.status != ExpenseStatus.approved) {
+          throw Exception(
+            'Expense status changed to ${expense.status.name}',
+          );
+        }
+
+        final now = DateTime.now();
+        String? ledgerId;
+        double? balAfter;
+        int? balAfterMinor;
+
+        if (!expense.isNonWallet && expense.fundAccountId.isNotEmpty) {
+          final lockId =
+              DayLockEntity.lockId(expense.fundAccountId, expense.date);
+          final lockSnap = await txn.get(_dayLocks.doc(lockId));
+          if (lockSnap.exists) {
+            throw Exception('Day was locked during approve');
+          }
+
+          final accountRef = _accounts.doc(expense.fundAccountId);
+          final accSnap = await txn.get(accountRef);
+          if (!accSnap.exists || accSnap.data() == null) {
+            throw Exception('Fund account not found');
+          }
+          final account = FundAccountModel.fromJson(accSnap.data()!);
+          if (!account.isActive) {
+            throw Exception('Fund account is inactive');
+          }
+
+          final amountMinor = expense.resolvedAmountMinor;
+          final amountMajor = amountMinor / 100.0;
+          final balBeforeMinor = account.currentBalanceMinor;
+          balAfterMinor = balBeforeMinor - amountMinor;
+          if (balAfterMinor < 0) {
+            throw Exception('Insufficient fund balance');
+          }
+
+          final bucket = _resolvePaymentBucket(
+            paymentMethod: expense.paymentMethod,
+            cashBalance: account.cashBalance,
+            stcPayBalance: account.stcPayBalance,
+          );
+          double cash = account.cashBalance;
+          double stc = account.stcPayBalance;
+          if (bucket == FundBucket.cash) {
+            if (cash + 1e-9 < amountMajor) {
+              throw Exception('Insufficient cash balance');
+            }
+            cash -= amountMajor;
+          } else if (bucket == FundBucket.stcPay) {
+            if (stc + 1e-9 < amountMajor) {
+              throw Exception('Insufficient STC Pay balance');
+            }
+            stc -= amountMajor;
+          } else {
+            // FundBucket.total: deduct from cash first, then remainder from STC Pay
+            if (cash >= amountMajor) {
+              cash -= amountMajor;
+            } else {
+              final rem = amountMajor - cash;
+              cash = 0;
+              stc = (stc - rem).clamp(0.0, double.infinity);
+            }
+          }
+
+          ledgerId = _uuid.v4();
+          final balBefore = balBeforeMinor / 100.0;
+          balAfter = balAfterMinor / 100.0;
+
+          final tx = FundTransactionModel(
+            id: ledgerId,
+            fundAccountId: expense.fundAccountId,
+            type: FundTransactionType.expensePayment,
+            amount: amountMajor,
+            amountMinor: amountMinor,
+            currency: expense.currency,
+            description:
+                'Payment ${expense.referenceNumber} — ${expense.expenseType}',
+            referenceExpenseId: expense.id,
+            performedBy: actorName,
+            performedByUserId: actorUserId,
+            date: now,
+            createdAt: now,
+            balanceBefore: balBefore,
+            balanceAfter: balAfter,
+            bucket: bucket,
+          );
+
+          // set() allows full document; update() rejects null fields on web.
+          txn.set(_txs.doc(ledgerId), _stripNulls(tx.toJson()));
+          final cashMinor = ((cash < 0 ? 0.0 : cash) * 100).round();
+          final stcMinor = ((stc < 0 ? 0.0 : stc) * 100).round();
+          txn.update(accountRef, {
+            'currentBalanceMinor': balAfterMinor,
+            'cashBalanceMinor': cashMinor,
+            'stcPayBalanceMinor': stcMinor,
+            'currentBalance': balAfter,
+            'cashBalance': cash < 0 ? 0.0 : cash,
+            'stcPayBalance': stc < 0 ? 0.0 : stc,
+          });
+        }
+
+        final updated = expense.copyWith(
+          status: expense.isNonWallet
+              ? ExpenseStatus.approved
+              : ExpenseStatus.paid,
+          approvedBy: actorName,
+          approvedByUserId: actorUserId,
+          approvedAt: expense.approvedAt ?? now,
+          paidBy: expense.isNonWallet ? null : actorName,
+          paidByUserId: expense.isNonWallet ? null : actorUserId,
+          paidAt: expense.isNonWallet ? null : now,
+          ledgerEntryId: ledgerId,
+          balanceAfter: expense.isNonWallet ? null : balAfter,
+          balanceAfterMinor: expense.isNonWallet ? null : balAfterMinor,
+          updatedAt: now,
+          amountMinor: expense.resolvedAmountMinor,
+        );
+
+        // Merge set so null fields are not sent as invalid update values.
+        txn.set(
+          expRef,
+          _stripNulls(ExpenseModel.fromEntity(updated).toJson()),
+          SetOptions(merge: true),
+        );
+        return ExpenseModel.fromEntity(updated);
+      });
+
+      // Non-blocking audit log so response returns immediately to UI
+      unawaited(
+        _writeAudit(
+          action: result.isNonWallet
+              ? 'expense.approve'
+              : 'expense.approve_and_post',
+          entityType: 'expense',
+          entityId: expenseId,
+          actorUserId: actorUserId,
+          actorName: actorName,
+          detail: result.referenceNumber,
+        ),
+      );
+      return result;
+    } catch (e) {
+      throw StateError(_unwrapFirebaseError(e));
+    }
+  }
+
+  @override
+  Future<ExpenseModel> rejectExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String reason,
+  }) async {
+    final existing = await getExpenseById(expenseId);
+    if (existing == null) throw StateError('Expense not found');
+    if (!existing.status.canReject) {
+      throw StateError('Cannot reject expense in status ${existing.status.name}');
+    }
+    final now = DateTime.now();
+    final updated = existing.copyWith(
+      status: ExpenseStatus.rejected,
+      approvedBy: actorName,
+      approvedByUserId: actorUserId,
+      approvedAt: now,
+      rejectionReason: reason,
+      updatedAt: now,
+    );
+    await _expenses.doc(expenseId).update(ExpenseModel.fromEntity(updated).toJson());
+    await _writeAudit(
+      action: 'expense.reject',
+      entityType: 'expense',
+      entityId: expenseId,
+      actorUserId: actorUserId,
+      actorName: actorName,
+      detail: reason,
+    );
+    return ExpenseModel.fromEntity(updated);
+  }
+
+  @override
+  Future<ExpenseModel> voidPaidExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String reason,
+  }) async {
+    return firestore.runTransaction((txn) async {
+      final expRef = _expenses.doc(expenseId);
+      final expSnap = await txn.get(expRef);
+      if (!expSnap.exists || expSnap.data() == null) {
+        throw StateError('Expense not found');
+      }
+      final expense = ExpenseModel.fromJson(expSnap.data()!);
+      if (expense.status == ExpenseStatus.voided) return expense;
+      if (!expense.status.canVoid) {
+        throw StateError('Only paid expenses can be voided');
+      }
+      // Payroll mirrors are owned by the salary record — voiding here alone
+      // would refund the wallet while the salary still reads as paid.
+      if (expense.salaryPaymentId != null &&
+          expense.salaryPaymentId!.isNotEmpty) {
+        throw StateError(
+          'This is a salary payment. Void it from the Salaries tab so the '
+          'payroll record, the wallet and any advance recovery all reverse '
+          'together.',
+        );
+      }
+
+      final now = DateTime.now();
+      String? reverseId;
+
+      if (!expense.isNonWallet &&
+          expense.fundAccountId.isNotEmpty &&
+          expense.ledgerEntryId != null) {
+        final accountRef = _accounts.doc(expense.fundAccountId);
+        final accSnap = await txn.get(accountRef);
+        if (!accSnap.exists || accSnap.data() == null) {
+          throw StateError('Fund account not found');
+        }
+        final account = FundAccountModel.fromJson(accSnap.data()!);
+        final amountMinor = expense.resolvedAmountMinor;
+        final amountMajor = amountMinor / 100.0;
+        final balBeforeMinor = account.currentBalanceMinor;
+        final balAfterMinor = balBeforeMinor + amountMinor;
+        final balBefore = balBeforeMinor / 100.0;
+        final balAfter = balAfterMinor / 100.0;
+
+        final bucket = _bucketFromPaymentMethod(expense.paymentMethod);
+        double cash = account.cashBalance;
+        double stc = account.stcPayBalance;
+        if (bucket == FundBucket.cash) {
+          cash += amountMajor;
+        } else if (bucket == FundBucket.stcPay) {
+          stc += amountMajor;
+        }
+
+        reverseId = _uuid.v4();
+        final tx = FundTransactionModel(
+          id: reverseId,
+          fundAccountId: expense.fundAccountId,
+          type: FundTransactionType.reversal,
+          amount: amountMajor,
+          amountMinor: amountMinor,
+          currency: expense.currency,
+          description: 'Void ${expense.referenceNumber}: $reason',
+          referenceExpenseId: expense.id,
+          reversesTransactionId: expense.ledgerEntryId,
+          performedBy: actorName,
+          performedByUserId: actorUserId,
+          date: now,
+          createdAt: now,
+          balanceBefore: balBefore,
+          balanceAfter: balAfter,
+          bucket: bucket,
+          auditNote: reason,
+        );
+        txn.set(_txs.doc(reverseId), tx.toJson());
+        final cashMinor = ((cash < 0 ? 0.0 : cash) * 100).round();
+        final stcMinor = ((stc < 0 ? 0.0 : stc) * 100).round();
+        txn.update(accountRef, {
+          'currentBalanceMinor': balAfterMinor,
+          'cashBalanceMinor': cashMinor,
+          'stcPayBalanceMinor': stcMinor,
+          'currentBalance': balAfter,
+          'cashBalance': cash,
+          'stcPayBalance': stc,
+        });
+        if (expense.ledgerEntryId != null) {
+          txn.update(_txs.doc(expense.ledgerEntryId!), {'isReversed': true});
+        }
+      }
+
+      final updated = expense.copyWith(
+        status: ExpenseStatus.voided,
+        voidedBy: actorName,
+        voidedByUserId: actorUserId,
+        voidedAt: now,
+        voidReason: reason,
+        reverseLedgerEntryId: reverseId,
+        updatedAt: now,
+      );
+      txn.update(expRef, ExpenseModel.fromEntity(updated).toJson());
+      return ExpenseModel.fromEntity(updated);
+    }).then((result) async {
+      await _writeAudit(
+        action: 'expense.void',
+        entityType: 'expense',
+        entityId: expenseId,
+        actorUserId: actorUserId,
+        actorName: actorName,
+        detail: reason,
+      );
+      return result;
+    });
+  }
+
+  // ─── Fund accounts ──────────────────────────────────────────
 
   @override
   Future<List<FundAccountModel>> getAllFundAccounts() async {
-    final snapshot = await firestore
-        .collection('fund_accounts')
-        .orderBy('name')
-        .get();
+    final snapshot = await _accounts.orderBy('name').get();
     return snapshot.docs
-        .map((doc) => FundAccountModel.fromJson(doc.data()))
+        .map((d) => FundAccountModel.fromJson(d.data()))
         .toList();
   }
 
   @override
   Future<void> insertFundAccount(FundAccountModel account) async {
-    await firestore
-        .collection('fund_accounts')
-        .doc(account.id)
-        .set(account.toJson());
+    await _accounts.doc(account.id).set(account.toJson());
   }
 
   @override
   Future<void> updateFundAccount(FundAccountModel account) async {
-    await firestore
-        .collection('fund_accounts')
-        .doc(account.id)
-        .update(account.toJson());
+    // Do not allow clients to overwrite balances via this path.
+    // Both legacy double fields and new int minor fields are stripped.
+    final data = account.toJson();
+    data.remove('currentBalance');
+    data.remove('cashBalance');
+    data.remove('stcPayBalance');
+    data.remove('currentBalanceMinor');
+    data.remove('cashBalanceMinor');
+    data.remove('stcPayBalanceMinor');
+    await _accounts.doc(account.id).update(data);
+  }
+
+  @override
+  Future<void> deactivateFundAccount(String id) async {
+    await _accounts.doc(id).update({'isActive': false});
   }
 
   @override
   Future<void> deleteFundAccount(String id) async {
-    await firestore.collection('fund_accounts').doc(id).delete();
+    final accSnap = await _accounts.doc(id).get();
+    if (!accSnap.exists || accSnap.data() == null) return;
+    final account = FundAccountModel.fromJson(accSnap.data()!);
+
+    if (account.currentBalanceMinor > 0) {
+      throw StateError(
+        'Cannot close account "${account.name}" with an active balance of ${account.currentBalance.toStringAsFixed(2)} ${account.currency}. Please transfer or withdraw all funds first.',
+      );
+    }
+
+    // Soft-delete only: deactivate. Hard delete blocked for posted history.
+    final txs = await _txs.where('fundAccountId', isEqualTo: id).limit(1).get();
+    if (txs.docs.isNotEmpty) {
+      await deactivateFundAccount(id);
+      return;
+    }
+    await _accounts.doc(id).delete();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // FUND TRANSACTIONS
-  // ═══════════════════════════════════════════════════════════
+  // ─── Fund transactions ──────────────────────────────────────
+
+  @override
+  Future<FundTransactionModel?> getTransactionById(String id) async {
+    final doc = await _txs.doc(id).get();
+    if (!doc.exists || doc.data() == null) return null;
+    return FundTransactionModel.fromJson(doc.data()!);
+  }
 
   @override
   Future<List<FundTransactionModel>> getTransactionsForAccount(
     String accountId,
   ) async {
-    final snapshot = await firestore
-        .collection('fund_transactions')
-        .where('fundAccountId', isEqualTo: accountId)
-        .orderBy('date', descending: true)
-        .get();
-    return snapshot.docs
-        .map((doc) => FundTransactionModel.fromJson(doc.data()))
+    // Equality-only query so approve/UI works without waiting for composite
+    // index deploy. Optional index still speeds large accounts later.
+    final snapshot =
+        await _txs.where('fundAccountId', isEqualTo: accountId).get();
+    final list = snapshot.docs
+        .map((d) => FundTransactionModel.fromJson(d.data()))
         .toList();
+    list.sort((a, b) => b.date.compareTo(a.date));
+    return list;
   }
 
   @override
-  Future<void> insertTransaction(FundTransactionModel transaction) async {
-    // Use a batch to update both the transaction and the account balance
-    // atomically.
-    final batch = firestore.batch();
+  Future<FundTransactionModel> postFundMovement(PostFundRequest request) async {
+    if (request.amountMajor <= 0) {
+      throw ArgumentError('Amount must be positive');
+    }
+    final movementDate = request.date ?? DateTime.now();
+    await _throwIfDayLocked(request.fundAccountId, movementDate);
 
-    // 1. Insert the transaction document.
-    final txRef =
-        firestore.collection('fund_transactions').doc(transaction.id);
-    batch.set(txRef, transaction.toJson());
+    return firestore.runTransaction((txn) async {
+      final accountRef = _accounts.doc(request.fundAccountId);
+      final accSnap = await txn.get(accountRef);
+      if (!accSnap.exists || accSnap.data() == null) {
+        throw StateError('Fund account not found');
+      }
+      final account = FundAccountModel.fromJson(accSnap.data()!);
+      if (!account.isActive) {
+        throw StateError('Fund account is inactive');
+      }
 
-    // 2. Update the fund account balance.
-    final accountRef =
-        firestore.collection('fund_accounts').doc(transaction.fundAccountId);
-    batch.update(accountRef, {
-      'currentBalance': transaction.balanceAfter,
+      final amountMinor = (request.amountMajor * 100).round();
+      final amountMajor = amountMinor / 100.0;
+      final balBeforeMinor = account.currentBalanceMinor;
+      final deltaMinor = request.credit ? amountMinor : -amountMinor;
+      final balAfterMinor = balBeforeMinor + deltaMinor;
+      if (balAfterMinor < 0) {
+        throw StateError('Insufficient fund balance');
+      }
+
+      double cash = account.cashBalance;
+      double stc = account.stcPayBalance;
+
+      if (request.cashDeltaMajor != null) {
+        cash += request.cashDeltaMajor!;
+        if (cash < -1e-9) throw StateError('Insufficient cash balance');
+      } else if (request.bucket == FundBucket.cash) {
+        cash += request.credit ? amountMajor : -amountMajor;
+        if (cash < -1e-9) throw StateError('Insufficient cash balance');
+      }
+
+      if (request.stcPayDeltaMajor != null) {
+        stc += request.stcPayDeltaMajor!;
+        if (stc < -1e-9) throw StateError('Insufficient STC Pay balance');
+      } else if (request.bucket == FundBucket.stcPay) {
+        stc += request.credit ? amountMajor : -amountMajor;
+        if (stc < -1e-9) throw StateError('Insufficient STC Pay balance');
+      }
+
+      // If bucket is FundBucket.total and neither cashDelta nor stcPayDelta was explicitly set:
+      if (request.cashDeltaMajor == null &&
+          request.stcPayDeltaMajor == null &&
+          (request.bucket == FundBucket.total ||
+              (request.bucket != FundBucket.cash &&
+                  request.bucket != FundBucket.stcPay))) {
+        if (request.credit) {
+          // Default incoming money to cash bucket
+          cash += amountMajor;
+        } else {
+          // Outgoing money: deduct from cash first, then remainder from STC
+          if (cash >= amountMajor) {
+            cash -= amountMajor;
+          } else {
+            final remainder = amountMajor - cash;
+            cash = 0;
+            stc = (stc - remainder).clamp(0.0, double.infinity);
+          }
+        }
+      }
+
+      if (cash < 0) cash = 0;
+      if (stc < 0) stc = 0;
+
+      final balBefore = balBeforeMinor / 100.0;
+      final balAfter = balAfterMinor / 100.0;
+      final id = _uuid.v4();
+
+      final tx = FundTransactionModel(
+        id: id,
+        fundAccountId: request.fundAccountId,
+        type: request.type,
+        amount: amountMajor,
+        amountMinor: amountMinor,
+        currency: request.currency,
+        description: request.description,
+        referenceExpenseId: request.referenceExpenseId,
+        transferToAccountId: request.transferToAccountId,
+        transferPairId: request.transferPairId,
+        reversesTransactionId: request.reversesTransactionId,
+        performedBy: request.performedBy,
+        performedByUserId: request.performedByUserId,
+        date: movementDate,
+        createdAt: DateTime.now(),
+        balanceBefore: balBefore,
+        balanceAfter: balAfter,
+        bucket: request.bucket,
+        auditNote: request.auditNote,
+      );
+
+      txn.set(_txs.doc(id), tx.toJson());
+      final cashMinor = ((cash < 0 ? 0.0 : cash) * 100).round();
+      final stcMinor = ((stc < 0 ? 0.0 : stc) * 100).round();
+      txn.update(accountRef, {
+        'currentBalanceMinor': balAfterMinor,
+        'cashBalanceMinor': cashMinor,
+        'stcPayBalanceMinor': stcMinor,
+        'currentBalance': balAfter,
+        'cashBalance': cash,
+        'stcPayBalance': stc,
+      });
+      return tx;
     });
-
-    await batch.commit();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // PETTY CASH SESSIONS
-  // ═══════════════════════════════════════════════════════════
+  @override
+  Future<void> transferBetweenAccounts({
+    required String fromAccountId,
+    required String toAccountId,
+    required double amountMajor,
+    required String currency,
+    required String description,
+    required String performedBy,
+    required String performedByUserId,
+    FundBucket fromBucket = FundBucket.total,
+    FundBucket toBucket = FundBucket.total,
+  }) async {
+    if (fromAccountId == toAccountId) {
+      throw ArgumentError('Cannot transfer to the same account');
+    }
+    final now = DateTime.now();
+    await _throwIfDayLocked(fromAccountId, now);
+    await _throwIfDayLocked(toAccountId, now);
+    final pairId = _uuid.v4();
+    await firestore.runTransaction((txn) async {
+      final fromRef = _accounts.doc(fromAccountId);
+      final toRef = _accounts.doc(toAccountId);
+      final fromSnap = await txn.get(fromRef);
+      final toSnap = await txn.get(toRef);
+      if (!fromSnap.exists || fromSnap.data() == null) {
+        throw StateError('Source account not found');
+      }
+      if (!toSnap.exists || toSnap.data() == null) {
+        throw StateError('Destination account not found');
+      }
+      final from = FundAccountModel.fromJson(fromSnap.data()!);
+      final to = FundAccountModel.fromJson(toSnap.data()!);
+      if (!from.isActive || !to.isActive) {
+        throw StateError('Both accounts must be active');
+      }
+
+      final amountMinor = (amountMajor * 100).round();
+      final amount = amountMinor / 100.0;
+      final fromBeforeM = from.currentBalanceMinor;
+      final toBeforeM = to.currentBalanceMinor;
+      if (fromBeforeM < amountMinor) {
+        throw StateError('Insufficient balance on source account');
+      }
+      final fromAfterM = fromBeforeM - amountMinor;
+      final toAfterM = toBeforeM + amountMinor;
+
+      double fromCash = from.cashBalance;
+      double fromStc = from.stcPayBalance;
+      double toCash = to.cashBalance;
+      double toStc = to.stcPayBalance;
+
+      if (from.isPettyCash) {
+        if (fromBucket == FundBucket.cash) {
+          if (fromCash + 1e-9 < amount) throw StateError('Insufficient Physical Cash balance on source account');
+          fromCash -= amount;
+        } else if (fromBucket == FundBucket.stcPay) {
+          if (fromStc + 1e-9 < amount) throw StateError('Insufficient STC Pay balance on source account');
+          fromStc -= amount;
+        } else {
+          if (fromCash >= amount) {
+            fromCash -= amount;
+          } else if (fromStc >= amount) {
+            fromStc -= amount;
+          } else {
+            fromCash = (fromCash - amount).clamp(0.0, double.infinity);
+          }
+        }
+      } else {
+        if (fromBucket == FundBucket.cash) {
+          fromCash -= amount;
+        } else if (fromBucket == FundBucket.stcPay) {
+          fromStc -= amount;
+        }
+      }
+
+      if (to.isPettyCash) {
+        if (toBucket == FundBucket.stcPay) {
+          toStc += amount;
+        } else {
+          toCash += amount;
+        }
+      } else {
+        if (toBucket == FundBucket.cash) {
+          toCash += amount;
+        } else if (toBucket == FundBucket.stcPay) {
+          toStc += amount;
+        }
+      }
+
+      final now = DateTime.now();
+      final outId = _uuid.v4();
+      final inId = _uuid.v4();
+
+      final outTx = FundTransactionModel(
+        id: outId,
+        fundAccountId: fromAccountId,
+        type: FundTransactionType.transfer,
+        amount: amount,
+        amountMinor: amountMinor,
+        currency: currency,
+        description: 'Transfer out → ${to.name}: $description',
+        transferToAccountId: toAccountId,
+        transferPairId: pairId,
+        performedBy: performedBy,
+        performedByUserId: performedByUserId,
+        date: now,
+        createdAt: now,
+        balanceBefore: fromBeforeM / 100.0,
+        balanceAfter: fromAfterM / 100.0,
+        bucket: fromBucket,
+      );
+      final inTx = FundTransactionModel(
+        id: inId,
+        fundAccountId: toAccountId,
+        type: FundTransactionType.transfer,
+        amount: amount,
+        amountMinor: amountMinor,
+        currency: currency,
+        description: 'Transfer in ← ${from.name}: $description',
+        transferToAccountId: fromAccountId,
+        transferPairId: pairId,
+        performedBy: performedBy,
+        performedByUserId: performedByUserId,
+        date: now,
+        createdAt: now,
+        balanceBefore: toBeforeM / 100.0,
+        balanceAfter: toAfterM / 100.0,
+        bucket: toBucket,
+      );
+
+      txn.set(_txs.doc(outId), outTx.toJson());
+      txn.set(_txs.doc(inId), inTx.toJson());
+      final fromCashMinor = ((fromCash < 0 ? 0.0 : fromCash) * 100).round();
+      final fromStcMinor = ((fromStc < 0 ? 0.0 : fromStc) * 100).round();
+      final toCashMinor = ((toCash < 0 ? 0.0 : toCash) * 100).round();
+      final toStcMinor = ((toStc < 0 ? 0.0 : toStc) * 100).round();
+      txn.update(fromRef, {
+        'currentBalanceMinor': fromAfterM,
+        'cashBalanceMinor': fromCashMinor,
+        'stcPayBalanceMinor': fromStcMinor,
+        'currentBalance': fromAfterM / 100.0,
+        'cashBalance': fromCash < 0 ? 0.0 : fromCash,
+        'stcPayBalance': fromStc < 0 ? 0.0 : fromStc,
+      });
+      txn.update(toRef, {
+        'currentBalanceMinor': toAfterM,
+        'cashBalanceMinor': toCashMinor,
+        'stcPayBalanceMinor': toStcMinor,
+        'currentBalance': toAfterM / 100.0,
+        'cashBalance': toCash < 0 ? 0.0 : toCash,
+        'stcPayBalance': toStc < 0 ? 0.0 : toStc,
+      });
+    });
+  }
+
+  // ─── Bucket rebalance ───────────────────────────────────────
+
+  @override
+  Future<void> transferBucket({
+    required String fundAccountId,
+    required double amountMajor,
+    required FundBucket fromBucket,
+    required FundBucket toBucket,
+    required String performedBy,
+    required String? performedByUserId,
+  }) async {
+    if (fromBucket == toBucket) {
+      throw ArgumentError('Source and destination buckets must differ');
+    }
+    if (amountMajor <= 0) {
+      throw ArgumentError('Amount must be positive');
+    }
+    final now = DateTime.now();
+    await _throwIfDayLocked(fundAccountId, now);
+
+    await firestore.runTransaction((txn) async {
+      final accountRef = _accounts.doc(fundAccountId);
+      final accSnap = await txn.get(accountRef);
+      if (!accSnap.exists || accSnap.data() == null) {
+        throw StateError('Fund account not found');
+      }
+      final account = FundAccountModel.fromJson(accSnap.data()!);
+      if (!account.isActive) {
+        throw StateError('Fund account is inactive');
+      }
+
+      final amountMinor = (amountMajor * 100).round();
+      final amount = amountMinor / 100.0;
+
+      double cash = account.cashBalance;
+      double stc = account.stcPayBalance;
+
+      // Deduct from source bucket
+      if (fromBucket == FundBucket.cash) {
+        if (cash + 1e-9 < amount) {
+          throw StateError('Insufficient Physical Cash balance');
+        }
+        cash -= amount;
+      } else if (fromBucket == FundBucket.stcPay) {
+        if (stc + 1e-9 < amount) {
+          throw StateError('Insufficient STC Pay balance');
+        }
+        stc -= amount;
+      }
+
+      // Credit to destination bucket
+      if (toBucket == FundBucket.cash) {
+        cash += amount;
+      } else if (toBucket == FundBucket.stcPay) {
+        stc += amount;
+      }
+
+      // Create an adjustment transaction for audit trail.
+      // Balance total stays the same so balanceBefore == balanceAfter.
+      final totalBalance = account.currentBalanceMinor / 100.0;
+      final txId = _uuid.v4();
+      final adjustTx = FundTransactionModel(
+        id: txId,
+        fundAccountId: fundAccountId,
+        type: FundTransactionType.adjustment,
+        amount: amount,
+        amountMinor: amountMinor,
+        currency: account.currency,
+        description:
+            'Bucket rebalance: ${fromBucket.displayName} → ${toBucket.displayName}',
+        performedBy: performedBy,
+        performedByUserId: performedByUserId,
+        date: now,
+        createdAt: now,
+        balanceBefore: totalBalance,
+        balanceAfter: totalBalance,
+        bucket: fromBucket,
+        auditNote:
+            'Intra-account bucket transfer: ${amount.toStringAsFixed(2)} ${account.currency}',
+      );
+
+      txn.set(_txs.doc(txId), adjustTx.toJson());
+
+      final cashMinor = ((cash < 0 ? 0.0 : cash) * 100).round();
+      final stcMinor = ((stc < 0 ? 0.0 : stc) * 100).round();
+      txn.update(accountRef, {
+        'cashBalanceMinor': cashMinor,
+        'stcPayBalanceMinor': stcMinor,
+        'cashBalance': cash < 0 ? 0.0 : cash,
+        'stcPayBalance': stc < 0 ? 0.0 : stc,
+        // currentBalanceMinor stays the same
+      });
+    });
+
+    await _writeAudit(
+      action: 'fund.bucket_transfer',
+      entityType: 'fund_account',
+      entityId: fundAccountId,
+      actorUserId: performedByUserId,
+      actorName: performedBy,
+      detail:
+          '${amountMajor.toStringAsFixed(2)} ${fromBucket.displayName} → ${toBucket.displayName}',
+    );
+  }
+
+  // ─── Petty cash ─────────────────────────────────────────────
 
   @override
   Future<List<PettyCashSessionModel>> getPettyCashSessions(
@@ -245,76 +1286,1219 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     final snapshot = await firestore
         .collection('petty_cash_sessions')
         .where('fundAccountId', isEqualTo: accountId)
-        .orderBy('date', descending: true)
         .get();
-    return snapshot.docs
-        .map((doc) => PettyCashSessionModel.fromJson(doc.data()))
+    final list = snapshot.docs
+        .map((d) => PettyCashSessionModel.fromJson(d.data()))
         .toList();
+    list.sort((a, b) => b.date.compareTo(a.date));
+    return list;
   }
 
   @override
   Future<PettyCashSessionModel?> getOpenSession(String accountId) async {
+    // Prefer equality-only + filter to avoid composite index on status.
     final snapshot = await firestore
         .collection('petty_cash_sessions')
         .where('fundAccountId', isEqualTo: accountId)
-        .where('status', isEqualTo: 'open')
-        .limit(1)
         .get();
-    if (snapshot.docs.isEmpty) return null;
-    return PettyCashSessionModel.fromJson(snapshot.docs.first.data());
+    for (final doc in snapshot.docs) {
+      final s = PettyCashSessionModel.fromJson(doc.data());
+      if (s.status == PettyCashSessionStatus.open) return s;
+    }
+    return null;
   }
 
   @override
   Future<void> openPettyCashSession(PettyCashSessionModel session) async {
-    await firestore
-        .collection('petty_cash_sessions')
-        .doc(session.id)
-        .set(session.toJson());
-  }
+    // Guard 1: check if day is already locked
+    final locked = await isDayLocked(session.fundAccountId, session.date);
+    if (locked) {
+      throw StateError(
+          'This account has already been verified and locked for this date. Cannot open a new session.');
+    }
 
-  @override
-  Future<void> closePettyCashSession(PettyCashSessionModel session) async {
-    await firestore
-        .collection('petty_cash_sessions')
-        .doc(session.id)
-        .update(session.toJson());
-  }
+    // Guard 2: check if any session already exists for this calendar day
+    final allSessions = await getPettyCashSessions(session.fundAccountId);
+    final targetDay =
+        DateTime(session.date.year, session.date.month, session.date.day);
+    for (final s in allSessions) {
+      final sDay = DateTime(s.date.year, s.date.month, s.date.day);
+      if (sDay == targetDay) {
+        if (s.status == PettyCashSessionStatus.verified) {
+          throw StateError(
+              'Today\'s session has already been verified and locked.');
+        }
+        if (s.status == PettyCashSessionStatus.closed) {
+          throw StateError(
+              'Today\'s session has already been closed. A daily register can only be opened once per day.');
+        }
+        if (s.status == PettyCashSessionStatus.open) {
+          throw StateError('An open session already exists for this account');
+        }
+      }
+    }
 
-  @override
-  Future<void> verifyPettyCashSession(
-    String sessionId,
-    String verifiedBy,
-  ) async {
-    await firestore.collection('petty_cash_sessions').doc(sessionId).update({
-      'status': 'verified',
-      'verifiedBy': verifiedBy,
-      'verifiedAt': DateTime.now().toIso8601String(),
+    // Snapshot live balances from the ledger inside a transaction so the
+    // opening balance cannot be tampered with by the client.
+    await firestore.runTransaction((txn) async {
+      final lockId = DayLockEntity.lockId(session.fundAccountId, session.date);
+      final lockSnap = await txn.get(_dayLocks.doc(lockId));
+      if (lockSnap.exists) {
+        throw StateError('Day is already locked for this account');
+      }
+
+      final sessionRef = firestore
+          .collection('petty_cash_sessions')
+          .doc(session.id);
+
+      // Re-check for sessions for this day inside the transaction (race guard).
+      final existing = await firestore
+          .collection('petty_cash_sessions')
+          .where('fundAccountId', isEqualTo: session.fundAccountId)
+          .get();
+      for (final doc in existing.docs) {
+        final s = PettyCashSessionModel.fromJson(doc.data());
+        final sDay = DateTime(s.date.year, s.date.month, s.date.day);
+        if (sDay == targetDay) {
+          throw StateError('A session already exists for this date');
+        }
+      }
+
+      final accSnap = await txn.get(_accounts.doc(session.fundAccountId));
+      if (!accSnap.exists || accSnap.data() == null) {
+        throw StateError('Fund account not found');
+      }
+      final account = FundAccountModel.fromJson(accSnap.data()!);
+      if (!account.isActive) {
+        throw StateError('Fund account is inactive');
+      }
+
+      // Override client-supplied opening balances with the authoritative
+      // ledger snapshot. This ensures expectedClosingBalance is grounded
+      // in actual money, not whatever the user typed.
+      final snapshotted = PettyCashSessionModel.fromEntity(
+        session.copyWith(
+          openingCashBalance: account.cashBalance,
+          openingStcPayBalance: account.stcPayBalance,
+        ),
+      );
+
+      txn.set(sessionRef, snapshotted.toJson());
     });
+
+    await _writeAudit(
+      action: 'petty_cash.open',
+      entityType: 'petty_cash_session',
+      entityId: session.id,
+      actorName: session.openedBy,
+      detail: 'fundAccount=${session.fundAccountId}',
+    );
+  }
+
+  @override
+  Future<PettyCashSessionModel> closePettyCashSession({
+    required PettyCashSessionModel session,
+    required String closedBy,
+    required String? closedByUserId,
+  }) async {
+    if (session.status != PettyCashSessionStatus.open) {
+      throw StateError('Only open sessions can be closed');
+    }
+    final totals = await getLedgerDayTotals(
+      session.fundAccountId,
+      session.date,
+      sessionOpenedAt: session.createdAt,
+    );
+    final closed = session.copyWith(
+      cashDeposits: totals.cashDeposits,
+      stcPayDeposits: totals.stcPayDeposits,
+      cashExpenses: totals.cashExpenses,
+      stcPayExpenses: totals.stcPayExpenses,
+      closedBy: closedBy,
+      status: PettyCashSessionStatus.closed,
+      discrepancy: session.closingBalance -
+          (session.openingCashBalance +
+              session.openingStcPayBalance +
+              totals.cashDeposits +
+              totals.stcPayDeposits -
+              totals.cashExpenses -
+              totals.stcPayExpenses),
+    );
+    // Fix expected using recomputed deposits/expenses
+    final expected = closed.expectedClosingBalance;
+    final withDisc = closed.copyWith(
+      discrepancy: session.closingBalance - expected,
+    );
+    await firestore
+        .collection('petty_cash_sessions')
+        .doc(session.id)
+        .update(PettyCashSessionModel.fromEntity(withDisc).toJson());
+    await _writeAudit(
+      action: 'petty_cash.close',
+      entityType: 'petty_cash_session',
+      entityId: session.id,
+      actorUserId: closedByUserId,
+      actorName: closedBy,
+      detail:
+          'disc=${withDisc.discrepancy?.toStringAsFixed(2)} expected=$expected',
+    );
+    return PettyCashSessionModel.fromEntity(withDisc);
+  }
+
+  @override
+  Future<void> verifyPettyCashSession({
+    required String sessionId,
+    required String verifiedBy,
+    required String? verifiedByUserId,
+    String? resolutionNotes,
+  }) async {
+    final ref = firestore.collection('petty_cash_sessions').doc(sessionId);
+    final snap = await ref.get();
+    if (!snap.exists || snap.data() == null) {
+      throw StateError('Session not found');
+    }
+    final session = PettyCashSessionModel.fromJson(snap.data()!);
+    if (session.status != PettyCashSessionStatus.closed) {
+      throw StateError('Only closed sessions can be verified');
+    }
+    final now = DateTime.now();
+    final lockId = DayLockEntity.lockId(session.fundAccountId, session.date);
+    final dayKey = DayLockEntity.dayKeyFrom(session.date);
+
+    final existingNotes = session.notes ?? '';
+    final combinedNotes = resolutionNotes != null && resolutionNotes.trim().isNotEmpty
+        ? (existingNotes.isNotEmpty
+            ? '$existingNotes\n[Resolution: ${resolutionNotes.trim()}]'
+            : '[Resolution: ${resolutionNotes.trim()}]')
+        : existingNotes;
+
+    await firestore.runTransaction((txn) async {
+      final updateData = <String, dynamic>{
+        'status': 'verified',
+        'verifiedBy': verifiedBy,
+        'verifiedAt': now.toIso8601String(),
+      };
+      if (combinedNotes.isNotEmpty) {
+        updateData['notes'] = combinedNotes;
+      }
+      txn.update(ref, updateData);
+      txn.set(_dayLocks.doc(lockId), {
+        'id': lockId,
+        'fundAccountId': session.fundAccountId,
+        'dayKey': dayKey,
+        'day': DateTime(session.date.year, session.date.month, session.date.day)
+            .toIso8601String(),
+        'lockedBy': verifiedBy,
+        'lockedByUserId': verifiedByUserId,
+        'lockedAt': now.toIso8601String(),
+        'sessionId': sessionId,
+        'reason': 'Petty cash day verified',
+      });
+    });
+    await _writeAudit(
+      action: 'petty_cash.verify_and_lock',
+      entityType: 'petty_cash_session',
+      entityId: sessionId,
+      actorUserId: verifiedByUserId,
+      actorName: verifiedBy,
+      detail:
+          'dayLock=$lockId${resolutionNotes != null && resolutionNotes.isNotEmpty ? ' resolution=$resolutionNotes' : ''}',
+    );
+  }
+
+  @override
+  Future<LedgerDayTotals> getLedgerDayTotals(
+    String accountId,
+    DateTime day, {
+    DateTime? sessionOpenedAt,
+  }) async {
+    final start = DateTime(day.year, day.month, day.day);
+    final end = start.add(const Duration(days: 1));
+    // Fetch account txs and filter in memory (avoids composite index issues).
+    final all = await getTransactionsForAccount(accountId);
+    double cashIn = 0, stcIn = 0, cashOut = 0, stcOut = 0, otherIn = 0, otherOut = 0;
+    for (final tx in all) {
+      if (tx.isReversed) continue;
+      if (tx.date.isBefore(start) || !tx.date.isBefore(end)) continue;
+      // If sessionOpenedAt is provided, only count transactions created
+      // AFTER the session was opened. Pre-session transactions are already
+      // captured in the session's opening balance snapshot.
+      if (sessionOpenedAt != null && tx.createdAt.isBefore(sessionOpenedAt)) {
+        continue;
+      }
+
+      // Reversals (e.g. voided expense payments) are skipped entirely.
+      // The original transaction is already excluded via isReversed=true,
+      // so skipping the reversal too means the voided pair cancels out
+      // cleanly — as if the transaction never happened.
+      if (tx.type == FundTransactionType.reversal) {
+        continue;
+      }
+
+      final isIn = tx.type == FundTransactionType.deposit ||
+          (tx.type == FundTransactionType.transfer &&
+              tx.balanceAfter > tx.balanceBefore);
+      final isOut = tx.type == FundTransactionType.withdrawal ||
+          tx.type == FundTransactionType.expensePayment ||
+          (tx.type == FundTransactionType.transfer &&
+              tx.balanceAfter < tx.balanceBefore);
+      if (isIn) {
+        if (tx.bucket == FundBucket.cash) {
+          cashIn += tx.amount;
+        } else if (tx.bucket == FundBucket.stcPay) {
+          stcIn += tx.amount;
+        } else {
+          // Split unknown total evenly attribution: treat as cash for petty
+          cashIn += tx.amount;
+        }
+      } else if (isOut) {
+        if (tx.bucket == FundBucket.cash) {
+          cashOut += tx.amount;
+        } else if (tx.bucket == FundBucket.stcPay) {
+          stcOut += tx.amount;
+        } else {
+          cashOut += tx.amount;
+        }
+      } else if (tx.type == FundTransactionType.adjustment) {
+        if (tx.balanceAfter >= tx.balanceBefore) {
+          otherIn += tx.amount;
+        } else {
+          otherOut += tx.amount;
+        }
+      }
+    }
+    return LedgerDayTotals(
+      cashDeposits: cashIn,
+      stcPayDeposits: stcIn,
+      cashExpenses: cashOut,
+      stcPayExpenses: stcOut,
+      otherIn: otherIn,
+      otherOut: otherOut,
+    );
+  }
+
+  @override
+  Future<List<SessionExpenseItem>> getSessionExpenses(
+    PettyCashSessionEntity session,
+  ) async {
+    final start = DateTime(session.date.year, session.date.month, session.date.day);
+    final end = start.add(const Duration(days: 1));
+
+    // 1. Fetch transactions for account and filter for this session day
+    final allTxs = await getTransactionsForAccount(session.fundAccountId);
+    final sessionTxs = <FundTransactionModel>[];
+    for (final tx in allTxs) {
+      if (tx.isReversed) continue;
+      if (tx.date.isBefore(start) || !tx.date.isBefore(end)) continue;
+      if (session.status == PettyCashSessionStatus.open &&
+          tx.createdAt.isBefore(session.createdAt)) {
+        continue;
+      }
+      if (tx.type == FundTransactionType.reversal) continue;
+
+      final isOut = tx.type == FundTransactionType.withdrawal ||
+          tx.type == FundTransactionType.expensePayment ||
+          (tx.type == FundTransactionType.transfer &&
+              tx.balanceAfter < tx.balanceBefore);
+      if (isOut) {
+        sessionTxs.add(tx);
+      }
+    }
+
+    // 2. Fetch all expenses for account
+    final allExpenses = await getExpensesByAccount(session.fundAccountId);
+    final expenseMap = <String, ExpenseModel>{};
+    for (final exp in allExpenses) {
+      expenseMap[exp.id] = exp;
+    }
+
+    // 3. Map transactions to SessionExpenseItems
+    final items = <SessionExpenseItem>[];
+    final matchedExpenseIds = <String>{};
+
+    for (final tx in sessionTxs) {
+      ExpenseModel? matched;
+      if (tx.referenceExpenseId != null) {
+        matched = expenseMap[tx.referenceExpenseId];
+      }
+      matched ??= allExpenses.where((e) => e.ledgerEntryId == tx.id).firstOrNull;
+      if (matched != null) {
+        matchedExpenseIds.add(matched.id);
+      }
+
+      final refNum = matched?.referenceNumber ??
+          (tx.id.length >= 6 ? 'TX-${tx.id.substring(0, 6).toUpperCase()}' : 'TX-${tx.id.toUpperCase()}');
+
+      final title = (matched?.description != null && matched!.description!.isNotEmpty)
+          ? matched.description!
+          : (matched?.expenseType ?? tx.description);
+
+      final category = (matched?.expenseCategory != null && matched!.expenseCategory.isNotEmpty)
+          ? matched.expenseCategory
+          : (tx.type == FundTransactionType.expensePayment ? 'Expense Payment' : tx.type.displayName);
+
+      final expenseType = matched?.expenseType ??
+          (tx.bucket == FundBucket.cash ? 'Cash Outflow' : 'Digital Outflow');
+
+      items.add(SessionExpenseItem(
+        id: tx.id,
+        transactionId: tx.id,
+        expenseId: matched?.id,
+        referenceNumber: refNum,
+        title: title,
+        category: category,
+        expenseType: expenseType,
+        amount: tx.amount,
+        bucket: tx.bucket,
+        date: tx.date,
+        performedBy: (matched?.submittedBy != null && matched!.submittedBy.isNotEmpty)
+            ? matched.submittedBy
+            : tx.performedBy,
+        notes: matched?.description ?? tx.description,
+        receiptUrls: matched?.receiptUrls ?? const [],
+        status: matched?.status.displayName ?? 'Paid',
+        vehicleName: matched?.vehicleName,
+        employeeName: matched?.employeeName,
+        originalExpense: matched,
+        originalTransaction: tx,
+      ));
+    }
+
+    // 4. Include any expenses on that calendar day not matched to a transaction
+    for (final exp in allExpenses) {
+      if (matchedExpenseIds.contains(exp.id)) continue;
+      final expDate = exp.paidAt ?? exp.date;
+      if (!expDate.isBefore(start) && expDate.isBefore(end)) {
+        if (exp.status == ExpenseStatus.paid || exp.status == ExpenseStatus.approved) {
+          items.add(SessionExpenseItem(
+            id: exp.id,
+            expenseId: exp.id,
+            referenceNumber: exp.referenceNumber,
+            title: (exp.description != null && exp.description!.isNotEmpty)
+                ? exp.description!
+                : exp.expenseType,
+            category: exp.expenseCategory,
+            expenseType: exp.expenseType,
+            amount: exp.amount,
+            bucket: exp.paymentMethod.toLowerCase().contains('stc')
+                ? FundBucket.stcPay
+                : FundBucket.cash,
+            date: expDate,
+            performedBy: exp.submittedBy,
+            notes: exp.description,
+            receiptUrls: exp.receiptUrls,
+            status: exp.status.displayName,
+            vehicleName: exp.vehicleName,
+            employeeName: exp.employeeName,
+            originalExpense: exp,
+          ));
+        }
+      }
+    }
+
+    items.sort((a, b) => b.date.compareTo(a.date));
+    return items;
+  }
+
+  @override
+  Future<bool> isDayLocked(String fundAccountId, DateTime day) async {
+    final id = DayLockEntity.lockId(fundAccountId, day);
+    final snap = await _dayLocks.doc(id).get();
+    return snap.exists;
+  }
+
+  // ─── Advances ───────────────────────────────────────────────
+
+  @override
+  Future<List<CashAdvanceModel>> getCashAdvances({String? fundAccountId}) async {
+    QuerySnapshot<Map<String, dynamic>> snap;
+    if (fundAccountId != null) {
+      snap = await _advances
+          .where('fundAccountId', isEqualTo: fundAccountId)
+          .get();
+    } else {
+      snap = await _advances.get();
+    }
+    final list =
+        snap.docs.map((d) => CashAdvanceModel.fromJson(d.data())).toList();
+    list.sort((a, b) => b.issuedAt.compareTo(a.issuedAt));
+    return list;
+  }
+
+  @override
+  Future<CashAdvanceModel> issueCashAdvance({
+    required CashAdvanceModel advance,
+  }) async {
+    // Prefer total-balance deduction so non-split wallets work.
+    final tx = await postFundMovement(
+      PostFundRequest(
+        fundAccountId: advance.fundAccountId,
+        type: FundTransactionType.withdrawal,
+        amountMajor: advance.amount,
+        currency: advance.currency,
+        description:
+            'Advance to ${advance.employeeName}: ${advance.purpose}',
+        performedBy: advance.issuedBy,
+        performedByUserId: advance.issuedByUserId,
+        bucket: FundBucket.total,
+        credit: false,
+        auditNote: 'cash_advance:${advance.id}',
+      ),
+    );
+    final withLedger = CashAdvanceModel(
+      id: advance.id,
+      fundAccountId: advance.fundAccountId,
+      fundAccountName: advance.fundAccountName,
+      employeeId: advance.employeeId,
+      employeeName: advance.employeeName,
+      amount: advance.amount,
+      amountMinor: advance.resolvedAmountMinor,
+      settledAmount: 0,
+      currency: advance.currency,
+      purpose: advance.purpose,
+      status: CashAdvanceStatus.open,
+      issuedBy: advance.issuedBy,
+      issuedByUserId: advance.issuedByUserId,
+      issuedAt: advance.issuedAt,
+      issueLedgerEntryId: tx.id,
+      notes: advance.notes,
+      createdAt: advance.createdAt,
+    );
+    await _advances.doc(advance.id).set(withLedger.toJson());
+    await _writeAudit(
+      action: 'advance.issue',
+      entityType: 'cash_advance',
+      entityId: advance.id,
+      actorUserId: advance.issuedByUserId,
+      actorName: advance.issuedBy,
+      detail: '${advance.amount} to ${advance.employeeName}',
+    );
+    return withLedger;
+  }
+
+  @override
+  Future<CashAdvanceModel> settleCashAdvance({
+    required String advanceId,
+    required double settleAmountMajor,
+    required String actorName,
+    required String actorUserId,
+    required bool returnToFund,
+  }) async {
+    if (settleAmountMajor <= 0) {
+      throw ArgumentError('Settle amount must be positive');
+    }
+    final snap = await _advances.doc(advanceId).get();
+    if (!snap.exists || snap.data() == null) {
+      throw StateError('Advance not found');
+    }
+    final advance = CashAdvanceModel.fromJson(snap.data()!);
+    if (!advance.isOpen) {
+      throw StateError('Advance is not open');
+    }
+    final outstanding = advance.outstanding;
+    if (settleAmountMajor > outstanding + 1e-9) {
+      throw StateError('Settle amount exceeds outstanding $outstanding');
+    }
+
+    if (returnToFund) {
+      await postFundMovement(
+        PostFundRequest(
+          fundAccountId: advance.fundAccountId,
+          type: FundTransactionType.deposit,
+          amountMajor: settleAmountMajor,
+          currency: advance.currency,
+          description:
+              'Advance settlement from ${advance.employeeName}',
+          performedBy: actorName,
+          performedByUserId: actorUserId,
+          bucket: FundBucket.total,
+          credit: true,
+          auditNote: 'cash_advance_settle:${advance.id}',
+        ),
+      );
+    }
+
+    final newSettled = advance.settledAmount + settleAmountMajor;
+    final fully = newSettled + 1e-9 >= advance.amount;
+    final updated = CashAdvanceModel(
+      id: advance.id,
+      fundAccountId: advance.fundAccountId,
+      fundAccountName: advance.fundAccountName,
+      employeeId: advance.employeeId,
+      employeeName: advance.employeeName,
+      amount: advance.amount,
+      amountMinor: advance.amountMinor,
+      settledAmount: newSettled,
+      currency: advance.currency,
+      purpose: advance.purpose,
+      status: fully
+          ? CashAdvanceStatus.settled
+          : CashAdvanceStatus.partiallySettled,
+      issuedBy: advance.issuedBy,
+      issuedByUserId: advance.issuedByUserId,
+      issuedAt: advance.issuedAt,
+      issueLedgerEntryId: advance.issueLedgerEntryId,
+      settledAt: fully ? DateTime.now() : advance.settledAt,
+      notes: advance.notes,
+      createdAt: advance.createdAt,
+    );
+    await _advances.doc(advanceId).update(_stripNulls(updated.toJson()));
+    return updated;
+  }
+
+  @override
+  Future<CashAdvanceModel> writeOffCashAdvance({
+    required String advanceId,
+    required String reason,
+    required String actorName,
+    required String actorUserId,
+  }) async {
+    final trimmed = reason.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('Write-off reason is required');
+    }
+    final snap = await _advances.doc(advanceId).get();
+    if (!snap.exists || snap.data() == null) {
+      throw StateError('Advance not found');
+    }
+    final advance = CashAdvanceModel.fromJson(snap.data()!);
+    if (!advance.isOpen) {
+      throw StateError('Only open advances can be written off');
+    }
+    final outstanding = advance.outstanding;
+    if (outstanding <= 1e-9) {
+      throw StateError('Nothing left to write off');
+    }
+
+    final note = [
+      if (advance.notes != null && advance.notes!.isNotEmpty) advance.notes,
+      'WRITE-OFF ${outstanding.toStringAsFixed(2)} ${advance.currency} '
+          'by $actorName: $trimmed',
+    ].join('\n');
+
+    final updated = CashAdvanceModel(
+      id: advance.id,
+      fundAccountId: advance.fundAccountId,
+      fundAccountName: advance.fundAccountName,
+      employeeId: advance.employeeId,
+      employeeName: advance.employeeName,
+      amount: advance.amount,
+      amountMinor: advance.amountMinor,
+      settledAmount: advance.settledAmount,
+      currency: advance.currency,
+      purpose: advance.purpose,
+      status: CashAdvanceStatus.writtenOff,
+      issuedBy: advance.issuedBy,
+      issuedByUserId: advance.issuedByUserId,
+      issuedAt: advance.issuedAt,
+      issueLedgerEntryId: advance.issueLedgerEntryId,
+      settledAt: DateTime.now(),
+      notes: note,
+      createdAt: advance.createdAt,
+    );
+    await _advances.doc(advanceId).update(_stripNulls(updated.toJson()));
+    await _writeAudit(
+      action: 'advance.write_off',
+      entityType: 'cash_advance',
+      entityId: advanceId,
+      actorUserId: actorUserId,
+      actorName: actorName,
+      detail: 'outstanding=$outstanding reason=$trimmed',
+    );
+    return updated;
+  }
+
+  // ─── Salaries ───────────────────────────────────────────────
+
+  @override
+  Future<List<SalaryStructureModel>> getSalaryStructures() async {
+    final snap = await _salaryStructures.get();
+    final list =
+        snap.docs.map((d) => SalaryStructureModel.fromJson(d.data())).toList();
+    list.sort((a, b) => a.employeeName.compareTo(b.employeeName));
+    return list;
+  }
+
+  @override
+  Future<SalaryStructureModel> saveSalaryStructure(
+    SalaryStructureModel structure,
+  ) async {
+    if (structure.employeeId.isEmpty) {
+      throw ArgumentError('Employee is required');
+    }
+    if (structure.basicSalary < 0 || structure.allowances < 0) {
+      throw ArgumentError('Salary amounts cannot be negative');
+    }
+    if (structure.grossSalary <= 0) {
+      throw ArgumentError('Monthly salary must be greater than zero');
+    }
+    await _salaryStructures
+        .doc(structure.employeeId)
+        .set(structure.toJson(), SetOptions(merge: true));
+    await _writeAudit(
+      action: 'salary.structure_save',
+      entityType: 'salary_structure',
+      entityId: structure.employeeId,
+      actorName: structure.updatedBy,
+      detail:
+          '${structure.employeeName} gross=${structure.grossSalary} ${structure.currency}',
+    );
+    return structure;
+  }
+
+  @override
+  Future<void> deleteSalaryStructure(String employeeId) async {
+    await _salaryStructures.doc(employeeId).delete();
+    await _writeAudit(
+      action: 'salary.structure_delete',
+      entityType: 'salary_structure',
+      entityId: employeeId,
+    );
+  }
+
+  @override
+  Future<List<SalaryPaymentModel>> getSalaryPayments({String? period}) async {
+    QuerySnapshot<Map<String, dynamic>> snap;
+    if (period != null && period.isNotEmpty) {
+      snap = await _salaryPayments.where('period', isEqualTo: period).get();
+    } else {
+      snap = await _salaryPayments.get();
+    }
+    final list =
+        snap.docs.map((d) => SalaryPaymentModel.fromJson(d.data())).toList();
+    list.sort((a, b) {
+      final byPeriod = b.period.compareTo(a.period);
+      if (byPeriod != 0) return byPeriod;
+      return a.employeeName.compareTo(b.employeeName);
+    });
+    return list;
+  }
+
+  @override
+  Future<List<SalaryPaymentModel>> generateSalaryRun({
+    required String period,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    final structures =
+        (await getSalaryStructures()).where((s) => s.isActive).toList();
+    final existing = await getSalaryPayments(period: period);
+    final existingEmployeeIds = existing.map((p) => p.employeeId).toSet();
+
+    final now = DateTime.now();
+    final created = <SalaryPaymentModel>[];
+    final batch = firestore.batch();
+
+    for (final s in structures) {
+      if (existingEmployeeIds.contains(s.employeeId)) continue;
+      final net = SalaryPaymentEntity.computeNet(
+        basicSalary: s.basicSalary,
+        allowances: s.allowances,
+      );
+      final payment = SalaryPaymentModel(
+        id: SalaryPaymentEntity.buildId(period, s.employeeId),
+        period: period,
+        employeeId: s.employeeId,
+        employeeName: s.employeeName,
+        position: s.position,
+        basicSalary: s.basicSalary,
+        allowances: s.allowances,
+        netAmount: net,
+        netAmountMinor: (net * 100).round(),
+        currency: s.currency,
+        fundAccountId: s.defaultFundAccountId,
+        status: SalaryPaymentStatus.pending,
+        createdAt: now,
+        createdBy: actorName,
+      );
+      batch.set(_salaryPayments.doc(payment.id), payment.toJson());
+      created.add(payment);
+    }
+
+    if (created.isNotEmpty) {
+      await batch.commit();
+      await _writeAudit(
+        action: 'salary.run_generate',
+        entityType: 'salary_run',
+        entityId: period,
+        actorUserId: actorUserId,
+        actorName: actorName,
+        detail: '${created.length} salaries generated',
+      );
+    }
+
+    return getSalaryPayments(period: period);
+  }
+
+  @override
+  Future<SalaryPaymentModel> saveSalaryPayment(
+    SalaryPaymentModel payment,
+  ) async {
+    if (payment.netAmount < 0) {
+      throw ArgumentError('Net salary cannot be negative');
+    }
+    final ref = _salaryPayments.doc(payment.id);
+    final snap = await ref.get();
+    if (snap.exists && snap.data() != null) {
+      final existing = SalaryPaymentModel.fromJson(snap.data()!);
+      if (!existing.status.canPay) {
+        throw StateError(
+          'Cannot edit a ${existing.status.displayName.toLowerCase()} salary. '
+          'Void it first.',
+        );
+      }
+    }
+    await ref.set(payment.toJson(), SetOptions(merge: true));
+    return payment;
+  }
+
+  @override
+  Future<void> deleteSalaryPayment(String paymentId) async {
+    final snap = await _salaryPayments.doc(paymentId).get();
+    if (!snap.exists || snap.data() == null) return;
+    final payment = SalaryPaymentModel.fromJson(snap.data()!);
+    if (!payment.status.canDelete) {
+      throw StateError('Only pending salaries can be removed. Void instead.');
+    }
+    await _salaryPayments.doc(paymentId).delete();
+    await _writeAudit(
+      action: 'salary.delete_pending',
+      entityType: 'salary_payment',
+      entityId: paymentId,
+      detail: '${payment.employeeName} ${payment.period}',
+    );
+  }
+
+  @override
+  Future<SalaryPaymentModel> paySalary({
+    required String paymentId,
+    required String fundAccountId,
+    required String actorName,
+    String? actorUserId,
+    String paymentMethod = 'cash',
+    Map<String, double> advanceRecoveries = const {},
+  }) async {
+    final snap = await _salaryPayments.doc(paymentId).get();
+    if (!snap.exists || snap.data() == null) {
+      throw StateError('Salary record not found');
+    }
+    final payment = SalaryPaymentModel.fromJson(snap.data()!);
+    if (!payment.status.canPay) {
+      throw StateError(
+        'Salary is already ${payment.status.displayName.toLowerCase()}',
+      );
+    }
+
+    final accSnap = await _accounts.doc(fundAccountId).get();
+    if (!accSnap.exists || accSnap.data() == null) {
+      throw StateError('Fund account not found');
+    }
+    final account = FundAccountModel.fromJson(accSnap.data()!);
+    if (!account.isActive) {
+      throw StateError('Fund account is inactive');
+    }
+    if (account.currency != payment.currency) {
+      throw StateError(
+        'Account currency ${account.currency} does not match salary currency '
+        '${payment.currency}',
+      );
+    }
+
+    final now = DateTime.now();
+
+    // ── Petty cash rules ───────────────────────────────────────
+    // Same gates an expense payment goes through: the day must not be locked
+    // by a verified session, and a petty cash wallet must have a session open.
+    await _throwIfDayLocked(fundAccountId, now);
+    if (account.isPettyCash) {
+      final openSession = await getOpenSession(account.id);
+      if (openSession == null) {
+        throw StateError(
+          'Cannot pay salary from Petty Cash account "${account.name}" because '
+          'no petty cash session is currently open. Open today\'s session in '
+          'the Petty Cash tab first.',
+        );
+      }
+    }
+
+    // ── Advance recovery ───────────────────────────────────────
+    // Validate every advance before any money moves, so a bad entry cannot
+    // leave a half-applied payment behind.
+    final recoveries = <String, double>{};
+    var totalRecovery = 0.0;
+    for (final entry in advanceRecoveries.entries) {
+      final amount = (entry.value * 100).round() / 100.0;
+      if (amount <= 0) continue;
+      final advSnap = await _advances.doc(entry.key).get();
+      if (!advSnap.exists || advSnap.data() == null) {
+        throw StateError('Cash advance ${entry.key} not found');
+      }
+      final advance = CashAdvanceModel.fromJson(advSnap.data()!);
+      if (advance.employeeId != payment.employeeId) {
+        throw StateError(
+          'Advance ${advance.id} belongs to ${advance.employeeName}, '
+          'not ${payment.employeeName}',
+        );
+      }
+      if (!advance.isOpen) {
+        throw StateError(
+          'Advance for ${advance.employeeName} is already '
+          '${advance.status.displayName.toLowerCase()}',
+        );
+      }
+      if (amount > advance.outstanding + 1e-9) {
+        throw StateError(
+          'Recovery ${amount.toStringAsFixed(2)} exceeds the outstanding '
+          '${advance.outstanding.toStringAsFixed(2)} on this advance',
+        );
+      }
+      recoveries[entry.key] = amount;
+      totalRecovery += amount;
+    }
+
+    // Net is always recomputed here — never trusted from the UI.
+    final net = SalaryPaymentEntity.computeNet(
+      basicSalary: payment.basicSalary,
+      allowances: payment.allowances,
+      deductions: payment.deductions,
+      advanceRecovery: totalRecovery,
+    );
+    if (net <= 0 && totalRecovery <= 0) {
+      throw StateError('Net salary must be greater than zero');
+    }
+    if (payment.grossSalary - payment.deductions - totalRecovery < -1e-9) {
+      throw StateError('Deductions and advance recovery exceed gross pay');
+    }
+
+    final netMinor = (net * 100).round();
+    FundTransactionModel? tx;
+    String? expenseId;
+
+    // Net can legitimately be zero when the whole salary goes to repaying an
+    // advance — then no cash moves and there is nothing to post.
+    if (netMinor > 0) {
+      final bucket = _resolvePaymentBucket(
+        paymentMethod: paymentMethod,
+        cashBalance: account.cashBalance,
+        stcPayBalance: account.stcPayBalance,
+      );
+      if (account.currentBalanceMinor - netMinor < 0) {
+        throw StateError(
+          'Insufficient fund balance '
+          '(have ${account.currentBalance.toStringAsFixed(2)}, '
+          'need ${net.toStringAsFixed(2)} ${payment.currency})',
+        );
+      }
+      if (bucket == FundBucket.cash && account.cashBalance + 1e-9 < net) {
+        throw StateError(
+          'Insufficient cash balance '
+          '(have ${account.cashBalance.toStringAsFixed(2)}, '
+          'need ${net.toStringAsFixed(2)}). '
+          'Deposit cash into this wallet first, or pay by STC Pay.',
+        );
+      }
+      if (bucket == FundBucket.stcPay && account.stcPayBalance + 1e-9 < net) {
+        throw StateError(
+          'Insufficient STC Pay balance '
+          '(have ${account.stcPayBalance.toStringAsFixed(2)}, '
+          'need ${net.toStringAsFixed(2)}). '
+          'Top up STC Pay first, or pay in cash.',
+        );
+      }
+
+      tx = await postFundMovement(
+        PostFundRequest(
+          fundAccountId: fundAccountId,
+          type: FundTransactionType.expensePayment,
+          amountMajor: net,
+          currency: payment.currency,
+          description: _salaryLabel(payment),
+          performedBy: actorName,
+          performedByUserId: actorUserId,
+          bucket: bucket,
+          credit: false,
+          date: now,
+          auditNote: 'salary:${payment.id}',
+        ),
+      );
+
+      // Mirror the salary into `expenses` so payroll shows up in the expense
+      // list, category reports and petty cash session sheets. The shared
+      // ledgerEntryId is what stops it being counted twice.
+      expenseId = _uuid.v4();
+      final expense = ExpenseModel(
+        id: expenseId,
+        referenceNumber: await generateReferenceNumber(),
+        date: now,
+        createdAt: now,
+        submittedBy: actorName,
+        submittedByRole: 'ADMIN',
+        submittedByUserId: actorUserId,
+        expenseCategory: salaryExpenseCategory,
+        expenseType: salaryExpenseType,
+        description: _salaryLabel(payment),
+        paymentMethod: paymentMethod,
+        amount: net,
+        currency: payment.currency,
+        amountMinor: netMinor,
+        fundAccountId: fundAccountId,
+        fundAccountName: account.name,
+        status: ExpenseStatus.paid,
+        employeeId: payment.employeeId,
+        employeeName: payment.employeeName,
+        approvedBy: actorName,
+        approvedByUserId: actorUserId,
+        approvedAt: now,
+        ledgerEntryId: tx.id,
+        paidBy: actorName,
+        paidByUserId: actorUserId,
+        paidAt: now,
+        balanceAfter: tx.balanceAfter,
+        balanceAfterMinor: (tx.balanceAfter * 100).round(),
+        notes: _salaryBreakdownNote(payment, totalRecovery),
+        salaryPaymentId: payment.id,
+      );
+      await _expenses.doc(expenseId).set(_stripNulls(expense.toJson()));
+    }
+
+    // Settle the advances only after the money side succeeded.
+    for (final entry in recoveries.entries) {
+      await settleCashAdvance(
+        advanceId: entry.key,
+        settleAmountMajor: entry.value,
+        actorName: actorName,
+        actorUserId: actorUserId ?? '',
+        // The cash never left the fund — it was withheld from this salary —
+        // so no deposit is posted back.
+        returnToFund: false,
+      );
+    }
+
+    final updated = SalaryPaymentModel.fromEntity(
+      payment.copyWith(
+        status: SalaryPaymentStatus.paid,
+        advanceRecovery: totalRecovery,
+        advanceRecoveries: recoveries,
+        netAmount: net,
+        netAmountMinor: netMinor,
+        fundAccountId: fundAccountId,
+        fundAccountName: account.name,
+        paymentMethod: paymentMethod,
+        expenseId: expenseId,
+        paidAt: now,
+        paidBy: actorName,
+        paidByUserId: actorUserId,
+        ledgerEntryId: tx?.id,
+      ),
+    );
+    await _salaryPayments.doc(paymentId).set(
+          _stripNulls(updated.toJson()),
+          SetOptions(merge: true),
+        );
+    await _writeAudit(
+      action: 'salary.pay',
+      entityType: 'salary_payment',
+      entityId: paymentId,
+      actorUserId: actorUserId,
+      actorName: actorName,
+      detail:
+          '${payment.employeeName} net=$net ${payment.currency} '
+          'advanceRecovery=$totalRecovery from ${account.name} ($paymentMethod)',
+    );
+    return updated;
+  }
+
+  @override
+  Future<SalaryPaymentModel> voidSalaryPayment({
+    required String paymentId,
+    required String reason,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    final trimmed = reason.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('Void reason is required');
+    }
+    final snap = await _salaryPayments.doc(paymentId).get();
+    if (!snap.exists || snap.data() == null) {
+      throw StateError('Salary record not found');
+    }
+    final payment = SalaryPaymentModel.fromJson(snap.data()!);
+    if (!payment.status.canVoid) {
+      throw StateError('Only paid salaries can be voided');
+    }
+
+    final now = DateTime.now();
+    String? reverseId;
+
+    if (payment.ledgerEntryId != null &&
+        payment.fundAccountId != null &&
+        payment.fundAccountId!.isNotEmpty &&
+        payment.netAmount > 0) {
+      final tx = await postFundMovement(
+        PostFundRequest(
+          fundAccountId: payment.fundAccountId!,
+          type: FundTransactionType.reversal,
+          amountMajor: payment.netAmount,
+          currency: payment.currency,
+          description: 'Void ${_salaryLabel(payment)}: $trimmed',
+          performedBy: actorName,
+          performedByUserId: actorUserId,
+          reversesTransactionId: payment.ledgerEntryId,
+          bucket: _bucketFromPaymentMethod(payment.paymentMethod),
+          credit: true,
+          date: now,
+          auditNote: 'salary_void:${payment.id}',
+        ),
+      );
+      reverseId = tx.id;
+    }
+
+    // Put any recovered amounts back on the advances they came off.
+    for (final entry in payment.advanceRecoveries.entries) {
+      final advSnap = await _advances.doc(entry.key).get();
+      if (!advSnap.exists || advSnap.data() == null) continue;
+      final advance = CashAdvanceModel.fromJson(advSnap.data()!);
+      final restored = advance.settledAmount - entry.value;
+      final newSettled = restored < 0 ? 0.0 : restored;
+      final newStatus = newSettled <= 1e-9
+          ? CashAdvanceStatus.open
+          : (newSettled + 1e-9 >= advance.amount
+              ? CashAdvanceStatus.settled
+              : CashAdvanceStatus.partiallySettled);
+      await _advances.doc(entry.key).update({
+        'settledAmount': newSettled,
+        'status': newStatus.name,
+        if (newStatus != CashAdvanceStatus.settled)
+          'settledAt': FieldValue.delete(),
+      });
+    }
+
+    // Void the mirrored expense so the expense list agrees with payroll.
+    if (payment.expenseId != null && payment.expenseId!.isNotEmpty) {
+      await _expenses.doc(payment.expenseId!).set(
+        _stripNulls({
+          'status': ExpenseStatus.voided.name,
+          'voidedBy': actorName,
+          'voidedByUserId': actorUserId,
+          'voidedAt': now.toIso8601String(),
+          'voidReason': trimmed,
+          'reverseLedgerEntryId': reverseId,
+        }),
+        SetOptions(merge: true),
+      );
+    }
+
+    final updated = SalaryPaymentModel.fromEntity(
+      payment.copyWith(
+        status: SalaryPaymentStatus.voided,
+        voidedAt: now,
+        voidedBy: actorName,
+        voidReason: trimmed,
+        reverseLedgerEntryId: reverseId,
+      ),
+    );
+    await _salaryPayments.doc(paymentId).set(
+          _stripNulls(updated.toJson()),
+          SetOptions(merge: true),
+        );
+    await _writeAudit(
+      action: 'salary.void',
+      entityType: 'salary_payment',
+      entityId: paymentId,
+      actorUserId: actorUserId,
+      actorName: actorName,
+      detail: '${payment.employeeName} reason=$trimmed',
+    );
+    return updated;
+  }
+
+  static const _monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+
+  /// "Salary Sep 2026 — Ahmed Ali", falling back to the raw period.
+  String _salaryLabel(SalaryPaymentEntity payment) {
+    final parts = payment.period.split('-');
+    if (parts.length == 2) {
+      final month = int.tryParse(parts[1]);
+      if (month != null && month >= 1 && month <= 12) {
+        return 'Salary ${_monthNames[month - 1]} ${parts[0]} — '
+            '${payment.employeeName}';
+      }
+    }
+    return 'Salary ${payment.period} — ${payment.employeeName}';
+  }
+
+  String _salaryBreakdownNote(
+    SalaryPaymentEntity payment,
+    double advanceRecovery,
+  ) {
+    final parts = <String>[
+      'Basic ${payment.basicSalary.toStringAsFixed(2)}',
+      'Allowances ${payment.allowances.toStringAsFixed(2)}',
+    ];
+    if (payment.deductions > 0) {
+      parts.add(
+        'Deductions -${payment.deductions.toStringAsFixed(2)}'
+        '${payment.deductionNote != null ? ' (${payment.deductionNote})' : ''}',
+      );
+    }
+    if (advanceRecovery > 0) {
+      parts.add('Advance recovery -${advanceRecovery.toStringAsFixed(2)}');
+    }
+    return parts.join(' · ');
+  }
+
+  // ─── Policy (with 5-minute memory cache) ───────────────────
+
+  FinancePolicyEntity? _cachedPolicy;
+  DateTime? _policyCachedAt;
+  static const _policyCacheDuration = Duration(minutes: 5);
+
+  @override
+  Future<FinancePolicyEntity> getFinancePolicy() async {
+    if (_cachedPolicy != null &&
+        _policyCachedAt != null &&
+        DateTime.now().difference(_policyCachedAt!) < _policyCacheDuration) {
+      return _cachedPolicy!;
+    }
+    final snap = await _policyDoc.get();
+    if (!snap.exists) {
+      _cachedPolicy = const FinancePolicyEntity();
+    } else {
+      _cachedPolicy = FinancePolicyEntity.fromJson(snap.data());
+    }
+    _policyCachedAt = DateTime.now();
+    return _cachedPolicy!;
+  }
+
+  @override
+  Future<void> saveFinancePolicy(FinancePolicyEntity policy) async {
+    _cachedPolicy = policy;
+    _policyCachedAt = DateTime.now();
+    await _policyDoc.set(policy.toJson(), SetOptions(merge: true));
   }
 
   @override
   Future<String> uploadClosingSheet(XFile file, String sessionId) async {
     final ext = file.name.split('.').last;
     final ref = storage.ref('petty_cash/$sessionId/closing_sheet.$ext');
-
-    final Uint8List bytes = await file.readAsBytes();
+    final bytes = await file.readAsBytes();
     final metadata = SettableMetadata(contentType: _getMimeType(ext));
     await ref.putData(bytes, metadata);
-    return await ref.getDownloadURL();
+    return ref.getDownloadURL();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // EXPENSE CATEGORIES
-  // ═══════════════════════════════════════════════════════════
+  // ─── Categories ─────────────────────────────────────────────
 
   @override
   Future<List<ExpenseCategoryModel>> getExpenseCategories() async {
-    final snapshot = await firestore
-        .collection('expense_categories')
-        .orderBy('name')
-        .get();
+    final snapshot =
+        await firestore.collection('expense_categories').orderBy('name').get();
     return snapshot.docs
-        .map((doc) => ExpenseCategoryModel.fromJson(doc.data()))
+        .map((d) => ExpenseCategoryModel.fromJson(d.data()))
         .toList();
   }
 
@@ -339,9 +2523,212 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     await firestore.collection('expense_categories').doc(id).delete();
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // HELPERS
-  // ═══════════════════════════════════════════════════════════
+  // ─── Account Types ──────────────────────────────────────────
+
+  @override
+  Future<List<FundAccountTypeModel>> getFundAccountTypes() async {
+    final snapshot = await firestore
+        .collection('fund_account_types')
+        .orderBy('createdAt')
+        .get();
+
+    if (snapshot.docs.isEmpty) {
+      // Auto-seed default types (Bank, Petty Cash, STC Pay)
+      final defaults = FundAccountTypeEntity.defaultTypes
+          .map((e) => FundAccountTypeModel.fromEntity(e))
+          .toList();
+      for (final d in defaults) {
+        await firestore
+            .collection('fund_account_types')
+            .doc(d.id)
+            .set(d.toJson());
+      }
+      return defaults;
+    }
+
+    final loaded = snapshot.docs
+        .map((d) => FundAccountTypeModel.fromJson(d.data()))
+        .toList();
+
+    // Ensure all system default types exist if not present in collection
+    final loadedIds = loaded.map((e) => e.id).toSet();
+    final missingDefaults = FundAccountTypeEntity.defaultTypes
+        .where((d) => !loadedIds.contains(d.id))
+        .map((e) => FundAccountTypeModel.fromEntity(e))
+        .toList();
+
+    for (final d in missingDefaults) {
+      await firestore
+          .collection('fund_account_types')
+          .doc(d.id)
+          .set(d.toJson());
+      loaded.add(d);
+    }
+
+    return loaded;
+  }
+
+  @override
+  Future<void> insertFundAccountType(FundAccountTypeModel type) async {
+    await firestore
+        .collection('fund_account_types')
+        .doc(type.id)
+        .set(type.toJson());
+  }
+
+  @override
+  Future<void> updateFundAccountType(FundAccountTypeModel type) async {
+    await firestore
+        .collection('fund_account_types')
+        .doc(type.id)
+        .update(type.toJson());
+  }
+
+  @override
+  Future<void> deleteFundAccountType(String id) async {
+    await firestore.collection('fund_account_types').doc(id).delete();
+  }
+
+  // ─── Helpers ────────────────────────────────────────────────
+
+  FundBucket _bucketFromPaymentMethod(String method) {
+    final m = method.toLowerCase();
+    if (m == 'cash') return FundBucket.cash;
+    if (m.contains('stc')) return FundBucket.stcPay;
+    return FundBucket.total;
+  }
+
+  /// Prefer cash/STC split when those buckets are funded; otherwise total-only.
+  /// Avoids approve failing when deposits only raised [currentBalance].
+  FundBucket _resolvePaymentBucket({
+    required String paymentMethod,
+    required double cashBalance,
+    required double stcPayBalance,
+  }) {
+    final preferred = _bucketFromPaymentMethod(paymentMethod);
+    final usesSplit = cashBalance > 1e-9 || stcPayBalance > 1e-9;
+    if (!usesSplit) return FundBucket.total;
+    return preferred;
+  }
+
+  /// Firestore [update] rejects null field values (especially on web).
+  Map<String, dynamic> _stripNulls(Map<String, dynamic> data) {
+    final out = <String, dynamic>{};
+    data.forEach((key, value) {
+      if (value != null) out[key] = value;
+    });
+    return out;
+  }
+
+  String _unwrapFirebaseError(Object e) {
+    final s = e.toString();
+    // Flutter web wraps real errors in this opaque message.
+    if (s.contains('Dart exception thrown from converted Future') ||
+        s.contains('Stacktrace: null')) {
+      try {
+        // ignore: avoid_dynamic_calls
+        final dynamic d = e;
+        final inner = d.error;
+        if (inner != null) return inner.toString();
+      } catch (_) {}
+    }
+    if (s.contains('permission-denied')) {
+      return 'Permission denied. Check you are logged in and your '
+          'allowed_users role can update expenses/fund_accounts.';
+    }
+    if (s.contains('failed-precondition')) {
+      return 'Firestore precondition failed (often a missing index or '
+          'stale transaction). Retry once. Details: $s';
+    }
+    return s
+        .replaceFirst('StateError: ', '')
+        .replaceFirst('Exception: ', '')
+        .replaceFirst('Bad state: ', '');
+  }
+
+  Future<void> _throwIfDayLocked(String fundAccountId, DateTime day) async {
+    if (await isDayLocked(fundAccountId, day)) {
+      final key = DayLockEntity.dayKeyFrom(day);
+      throw StateError(
+        'Day $key is locked for this fund account after petty cash verification. '
+        'No new money posts allowed.',
+      );
+    }
+  }
+
+  void _assertExpensePolicy(ExpenseEntity expense, FinancePolicyEntity policy) {
+    if (expense.amount >= policy.receiptRequiredAbove &&
+        expense.receiptUrls.isEmpty) {
+      throw StateError(
+        'Receipt required for amounts >= ${policy.receiptRequiredAbove}',
+      );
+    }
+    final type = expense.expenseType.toUpperCase();
+    if (policy.requireVehicleForFuel &&
+        type.contains('FUEL') &&
+        (expense.vehicleId == null || expense.vehicleId!.isEmpty)) {
+      throw StateError('Vehicle is required for fuel expenses');
+    }
+    if (policy.requireEmployeeForSalary &&
+        (type.contains('SALARY') || type.contains('PAYROLL')) &&
+        (expense.employeeId == null || expense.employeeId!.isEmpty)) {
+      throw StateError('Employee is required for salary expenses');
+    }
+  }
+
+  @override
+  Future<void> resetFinanceModuleData() async {
+    final collections = [
+      _expenses,
+      _txs,
+      _accounts,
+      _advances,
+      _dayLocks,
+      firestore.collection('petty_cash_sessions'),
+      firestore.collection('finance_audits'),
+      _salaryPayments,
+    ];
+
+    for (final col in collections) {
+      final snap = await col.get();
+      for (var i = 0; i < snap.docs.length; i += 400) {
+        final chunk = snap.docs.sublist(
+          i,
+          i + 400 > snap.docs.length ? snap.docs.length : i + 400,
+        );
+        final batch = firestore.batch();
+        for (final doc in chunk) {
+          batch.delete(doc.reference);
+        }
+        await batch.commit();
+      }
+    }
+    _cachedPolicy = null;
+    _policyCachedAt = null;
+  }
+
+  Future<void> _writeAudit({
+    required String action,
+    required String entityType,
+    required String entityId,
+    String? actorUserId,
+    String? actorName,
+    String? detail,
+  }) async {
+    try {
+      await _audit.add({
+        'action': action,
+        'entityType': entityType,
+        'entityId': entityId,
+        'actorUserId': actorUserId,
+        'actorName': actorName,
+        'detail': detail,
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {
+      // Audit must not block money ops.
+    }
+  }
 
   String _getMimeType(String ext) {
     switch (ext.toLowerCase().replaceAll('.', '')) {

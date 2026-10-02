@@ -8,9 +8,12 @@ class PettyCashSessionModel extends PettyCashSessionEntity {
     required super.date,
     super.openedBy,
     super.closedBy,
-    super.openingBalance = 0.0,
-    super.totalExpenses = 0.0,
-    super.deposits = 0.0,
+    super.openingCashBalance = 0.0,
+    super.openingStcPayBalance = 0.0,
+    super.cashDeposits = 0.0,
+    super.stcPayDeposits = 0.0,
+    super.cashExpenses = 0.0,
+    super.stcPayExpenses = 0.0,
     super.closingBalance = 0.0,
     super.cashInHand = 0.0,
     super.stcPayBalance,
@@ -31,9 +34,12 @@ class PettyCashSessionModel extends PettyCashSessionEntity {
       'date': date.toIso8601String(),
       'openedBy': openedBy,
       'closedBy': closedBy,
-      'openingBalance': openingBalance,
-      'totalExpenses': totalExpenses,
-      'deposits': deposits,
+      'openingCashBalance': openingCashBalance,
+      'openingStcPayBalance': openingStcPayBalance,
+      'cashDeposits': cashDeposits,
+      'stcPayDeposits': stcPayDeposits,
+      'cashExpenses': cashExpenses,
+      'stcPayExpenses': stcPayExpenses,
       'closingBalance': closingBalance,
       'cashInHand': cashInHand,
       'stcPayBalance': stcPayBalance,
@@ -49,17 +55,22 @@ class PettyCashSessionModel extends PettyCashSessionEntity {
   }
 
   factory PettyCashSessionModel.fromJson(Map<String, dynamic> json) {
+    final legacyOpening = (json['openingBalance'] as num?)?.toDouble() ?? 0.0;
+    final legacyDeposits = (json['deposits'] as num?)?.toDouble() ?? 0.0;
+    final legacyExpenses = (json['totalExpenses'] as num?)?.toDouble() ?? 0.0;
+
     return PettyCashSessionModel(
       id: json['id'] as String,
       fundAccountId: json['fundAccountId'] as String? ?? '',
-      date: json['date'] != null
-          ? DateTime.parse(json['date'] as String)
-          : DateTime.now(),
+      date: _parseDateTime(json['date']) ?? DateTime.now(),
       openedBy: json['openedBy'] as String?,
       closedBy: json['closedBy'] as String?,
-      openingBalance: (json['openingBalance'] as num?)?.toDouble() ?? 0.0,
-      totalExpenses: (json['totalExpenses'] as num?)?.toDouble() ?? 0.0,
-      deposits: (json['deposits'] as num?)?.toDouble() ?? 0.0,
+      openingCashBalance: (json['openingCashBalance'] as num?)?.toDouble() ?? legacyOpening,
+      openingStcPayBalance: (json['openingStcPayBalance'] as num?)?.toDouble() ?? 0.0,
+      cashDeposits: (json['cashDeposits'] as num?)?.toDouble() ?? legacyDeposits,
+      stcPayDeposits: (json['stcPayDeposits'] as num?)?.toDouble() ?? 0.0,
+      cashExpenses: (json['cashExpenses'] as num?)?.toDouble() ?? legacyExpenses,
+      stcPayExpenses: (json['stcPayExpenses'] as num?)?.toDouble() ?? 0.0,
       closingBalance: (json['closingBalance'] as num?)?.toDouble() ?? 0.0,
       cashInHand: (json['cashInHand'] as num?)?.toDouble() ?? 0.0,
       stcPayBalance: (json['stcPayBalance'] as num?)?.toDouble(),
@@ -68,15 +79,24 @@ class PettyCashSessionModel extends PettyCashSessionEntity {
       closingSheetUrl: json['closingSheetUrl'] as String?,
       status: _parseStatus(json['status'] as String?),
       verifiedBy: json['verifiedBy'] as String?,
-      verifiedAt: json['verifiedAt'] != null
-          ? DateTime.parse(json['verifiedAt'] as String)
-          : null,
+      verifiedAt: _parseDateTime(json['verifiedAt']),
       discrepancy: (json['discrepancy'] as num?)?.toDouble(),
       notes: json['notes'] as String?,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : DateTime.now(),
+      createdAt: _parseDateTime(json['createdAt']) ?? DateTime.now(),
     );
+  }
+
+  static DateTime? _parseDateTime(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    if (val is String) return DateTime.tryParse(val);
+    try {
+      final dynamic d = val;
+      if (d.toDate != null) {
+        return (d.toDate() as DateTime);
+      }
+    } catch (_) {}
+    return null;
   }
 
   factory PettyCashSessionModel.fromEntity(PettyCashSessionEntity entity) {
@@ -86,9 +106,12 @@ class PettyCashSessionModel extends PettyCashSessionEntity {
       date: entity.date,
       openedBy: entity.openedBy,
       closedBy: entity.closedBy,
-      openingBalance: entity.openingBalance,
-      totalExpenses: entity.totalExpenses,
-      deposits: entity.deposits,
+      openingCashBalance: entity.openingCashBalance,
+      openingStcPayBalance: entity.openingStcPayBalance,
+      cashDeposits: entity.cashDeposits,
+      stcPayDeposits: entity.stcPayDeposits,
+      cashExpenses: entity.cashExpenses,
+      stcPayExpenses: entity.stcPayExpenses,
       closingBalance: entity.closingBalance,
       cashInHand: entity.cashInHand,
       stcPayBalance: entity.stcPayBalance,

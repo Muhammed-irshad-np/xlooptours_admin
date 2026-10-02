@@ -1,16 +1,198 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if the user is authenticated and is an admin
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+
+    function userEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function allowedUserDoc() {
+      return get(/databases/$(database)/documents/allowed_users/$(userEmail()));
+    }
+
+    function isAllowedUser() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/allowed_users/$(userEmail()))
+        && allowedUserDoc().data.get('isActive', true) == true;
+    }
+
+    function userRole() {
+      return allowedUserDoc().data.get('role',
+        allowedUserDoc().data.get('isAdmin', false) == true ? 'admin' : 'viewer'
+      );
+    }
+
     function isAdmin() {
-      return request.auth != null && 
-             request.auth.token.email != null &&
-             exists(/databases/$(database)/documents/allowed_users/$(request.auth.token.email.lower())) &&
-             get(/databases/$(database)/documents/allowed_users/$(request.auth.token.email.lower())).data.isAdmin == true;
+      return isAllowedUser() && (
+        userRole() == 'admin' ||
+        allowedUserDoc().data.get('isAdmin', false) == true
+      );
+    }
+
+    function isFinance() {
+      return isAllowedUser() && (
+        userRole() in ['finance', 'admin'] ||
+        allowedUserDoc().data.get('isAdmin', false) == true
+      );
+    }
+
+    function isManagerOrAbove() {
+      return isAllowedUser() && (
+        userRole() in ['manager', 'finance', 'admin'] ||
+        allowedUserDoc().data.get('isAdmin', false) == true
+      );
+    }
+
+    function isCoordinatorOrAbove() {
+      return isAllowedUser() && (
+        userRole() in ['coordinator', 'manager', 'finance', 'admin'] ||
+        allowedUserDoc().data.get('isAdmin', false) == true
+      );
+    }
+
+    // Whitelist: users can read own doc; only admin manages list
+    match /allowed_users/{email} {
+      allow read: if isAllowedUser() && (email == userEmail() || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // Finance collections — authenticated staff only
+    match /expenses/{id} {
+      allow read: if isAllowedUser();
+      allow create: if isAllowedUser();
+      allow update: if isManagerOrAbove() || isCoordinatorOrAbove();
+      allow delete: if isFinance();
+    }
+
+    match /fund_accounts/{id} {
+      allow read: if isAllowedUser();
+      allow create, update: if isFinance() || isCoordinatorOrAbove();
+      allow delete: if isFinance();
+    }
+
+    match /fund_transactions/{id} {
+      allow read: if isAllowedUser();
+      // Client may create via app transactions; prefer finance roles
+      allow create: if isCoordinatorOrAbove();
+      allow update: if isFinance();
+      allow delete: if false; // append-only ledger
+    }
+
+    match /petty_cash_sessions/{id} {
+      allow read: if isAllowedUser();
+      allow create, update: if isCoordinatorOrAbove();
+      allow delete: if isFinance();
+    }
+
+    match /expense_categories/{id} {
+      allow read: if isAllowedUser();
+      allow write: if isFinance();
+    }
+
+    match /counters/{id} {
+      allow read, write: if isAllowedUser();
+    }
+
+    match /finance_audit_log/{id} {
+      allow read: if isManagerOrAbove();
+      allow create: if isAllowedUser();
+      allow update, delete: if false;
+    }
+
+    match /finance_day_locks/{id} {
+      allow read: if isAllowedUser();
+      allow create: if isManagerOrAbove();
+      allow update, delete: if isFinance();
+    }
+
+    match /cash_advances/{id} {
+      allow read: if isAllowedUser();
+      allow create, update: if isCoordinatorOrAbove();
+      allow delete: if isFinance();
+    }
+
+    match /salary_structures/{id} {
+      allow read: if isManagerOrAbove();
+      allow create, update, delete: if isFinance();
+    }
+
+    match /salary_payments/{id} {
+      allow read: if isManagerOrAbove();
+      allow create, update: if isFinance();
+      allow delete: if isFinance();
+    }
+
+    match /finance_settings/{id} {
+      allow read: if isAllowedUser();
+      allow write: if isFinance();
+    }
+
+    // ── Odometer readings ──────────────────────────────────────────────────
+    //
+    // The reading log is append-only. A reading is an observation of what a
+    // cluster showed at a moment in time; it is never edited and never deleted.
+    // A wrong reading is superseded by a correction, which keeps the series
+    // intact so downstream maintenance maths can be recomputed rather than
+    // guessed at.
+    //
+    // These rules are the last line of defence. The client-side plausibility
+    // engine (ValidateOdometerReadingUseCase) does the nuanced, history-aware
+    // work; what is enforced here is only what can be checked from the document
+    // itself, so that a client that skips the engine still cannot write
+    // nonsense.
+
+    function odometerFieldsValid(data) {
+      return data.value is int
+             && data.value >= 0
+             && data.value <= 2000000
+             && data.vehicleId is string
+             && data.readingAt is string
+             && data.source is string
+             && data.status in ['accepted', 'quarantined', 'rejected', 'superseded'];
+    }
+
+    // The observation itself is immutable. Only the review verdict may change,
+    // and only into the fields listed here.
+    function onlyReviewFieldsChanged() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly([
+                 'status',
+                 'supersededByReadingId',
+                 'reviewedByUid',
+                 'reviewedByName',
+                 'reviewedAt',
+                 'reviewNote'
+               ]);
+    }
+
+    // Fleet-wide (collection-group) reads need their own rule. A rule matching
+    // /vehicles/{id}/odometerReadings/{rid} does NOT authorize a collectionGroup
+    // query — Firestore requires a recursive-wildcard match for those, and
+    // without it the query is denied no matter what indexes exist.
+    match /{path=**}/odometerReadings/{readingId} {
+      allow read: if isAllowedUser();
+    }
+
+    match /vehicles/{vehicleId}/odometerReadings/{readingId} {
+      allow read: if isAllowedUser();
+
+      allow create: if isAllowedUser()
+                    && odometerFieldsValid(request.resource.data)
+                    && request.resource.data.vehicleId == vehicleId;
+
+      // Review verdicts only — never the value, date, source or entrant.
+      allow update: if isAllowedUser() && onlyReviewFieldsChanged();
+
+      // Nothing deletes a reading, not even an admin. Reject it instead: it
+      // stops counting immediately but stays answerable for audit.
+      allow delete: if false;
     }
 
     match /{document=**} {
-      allow read, create, update: if true;
+      allow read, create, update: if isAllowedUser();
       allow delete: if isAdmin();
     }
   }

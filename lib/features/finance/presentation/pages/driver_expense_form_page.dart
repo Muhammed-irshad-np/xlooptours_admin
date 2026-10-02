@@ -9,9 +9,12 @@ import 'package:image_picker/image_picker.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../../../vehicle/presentation/providers/vehicle_provider.dart';
+import '../../../vehicle/domain/entities/odometer_reading_entity.dart';
+import '../../../vehicle/presentation/providers/odometer_provider.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../pages/finance_dashboard_page.dart';
+import '../widgets/finance_dialog_helpers.dart';
 
 /// Public-facing mobile web form for drivers to submit daily expenses.
 class DriverExpenseFormPage extends StatefulWidget {
@@ -117,7 +120,7 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
                       // Vehicle Dropdown
                       _buildLabel('Select Vehicle *'),
                       DropdownButtonFormField<String>(
-                        value: _selectedVehicleId,
+                        initialValue: _selectedVehicleId,
                         decoration: _inputDecoration('Choose vehicle plate/model'),
                         items: vehicleProv.vehicles.map((v) {
                           return DropdownMenuItem(
@@ -133,7 +136,7 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
                       // Expense Type
                       _buildLabel('Expense Type *'),
                       DropdownButtonFormField<String>(
-                        value: _selectedType,
+                        initialValue: _selectedType,
                         decoration: _inputDecoration('Choose expense type'),
                         items: _expenseTypes.map((t) {
                           return DropdownMenuItem(value: t, child: Text(t));
@@ -326,7 +329,9 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
       final url = await provider.uploadReceipt(file, expenseId);
       setState(() => _receiptUrl = url);
     } catch (e) {
-      AppSnackBar.showError(context, 'Failed to upload: $e');
+      if (mounted) {
+        AppSnackBar.showError(context, 'Failed to upload: $e');
+      }
     } finally {
       setState(() => _uploadingReceipt = false);
     }
@@ -345,7 +350,14 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
           elevation: 0,
         ),
         child: _isSaving
-            ? const CircularProgressIndicator(color: Colors.white)
+            ? SizedBox(
+                width: 18.w,
+                height: 18.h,
+                child: const CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  color: Colors.white,
+                ),
+              )
             : Text(
                 'Submit Expense',
                 style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13.sp),
@@ -383,7 +395,7 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
         submittedBy: _driverNameCtrl.text.toUpperCase().trim(),
         submittedByRole: 'DRIVER',
         expenseCategory: 'VEHICLES',
-        expenseType: _selectedType!.toUpperCase(),
+        expenseType: _selectedType!,
         amount: double.parse(_amountCtrl.text),
         currency: 'SAR',
         fundAccountId: defaultAccount.id,
@@ -398,11 +410,34 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
 
       await provider.insertExpense(expense);
 
+      // The driver read this off the cluster to fill the mileage field, so it
+      // is a genuine odometer observation — log it as one instead of letting
+      // it sit unused on the expense. Best-effort: a failure here must never
+      // cost the driver their submission.
+      if (mounted) {
+        final mileage = expense.mileageKm;
+        if (mileage != null && mileage > 0) {
+          await context.read<OdometerProvider>().recordSilently(
+            vehicle: selectedVehicle,
+            value: mileage.round(),
+            source: OdometerSource.expense,
+            readingAt: expense.date,
+            sourceRefId: expense.id,
+            enteredByName: expense.submittedBy,
+            note:
+                'From driver ${expense.expenseType} expense '
+                '${expense.referenceNumber}.',
+          );
+        }
+      }
+
       if (mounted) {
         _showSuccessDialog();
       }
     } catch (e) {
-      AppSnackBar.showError(context, 'Error: $e');
+      if (mounted) {
+        AppSnackBar.showError(context, 'Error: $e');
+      }
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -413,24 +448,25 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.check_circle_rounded, color: FinDT.success, size: 24.sp),
-            SizedBox(width: 8.w),
-            const Text('Submitted!'),
-          ],
-        ),
-        content: const Text(
-          'Your expense has been successfully submitted for review. You can close this page now.',
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: finDialogShape,
+        title: finDialogTitle('Expense Submitted!', icon: Icons.check_circle_rounded, iconColor: FinDT.success),
+        content: SizedBox(
+          width: 400.w,
+          child: Text(
+            'Your expense has been successfully submitted for review. You can close this page now.',
+            style: GoogleFonts.inter(fontSize: 13.sp, color: FinDT.textSecondary, height: 1.4),
+          ),
         ),
         actions: [
-          FilledButton(
+          finDialogActionButton(
             onPressed: () {
               Navigator.pop(ctx);
               _resetForm();
             },
-            style: FilledButton.styleFrom(backgroundColor: const Color(0xFF13B1F2)),
-            child: const Text('OK'),
+            label: 'Done',
+            backgroundColor: FinDT.brand,
           ),
         ],
       ),

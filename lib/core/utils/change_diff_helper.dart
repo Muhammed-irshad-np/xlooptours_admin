@@ -30,7 +30,18 @@ class ChangeDiffHelper {
     _addDateIfChanged(changes, 'Join Date', oldE.joinDate, newE.joinDate);
     _addDateIfChanged(changes, 'Birth Date', oldE.birthDate, newE.birthDate);
     _addIfChanged(changes, 'Gender', oldE.gender, newE.gender);
-    _addIfChanged(changes, 'Driver Type', oldE.driverType, newE.driverType);
+    _addIfChanged(
+        changes, 'Employment Type', oldE.employmentType, newE.employmentType);
+    _addIfChanged(changes, 'Vehicle Make', oldE.externalVehicle?.make,
+        newE.externalVehicle?.make);
+    _addIfChanged(changes, 'Vehicle Model', oldE.externalVehicle?.model,
+        newE.externalVehicle?.model);
+    _addIfChanged(changes, 'Vehicle Year', oldE.externalVehicle?.year?.toString(),
+        newE.externalVehicle?.year?.toString());
+    _addIfChanged(changes, 'Vehicle Color', oldE.externalVehicle?.vehicleColor,
+        newE.externalVehicle?.vehicleColor);
+    _addIfChanged(changes, 'Car Plate No', oldE.externalVehicle?.plateNumber,
+        newE.externalVehicle?.plateNumber);
     _addBoolIfChanged(changes, 'Status', oldE.isActive, newE.isActive,
         trueLabel: 'Active', falseLabel: 'Inactive');
 

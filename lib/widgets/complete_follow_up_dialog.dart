@@ -11,6 +11,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../features/vehicle/presentation/providers/odometer_provider.dart';
+import '../features/vehicle/domain/entities/odometer_reading_entity.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
@@ -47,11 +49,40 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
     _dateController = TextEditingController(
       text: DateFormat('MMM dd, yyyy').format(_selectedDate),
     );
-    // Pre-fill with the expected odometer reading or current vehicle odometer
-    final expectedMileage = widget.record.nextServiceMileage ?? widget.vehicle.currentOdometer ?? 0;
-    _odometerController = TextEditingController(
-      text: expectedMileage.toString(),
-    );
+    // Deliberately left empty. Pre-filling the expected mileage invites the
+    // entrant to accept the number rather than read the cluster, and editing a
+    // pre-filled figure in place is how a stray digit slips through unnoticed.
+    // The expected value is shown as helper text instead.
+    _odometerController = TextEditingController();
+  }
+
+  /// The last reading we can validate against, so the entrant sees what the
+  /// system already believes before typing over it.
+  int? get _lastKnownOdometer => widget.vehicle.currentOdometer;
+
+  String? get _odometerHelperText {
+    final last = _lastKnownOdometer;
+    final expected = widget.record.nextServiceMileage;
+    final parts = <String>[
+      if (last != null) 'Last recorded: $last km',
+      if (expected != null) 'service due at $expected km',
+    ];
+    return parts.isEmpty ? null : parts.join(' · ');
+  }
+
+  /// Blocks the two errors this dialog can catch on its own. Anything subtler
+  /// is caught downstream by the plausibility engine when the reading is
+  /// written to the odometer log.
+  String? _validateOdometer(String? v) {
+    if (v == null || v.isEmpty) return 'Required';
+    final parsed = int.tryParse(v);
+    if (parsed == null) return 'Invalid odometer';
+
+    final last = _lastKnownOdometer;
+    if (last != null && parsed < last) {
+      return 'Lower than the last recorded reading ($last km)';
+    }
+    return null;
   }
 
   @override
@@ -140,6 +171,7 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
     final navigator = Navigator.of(context);
     final notifProvider = context.read<NotificationProvider>();
     final provider = context.read<VehicleProvider>();
+    final odometerProvider = context.read<OdometerProvider>();
     final authProvider = context.read<AuthProvider>();
 
     final user = authProvider.user;
@@ -202,22 +234,27 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
       final existingMaintenance = widget.vehicle.maintenance ?? const VehicleMaintenance();
       final updatedMaintenance = _updateMatchingTypedRecord(existingMaintenance, widget.record, updatedRecord);
 
-      int currentOdometer = widget.vehicle.currentOdometer ?? 0;
-      final newOdometer = int.parse(_odometerController.text);
-      if (newOdometer > currentOdometer) {
-        currentOdometer = newOdometer;
-      }
-
+      // The odometer is no longer written here. This dialog used to take
+      // max(entered, current), which silently swallowed a too-low entry and
+      // bypassed every plausibility check. The service mileage now goes into
+      // the odometer log like any other reading, and the vehicle's derived
+      // odometer is refreshed from there.
       final updatedVehicle = widget.vehicle.copyWith(
         maintenanceHistory: updatedHistory,
         maintenance: updatedMaintenance,
-        currentOdometer: currentOdometer,
-        lastOdometerUpdateDate: newOdometer > (widget.vehicle.currentOdometer ?? 0)
-            ? DateTime.now()
-            : widget.vehicle.lastOdometerUpdateDate,
       );
 
       await provider.updateVehicle(updatedVehicle);
+
+      await odometerProvider.recordSilently(
+        vehicle: updatedVehicle,
+        value: completion.mileage,
+        source: OdometerSource.followUp,
+        readingAt: _selectedDate,
+        enteredByUid: user?.id,
+        enteredByName: username,
+        note: 'Captured while completing ${widget.record.serviceType}.',
+      );
 
       if (mounted) {
         await ActivityLogger.log(
@@ -309,17 +346,16 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
                 decoration: InputDecoration(
                   labelText: 'Odometer Reading',
                   suffixText: 'km',
+                  hintText: 'Read it off the cluster',
+                  helperText: _odometerHelperText,
+                  helperMaxLines: 2,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.r),
                   ),
                 ),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (v) {
-                  if (v == null || v.isEmpty) return 'Required';
-                  if (int.tryParse(v) == null) return 'Invalid odometer';
-                  return null;
-                },
+                validator: _validateOdometer,
               ),
               SizedBox(height: 16.h),
               TextFormField(

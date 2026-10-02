@@ -1,6 +1,5 @@
 import '../../domain/entities/expense_entity.dart';
 
-/// Data model for [ExpenseEntity] with Firestore serialization.
 class ExpenseModel extends ExpenseEntity {
   const ExpenseModel({
     required super.id,
@@ -10,17 +9,22 @@ class ExpenseModel extends ExpenseEntity {
     super.updatedAt,
     required super.submittedBy,
     required super.submittedByRole,
+    super.submittedByUserId,
     required super.expenseCategory,
     required super.expenseType,
     super.description,
     super.paymentDetails,
+    super.paymentMethod = 'cash',
     required super.amount,
     required super.currency,
+    super.amountMinor,
     required super.fundAccountId,
     super.fundAccountName,
+    super.isNonWallet = false,
     super.status = ExpenseStatus.pending,
     super.employeeId,
     super.employeeName,
+    super.submittedByEmployeeId,
     super.vehicleId,
     super.vehicleName,
     super.mileageKm,
@@ -30,9 +34,22 @@ class ExpenseModel extends ExpenseEntity {
     super.simOperator,
     super.country,
     super.approvedBy,
+    super.approvedByUserId,
     super.approvedAt,
     super.rejectionReason,
+    super.ledgerEntryId,
+    super.paidBy,
+    super.paidByUserId,
+    super.paidAt,
+    super.balanceAfter,
+    super.balanceAfterMinor,
+    super.voidedBy,
+    super.voidedByUserId,
+    super.voidedAt,
+    super.voidReason,
+    super.reverseLedgerEntryId,
     super.notes,
+    super.salaryPaymentId,
   });
 
   Map<String, dynamic> toJson() {
@@ -44,17 +61,22 @@ class ExpenseModel extends ExpenseEntity {
       'updatedAt': updatedAt?.toIso8601String(),
       'submittedBy': submittedBy,
       'submittedByRole': submittedByRole,
+      'submittedByUserId': submittedByUserId,
       'expenseCategory': expenseCategory,
       'expenseType': expenseType,
       'description': description,
       'paymentDetails': paymentDetails,
+      'paymentMethod': paymentMethod,
       'amount': amount,
       'currency': currency,
+      'amountMinor': amountMinor ?? (amount * 100).round(),
       'fundAccountId': fundAccountId,
       'fundAccountName': fundAccountName,
+      'isNonWallet': isNonWallet,
       'status': status.name,
       'employeeId': employeeId,
       'employeeName': employeeName,
+      'submittedByEmployeeId': submittedByEmployeeId,
       'vehicleId': vehicleId,
       'vehicleName': vehicleName,
       'mileageKm': mileageKm,
@@ -64,36 +86,52 @@ class ExpenseModel extends ExpenseEntity {
       'simOperator': simOperator,
       'country': country,
       'approvedBy': approvedBy,
+      'approvedByUserId': approvedByUserId,
       'approvedAt': approvedAt?.toIso8601String(),
       'rejectionReason': rejectionReason,
+      'ledgerEntryId': ledgerEntryId,
+      'paidBy': paidBy,
+      'paidByUserId': paidByUserId,
+      'paidAt': paidAt?.toIso8601String(),
+      'balanceAfter': balanceAfter,
+      'balanceAfterMinor': balanceAfterMinor,
+      'voidedBy': voidedBy,
+      'voidedByUserId': voidedByUserId,
+      'voidedAt': voidedAt?.toIso8601String(),
+      'voidReason': voidReason,
+      'reverseLedgerEntryId': reverseLedgerEntryId,
       'notes': notes,
+      'salaryPaymentId': salaryPaymentId,
     };
   }
 
   factory ExpenseModel.fromJson(Map<String, dynamic> json) {
+    final amount = (json['amount'] as num?)?.toDouble() ?? 0.0;
     return ExpenseModel(
       id: json['id'] as String,
       referenceNumber: json['referenceNumber'] as String? ?? '',
-      date: DateTime.parse(json['date'] as String),
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : DateTime.now(),
-      updatedAt: json['updatedAt'] != null
-          ? DateTime.parse(json['updatedAt'] as String)
-          : null,
+      date: _parseDateTime(json['date']) ?? DateTime.now(),
+      createdAt: _parseDateTime(json['createdAt']) ?? DateTime.now(),
+      updatedAt: _parseDateTime(json['updatedAt']),
       submittedBy: json['submittedBy'] as String? ?? '',
       submittedByRole: json['submittedByRole'] as String? ?? '',
+      submittedByUserId: json['submittedByUserId'] as String?,
       expenseCategory: json['expenseCategory'] as String? ?? '',
       expenseType: json['expenseType'] as String? ?? '',
       description: json['description'] as String?,
       paymentDetails: json['paymentDetails'] as String?,
-      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      paymentMethod: json['paymentMethod'] as String? ?? 'cash',
+      amount: amount,
       currency: json['currency'] as String? ?? 'SAR',
+      amountMinor: (json['amountMinor'] as num?)?.toInt() ??
+          (amount * 100).round(),
       fundAccountId: json['fundAccountId'] as String? ?? '',
       fundAccountName: json['fundAccountName'] as String?,
+      isNonWallet: json['isNonWallet'] as bool? ?? false,
       status: _parseStatus(json['status'] as String?),
       employeeId: json['employeeId'] as String?,
       employeeName: json['employeeName'] as String?,
+      submittedByEmployeeId: json['submittedByEmployeeId'] as String?,
       vehicleId: json['vehicleId'] as String?,
       vehicleName: json['vehicleName'] as String?,
       mileageKm: (json['mileageKm'] as num?)?.toDouble(),
@@ -106,12 +144,36 @@ class ExpenseModel extends ExpenseEntity {
       simOperator: json['simOperator'] as String?,
       country: json['country'] as String?,
       approvedBy: json['approvedBy'] as String?,
-      approvedAt: json['approvedAt'] != null
-          ? DateTime.parse(json['approvedAt'] as String)
-          : null,
+      approvedByUserId: json['approvedByUserId'] as String?,
+      approvedAt: _parseDateTime(json['approvedAt']),
       rejectionReason: json['rejectionReason'] as String?,
+      ledgerEntryId: json['ledgerEntryId'] as String?,
+      paidBy: json['paidBy'] as String?,
+      paidByUserId: json['paidByUserId'] as String?,
+      paidAt: _parseDateTime(json['paidAt']),
+      balanceAfter: (json['balanceAfter'] as num?)?.toDouble(),
+      balanceAfterMinor: (json['balanceAfterMinor'] as num?)?.toInt(),
+      voidedBy: json['voidedBy'] as String?,
+      voidedByUserId: json['voidedByUserId'] as String?,
+      voidedAt: _parseDateTime(json['voidedAt']),
+      voidReason: json['voidReason'] as String?,
+      reverseLedgerEntryId: json['reverseLedgerEntryId'] as String?,
       notes: json['notes'] as String?,
+      salaryPaymentId: json['salaryPaymentId'] as String?,
     );
+  }
+
+  static DateTime? _parseDateTime(dynamic val) {
+    if (val == null) return null;
+    if (val is DateTime) return val;
+    if (val is String) return DateTime.tryParse(val);
+    try {
+      final dynamic d = val;
+      if (d.toDate != null) {
+        return (d.toDate() as DateTime);
+      }
+    } catch (_) {}
+    return null;
   }
 
   factory ExpenseModel.fromEntity(ExpenseEntity entity) {
@@ -123,17 +185,22 @@ class ExpenseModel extends ExpenseEntity {
       updatedAt: entity.updatedAt,
       submittedBy: entity.submittedBy,
       submittedByRole: entity.submittedByRole,
+      submittedByUserId: entity.submittedByUserId,
       expenseCategory: entity.expenseCategory,
       expenseType: entity.expenseType,
       description: entity.description,
       paymentDetails: entity.paymentDetails,
+      paymentMethod: entity.paymentMethod,
       amount: entity.amount,
       currency: entity.currency,
+      amountMinor: entity.amountMinor ?? (entity.amount * 100).round(),
       fundAccountId: entity.fundAccountId,
       fundAccountName: entity.fundAccountName,
+      isNonWallet: entity.isNonWallet,
       status: entity.status,
       employeeId: entity.employeeId,
       employeeName: entity.employeeName,
+      submittedByEmployeeId: entity.submittedByEmployeeId,
       vehicleId: entity.vehicleId,
       vehicleName: entity.vehicleName,
       mileageKm: entity.mileageKm,
@@ -143,9 +210,22 @@ class ExpenseModel extends ExpenseEntity {
       simOperator: entity.simOperator,
       country: entity.country,
       approvedBy: entity.approvedBy,
+      approvedByUserId: entity.approvedByUserId,
       approvedAt: entity.approvedAt,
       rejectionReason: entity.rejectionReason,
+      ledgerEntryId: entity.ledgerEntryId,
+      paidBy: entity.paidBy,
+      paidByUserId: entity.paidByUserId,
+      paidAt: entity.paidAt,
+      balanceAfter: entity.balanceAfter,
+      balanceAfterMinor: entity.balanceAfterMinor,
+      voidedBy: entity.voidedBy,
+      voidedByUserId: entity.voidedByUserId,
+      voidedAt: entity.voidedAt,
+      voidReason: entity.voidReason,
+      reverseLedgerEntryId: entity.reverseLedgerEntryId,
       notes: entity.notes,
+      salaryPaymentId: entity.salaryPaymentId,
     );
   }
 

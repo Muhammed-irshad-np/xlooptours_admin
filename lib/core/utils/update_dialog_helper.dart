@@ -21,7 +21,14 @@ import '../../features/xloop_vault/presentation/providers/vault_provider.dart';
 import '../../features/xloop_vault/domain/entities/vault_data.dart';
 import '../../features/vehicle/presentation/widgets/maintenance_extension_dialog.dart';
 import '../../features/vehicle/domain/usecases/get_vehicle_maintenance_alerts_usecase.dart';
+import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
+import '../../features/finance/presentation/providers/finance_provider.dart';
+import '../../features/finance/presentation/providers/fund_account_provider.dart';
+import '../../features/finance/domain/entities/expense_entity.dart';
+import '../../features/finance/domain/entities/fund_account_entity.dart';
+import '../widgets/inline_expense_section.dart';
 import '../../injection_container.dart';
 import '../utils/activity_logger.dart';
 import '../utils/change_diff_helper.dart';
@@ -42,6 +49,197 @@ class UpdateDialogHelper {
     } else if (notification.id.startsWith('followup_')) {
       _showFollowUpResolveDialog(context, notification);
     }
+  }
+
+  /// Clears the alert and records the activity once a document edit has been
+  /// persisted. Shared by the inline save and the "More options" hand-off so
+  /// both leave the same trail.
+  static Future<void> _finishDocumentUpdate(
+    BuildContext ctx, {
+    required NotificationEntity notification,
+    required EmployeeEntity employee,
+    required String documentType,
+    required DateTime? newExpiryDate,
+    required EmployeeProvider employeeProvider,
+  }) async {
+    final notifProvider = ctx.read<NotificationProvider>();
+    final vehicleProvider = ctx.read<VehicleProvider>();
+    final vaultProvider = ctx.read<VaultProvider>();
+
+    await notifProvider.markAsRead(notification.id);
+    await notifProvider.refreshAlerts(
+      vehicles: vehicleProvider.vehicles,
+      maintenanceTypes: vehicleProvider.maintenanceTypes,
+      employees: employeeProvider.employees,
+      employeeSettings: employeeProvider.settings,
+      vehicleSettings: vehicleProvider.settings,
+      vaultData: vaultProvider.vaultData,
+    );
+
+    if (!ctx.mounted) return;
+    await ActivityLogger.log(
+      ctx,
+      title: 'Employee Document Updated',
+      message: ChangeDiffHelper.describeEmployeeDocumentUpdate(
+        employeeName: employee.fullName,
+        documentType: documentType,
+        newExpiryDate: newExpiryDate,
+      ),
+      relatedId: employee.id,
+    );
+  }
+
+  /// Materialises a drafted inline expense: uploads its receipt and stamps it
+  /// with an id and reference number. Returns null when the section is off.
+  ///
+  /// Deliberately done *before* the host dialog writes its own record, so the
+  /// only step left that can fail is the insert itself.
+  static Future<ExpenseEntity?> _prepareInlineExpense(
+    InlineExpenseController c, {
+    required FinanceProvider finance,
+    required ExpenseAttribution attribution,
+    required String description,
+    required List<FundAccountEntity> accounts,
+    required List<EmployeeEntity> employees,
+    required String submitterName,
+    required String submitterRole,
+    String? submitterUserId,
+  }) async {
+    if (!c.enabled) return null;
+
+    final expenseId = const Uuid().v4();
+    final receiptUrls = <String>[];
+    if (c.receipt != null) {
+      receiptUrls.add(await finance.uploadReceipt(c.receipt!, expenseId));
+    }
+
+    return c
+        .buildDraft(
+          attribution: attribution,
+          description: description,
+          accounts: accounts,
+          employees: employees,
+          fallbackSubmitterName: submitterName,
+          fallbackSubmitterRole: submitterRole,
+          fallbackSubmitterUserId: submitterUserId,
+        )
+        .copyWith(
+          id: expenseId,
+          referenceNumber: await finance.generateReferenceNumber(),
+          amountMinor: (c.amount * 100).round(),
+          receiptUrls: receiptUrls,
+        );
+  }
+
+  /// Loads what the inline expense dropdowns need. The alert can be opened
+  /// from any screen, so finance may never have been visited this session.
+  static Future<void> _primeFinanceForInlineExpense(
+    FinanceProvider finance,
+    FundAccountProvider accounts,
+  ) async {
+    if (accounts.accounts.isEmpty) await accounts.fetchAllAccounts();
+    if (finance.categories.isEmpty) await finance.fetchCategories();
+    // The receipt threshold has to be the configured one, not the default.
+    if (!finance.isPolicyLoaded) await finance.fetchFinancePolicy();
+  }
+
+  /// Active seeded types under [category], with [fallback] guaranteed present
+  /// so the dropdown always has the mapped default even before any seeding.
+  static List<String> _expenseTypeOptions(
+    FinanceProvider finance,
+    String category,
+    String fallback,
+  ) {
+    final match = finance.categories.where(
+      (c) => c.name.trim().toUpperCase() == category,
+    );
+    final names = match.isEmpty
+        ? <String>[]
+        : match.first.expenseTypes
+              .where((t) => t.isActive)
+              .map((t) => t.name)
+              .toList();
+    if (!names.contains(fallback)) names.insert(0, fallback);
+    return names;
+  }
+
+  /// Expense category every employee document cost lands under. Matches the
+  /// seeded category so these rows sit beside payroll in reports.
+  static const String _employeeExpenseCategory = 'EMPLOYEES';
+
+  /// Document label → seeded expense type, so the renewal cost is classified
+  /// the same way whether it is logged from an alert or typed in by hand.
+  static const Map<String, String> _documentExpenseTypes = {
+    'Iqama': 'Iqama Renewal',
+    'Bahrain Residence ID': 'Residence Permit Renewal',
+    'Passport': 'Passport Renewal',
+    'Driving License': 'Driving License Renewal',
+    'Saudi Visa': 'Visa Renewal',
+    'Bahrain Visa': 'Visa Renewal',
+    'Dubai Visa': 'Visa Renewal',
+    'Qatar Visa': 'Visa Renewal',
+    'Authorization': 'Tafweed (Authorization) Renewal',
+    'Health Insurance': 'Health Insurance',
+  };
+
+  /// Expense category company-level document costs land under. These are not
+  /// carried for any one employee or vehicle, so they carry no attribution id.
+  static const String _companyExpenseCategory = 'COMPANY';
+
+  static const Map<String, String> _vaultDocumentExpenseTypes = {
+    'Commercial License': 'Commercial Registration (CR) Renewal',
+    'VAT Certificate': 'VAT Certificate Renewal',
+  };
+
+  static String _expenseTypeForVaultDocument(String documentType) =>
+      _vaultDocumentExpenseTypes[documentType] ??
+      'Commercial Registration (CR) Renewal';
+
+  /// Expense category every vehicle cost lands under.
+  static const String _vehicleExpenseCategory = 'VEHICLES';
+
+  /// Vehicle document label → seeded expense type.
+  static const Map<String, String> _vehicleDocumentExpenseTypes = {
+    'Istimara': 'Istimara Renewal',
+    'Insurance': 'Vehicle Insurance',
+    'Bahrain Insurance': 'Vehicle Insurance',
+    'Fahas': 'Fahas / MVPI',
+    'Tafweed': 'Vehicle Authorization (Tafweed)',
+  };
+
+  static String _expenseTypeForVehicleDocument(String documentType) =>
+      _vehicleDocumentExpenseTypes[documentType] ?? 'Istimara Renewal';
+
+  /// Plate first, since that is how the fleet is spoken about.
+  static String _vehicleLabel(VehicleEntity v) =>
+      '${v.plateNumber} · ${v.make} ${v.model}';
+
+  static ExpenseAttribution _vehicleAttribution(
+    VehicleEntity v, {
+    double? mileageKm,
+  }) => ExpenseAttribution(
+    label: _vehicleLabel(v),
+    vehicleId: v.id,
+    vehicleName: '${v.plateNumber} - ${v.model}',
+    mileageKm: mileageKm,
+  );
+
+  static String _expenseTypeForDocument(String documentType) {
+    if (documentType.startsWith('Phone Recharge')) return 'Phone Recharge';
+    return _documentExpenseTypes[documentType] ?? 'Iqama Renewal';
+  }
+
+  /// Human-readable line that explains the row without opening the record it
+  /// came from. [subject] is whoever or whatever the document belongs to — an
+  /// employee, a vehicle, or the company.
+  static String _expenseDescription({
+    required String documentType,
+    required String subject,
+    DateTime? newExpiry,
+  }) {
+    final base = '$documentType — $subject';
+    if (newExpiry == null) return base;
+    return '$base (new expiry ${DateFormat('dd MMM yyyy').format(newExpiry)})';
   }
 
   /// Shows a dialog to update an employee document's expiry date, with all
@@ -162,6 +360,45 @@ class UpdateDialogHelper {
       }
     }
 
+    // ── Inline "log this cost to Finance" state ─────────────────────────
+    final financeProvider = context.read<FinanceProvider>();
+    final fundAccountProvider = context.read<FundAccountProvider>();
+    final authUser = context.read<AuthProvider>().user;
+
+    // Phone recharge already asks for a cost and a holder above; reuse those
+    // rather than asking the same two questions twice.
+    final usesRechargeCost = documentType.startsWith('Phone Recharge');
+
+    final inlineExpense = InlineExpenseController(
+      category: _employeeExpenseCategory,
+      defaultType: _expenseTypeForDocument(documentType),
+      amountSource: usesRechargeCost ? costController : null,
+    );
+
+    await _primeFinanceForInlineExpense(financeProvider, fundAccountProvider);
+    if (!context.mounted) return;
+
+    /// Employee the cost is attributed to. For a swapped SIM this is whoever
+    /// currently holds it, not the employee the contact is filed under.
+    EmployeeEntity beneficiaryEmployee() {
+      if (usesRechargeCost && selectedHolderId != null) {
+        final match = employeeProvider.employees.where(
+          (e) => e.id == selectedHolderId,
+        );
+        if (match.isNotEmpty) return match.first;
+      }
+      return employee;
+    }
+
+    ExpenseAttribution attribution() {
+      final target = beneficiaryEmployee();
+      return ExpenseAttribution(
+        label: target.fullName,
+        employeeId: target.id,
+        employeeName: target.fullName,
+      );
+    }
+
     /// Returns the extension-only filename, trimmed to ~30 chars for display.
     String _fileName(XFile f) {
       final base = p.basename(f.path);
@@ -187,6 +424,159 @@ class UpdateDialogHelper {
       'Dubai Visa',
       'Qatar Visa',
     };
+
+    /// Applies the edited values onto the employee record. Pure — it returns
+    /// the new entity so the caller decides when (and whether) to persist it.
+    EmployeeEntity buildUpdatedEmployee(String? newAttachmentUrl) {
+      EmployeeEntity updatedEmployee = employee;
+
+      String? _url(String? existing) => newAttachmentUrl ?? existing;
+
+      switch (documentType) {
+        case 'Iqama':
+          if (selectedDate == null) {
+            updatedEmployee = employee.copyWith(clearIqama: true);
+          } else {
+            updatedEmployee = employee.copyWith(
+              iqama: IqamaDocument(
+                number: numberController.text,
+                expiryDate: selectedDate!,
+                attachmentUrl: _url(employee.iqama?.attachmentUrl),
+              ),
+            );
+          }
+          break;
+        case 'Bahrain Residence ID':
+          if (selectedDate == null) {
+            updatedEmployee = employee.copyWith(clearBahrainResidence: true);
+          } else {
+            updatedEmployee = employee.copyWith(
+              bahrainResidence: BahrainResidenceDocument(
+                number: numberController.text,
+                expiryDate: selectedDate!,
+                attachmentUrl: _url(employee.bahrainResidence?.attachmentUrl),
+              ),
+            );
+          }
+          break;
+        case 'Health Insurance':
+          if (selectedDate == null) {
+            updatedEmployee = employee.copyWith(clearHealthInsurance: true);
+          } else {
+            updatedEmployee = employee.copyWith(
+              healthInsurance: HealthInsuranceDocument(
+                expiryDate: selectedDate!,
+                attachmentUrl: _url(employee.healthInsurance?.attachmentUrl),
+              ),
+            );
+          }
+          break;
+        case 'Driving License':
+          if (selectedDate == null) {
+            updatedEmployee = employee.copyWith(clearDrivingLicense: true);
+          } else {
+            updatedEmployee = employee.copyWith(
+              drivingLicense: DrivingLicenseDocument(
+                countryOfOrigin: countryController.text,
+                number: numberController.text,
+                expiryDate: selectedDate!,
+                type: selectedLicenseType,
+                attachmentUrl: _url(employee.drivingLicense?.attachmentUrl),
+              ),
+            );
+          }
+          break;
+        case 'Passport':
+          if (selectedDate == null) {
+            updatedEmployee = employee.copyWith(clearPassport: true);
+          } else {
+            updatedEmployee = employee.copyWith(
+              passport: PassportDocument(
+                nameOnPassport: nameController.text,
+                number: numberController.text,
+                expiryDate: selectedDate!,
+                attachmentUrl: _url(employee.passport?.attachmentUrl),
+              ),
+            );
+          }
+          break;
+        case 'Saudi Visa':
+          if (selectedDate == null) {
+            updatedEmployee = employee.copyWith(clearSaudiVisa: true);
+          } else {
+            updatedEmployee = employee.copyWith(
+              saudiVisa: VisaDocument(
+                number: numberController.text,
+                expiryDate: selectedDate!,
+                type: selectedVisaType,
+                attachmentUrl: _url(employee.saudiVisa?.attachmentUrl),
+              ),
+            );
+          }
+          break;
+        case 'Bahrain Visa':
+          if (selectedDate == null) {
+            updatedEmployee = employee.copyWith(clearBahrainVisa: true);
+          } else {
+            updatedEmployee = employee.copyWith(
+              bahrainVisa: VisaDocument(
+                number: numberController.text,
+                expiryDate: selectedDate!,
+                type: selectedVisaType,
+                attachmentUrl: _url(employee.bahrainVisa?.attachmentUrl),
+              ),
+            );
+          }
+          break;
+        case 'Dubai Visa':
+          if (selectedDate == null) {
+            updatedEmployee = employee.copyWith(clearDubaiVisa: true);
+          } else {
+            updatedEmployee = employee.copyWith(
+              dubaiVisa: VisaDocument(
+                number: numberController.text,
+                expiryDate: selectedDate!,
+                type: selectedVisaType,
+                attachmentUrl: _url(employee.dubaiVisa?.attachmentUrl),
+              ),
+            );
+          }
+          break;
+        case 'Qatar Visa':
+          if (selectedDate == null) {
+            updatedEmployee = employee.copyWith(clearQatarVisa: true);
+          } else {
+            updatedEmployee = employee.copyWith(
+              qatarVisa: VisaDocument(
+                number: numberController.text,
+                expiryDate: selectedDate!,
+                type: selectedVisaType,
+                attachmentUrl: _url(employee.qatarVisa?.attachmentUrl),
+              ),
+            );
+          }
+          break;
+        default:
+          // Phone Recharge contacts
+          if (documentType.startsWith('Phone Recharge')) {
+            final updatedContacts = employee.contacts.map((c) {
+              final contactId = '${c.countryCode} ${c.phoneNumber}';
+              if (documentType.contains(contactId)) {
+                return c.copyWith(
+                  rechargeExpiryDate: selectedDate,
+                  rechargeCost: double.tryParse(costController.text),
+                  currentHolderId: selectedHolderId,
+                );
+              }
+              return c;
+            }).toList();
+            updatedEmployee = employee.copyWith(contacts: updatedContacts);
+          }
+          break;
+      }
+
+      return updatedEmployee;
+    }
 
     await showDialog(
       context: context,
@@ -443,6 +833,24 @@ class UpdateDialogHelper {
                           },
                         ),
                       ],
+
+                      // ── Log the renewal cost to Finance ──────────────────
+                      InlineExpenseSection(
+                        controller: inlineExpense,
+                        attribution: attribution(),
+                        enableLabel: 'Log renewal cost to Finance',
+                        submitterLabel: authUser?.actorLabel ?? 'You',
+                        accounts: fundAccountProvider.activeAccounts,
+                        employees: employeeProvider.employees,
+                        typeOptions: _expenseTypeOptions(
+                          financeProvider,
+                          _employeeExpenseCategory,
+                          inlineExpense.expenseType,
+                        ),
+                        policy: financeProvider.policy,
+                        isSaving: isSaving,
+                        onChanged: () => setState(() {}),
+                      ),
                     ],
                   ),
                 ),
@@ -458,6 +866,17 @@ class UpdateDialogHelper {
                       : () async {
                           setState(() => isSaving = true);
 
+                          // Validate the inline expense first, so a bad
+                          // amount never reaches the document write.
+                          final problem = inlineExpense.validate(
+                            financeProvider.policy,
+                          );
+                          if (problem != null) {
+                            setState(() => isSaving = false);
+                            AppSnackBar.showError(ctx, problem);
+                            return;
+                          }
+
                           try {
                             // ── Upload new file if picked ────────────────
                             String? newAttachmentUrl;
@@ -472,243 +891,75 @@ class UpdateDialogHelper {
                             }
 
                             // ── Build updated employee with new date (+url) ─
-                            EmployeeEntity updatedEmployee = employee;
+                            final updatedEmployee = buildUpdatedEmployee(
+                              newAttachmentUrl,
+                            );
 
-                            String? _url(String? existing) =>
-                                newAttachmentUrl ?? existing;
-
-                            switch (documentType) {
-                              case 'Iqama':
-                                if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(
-                                    clearIqama: true,
-                                  );
-                                } else {
-                                  updatedEmployee = employee.copyWith(
-                                    iqama: IqamaDocument(
-                                      number: numberController.text,
-                                      expiryDate: selectedDate!,
-                                      attachmentUrl: _url(
-                                        employee.iqama?.attachmentUrl,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                break;
-                              case 'Bahrain Residence ID':
-                                if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(
-                                    clearBahrainResidence: true,
-                                  );
-                                } else {
-                                  updatedEmployee = employee.copyWith(
-                                    bahrainResidence: BahrainResidenceDocument(
-                                      number: numberController.text,
-                                      expiryDate: selectedDate!,
-                                      attachmentUrl: _url(
-                                        employee
-                                            .bahrainResidence
-                                            ?.attachmentUrl,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                break;
-                              case 'Health Insurance':
-                                if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(
-                                    clearHealthInsurance: true,
-                                  );
-                                } else {
-                                  updatedEmployee = employee.copyWith(
-                                    healthInsurance: HealthInsuranceDocument(
-                                      expiryDate: selectedDate!,
-                                      attachmentUrl: _url(
-                                        employee.healthInsurance?.attachmentUrl,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                break;
-                              case 'Driving License':
-                                if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(
-                                    clearDrivingLicense: true,
-                                  );
-                                } else {
-                                  updatedEmployee = employee.copyWith(
-                                    drivingLicense: DrivingLicenseDocument(
-                                      countryOfOrigin: countryController.text,
-                                      number: numberController.text,
-                                      expiryDate: selectedDate!,
-                                      type: selectedLicenseType,
-                                      attachmentUrl: _url(
-                                        employee.drivingLicense?.attachmentUrl,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                break;
-                              case 'Passport':
-                                if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(
-                                    clearPassport: true,
-                                  );
-                                } else {
-                                  updatedEmployee = employee.copyWith(
-                                    passport: PassportDocument(
-                                      nameOnPassport: nameController.text,
-                                      number: numberController.text,
-                                      expiryDate: selectedDate!,
-                                      attachmentUrl: _url(
-                                        employee.passport?.attachmentUrl,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                break;
-                              case 'Saudi Visa':
-                                if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(
-                                    clearSaudiVisa: true,
-                                  );
-                                } else {
-                                  updatedEmployee = employee.copyWith(
-                                    saudiVisa: VisaDocument(
-                                      number: numberController.text,
-                                      expiryDate: selectedDate!,
-                                      type: selectedVisaType,
-                                      attachmentUrl: _url(
-                                        employee.saudiVisa?.attachmentUrl,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                break;
-                              case 'Bahrain Visa':
-                                if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(
-                                    clearBahrainVisa: true,
-                                  );
-                                } else {
-                                  updatedEmployee = employee.copyWith(
-                                    bahrainVisa: VisaDocument(
-                                      number: numberController.text,
-                                      expiryDate: selectedDate!,
-                                      type: selectedVisaType,
-                                      attachmentUrl: _url(
-                                        employee.bahrainVisa?.attachmentUrl,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                break;
-                              case 'Dubai Visa':
-                                if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(
-                                    clearDubaiVisa: true,
-                                  );
-                                } else {
-                                  updatedEmployee = employee.copyWith(
-                                    dubaiVisa: VisaDocument(
-                                      number: numberController.text,
-                                      expiryDate: selectedDate!,
-                                      type: selectedVisaType,
-                                      attachmentUrl: _url(
-                                        employee.dubaiVisa?.attachmentUrl,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                break;
-                              case 'Qatar Visa':
-                                if (selectedDate == null) {
-                                  updatedEmployee = employee.copyWith(
-                                    clearQatarVisa: true,
-                                  );
-                                } else {
-                                  updatedEmployee = employee.copyWith(
-                                    qatarVisa: VisaDocument(
-                                      number: numberController.text,
-                                      expiryDate: selectedDate!,
-                                      type: selectedVisaType,
-                                      attachmentUrl: _url(
-                                        employee.qatarVisa?.attachmentUrl,
-                                      ),
-                                    ),
-                                  );
-                                }
-                                break;
-                              default:
-                                // Phone Recharge contacts
-                                if (documentType.startsWith('Phone Recharge')) {
-                                  final updatedContacts = employee.contacts.map(
-                                    (c) {
-                                      final contactId =
-                                          '${c.countryCode} ${c.phoneNumber}';
-                                      if (documentType.contains(contactId)) {
-                                        return c.copyWith(
-                                          rechargeExpiryDate: selectedDate,
-                                          rechargeCost: double.tryParse(
-                                            costController.text,
-                                          ),
-                                          currentHolderId: selectedHolderId,
-                                        );
-                                      }
-                                      return c;
-                                    },
-                                  ).toList();
-                                  updatedEmployee = employee.copyWith(
-                                    contacts: updatedContacts,
-                                  );
-                                }
-                                break;
-                            }
+                            final target = beneficiaryEmployee();
+                            final expense = await _prepareInlineExpense(
+                              inlineExpense,
+                              finance: financeProvider,
+                              attribution: attribution(),
+                              description: _expenseDescription(
+                                documentType: documentType,
+                                subject: target.fullName,
+                                newExpiry: selectedDate,
+                              ),
+                              accounts: fundAccountProvider.activeAccounts,
+                              employees: employeeProvider.employees,
+                              submitterName: authUser?.actorLabel ?? '',
+                              submitterRole:
+                                  authUser?.role.name.toUpperCase() ?? 'USER',
+                              submitterUserId: authUser?.id,
+                            );
 
                             await employeeProvider.updateEmployee(
                               updatedEmployee,
                             );
 
+                            if (expense != null) {
+                              try {
+                                await financeProvider.insertExpense(expense);
+                              } catch (_) {
+                                // Keep the two in step: if the cost cannot be
+                                // recorded, the document goes back to what it
+                                // was rather than silently diverging.
+                                await employeeProvider.updateEmployee(employee);
+                                rethrow;
+                              }
+                            }
+
                             if (ctx.mounted) {
-                              final notifProvider = ctx
-                                  .read<NotificationProvider>();
-                              final vehicleProvider = ctx
-                                  .read<VehicleProvider>();
-                              final vaultProvider = ctx.read<VaultProvider>();
                               final navigator = Navigator.of(ctx);
 
-                              await notifProvider.markAsRead(notification.id);
-                              await notifProvider.refreshAlerts(
-                                vehicles: vehicleProvider.vehicles,
-                                maintenanceTypes:
-                                    vehicleProvider.maintenanceTypes,
-                                employees: employeeProvider.employees,
-                                employeeSettings: employeeProvider.settings,
-                                vehicleSettings: vehicleProvider.settings,
-                                vaultData: vaultProvider.vaultData,
-                              );
-
-                              await ActivityLogger.log(
+                              await _finishDocumentUpdate(
                                 ctx,
-                                title: 'Employee Document Updated',
-                                message:
-                                    ChangeDiffHelper.describeEmployeeDocumentUpdate(
-                                      employeeName: employee.fullName,
-                                      documentType: documentType,
-                                      newExpiryDate: selectedDate,
-                                    ),
-                                relatedId: employee.id,
+                                notification: notification,
+                                employee: employee,
+                                documentType: documentType,
+                                newExpiryDate: selectedDate,
+                                employeeProvider: employeeProvider,
                               );
 
                               navigator.pop();
                               if (ctx.mounted) {
-                                AppSnackBar.showSuccess(ctx, 'Updated successfully');
+                                AppSnackBar.showSuccess(
+                                  ctx,
+                                  inlineExpense.enabled
+                                      ? 'Updated · expense logged as pending'
+                                      : 'Updated successfully',
+                                );
                               }
                             }
                           } catch (e) {
                             setState(() => isSaving = false);
                             if (ctx.mounted) {
-                              AppSnackBar.showError(ctx, 'Error: $e');
+                              AppSnackBar.showError(
+                                ctx,
+                                inlineExpense.enabled
+                                    ? 'Could not save. Nothing was changed: $e'
+                                    : 'Error: $e',
+                              );
                             }
                           }
                         },
@@ -762,9 +1013,26 @@ class UpdateDialogHelper {
     final followUpKmController = TextEditingController();
 
     String? selectedShopName;
+    bool isSaving = false;
 
     // Fetch shops for dropdown
     context.read<VehicleProvider>().fetchAllShops();
+
+    // ── Inline "log this cost to Finance" ───────────────────────────────
+    final financeProvider = context.read<FinanceProvider>();
+    final fundAccountProvider = context.read<FundAccountProvider>();
+    final employeeProvider = context.read<EmployeeProvider>();
+    final authUser = context.read<AuthProvider>().user;
+
+    // The dialog already asks for a service cost; reuse it as the amount.
+    final inlineExpense = InlineExpenseController(
+      category: _vehicleExpenseCategory,
+      defaultType: 'Maintenance & Repairs',
+      amountSource: costController,
+    );
+
+    await _primeFinanceForInlineExpense(financeProvider, fundAccountProvider);
+    if (!context.mounted) return;
 
     await showDialog(
       context: context,
@@ -948,12 +1216,31 @@ class UpdateDialogHelper {
                         ],
                       ),
                     ],
+                    InlineExpenseSection(
+                      controller: inlineExpense,
+                      attribution: _vehicleAttribution(
+                        vehicle,
+                        mileageKm: double.tryParse(mileageController.text),
+                      ),
+                      enableLabel: 'Log service cost to Finance',
+                      submitterLabel: authUser?.actorLabel ?? 'You',
+                      accounts: fundAccountProvider.activeAccounts,
+                      employees: employeeProvider.employees,
+                      typeOptions: _expenseTypeOptions(
+                        financeProvider,
+                        _vehicleExpenseCategory,
+                        inlineExpense.expenseType,
+                      ),
+                      policy: financeProvider.policy,
+                      isSaving: isSaving,
+                      onChanged: () => setState(() {}),
+                    ),
                   ],
                 ),
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: isSaving ? null : () => Navigator.pop(context),
                   child: const Text('Cancel'),
                 ),
                 TextButton(
@@ -1013,200 +1300,288 @@ class UpdateDialogHelper {
                   child: const Text('Extend Alert'),
                 ),
                 ElevatedButton(
-                  onPressed: () async {
-                    if (selectedDate == null) {
-                      AppSnackBar.showWarning(context, 'Please select a date');
-                      return;
-                    }
-                    if (mileageController.text.isEmpty ||
-                        int.tryParse(mileageController.text) == null) {
-                      AppSnackBar.showWarning(
-                        context,
-                        'Please enter a valid mileage',
-                      );
-                      return;
-                    }
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          if (selectedDate == null) {
+                            AppSnackBar.showWarning(
+                              context,
+                              'Please select a date',
+                            );
+                            return;
+                          }
+                          if (mileageController.text.isEmpty ||
+                              int.tryParse(mileageController.text) == null) {
+                            AppSnackBar.showWarning(
+                              context,
+                              'Please enter a valid mileage',
+                            );
+                            return;
+                          }
 
-                    final newMileage = int.parse(mileageController.text);
+                          // Check the inline expense before anything is written.
+                          final problem = inlineExpense.validate(
+                            financeProvider.policy,
+                          );
+                          if (problem != null) {
+                            AppSnackBar.showError(context, problem);
+                            return;
+                          }
 
-                    final user = context.read<AuthProvider>().user;
-                    final email = user?.email;
-                    final username =
-                        (user?.displayName != null &&
-                            user!.displayName!.isNotEmpty)
-                        ? user.displayName
-                        : (email != null && email.contains('@')
-                              ? email.split('@').first
-                              : (email ?? 'System'));
+                          setState(() => isSaving = true);
 
-                    final newRecord = MaintenanceRecord(
-                      date: selectedDate!,
-                      mileage: newMileage,
-                      cost: double.tryParse(costController.text),
-                      serviceProvider: selectedShopName ?? '',
-                      notes: notesController.text,
-                      serviceType: category,
-                      isFollowUpRequired: isFollowUpRequired,
-                      followUpReason: isFollowUpRequired
-                          ? followUpReasonController.text.trim()
-                          : null,
-                      nextServiceDate: isFollowUpRequired ? followUpDate : null,
-                      nextServiceMileage: isFollowUpRequired
-                          ? int.tryParse(followUpKmController.text)
-                          : null,
-                      isFollowUpCompleted: isFollowUpRequired ? false : null,
-                      followUpIntervalKm: null,
-                      followUpTimesCount: null,
-                      followUpCompletions: isFollowUpRequired ? const [] : null,
-                      performedBy: username,
-                    );
+                          final newMileage = int.parse(mileageController.text);
 
-                    final currentMaintenance =
-                        vehicle.maintenance ?? const VehicleMaintenance();
-                    VehicleMaintenance updatedMaintenance = currentMaintenance;
+                          final user = context.read<AuthProvider>().user;
+                          final email = user?.email;
+                          final username =
+                              (user?.displayName != null &&
+                                  user!.displayName!.isNotEmpty)
+                              ? user.displayName
+                              : (email != null && email.contains('@')
+                                    ? email.split('@').first
+                                    : (email ?? 'System'));
 
-                    switch (category) {
-                      case 'Engine Oil':
-                      case 'Engine Oil Change':
-                      case 'Engine Oil & Filter':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          engineOil: newRecord,
-                        );
-                        break;
-                      case 'Gear Oil':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          gearOil: newRecord,
-                        );
-                        break;
-                      case 'Housing Oil':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          housingOil: newRecord,
-                        );
-                        break;
-                      case 'Tyre Change':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          tyreChange: newRecord,
-                        );
-                        break;
-                      case 'Battery Change':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          batteryChange: newRecord,
-                        );
-                        break;
-                      case 'Brake Pads':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          brakePads: newRecord,
-                        );
-                        break;
-                      case 'Air Filter':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          airFilter: newRecord,
-                        );
-                        break;
-                      case 'AC Service':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          acService: newRecord,
-                        );
-                        break;
-                      case 'Wheel Alignment':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          wheelAlignment: newRecord,
-                        );
-                        break;
-                      case 'Spark Plugs':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          sparkPlugs: newRecord,
-                        );
-                        break;
-                      case 'Coolant Flush':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          coolantFlush: newRecord,
-                        );
-                        break;
-                      case 'Wiper Blades':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          wiperBlades: newRecord,
-                        );
-                        break;
-                      case 'Timing Belt':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          timingBelt: newRecord,
-                        );
-                        break;
-                      case 'Transmission Fluid':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          transmissionFluid: newRecord,
-                        );
-                        break;
-                      case 'Brake Fluid':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          brakeFluid: newRecord,
-                        );
-                        break;
-                      case 'Fuel Filter':
-                        updatedMaintenance = currentMaintenance.copyWith(
-                          fuelFilter: newRecord,
-                        );
-                        break;
-                    }
+                          final newRecord = MaintenanceRecord(
+                            date: selectedDate!,
+                            mileage: newMileage,
+                            cost: double.tryParse(costController.text),
+                            serviceProvider: selectedShopName ?? '',
+                            notes: notesController.text,
+                            serviceType: category,
+                            isFollowUpRequired: isFollowUpRequired,
+                            followUpReason: isFollowUpRequired
+                                ? followUpReasonController.text.trim()
+                                : null,
+                            nextServiceDate: isFollowUpRequired
+                                ? followUpDate
+                                : null,
+                            nextServiceMileage: isFollowUpRequired
+                                ? int.tryParse(followUpKmController.text)
+                                : null,
+                            isFollowUpCompleted: isFollowUpRequired
+                                ? false
+                                : null,
+                            followUpIntervalKm: null,
+                            followUpTimesCount: null,
+                            followUpCompletions: isFollowUpRequired
+                                ? const []
+                                : null,
+                            performedBy: username,
+                          );
 
-                    int updatedOdometer = vehicle.currentOdometer ?? 0;
-                    if (newMileage > updatedOdometer) {
-                      updatedOdometer = newMileage;
-                    }
+                          final currentMaintenance =
+                              vehicle.maintenance ?? const VehicleMaintenance();
+                          VehicleMaintenance updatedMaintenance =
+                              currentMaintenance;
 
-                    final updatedHistory = List<MaintenanceRecord>.from(
-                      vehicle.maintenanceHistory ?? [],
-                    );
-                    updatedHistory.add(newRecord);
+                          switch (category) {
+                            case 'Engine Oil':
+                            case 'Engine Oil Change':
+                            case 'Engine Oil & Filter':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                engineOil: newRecord,
+                              );
+                              break;
+                            case 'Gear Oil':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                gearOil: newRecord,
+                              );
+                              break;
+                            case 'Housing Oil':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                housingOil: newRecord,
+                              );
+                              break;
+                            case 'Tyre Change':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                tyreChange: newRecord,
+                              );
+                              break;
+                            case 'Battery Change':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                batteryChange: newRecord,
+                              );
+                              break;
+                            case 'Brake Pads':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                brakePads: newRecord,
+                              );
+                              break;
+                            case 'Air Filter':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                airFilter: newRecord,
+                              );
+                              break;
+                            case 'AC Service':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                acService: newRecord,
+                              );
+                              break;
+                            case 'Wheel Alignment':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                wheelAlignment: newRecord,
+                              );
+                              break;
+                            case 'Spark Plugs':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                sparkPlugs: newRecord,
+                              );
+                              break;
+                            case 'Coolant Flush':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                coolantFlush: newRecord,
+                              );
+                              break;
+                            case 'Wiper Blades':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                wiperBlades: newRecord,
+                              );
+                              break;
+                            case 'Timing Belt':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                timingBelt: newRecord,
+                              );
+                              break;
+                            case 'Transmission Fluid':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                transmissionFluid: newRecord,
+                              );
+                              break;
+                            case 'Brake Fluid':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                brakeFluid: newRecord,
+                              );
+                              break;
+                            case 'Fuel Filter':
+                              updatedMaintenance = currentMaintenance.copyWith(
+                                fuelFilter: newRecord,
+                              );
+                              break;
+                          }
 
-                    final updatedVehicle = vehicle.copyWith(
-                      maintenance: updatedMaintenance,
-                      currentOdometer: updatedOdometer,
-                      lastOdometerUpdateDate:
-                          newMileage > (vehicle.currentOdometer ?? 0)
-                          ? DateTime.now()
-                          : vehicle.lastOdometerUpdateDate,
-                      maintenanceHistory: updatedHistory,
-                    );
+                          int updatedOdometer = vehicle.currentOdometer ?? 0;
+                          if (newMileage > updatedOdometer) {
+                            updatedOdometer = newMileage;
+                          }
 
-                    await vehicleProvider.updateVehicle(updatedVehicle);
+                          final updatedHistory = List<MaintenanceRecord>.from(
+                            vehicle.maintenanceHistory ?? [],
+                          );
+                          updatedHistory.add(newRecord);
 
-                    if (context.mounted) {
-                      await ActivityLogger.log(
-                        context,
-                        title: 'Maintenance Updated',
-                        message: ChangeDiffHelper.describeMaintenanceUpdate(
-                          category: category,
-                          plateNumber: vehicle.plateNumber,
-                          newRecord: newRecord,
-                        ),
-                        relatedId: vehicle.id,
-                      );
+                          final updatedVehicle = vehicle.copyWith(
+                            maintenance: updatedMaintenance,
+                            currentOdometer: updatedOdometer,
+                            lastOdometerUpdateDate:
+                                newMileage > (vehicle.currentOdometer ?? 0)
+                                ? DateTime.now()
+                                : vehicle.lastOdometerUpdateDate,
+                            maintenanceHistory: updatedHistory,
+                          );
 
-                      final notificationProvider = context
-                          .read<NotificationProvider>();
-                      final employeeProvider = context.read<EmployeeProvider>();
-                      final vaultProvider = context.read<VaultProvider>();
-                      final navigator = Navigator.of(context);
+                          try {
+                            // Prepared before the vehicle is written, so the only
+                            // step that can still fail is the insert itself.
+                            final expense = await _prepareInlineExpense(
+                              inlineExpense,
+                              finance: financeProvider,
+                              attribution: _vehicleAttribution(
+                                vehicle,
+                                mileageKm: newMileage.toDouble(),
+                              ),
+                              description:
+                                  '$category — ${vehicle.plateNumber}'
+                                  '${selectedShopName != null && selectedShopName!.isNotEmpty ? " at $selectedShopName" : ""}',
+                              accounts: fundAccountProvider.activeAccounts,
+                              employees: employeeProvider.employees,
+                              submitterName:
+                                  authUser?.actorLabel ?? username ?? '',
+                              submitterRole:
+                                  authUser?.role.name.toUpperCase() ?? 'USER',
+                              submitterUserId: authUser?.id,
+                            );
 
-                      await notificationProvider.markAsRead(notification.id);
-                      await notificationProvider.refreshAlerts(
-                        vehicles: vehicleProvider.vehicles,
-                        maintenanceTypes: vehicleProvider.maintenanceTypes,
-                        employees: employeeProvider.employees,
-                        employeeSettings: employeeProvider.settings,
-                        vehicleSettings: vehicleProvider.settings,
-                        vaultData: vaultProvider.vaultData,
-                      );
+                            await vehicleProvider.updateVehicle(updatedVehicle);
 
-                      navigator.pop();
-                      if (context.mounted) {
-                        AppSnackBar.showSuccess(context, 'Updated successfully');
-                      }
-                    }
-                  },
-                  child: const Text('Mark Completed'),
+                            if (expense != null) {
+                              try {
+                                await financeProvider.insertExpense(expense);
+                              } catch (_) {
+                                // Keep the two in step: if the cost cannot be
+                                // recorded, the service record goes back to what it
+                                // was rather than silently diverging.
+                                await vehicleProvider.updateVehicle(vehicle);
+                                rethrow;
+                              }
+                            }
+                          } catch (e) {
+                            setState(() => isSaving = false);
+                            if (context.mounted) {
+                              AppSnackBar.showError(
+                                context,
+                                inlineExpense.enabled
+                                    ? 'Could not save. Nothing was changed: $e'
+                                    : 'Error: $e',
+                              );
+                            }
+                            return;
+                          }
+
+                          if (context.mounted) {
+                            await ActivityLogger.log(
+                              context,
+                              title: 'Maintenance Updated',
+                              message:
+                                  ChangeDiffHelper.describeMaintenanceUpdate(
+                                    category: category,
+                                    plateNumber: vehicle.plateNumber,
+                                    newRecord: newRecord,
+                                  ),
+                              relatedId: vehicle.id,
+                            );
+
+                            final notificationProvider = context
+                                .read<NotificationProvider>();
+                            final employeeProvider = context
+                                .read<EmployeeProvider>();
+                            final vaultProvider = context.read<VaultProvider>();
+                            final navigator = Navigator.of(context);
+
+                            await notificationProvider.markAsRead(
+                              notification.id,
+                            );
+                            await notificationProvider.refreshAlerts(
+                              vehicles: vehicleProvider.vehicles,
+                              maintenanceTypes:
+                                  vehicleProvider.maintenanceTypes,
+                              employees: employeeProvider.employees,
+                              employeeSettings: employeeProvider.settings,
+                              vehicleSettings: vehicleProvider.settings,
+                              vaultData: vaultProvider.vaultData,
+                            );
+
+                            navigator.pop();
+                            if (context.mounted) {
+                              AppSnackBar.showSuccess(
+                                context,
+                                inlineExpense.enabled
+                                    ? 'Updated · expense logged as pending'
+                                    : 'Updated successfully',
+                              );
+                            }
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text('Mark Completed'),
                 ),
               ],
             );
@@ -1239,6 +1614,20 @@ class UpdateDialogHelper {
       regNoController.text = vaultData.license.registrationNo;
     }
 
+    // ── Inline "log this cost to Finance" ───────────────────────────────
+    final financeProvider = context.read<FinanceProvider>();
+    final fundAccountProvider = context.read<FundAccountProvider>();
+    final employeeProvider = context.read<EmployeeProvider>();
+    final authUser = context.read<AuthProvider>().user;
+
+    final inlineExpense = InlineExpenseController(
+      category: _companyExpenseCategory,
+      defaultType: _expenseTypeForVaultDocument(documentType),
+    );
+
+    await _primeFinanceForInlineExpense(financeProvider, fundAccountProvider);
+    if (!context.mounted) return;
+
     await showDialog(
       context: context,
       builder: (ctx) {
@@ -1252,63 +1641,87 @@ class UpdateDialogHelper {
                 'Update $documentType',
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (documentType == 'Commercial License') ...[
-                    TextFormField(
-                      controller: regNoController,
-                      decoration: const InputDecoration(
-                        labelText: 'Registration No.',
-                        border: OutlineInputBorder(),
+              content: SizedBox(
+                width: 400,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (documentType == 'Commercial License') ...[
+                        TextFormField(
+                          controller: regNoController,
+                          decoration: const InputDecoration(
+                            labelText: 'Registration No.',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      CustomDatePicker(
+                        label: 'New Expiry Date',
+                        date: selectedDate,
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: ctx,
+                            initialDate: selectedDate ?? DateTime.now(),
+                            firstDate: DateTime(2000),
+                            lastDate: DateTime(2100),
+                          );
+                          if (picked != null)
+                            setState(() => selectedDate = picked);
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  CustomDatePicker(
-                    label: 'New Expiry Date',
-                    date: selectedDate,
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: ctx,
-                        initialDate: selectedDate ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime(2100),
-                      );
-                      if (picked != null) setState(() => selectedDate = picked);
-                    },
+                      const SizedBox(height: 20),
+                      const Divider(),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        icon: Icon(
+                          pickedFile != null
+                              ? Icons.check_circle
+                              : Icons.attach_file,
+                        ),
+                        label: Text(
+                          pickedFile != null
+                              ? p.basename(pickedFile!.path)
+                              : 'Choose File',
+                        ),
+                        onPressed: isSaving
+                            ? null
+                            : () async {
+                                final result = await FilePicker.platform
+                                    .pickFiles(type: FileType.any);
+                                if (result != null && result.files.isNotEmpty) {
+                                  setState(
+                                    () => pickedFile = XFile(
+                                      result.files.first.path!,
+                                    ),
+                                  );
+                                }
+                              },
+                      ),
+                      InlineExpenseSection(
+                        controller: inlineExpense,
+                        attribution: ExpenseAttribution(
+                          label: 'Company · $documentType',
+                        ),
+                        enableLabel: 'Log renewal cost to Finance',
+                        subtitle: 'Tracks what this renewal cost the company.',
+                        submitterLabel: authUser?.actorLabel ?? 'You',
+                        accounts: fundAccountProvider.activeAccounts,
+                        employees: employeeProvider.employees,
+                        typeOptions: _expenseTypeOptions(
+                          financeProvider,
+                          _companyExpenseCategory,
+                          inlineExpense.expenseType,
+                        ),
+                        policy: financeProvider.policy,
+                        isSaving: isSaving,
+                        onChanged: () => setState(() {}),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 20),
-                  const Divider(),
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                    icon: Icon(
-                      pickedFile != null
-                          ? Icons.check_circle
-                          : Icons.attach_file,
-                    ),
-                    label: Text(
-                      pickedFile != null
-                          ? p.basename(pickedFile!.path)
-                          : 'Choose File',
-                    ),
-                    onPressed: isSaving
-                        ? null
-                        : () async {
-                            final result = await FilePicker.platform.pickFiles(
-                              type: FileType.any,
-                            );
-                            if (result != null && result.files.isNotEmpty) {
-                              setState(
-                                () => pickedFile = XFile(
-                                  result.files.first.path!,
-                                ),
-                              );
-                            }
-                          },
-                  ),
-                ],
+                ),
               ),
               actions: [
                 TextButton(
@@ -1320,6 +1733,15 @@ class UpdateDialogHelper {
                       ? null
                       : () async {
                           if (selectedDate == null) return;
+
+                          final problem = inlineExpense.validate(
+                            financeProvider.policy,
+                          );
+                          if (problem != null) {
+                            AppSnackBar.showError(ctx, problem);
+                            return;
+                          }
+
                           setState(() => isSaving = true);
                           try {
                             VaultDocument? newDoc;
@@ -1351,15 +1773,46 @@ class UpdateDialogHelper {
                               );
                             }
 
+                            // Prepared before the vault is written, so the
+                            // only step that can still fail is the insert.
+                            final expense = await _prepareInlineExpense(
+                              inlineExpense,
+                              finance: financeProvider,
+                              attribution: ExpenseAttribution(
+                                label: 'Company · $documentType',
+                              ),
+                              description: _expenseDescription(
+                                documentType: documentType,
+                                subject: 'Company',
+                                newExpiry: selectedDate,
+                              ),
+                              accounts: fundAccountProvider.activeAccounts,
+                              employees: employeeProvider.employees,
+                              submitterName: authUser?.actorLabel ?? '',
+                              submitterRole:
+                                  authUser?.role.name.toUpperCase() ?? 'USER',
+                              submitterUserId: authUser?.id,
+                            );
+
                             await vaultProvider.updateVaultData(updatedData);
+
+                            if (expense != null) {
+                              try {
+                                await financeProvider.insertExpense(expense);
+                              } catch (_) {
+                                // Keep the two in step: if the cost cannot be
+                                // recorded, the document goes back to what it
+                                // was rather than silently diverging.
+                                await vaultProvider.updateVaultData(vaultData);
+                                rethrow;
+                              }
+                            }
 
                             if (ctx.mounted) {
                               final notifProvider = ctx
                                   .read<NotificationProvider>();
                               final vehicleProvider = ctx
                                   .read<VehicleProvider>();
-                              final employeeProvider = ctx
-                                  .read<EmployeeProvider>();
                               await notifProvider.markAsRead(notification.id);
                               await notifProvider.refreshAlerts(
                                 vehicles: vehicleProvider.vehicles,
@@ -1373,12 +1826,19 @@ class UpdateDialogHelper {
                               Navigator.pop(ctx);
                               AppSnackBar.showSuccess(
                                 ctx,
-                                'Updated successfully',
+                                inlineExpense.enabled
+                                    ? 'Updated · expense logged as pending'
+                                    : 'Updated successfully',
                               );
                             }
                           } catch (e) {
                             setState(() => isSaving = false);
-                            AppSnackBar.showError(ctx, 'Error: $e');
+                            AppSnackBar.showError(
+                              ctx,
+                              inlineExpense.enabled
+                                  ? 'Could not save. Nothing was changed: $e'
+                                  : 'Error: $e',
+                            );
                           }
                         },
                   child: isSaving
@@ -1433,6 +1893,19 @@ class UpdateDialogHelper {
     if (employeeProvider.employees.isEmpty) {
       await employeeProvider.fetchAllEmployees();
     }
+    if (!context.mounted) return;
+
+    // ── Inline "log this cost to Finance" ───────────────────────────────
+    final financeProvider = context.read<FinanceProvider>();
+    final fundAccountProvider = context.read<FundAccountProvider>();
+    final authUser = context.read<AuthProvider>().user;
+
+    final inlineExpense = InlineExpenseController(
+      category: _vehicleExpenseCategory,
+      defaultType: _expenseTypeForVehicleDocument(documentType),
+    );
+
+    await _primeFinanceForInlineExpense(financeProvider, fundAccountProvider);
     if (!context.mounted) return;
 
     TafweedRecord? existingTafweed;
@@ -1742,6 +2215,22 @@ class UpdateDialogHelper {
                                 },
                         ),
                       ],
+                      InlineExpenseSection(
+                        controller: inlineExpense,
+                        attribution: _vehicleAttribution(vehicle),
+                        enableLabel: 'Log renewal cost to Finance',
+                        submitterLabel: authUser?.actorLabel ?? 'You',
+                        accounts: fundAccountProvider.activeAccounts,
+                        employees: employeeProvider.employees,
+                        typeOptions: _expenseTypeOptions(
+                          financeProvider,
+                          _vehicleExpenseCategory,
+                          inlineExpense.expenseType,
+                        ),
+                        policy: financeProvider.policy,
+                        isSaving: isSaving,
+                        onChanged: () => setState(() {}),
+                      ),
                     ],
                   ),
                 ),
@@ -1755,6 +2244,14 @@ class UpdateDialogHelper {
                   onPressed: isSaving
                       ? null
                       : () async {
+                          final problem = inlineExpense.validate(
+                            financeProvider.policy,
+                          );
+                          if (problem != null) {
+                            AppSnackBar.showError(ctx, problem);
+                            return;
+                          }
+
                           setState(() => isSaving = true);
                           try {
                             String? newUrl;
@@ -2030,7 +2527,38 @@ class UpdateDialogHelper {
                                 break;
                             }
 
+                            // Prepared before the vehicle is written, so the
+                            // only step that can still fail is the insert.
+                            final expense = await _prepareInlineExpense(
+                              inlineExpense,
+                              finance: financeProvider,
+                              attribution: _vehicleAttribution(vehicle),
+                              description: _expenseDescription(
+                                documentType: documentType,
+                                subject: _vehicleLabel(vehicle),
+                                newExpiry: selectedDate,
+                              ),
+                              accounts: fundAccountProvider.activeAccounts,
+                              employees: employeeProvider.employees,
+                              submitterName: authUser?.actorLabel ?? '',
+                              submitterRole:
+                                  authUser?.role.name.toUpperCase() ?? 'USER',
+                              submitterUserId: authUser?.id,
+                            );
+
                             await vehicleProvider.updateVehicle(updatedVehicle);
+
+                            if (expense != null) {
+                              try {
+                                await financeProvider.insertExpense(expense);
+                              } catch (_) {
+                                // Keep the two in step: if the cost cannot be
+                                // recorded, the document goes back to what it
+                                // was rather than silently diverging.
+                                await vehicleProvider.updateVehicle(vehicle);
+                                rethrow;
+                              }
+                            }
 
                             if (ctx.mounted) {
                               // Build a specific activity log message for this document change
@@ -2107,13 +2635,20 @@ class UpdateDialogHelper {
                               Navigator.pop(ctx);
                               AppSnackBar.showSuccess(
                                 ctx,
-                                'Updated successfully',
+                                inlineExpense.enabled
+                                    ? 'Updated · expense logged as pending'
+                                    : 'Updated successfully',
                               );
                             }
                           } catch (e) {
                             setState(() => isSaving = false);
                             if (!ctx.mounted) return;
-                            AppSnackBar.showError(ctx, 'Error: $e');
+                            AppSnackBar.showError(
+                              ctx,
+                              inlineExpense.enabled
+                                  ? 'Could not save. Nothing was changed: $e'
+                                  : 'Error: $e',
+                            );
                           }
                         },
                   child: isSaving

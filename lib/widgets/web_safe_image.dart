@@ -25,15 +25,19 @@ class WebSafeImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (kIsWeb) {
-      return SizedBox(
-        width: width,
-        height: height,
-        child: platform_impl.buildWebImage(
-          imageUrl: imageUrl,
-          fit: fit,
-          errorWidget: errorWidget,
-        ),
+      final webView = platform_impl.buildWebImage(
+        imageUrl: imageUrl,
+        fit: fit,
+        errorWidget: errorWidget,
       );
+      if (width != null || height != null) {
+        return SizedBox(
+          width: width,
+          height: height,
+          child: webView,
+        );
+      }
+      return webView;
     }
 
     return platform_impl.buildNativeImage(

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../features/company/domain/entities/company_entity.dart';
 import '../features/company/presentation/providers/company_provider.dart';
 import '../widgets/responsive_layout.dart';
+import '../core/widgets/confirm_save_dialog.dart';
 
 class CompanyFormScreen extends StatefulWidget {
   final CompanyEntity? company;
@@ -91,6 +92,82 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
 
   Future<void> _saveCompany() async {
     if (_formKey.currentState!.validate() && !_isSaving.value) {
+      // Show confirmation dialog with entered details
+      final sections = <ConfirmDetailSection>[
+        ConfirmDetailSection(
+          title: 'Business Details',
+          icon: Icons.business_outlined,
+          entries: [
+            ConfirmDetailEntry(
+              label: 'Company Name',
+              value: _companyNameController.text.trim(),
+            ),
+            ConfirmDetailEntry(
+              label: 'Email',
+              value: _emailController.text.trim(),
+            ),
+            ConfirmDetailEntry(
+              label: 'Country',
+              value: _countryController.text.trim(),
+            ),
+            ConfirmDetailEntry(
+              label: 'VAT Registered',
+              value: _vatRegisteredInKSA.value ? 'Yes' : 'No',
+            ),
+            ConfirmDetailEntry(
+              label: 'Tax Reg. No.',
+              value: _taxRegController.text.trim(),
+            ),
+            if (_usesCaseCode.value)
+              ConfirmDetailEntry(
+                label: 'Case Code Label',
+                value: _caseCodeLabelController.text.trim(),
+              ),
+            if (_usesCaseCode.value && _caseCodes.value.isNotEmpty)
+              ConfirmDetailEntry(
+                label: 'Case Codes',
+                value: '${_caseCodes.value.length} code(s)',
+              ),
+          ],
+        ),
+        ConfirmDetailSection(
+          title: 'Address',
+          icon: Icons.location_on_outlined,
+          entries: [
+            ConfirmDetailEntry(
+              label: 'City',
+              value: _cityController.text.trim(),
+            ),
+            ConfirmDetailEntry(
+              label: 'Street',
+              value: _streetController.text.trim(),
+            ),
+            ConfirmDetailEntry(
+              label: 'Building No.',
+              value: _buildingNumberController.text.trim(),
+            ),
+            ConfirmDetailEntry(
+              label: 'District',
+              value: _districtController.text.trim(),
+            ),
+            ConfirmDetailEntry(
+              label: 'Postal Code',
+              value: _postalCodeController.text.trim(),
+            ),
+          ],
+        ),
+      ];
+
+      final confirmed = await showConfirmSaveDialog(
+        context: context,
+        title: widget.company == null
+            ? 'Confirm Add Company'
+            : 'Confirm Update Company',
+        entityName: _companyNameController.text.trim(),
+        sections: sections,
+      );
+      if (confirmed != true) return;
+
       _isSaving.value = true;
 
       try {

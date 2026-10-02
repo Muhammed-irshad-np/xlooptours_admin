@@ -9,6 +9,7 @@ import '../features/vehicle/domain/entities/shop_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
+import '../core/widgets/confirm_save_dialog.dart';
 
 class ShopMasterScreen extends StatefulWidget {
   const ShopMasterScreen({super.key});
@@ -366,6 +367,42 @@ class _AddEditShopDialogState extends State<_AddEditShopDialog> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // Show confirmation dialog with entered details
+    final sections = <ConfirmDetailSection>[
+      ConfirmDetailSection(
+        title: 'Shop Details',
+        icon: Icons.storefront_outlined,
+        entries: [
+          ConfirmDetailEntry(
+            label: 'Shop Name',
+            value: _nameController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Phone',
+            value: _phoneController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Address',
+            value: _addressController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Notes',
+            value: _notesController.text.trim(),
+          ),
+        ],
+      ),
+    ];
+
+    final confirmed = await showConfirmSaveDialog(
+      context: context,
+      title: widget.shop == null
+          ? 'Confirm Add Shop'
+          : 'Confirm Update Shop',
+      entityName: _nameController.text.trim(),
+      sections: sections,
+    );
+    if (confirmed != true) return;
 
     setState(() {
       _isSaving = true;

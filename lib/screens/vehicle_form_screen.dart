@@ -22,6 +22,7 @@ import '../services/image_service.dart';
 import 'document_viewer_screen.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
+import '../core/widgets/confirm_save_dialog.dart';
 
 class VehicleFormScreen extends StatefulWidget {
   final VehicleEntity? vehicle;
@@ -471,6 +472,113 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       );
       return;
     }
+
+    // Show confirmation dialog with entered details
+    final sections = <ConfirmDetailSection>[
+      ConfirmDetailSection(
+        title: 'Vehicle Details',
+        icon: Icons.directions_car_outlined,
+        entries: [
+          ConfirmDetailEntry(label: 'Make', value: _selectedMake.value),
+          ConfirmDetailEntry(label: 'Model', value: _selectedModel.value),
+          ConfirmDetailEntry(
+            label: 'Year',
+            value: _selectedYear.value?.toString(),
+          ),
+          ConfirmDetailEntry(label: 'Color', value: _selectedColor.value),
+          ConfirmDetailEntry(
+            label: 'Plate Number',
+            value: _plateNumberController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Type',
+            value: _typeController.text.trim(),
+          ),
+          ConfirmDetailEntry(label: 'Fuel Type', value: _fuelType.value),
+          ConfirmDetailEntry(
+            label: 'Transmission',
+            value: _transmission.value,
+          ),
+          ConfirmDetailEntry(label: 'Status', value: _status.value),
+        ],
+      ),
+      ConfirmDetailSection(
+        title: 'Specifications',
+        icon: Icons.build_outlined,
+        entries: [
+          ConfirmDetailEntry(
+            label: 'VIN Number',
+            value: _vinNumberController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Engine No.',
+            value: _engineNumberController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Department',
+            value: _departmentController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'GVWR',
+            value: _gvwrController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Tire Size',
+            value: _tireSizeController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Purchase Price',
+            value: _purchasePriceController.text.trim(),
+          ),
+          ConfirmDetailEntry(
+            label: 'Purchase Date',
+            value: formatDateForConfirmation(_purchaseDate.value),
+          ),
+          ConfirmDetailEntry(
+            label: 'Current Odometer',
+            value: _currentOdometerController.text.trim(),
+          ),
+        ],
+      ),
+      ConfirmDetailSection(
+        title: 'Documents',
+        icon: Icons.description_outlined,
+        entries: [
+          ConfirmDetailEntry(
+            label: 'Insurance Expiry',
+            value: formatDateForConfirmation(_insuranceExpiryDate.value),
+          ),
+          ConfirmDetailEntry(
+            label: 'Isthimara Expiry',
+            value: formatDateForConfirmation(_registrationExpiryDate.value),
+          ),
+          ConfirmDetailEntry(
+            label: 'Fahas Expiry',
+            value: formatDateForConfirmation(_fahasExpiryDate.value),
+          ),
+          ConfirmDetailEntry(
+            label: 'Bahrain Ins. Expiry',
+            value: formatDateForConfirmation(
+              _bahrainInsuranceExpiryDate.value,
+            ),
+          ),
+        ],
+      ),
+    ];
+
+    final vehicleLabel =
+        '${_selectedMake.value ?? ''} ${_selectedModel.value ?? ''} - ${_plateNumberController.text.trim()}'
+            .trim();
+
+    final confirmed = await showConfirmSaveDialog(
+      context: context,
+      title: widget.vehicle == null
+          ? 'Confirm Add Vehicle'
+          : 'Confirm Update Vehicle',
+      entityName: vehicleLabel.isNotEmpty ? vehicleLabel : null,
+      sections: sections,
+    );
+    if (confirmed != true) return;
 
     _loadingMessage = 'Saving details...';
     _isLoading.value = true;
@@ -971,6 +1079,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                                   _purchaseOdometerController,
                                   isNumber: true,
                                   required: false,
+                                  extraValidator: _validatePurchaseOdometer,
                                 ),
                               ),
                             ],
@@ -981,6 +1090,8 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                             _currentOdometerController,
                             isNumber: true,
                             required: false,
+                            helperText: _currentOdometerHelper,
+                            extraValidator: _validateCurrentOdometer,
                           ),
                         ],
 
@@ -1520,6 +1631,8 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     bool isNumber = false,
     bool required = true,
     FocusNode? focusNode,
+    String? helperText,
+    String? Function(String?)? extraValidator,
   }) {
     return TextFormField(
       controller: controller,
@@ -1530,17 +1643,68 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           : null,
       decoration: InputDecoration(
         labelText: label,
+        helperText: helperText,
+        helperMaxLines: 2,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
       ),
-      validator: required
-          ? (value) {
-              if (value == null || value.isEmpty) {
-                return 'Please enter $label';
-              }
-              return null;
-            }
-          : null,
+      validator: (value) {
+        if (required && (value == null || value.isEmpty)) {
+          return 'Please enter $label';
+        }
+        return extraValidator?.call(value);
+      },
     );
+  }
+
+  // ── Odometer sanity on the master form ───────────────────────────────────
+  //
+  // This screen can set the odometer to anything, which makes it the easiest
+  // way to bypass the plausibility engine entirely. These checks cover what is
+  // decidable here: the two fields must agree with each other, and neither may
+  // rewrite history downwards once readings exist.
+
+  /// Hard ceiling shared with [OdometerPolicy], repeated here because the form
+  /// validates before any repository is reached.
+  static const int _lifetimeMaxKm = 2000000;
+
+  String? _validatePurchaseOdometer(String? value) {
+    if (value == null || value.isEmpty) return null;
+    final parsed = int.tryParse(value);
+    if (parsed == null) return 'Invalid odometer';
+    if (parsed > _lifetimeMaxKm) return 'Beyond any vehicle lifetime';
+
+    final current = int.tryParse(_currentOdometerController.text);
+    if (current != null && parsed > current) {
+      return 'Cannot exceed the current odometer';
+    }
+    return null;
+  }
+
+  String? _validateCurrentOdometer(String? value) {
+    if (value == null || value.isEmpty) return null;
+    final parsed = int.tryParse(value);
+    if (parsed == null) return 'Invalid odometer';
+    if (parsed > _lifetimeMaxKm) return 'Beyond any vehicle lifetime';
+
+    final purchase = int.tryParse(_purchaseOdometerController.text);
+    if (purchase != null && parsed < purchase) {
+      return 'Cannot be below the purchase odometer';
+    }
+
+    // On an existing vehicle the stored value is the latest accepted reading.
+    // Editing it downwards here would contradict the log, so it is refused;
+    // a genuine cluster replacement goes through the odometer review screen.
+    final existing = widget.vehicle?.currentOdometer;
+    if (existing != null && parsed < existing) {
+      return 'Below the recorded $existing km. Use Odometer Review to correct.';
+    }
+    return null;
+  }
+
+  String? get _currentOdometerHelper {
+    final existing = widget.vehicle?.currentOdometer;
+    if (existing == null) return 'Sets the starting point for all future checks';
+    return 'Recorded: $existing km. Weekly readings are validated against this.';
   }
 
 

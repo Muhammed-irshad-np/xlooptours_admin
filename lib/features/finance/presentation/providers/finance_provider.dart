@@ -1,7 +1,10 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/expense_category_entity.dart';
+import '../../domain/entities/finance_policy_entity.dart';
+import '../../domain/repositories/finance_repository.dart';
 import '../../domain/usecases/get_all_expenses_usecase.dart';
 import '../../domain/usecases/get_expenses_by_date_range_usecase.dart';
 import '../../domain/usecases/get_expenses_by_account_usecase.dart';
@@ -10,6 +13,7 @@ import '../../domain/usecases/update_expense_usecase.dart';
 import '../../domain/usecases/delete_expense_usecase.dart';
 import '../../domain/usecases/approve_expense_usecase.dart';
 import '../../domain/usecases/reject_expense_usecase.dart';
+import '../../domain/usecases/void_expense_usecase.dart';
 import '../../domain/usecases/generate_reference_number_usecase.dart';
 import '../../domain/usecases/upload_receipt_usecase.dart';
 import '../../domain/usecases/get_expense_categories_usecase.dart';
@@ -17,10 +21,7 @@ import '../../domain/usecases/insert_expense_category_usecase.dart';
 import '../../domain/usecases/update_expense_category_usecase.dart';
 import '../../domain/usecases/delete_expense_category_usecase.dart';
 
-/// Provider managing expense records and expense categories.
-///
-/// Handles CRUD operations, approval workflow, filtering,
-/// and expense category configuration.
+/// Provider managing expenses and categories.
 class FinanceProvider with ChangeNotifier {
   final GetAllExpensesUseCase getAllExpensesUseCase;
   final GetExpensesByDateRangeUseCase getExpensesByDateRangeUseCase;
@@ -30,12 +31,15 @@ class FinanceProvider with ChangeNotifier {
   final DeleteExpenseUseCase deleteExpenseUseCase;
   final ApproveExpenseUseCase approveExpenseUseCase;
   final RejectExpenseUseCase rejectExpenseUseCase;
+  final VoidExpenseUseCase voidExpenseUseCase;
   final GenerateReferenceNumberUseCase generateReferenceNumberUseCase;
   final UploadReceiptUseCase uploadReceiptUseCase;
   final GetExpenseCategoriesUseCase getExpenseCategoriesUseCase;
   final InsertExpenseCategoryUseCase insertExpenseCategoryUseCase;
   final UpdateExpenseCategoryUseCase updateExpenseCategoryUseCase;
   final DeleteExpenseCategoryUseCase deleteExpenseCategoryUseCase;
+  /// Direct repository access for paginated expense fetching.
+  final FinanceRepository financeRepository;
 
   FinanceProvider({
     required this.getAllExpensesUseCase,
@@ -46,46 +50,63 @@ class FinanceProvider with ChangeNotifier {
     required this.deleteExpenseUseCase,
     required this.approveExpenseUseCase,
     required this.rejectExpenseUseCase,
+    required this.voidExpenseUseCase,
     required this.generateReferenceNumberUseCase,
     required this.uploadReceiptUseCase,
     required this.getExpenseCategoriesUseCase,
     required this.insertExpenseCategoryUseCase,
     required this.updateExpenseCategoryUseCase,
     required this.deleteExpenseCategoryUseCase,
+    required this.financeRepository,
   });
 
-  // ─── State ──────────────────────────────────────────────────
-
   List<ExpenseEntity> _expenses = [];
+  List<ExpenseEntity> _outstandingExpenses = [];
   List<ExpenseCategoryEntity> _categories = [];
+  FinancePolicyEntity? _policy;
   bool _isLoading = false;
+  bool _isLoadingMore = false;
+  bool _isOutstandingLoading = false;
   bool _isCategoriesLoading = false;
+  bool _isPolicyLoading = false;
   String? _error;
-
-  // ─── Filters ────────────────────────────────────────────────
+  DocumentSnapshot? _lastCursor;
+  bool _hasMore = true;
 
   ExpenseStatus? _statusFilter;
   String? _categoryFilter;
+  String? _typeFilter;
   String? _accountFilter;
+  String? _employeeFilter;
   String? _searchQuery;
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
-  // ─── Getters ────────────────────────────────────────────────
-
   List<ExpenseEntity> get expenses => _expenses;
   List<ExpenseCategoryEntity> get categories => _categories;
+  bool get isOutstandingLoading => _isOutstandingLoading;
+  FinancePolicyEntity get policy => _policy ?? const FinancePolicyEntity();
   bool get isLoading => _isLoading;
+  bool get isLoadingMore => _isLoadingMore;
   bool get isCategoriesLoading => _isCategoriesLoading;
+  bool get isPolicyLoading => _isPolicyLoading;
+
+  /// False while [policy] is still the built-in default rather than the
+  /// org's configured one. Callers that enforce policy thresholds outside the
+  /// finance screens should fetch first.
+  bool get isPolicyLoaded => _policy != null;
   String? get error => _error;
+  /// Whether more pages are available to load.
+  bool get hasMore => _hasMore;
   ExpenseStatus? get statusFilter => _statusFilter;
   String? get categoryFilter => _categoryFilter;
+  String? get typeFilter => _typeFilter;
   String? get accountFilter => _accountFilter;
+  String? get employeeFilter => _employeeFilter;
   String? get searchQuery => _searchQuery;
   DateTime? get dateFrom => _dateFrom;
   DateTime? get dateTo => _dateTo;
 
-  /// Filtered expenses based on current filter state.
   List<ExpenseEntity> get filteredExpenses {
     var result = List<ExpenseEntity>.from(_expenses);
 
@@ -93,13 +114,22 @@ class FinanceProvider with ChangeNotifier {
       result = result.where((e) => e.status == _statusFilter).toList();
     }
     if (_categoryFilter != null && _categoryFilter!.isNotEmpty) {
+      result =
+          result.where((e) => e.expenseCategory == _categoryFilter).toList();
+    }
+    if (_typeFilter != null && _typeFilter!.isNotEmpty) {
+      final tf = _typeFilter!.trim().toLowerCase();
       result = result
-          .where((e) => e.expenseCategory == _categoryFilter)
+          .where((e) => e.expenseType.trim().toLowerCase() == tf)
           .toList();
     }
     if (_accountFilter != null && _accountFilter!.isNotEmpty) {
+      result =
+          result.where((e) => e.fundAccountId == _accountFilter).toList();
+    }
+    if (_employeeFilter != null && _employeeFilter!.isNotEmpty) {
       result = result
-          .where((e) => e.fundAccountId == _accountFilter)
+          .where((e) => e.beneficiaryEmployeeId == _employeeFilter)
           .toList();
     }
     if (_searchQuery != null && _searchQuery!.isNotEmpty) {
@@ -118,28 +148,129 @@ class FinanceProvider with ChangeNotifier {
     return result;
   }
 
-  /// Count of expenses pending approval.
   int get pendingCount =>
       _expenses.where((e) => e.status == ExpenseStatus.pending).length;
 
-  /// Total amount of all filtered expenses.
-  double get totalFilteredAmount =>
-      filteredExpenses.fold(0.0, (sum, e) => sum + e.amount);
+  // ─── Projected (estimated) wallet position ──────────────────
+  //
+  // The fund account balances are the *real* ledger: money that has already
+  // been posted. Expenses sitting in pending/approved are committed but not
+  // yet posted, so they are invisible in the ledger while still being money
+  // that is effectively spoken for. These getters expose that commitment so
+  // the UI can show "balance if every pending expense gets approved".
 
-  // ─── Expense Operations ─────────────────────────────────────
+  /// Every expense that is committed but not yet posted, newest first.
+  List<ExpenseEntity> get outstandingExpenses => _outstandingExpenses;
+
+  /// Outstanding expenses that will actually move money out of a wallet.
+  /// Non-wallet (tracking-only) expenses never touch a balance.
+  List<ExpenseEntity> get walletCommitments => _outstandingExpenses
+      .where((e) => !e.isNonWallet && e.fundAccountId.isNotEmpty)
+      .toList();
+
+  /// Total committed outflow across all wallets, in halalas.
+  int get outstandingOutflowMinor =>
+      walletCommitments.fold(0, (acc, e) => acc + e.resolvedAmountMinor);
+
+  /// Committed outflow for a single wallet, in halalas.
+  int outstandingOutflowMinorFor(String accountId) => walletCommitments
+      .where((e) => e.fundAccountId == accountId)
+      .fold(0, (acc, e) => acc + e.resolvedAmountMinor);
+
+  /// Number of outstanding expenses queued against a single wallet.
+  int outstandingCountFor(String accountId) =>
+      walletCommitments.where((e) => e.fundAccountId == accountId).length;
+
+  /// Committed outflow per wallet id, in halalas.
+  Map<String, int> get outstandingOutflowByAccountMinor {
+    final map = <String, int>{};
+    for (final e in walletCommitments) {
+      map[e.fundAccountId] =
+          (map[e.fundAccountId] ?? 0) + e.resolvedAmountMinor;
+    }
+    return map;
+  }
+
+  /// Loads the committed-but-unposted expenses used for balance projection.
+  /// This is a separate query from the paginated list so the estimate stays
+  /// correct even when the table only shows the first page.
+  Future<void> fetchOutstandingExpenses() async {
+    _isOutstandingLoading = true;
+    notifyListeners();
+    try {
+      _outstandingExpenses = await financeRepository.getOutstandingExpenses();
+    } catch (e) {
+      debugPrint('Error fetching outstanding expenses: $e');
+    } finally {
+      _isOutstandingLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Refreshes the projection without surfacing errors — the ledger figures
+  /// stay usable even if this secondary query fails.
+  Future<void> _refreshOutstandingQuietly() async {
+    try {
+      _outstandingExpenses = await financeRepository.getOutstandingExpenses();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error refreshing outstanding expenses: $e');
+    }
+  }
+
+  /// Total in halala (minor units) — excludes voided/rejected unless specifically filtered.
+  int get totalFilteredAmountMinor {
+    final list = _statusFilter == null
+        ? filteredExpenses.where((e) =>
+            e.status != ExpenseStatus.voided &&
+            e.status != ExpenseStatus.rejected)
+        : filteredExpenses;
+    return list.fold(0, (acc, e) => acc + e.resolvedAmountMinor);
+  }
+
+  /// Major-unit convenience for UI display.
+  double get totalFilteredAmount => totalFilteredAmountMinor / 100.0;
 
   Future<void> fetchAllExpenses() async {
     _isLoading = true;
     _error = null;
+    _lastCursor = null;
+    _hasMore = true;
     notifyListeners();
 
     try {
-      _expenses = await getAllExpensesUseCase();
+      final (page, cursor) = await financeRepository.getExpensesPage();
+      _expenses = page;
+      _lastCursor = cursor;
+      _hasMore = cursor != null;
+      await _refreshOutstandingQuietly();
     } catch (e) {
       _error = e.toString();
       debugPrint('Error fetching expenses: $e');
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Appends the next page of expenses to the existing list.
+  Future<void> fetchNextPage() async {
+    if (_isLoadingMore || !_hasMore) return;
+    _isLoadingMore = true;
+    notifyListeners();
+
+    try {
+      final (page, cursor) = await financeRepository.getExpensesPage(
+        cursor: _lastCursor,
+      );
+      _expenses = [..._expenses, ...page];
+      _lastCursor = cursor;
+      _hasMore = cursor != null && page.isNotEmpty;
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('Error fetching next page: $e');
+    } finally {
+      _isLoadingMore = false;
       notifyListeners();
     }
   }
@@ -163,93 +294,191 @@ class FinanceProvider with ChangeNotifier {
   }
 
   Future<void> insertExpense(ExpenseEntity expense) async {
-    _isLoading = true;
     _error = null;
+    final withMinor = expense.copyWith(
+      amountMinor: expense.amountMinor ?? (expense.amount * 100).round(),
+    );
+    _expenses = [withMinor, ..._expenses];
     notifyListeners();
 
     try {
-      await insertExpenseUseCase(expense);
-      _expenses.insert(0, expense);
+      await insertExpenseUseCase(withMinor);
+      await _refreshOutstandingQuietly();
     } catch (e) {
+      _expenses = _expenses.where((e) => e.id != withMinor.id).toList();
       _error = e.toString();
       debugPrint('Error inserting expense: $e');
-    } finally {
-      _isLoading = false;
       notifyListeners();
+      rethrow;
     }
   }
 
   Future<void> updateExpense(ExpenseEntity expense) async {
     _error = null;
+    final index = _expenses.indexWhere((e) => e.id == expense.id);
+    ExpenseEntity? oldExpense;
+
+    if (index != -1) {
+      oldExpense = _expenses[index];
+      _expenses[index] = expense;
+      notifyListeners();
+    }
+
     try {
       await updateExpenseUseCase(expense);
-      final index = _expenses.indexWhere((e) => e.id == expense.id);
-      if (index != -1) {
-        _expenses[index] = expense;
-        notifyListeners();
-      }
+      await _refreshOutstandingQuietly();
     } catch (e) {
+      if (index != -1 && oldExpense != null) {
+        _expenses[index] = oldExpense;
+      }
       _error = e.toString();
       debugPrint('Error updating expense: $e');
       notifyListeners();
+      rethrow;
     }
   }
 
+  /// Only drafts/pending. Posted expenses must be voided.
   Future<void> deleteExpense(String id) async {
     _error = null;
+    final index = _expenses.indexWhere((e) => e.id == id);
+    ExpenseEntity? oldExpense;
+
+    if (index != -1) {
+      oldExpense = _expenses[index];
+      if (!oldExpense.status.canHardDelete) {
+        _error =
+            'Cannot delete posted expense. Void it to reverse the payment.';
+        notifyListeners();
+        throw StateError(_error!);
+      }
+      _expenses.removeAt(index);
+      notifyListeners();
+    }
+
     try {
       await deleteExpenseUseCase(id);
-      _expenses.removeWhere((e) => e.id == id);
-      notifyListeners();
+      await _refreshOutstandingQuietly();
     } catch (e) {
+      if (index != -1 && oldExpense != null) {
+        _expenses.insert(index, oldExpense);
+      }
       _error = e.toString();
       debugPrint('Error deleting expense: $e');
       notifyListeners();
+      rethrow;
     }
   }
 
-  Future<void> approveExpense(ExpenseEntity expense, String approvedBy) async {
+  /// Approve + post to wallet (or approve only if non-wallet).
+  Future<void> approveExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String actorRole,
+    bool allowSelfApprove = false,
+  }) async {
     _error = null;
     try {
-      await approveExpenseUseCase(expense, approvedBy);
-      final index = _expenses.indexWhere((e) => e.id == expense.id);
+      final updated = await approveExpenseUseCase(
+        expenseId: expenseId,
+        actorName: actorName,
+        actorUserId: actorUserId,
+        actorRole: actorRole,
+        allowSelfApprove: allowSelfApprove,
+      );
+      final index = _expenses.indexWhere((e) => e.id == expenseId);
       if (index != -1) {
-        _expenses[index] = expense.copyWith(
-          status: ExpenseStatus.approved,
-          approvedBy: approvedBy,
-          approvedAt: DateTime.now(),
-        );
-        notifyListeners();
+        _expenses[index] = updated;
+      } else {
+        _expenses = [updated, ..._expenses];
       }
-    } catch (e) {
-      _error = e.toString();
-      debugPrint('Error approving expense: $e');
       notifyListeners();
+      await _refreshOutstandingQuietly();
+    } catch (e, st) {
+      _error = _readableError(e);
+      debugPrint('Error approving expense: $_error');
+      debugPrint('Approve raw: $e');
+      debugPrint('Approve stack: $st');
+      notifyListeners();
+      throw StateError(_error!);
     }
   }
 
-  Future<void> rejectExpense(
-    ExpenseEntity expense,
-    String rejectedBy,
-    String reason,
-  ) async {
+  String _readableError(Object e) {
+    final s = e.toString();
+    if (s.contains('Dart exception thrown from converted Future')) {
+      try {
+        // ignore: avoid_dynamic_calls
+        final dynamic d = e;
+        final inner = d.error ?? d.message;
+        if (inner != null && '$inner'.isNotEmpty) {
+          return '$inner';
+        }
+      } catch (_) {}
+      return 'Approve failed (web hid the real error). Common causes: '
+          'insufficient fund/cash balance, day locked, approval limit, '
+          'or Firestore permission-denied. Check fund balance and your role.';
+    }
+    return s
+        .replaceFirst('StateError: ', '')
+        .replaceFirst('Bad state: ', '')
+        .replaceFirst('Exception: ', '');
+  }
+
+  Future<void> rejectExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String reason,
+  }) async {
     _error = null;
     try {
-      await rejectExpenseUseCase(expense, rejectedBy, reason);
-      final index = _expenses.indexWhere((e) => e.id == expense.id);
+      final updated = await rejectExpenseUseCase(
+        expenseId: expenseId,
+        actorName: actorName,
+        actorUserId: actorUserId,
+        reason: reason,
+      );
+      final index = _expenses.indexWhere((e) => e.id == expenseId);
       if (index != -1) {
-        _expenses[index] = expense.copyWith(
-          status: ExpenseStatus.rejected,
-          approvedBy: rejectedBy,
-          approvedAt: DateTime.now(),
-          rejectionReason: reason,
-        );
-        notifyListeners();
+        _expenses[index] = updated;
       }
+      notifyListeners();
+      await _refreshOutstandingQuietly();
     } catch (e) {
       _error = e.toString();
       debugPrint('Error rejecting expense: $e');
       notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> voidExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String reason,
+  }) async {
+    _error = null;
+    try {
+      final updated = await voidExpenseUseCase(
+        expenseId: expenseId,
+        actorName: actorName,
+        actorUserId: actorUserId,
+        reason: reason,
+      );
+      final index = _expenses.indexWhere((e) => e.id == expenseId);
+      if (index != -1) {
+        _expenses[index] = updated;
+      }
+      notifyListeners();
+      await _refreshOutstandingQuietly();
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('Error voiding expense: $e');
+      notifyListeners();
+      rethrow;
     }
   }
 
@@ -261,8 +490,6 @@ class FinanceProvider with ChangeNotifier {
     return await uploadReceiptUseCase(file, expenseId);
   }
 
-  // ─── Filter Operations ─────────────────────────────────────
-
   void setStatusFilter(ExpenseStatus? status) {
     _statusFilter = status;
     notifyListeners();
@@ -270,11 +497,50 @@ class FinanceProvider with ChangeNotifier {
 
   void setCategoryFilter(String? category) {
     _categoryFilter = category;
+    if (_typeFilter != null && category != null && category.isNotEmpty) {
+      final available = availableExpenseTypes;
+      if (!available.any(
+        (t) => t.trim().toLowerCase() == _typeFilter!.trim().toLowerCase(),
+      )) {
+        _typeFilter = null;
+      }
+    }
+    notifyListeners();
+  }
+
+  void setTypeFilter(String? type) {
+    _typeFilter = type;
     notifyListeners();
   }
 
   void setAccountFilter(String? accountId) {
     _accountFilter = accountId;
+    notifyListeners();
+  }
+
+  /// Employees that appear as the beneficiary on at least one loaded expense,
+  /// as `id -> display name`, sorted by name. Drives the employee filter so it
+  /// only ever offers people who actually have costs against them.
+  Map<String, String> get expenseBeneficiaries {
+    final result = <String, String>{};
+    for (final e in _expenses) {
+      final id = e.beneficiaryEmployeeId;
+      if (id == null || id.isEmpty) continue;
+      final name = e.beneficiaryEmployeeName;
+      if (name != null && name.isNotEmpty) {
+        result[id] = name;
+      } else {
+        result.putIfAbsent(id, () => 'Unnamed employee');
+      }
+    }
+    final entries = result.entries.toList()
+      ..sort((a, b) => a.value.toLowerCase().compareTo(b.value.toLowerCase()));
+    return Map.fromEntries(entries);
+  }
+
+  /// Narrows the list to costs the company carried for one employee.
+  void setEmployeeFilter(String? employeeId) {
+    _employeeFilter = employeeId;
     notifyListeners();
   }
 
@@ -286,14 +552,14 @@ class FinanceProvider with ChangeNotifier {
   void clearFilters() {
     _statusFilter = null;
     _categoryFilter = null;
+    _typeFilter = null;
     _accountFilter = null;
+    _employeeFilter = null;
     _searchQuery = null;
     _dateFrom = null;
     _dateTo = null;
     notifyListeners();
   }
-
-  // ─── Category Operations ────────────────────────────────────
 
   Future<void> fetchCategories() async {
     _isCategoriesLoading = true;
@@ -313,11 +579,13 @@ class FinanceProvider with ChangeNotifier {
 
   Future<void> insertCategory(ExpenseCategoryEntity category) async {
     _error = null;
+    _categories = [category, ..._categories];
+    notifyListeners();
+
     try {
       await insertExpenseCategoryUseCase(category);
-      _categories.add(category);
-      notifyListeners();
     } catch (e) {
+      _categories = _categories.where((c) => c.id != category.id).toList();
       _error = e.toString();
       debugPrint('Error inserting category: $e');
       notifyListeners();
@@ -326,14 +594,21 @@ class FinanceProvider with ChangeNotifier {
 
   Future<void> updateCategory(ExpenseCategoryEntity category) async {
     _error = null;
+    final index = _categories.indexWhere((c) => c.id == category.id);
+    ExpenseCategoryEntity? oldCategory;
+
+    if (index != -1) {
+      oldCategory = _categories[index];
+      _categories[index] = category;
+      notifyListeners();
+    }
+
     try {
       await updateExpenseCategoryUseCase(category);
-      final index = _categories.indexWhere((c) => c.id == category.id);
-      if (index != -1) {
-        _categories[index] = category;
-        notifyListeners();
-      }
     } catch (e) {
+      if (index != -1 && oldCategory != null) {
+        _categories[index] = oldCategory;
+      }
       _error = e.toString();
       debugPrint('Error updating category: $e');
       notifyListeners();
@@ -342,21 +617,132 @@ class FinanceProvider with ChangeNotifier {
 
   Future<void> deleteCategory(String id) async {
     _error = null;
+    final index = _categories.indexWhere((c) => c.id == id);
+    ExpenseCategoryEntity? oldCategory;
+
+    if (index != -1) {
+      oldCategory = _categories[index];
+      _categories.removeAt(index);
+      notifyListeners();
+    }
+
     try {
       await deleteExpenseCategoryUseCase(id);
-      _categories.removeWhere((c) => c.id == id);
-      notifyListeners();
     } catch (e) {
+      if (index != -1 && oldCategory != null) {
+        _categories.insert(index, oldCategory);
+      }
       _error = e.toString();
       debugPrint('Error deleting category: $e');
       notifyListeners();
     }
   }
 
-  /// Returns expense types for a given category name.
   List<ExpenseTypeEntity> getTypesForCategory(String categoryName) {
-    final index = _categories.indexWhere((c) => c.name == categoryName);
+    final trimmed = categoryName.trim().toLowerCase();
+    final index = _categories.indexWhere(
+      (c) => c.name.trim().toLowerCase() == trimmed,
+    );
     if (index == -1) return [];
     return _categories[index].expenseTypes.where((t) => t.isActive).toList();
+  }
+
+  /// Available expense types for filtering.
+  /// If a category filter is active, returns types under that category plus
+  /// any types found on existing expenses in that category.
+  /// If no category filter is active, returns all configured active types
+  /// across categories plus types found on existing expenses.
+  List<String> get availableExpenseTypes {
+    final types = <String>{};
+
+    if (_categoryFilter != null && _categoryFilter!.isNotEmpty) {
+      final categoryTypes = getTypesForCategory(_categoryFilter!);
+      for (final t in categoryTypes) {
+        final trimmed = t.name.trim();
+        if (trimmed.isNotEmpty) types.add(trimmed);
+      }
+      final catLower = _categoryFilter!.trim().toLowerCase();
+      for (final e in _expenses) {
+        if (e.expenseCategory.trim().toLowerCase() == catLower &&
+            e.expenseType.trim().isNotEmpty) {
+          types.add(e.expenseType.trim());
+        }
+      }
+    } else {
+      for (final cat in _categories) {
+        for (final t in cat.expenseTypes) {
+          final trimmed = t.name.trim();
+          if (t.isActive && trimmed.isNotEmpty) {
+            types.add(trimmed);
+          }
+        }
+      }
+      for (final e in _expenses) {
+        final trimmed = e.expenseType.trim();
+        if (trimmed.isNotEmpty) {
+          types.add(trimmed);
+        }
+      }
+    }
+
+    final list = types.toList();
+    list.sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return list;
+  }
+
+  Future<void> fetchFinancePolicy() async {
+    _isPolicyLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _policy = await financeRepository.getFinancePolicy();
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('Error fetching finance policy: $e');
+    } finally {
+      _isPolicyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> saveFinancePolicy(FinancePolicyEntity policy) async {
+    _isPolicyLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await financeRepository.saveFinancePolicy(policy);
+      _policy = policy;
+    } catch (e) {
+      _error = e.toString();
+      debugPrint('Error saving finance policy: $e');
+      rethrow;
+    } finally {
+      _isPolicyLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> resetFinanceData() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      await financeRepository.resetFinanceModuleData();
+      _expenses = [];
+      _lastCursor = null;
+      _hasMore = false;
+      notifyListeners();
+    } catch (e) {
+      _error = _readableError(e);
+      debugPrint('Error resetting finance data: $_error');
+      notifyListeners();
+      rethrow;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

@@ -36,6 +36,16 @@ import 'features/employee/domain/usecases/upload_document_attachment_usecase.dar
 import 'features/employee/domain/usecases/upload_employee_image_usecase.dart';
 import 'features/employee/presentation/providers/employee_provider.dart';
 
+import 'features/vehicle/data/datasources/odometer_remote_data_source.dart';
+import 'features/vehicle/data/repositories/odometer_repository_impl.dart';
+import 'features/vehicle/domain/entities/odometer_policy.dart';
+import 'features/vehicle/domain/repositories/odometer_repository.dart';
+import 'features/vehicle/domain/usecases/get_odometer_readings_usecase.dart';
+import 'features/vehicle/domain/usecases/get_odometer_review_queue_usecase.dart';
+import 'features/vehicle/domain/usecases/record_odometer_reading_usecase.dart';
+import 'features/vehicle/domain/usecases/review_odometer_reading_usecase.dart';
+import 'features/vehicle/domain/usecases/validate_odometer_reading_usecase.dart';
+import 'features/vehicle/presentation/providers/odometer_provider.dart';
 import 'features/vehicle/data/datasources/vehicle_remote_data_source.dart';
 import 'features/vehicle/data/repositories/vehicle_repository_impl.dart';
 import 'features/vehicle/domain/repositories/vehicle_repository.dart';
@@ -132,27 +142,43 @@ import 'features/finance/domain/usecases/update_expense_usecase.dart';
 import 'features/finance/domain/usecases/delete_expense_usecase.dart';
 import 'features/finance/domain/usecases/approve_expense_usecase.dart';
 import 'features/finance/domain/usecases/reject_expense_usecase.dart';
+import 'features/finance/domain/usecases/void_expense_usecase.dart';
 import 'features/finance/domain/usecases/generate_reference_number_usecase.dart';
 import 'features/finance/domain/usecases/upload_receipt_usecase.dart';
+import 'features/finance/domain/usecases/generate_account_code_usecase.dart';
 import 'features/finance/domain/usecases/get_all_fund_accounts_usecase.dart';
 import 'features/finance/domain/usecases/insert_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/update_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/delete_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/get_transactions_usecase.dart';
+import 'features/finance/domain/usecases/get_transaction_by_id_usecase.dart';
 import 'features/finance/domain/usecases/insert_transaction_usecase.dart';
+import 'features/finance/domain/usecases/post_fund_movement_usecase.dart';
+import 'features/finance/domain/usecases/transfer_funds_usecase.dart';
+import 'features/finance/domain/usecases/cash_advance_usecases.dart';
+import 'features/finance/domain/usecases/salary_usecases.dart';
+import 'features/finance/domain/usecases/finance_policy_usecases.dart';
 import 'features/finance/domain/usecases/get_petty_cash_sessions_usecase.dart';
 import 'features/finance/domain/usecases/get_open_session_usecase.dart';
 import 'features/finance/domain/usecases/open_petty_cash_session_usecase.dart';
 import 'features/finance/domain/usecases/close_petty_cash_session_usecase.dart';
 import 'features/finance/domain/usecases/verify_petty_cash_session_usecase.dart';
 import 'features/finance/domain/usecases/upload_closing_sheet_usecase.dart';
+import 'features/finance/domain/usecases/get_session_expenses_usecase.dart';
+import 'features/finance/domain/usecases/transfer_bucket_usecase.dart';
 import 'features/finance/domain/usecases/get_expense_categories_usecase.dart';
 import 'features/finance/domain/usecases/insert_expense_category_usecase.dart';
 import 'features/finance/domain/usecases/update_expense_category_usecase.dart';
 import 'features/finance/domain/usecases/delete_expense_category_usecase.dart';
+import 'features/finance/domain/usecases/get_fund_account_types_usecase.dart';
+import 'features/finance/domain/usecases/insert_fund_account_type_usecase.dart';
+import 'features/finance/domain/usecases/update_fund_account_type_usecase.dart';
+import 'features/finance/domain/usecases/delete_fund_account_type_usecase.dart';
 import 'features/finance/presentation/providers/finance_provider.dart';
 import 'features/finance/presentation/providers/fund_account_provider.dart';
 import 'features/finance/presentation/providers/petty_cash_provider.dart';
+import 'features/finance/presentation/providers/cash_advance_provider.dart';
+import 'features/finance/presentation/providers/salary_provider.dart';
 
 import 'features/user_management/data/datasources/user_management_remote_data_source.dart';
 import 'features/user_management/data/repositories/user_management_repository_impl.dart';
@@ -398,6 +424,61 @@ Future<void> init() async {
     () => VehicleRemoteDataSourceImpl(firestore: sl(), storage: sl()),
   );
 
+  //! Features - Vehicle / Odometer
+  //
+  // The odometer reading log. Every odometer value in the app is written
+  // through RecordOdometerReadingUseCase so validation, attribution and the
+  // audit trail cannot be bypassed.
+
+  // Policy: all plausibility thresholds live in one tunable object.
+  sl.registerLazySingleton<OdometerPolicy>(() => const OdometerPolicy());
+
+  // State Management (Provider)
+  sl.registerFactory(
+    () => OdometerProvider(
+      getReadingsUseCase: sl(),
+      recordReadingUseCase: sl(),
+      reviewReadingUseCase: sl(),
+      getReviewQueueUseCase: sl(),
+      getFleetDailyMedianUseCase: sl(),
+      validator: sl(),
+      repository: sl(),
+      policy: sl(),
+    ),
+  );
+
+  // UseCases
+  sl.registerLazySingleton(
+    () => ValidateOdometerReadingUseCase(policy: sl()),
+  );
+  sl.registerLazySingleton(
+    () => RecordOdometerReadingUseCase(
+      odometerRepository: sl(),
+      vehicleRepository: sl(),
+      validator: sl(),
+      policy: sl(),
+    ),
+  );
+  sl.registerLazySingleton(
+    () => ReviewOdometerReadingUseCase(
+      odometerRepository: sl(),
+      vehicleRepository: sl(),
+    ),
+  );
+  sl.registerLazySingleton(() => GetOdometerReviewQueueUseCase(policy: sl()));
+  sl.registerLazySingleton(() => GetOdometerReadingsUseCase(sl()));
+  sl.registerLazySingleton(() => GetFleetDailyMedianUseCase(sl()));
+
+  // Repository
+  sl.registerLazySingleton<OdometerRepository>(
+    () => OdometerRepositoryImpl(remoteDataSource: sl()),
+  );
+
+  // Data source
+  sl.registerLazySingleton<OdometerRemoteDataSource>(
+    () => OdometerRemoteDataSourceImpl(firestore: sl(), storage: sl()),
+  );
+
   //! Features - Invoice
   // State Management (Provider)
   sl.registerFactory(
@@ -540,12 +621,14 @@ Future<void> init() async {
       deleteExpenseUseCase: sl(),
       approveExpenseUseCase: sl(),
       rejectExpenseUseCase: sl(),
+      voidExpenseUseCase: sl(),
       generateReferenceNumberUseCase: sl(),
       uploadReceiptUseCase: sl(),
       getExpenseCategoriesUseCase: sl(),
       insertExpenseCategoryUseCase: sl(),
       updateExpenseCategoryUseCase: sl(),
       deleteExpenseCategoryUseCase: sl(),
+      financeRepository: sl(),
     ),
   );
   sl.registerFactory(
@@ -555,7 +638,15 @@ Future<void> init() async {
       updateFundAccountUseCase: sl(),
       deleteFundAccountUseCase: sl(),
       getTransactionsUseCase: sl(),
+      getTransactionByIdUseCase: sl(),
       insertTransactionUseCase: sl(),
+      postFundMovementUseCase: sl(),
+      transferFundsUseCase: sl(),
+      generateAccountCodeUseCase: sl(),
+      getFundAccountTypesUseCase: sl(),
+      insertFundAccountTypeUseCase: sl(),
+      updateFundAccountTypeUseCase: sl(),
+      deleteFundAccountTypeUseCase: sl(),
     ),
   );
   sl.registerFactory(
@@ -566,6 +657,30 @@ Future<void> init() async {
       closePettyCashSessionUseCase: sl(),
       verifyPettyCashSessionUseCase: sl(),
       uploadClosingSheetUseCase: sl(),
+      getSessionExpensesUseCase: sl(),
+      transferBucketUseCase: sl(),
+      financeRepository: sl(),
+    ),
+  );
+  sl.registerFactory(
+    () => CashAdvanceProvider(
+      getCashAdvancesUseCase: sl(),
+      issueCashAdvanceUseCase: sl(),
+      settleCashAdvanceUseCase: sl(),
+      writeOffCashAdvanceUseCase: sl(),
+    ),
+  );
+  sl.registerFactory(
+    () => SalaryProvider(
+      getSalaryStructuresUseCase: sl(),
+      saveSalaryStructureUseCase: sl(),
+      deleteSalaryStructureUseCase: sl(),
+      getSalaryPaymentsUseCase: sl(),
+      generateSalaryRunUseCase: sl(),
+      saveSalaryPaymentUseCase: sl(),
+      paySalaryUseCase: sl(),
+      deleteSalaryPaymentUseCase: sl(),
+      voidSalaryPaymentUseCase: sl(),
     ),
   );
 
@@ -578,16 +693,39 @@ Future<void> init() async {
   sl.registerLazySingleton(() => DeleteExpenseUseCase(sl()));
   sl.registerLazySingleton(() => ApproveExpenseUseCase(sl()));
   sl.registerLazySingleton(() => RejectExpenseUseCase(sl()));
+  sl.registerLazySingleton(() => VoidExpenseUseCase(sl()));
   sl.registerLazySingleton(() => GenerateReferenceNumberUseCase(sl()));
   sl.registerLazySingleton(() => UploadReceiptUseCase(sl()));
 
   // UseCases - Fund Accounts
+  sl.registerLazySingleton(() => GenerateAccountCodeUseCase());
   sl.registerLazySingleton(() => GetAllFundAccountsUseCase(sl()));
   sl.registerLazySingleton(() => InsertFundAccountUseCase(sl()));
   sl.registerLazySingleton(() => UpdateFundAccountUseCase(sl()));
   sl.registerLazySingleton(() => DeleteFundAccountUseCase(sl()));
   sl.registerLazySingleton(() => GetTransactionsUseCase(sl()));
+  sl.registerLazySingleton(() => GetTransactionByIdUseCase(sl()));
   sl.registerLazySingleton(() => InsertTransactionUseCase(sl()));
+  sl.registerLazySingleton(() => PostFundMovementUseCase(sl()));
+  sl.registerLazySingleton(() => TransferFundsUseCase(sl()));
+  sl.registerLazySingleton(() => GetCashAdvancesUseCase(sl()));
+  sl.registerLazySingleton(() => IssueCashAdvanceUseCase(sl()));
+  sl.registerLazySingleton(() => SettleCashAdvanceUseCase(sl()));
+  sl.registerLazySingleton(() => WriteOffCashAdvanceUseCase(sl()));
+
+  // UseCases - Salaries
+  sl.registerLazySingleton(() => GetSalaryStructuresUseCase(sl()));
+  sl.registerLazySingleton(() => SaveSalaryStructureUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteSalaryStructureUseCase(sl()));
+  sl.registerLazySingleton(() => GetSalaryPaymentsUseCase(sl()));
+  sl.registerLazySingleton(() => GenerateSalaryRunUseCase(sl()));
+  sl.registerLazySingleton(() => SaveSalaryPaymentUseCase(sl()));
+  sl.registerLazySingleton(() => PaySalaryUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteSalaryPaymentUseCase(sl()));
+  sl.registerLazySingleton(() => VoidSalaryPaymentUseCase(sl()));
+  sl.registerLazySingleton(() => GetFinancePolicyUseCase(sl()));
+  sl.registerLazySingleton(() => SaveFinancePolicyUseCase(sl()));
+  sl.registerLazySingleton(() => GetLedgerDayTotalsUseCase(sl()));
 
   // UseCases - Petty Cash
   sl.registerLazySingleton(() => GetPettyCashSessionsUseCase(sl()));
@@ -596,12 +734,20 @@ Future<void> init() async {
   sl.registerLazySingleton(() => ClosePettyCashSessionUseCase(sl()));
   sl.registerLazySingleton(() => VerifyPettyCashSessionUseCase(sl()));
   sl.registerLazySingleton(() => UploadClosingSheetUseCase(sl()));
+  sl.registerLazySingleton(() => GetSessionExpensesUseCase(sl()));
+  sl.registerLazySingleton(() => TransferBucketUseCase(sl()));
 
   // UseCases - Expense Categories
   sl.registerLazySingleton(() => GetExpenseCategoriesUseCase(sl()));
   sl.registerLazySingleton(() => InsertExpenseCategoryUseCase(sl()));
   sl.registerLazySingleton(() => UpdateExpenseCategoryUseCase(sl()));
   sl.registerLazySingleton(() => DeleteExpenseCategoryUseCase(sl()));
+
+  // UseCases - Fund Account Types
+  sl.registerLazySingleton(() => GetFundAccountTypesUseCase(sl()));
+  sl.registerLazySingleton(() => InsertFundAccountTypeUseCase(sl()));
+  sl.registerLazySingleton(() => UpdateFundAccountTypeUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteFundAccountTypeUseCase(sl()));
 
   // Repositories
   sl.registerLazySingleton<FinanceRepository>(

@@ -145,26 +145,38 @@ class VehicleProvider extends ChangeNotifier {
     }
   }
 
+  /// Syncs an already-persisted vehicle into the in-memory list.
+  ///
+  /// Used by [OdometerProvider], which owns odometer writes and has already
+  /// saved the vehicle by the time it calls this. Purely a cache refresh, so it
+  /// performs no I/O of its own.
+  void applyVehicleLocally(VehicleEntity vehicle) {
+    final index = _vehicles.indexWhere((v) => v.id == vehicle.id);
+    if (index == -1) return;
+    _vehicles[index] = vehicle;
+    notifyListeners();
+  }
+
+  /// Direct odometer writes are no longer allowed from here.
+  ///
+  /// `currentOdometer` is a derived cache of the latest accepted reading in the
+  /// odometer log, not a field to be set. Writing it directly is exactly how a
+  /// mistyped value used to become unrecoverable truth: it overwrote the
+  /// previous reading, left no series to detect the anomaly against, and fed
+  /// straight into the maintenance alert maths.
+  ///
+  /// Record readings through `OdometerProvider.record` (or
+  /// [OdometerEntryDialog]) so they are validated, attributed and auditable.
+  @Deprecated(
+    'Use OdometerProvider.record / OdometerEntryDialog. '
+    'currentOdometer is derived from the odometer reading log.',
+  )
   Future<void> updateVehicleOdometer(String vehicleId, int newMileage) async {
-    _setLoading(true);
-    try {
-      final vehicleIndex = _vehicles.indexWhere((v) => v.id == vehicleId);
-      if (vehicleIndex != -1) {
-        final updatedVehicle = _vehicles[vehicleIndex].copyWith(
-          currentOdometer: newMileage,
-          lastOdometerUpdateDate: DateTime.now(),
-        );
-        await updateVehicleUseCase(updatedVehicle);
-        _vehicles[vehicleIndex] = updatedVehicle;
-      }
-      _errorMessage = null;
-    } catch (e) {
-      _errorMessage = 'Failed to update odometer: $e';
-      debugPrint(_errorMessage);
-      rethrow;
-    } finally {
-      _setLoading(false);
-    }
+    throw UnsupportedError(
+      'Odometer values must be recorded through OdometerProvider.record so '
+      'they are validated against the vehicle history and kept auditable. '
+      'See OdometerEntryDialog.show().',
+    );
   }
 
   Future<void> deleteVehicle(String id) async {

@@ -1,14 +1,23 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/finance_provider.dart';
+import '../providers/fund_account_provider.dart';
+import '../widgets/expense_review_dialog.dart';
 import '../widgets/expense_status_badge.dart';
+import '../widgets/projected_balance_strip.dart';
 import '../../domain/entities/expense_entity.dart';
+import '../../domain/entities/fund_transaction_entity.dart';
+import '../../domain/services/finance_export_service.dart';
+import '../../domain/services/finance_permission_service.dart';
 import 'expense_form_page.dart';
+import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
-import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 
 /// Expense list page with filtering, search, and data table.
 class ExpenseListPage extends StatelessWidget {
@@ -16,17 +25,29 @@ class ExpenseListPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<FinanceProvider>(
-      builder: (context, provider, _) {
+    return Consumer2<FinanceProvider, FundAccountProvider>(
+      builder: (context, provider, accountProvider, _) {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Ledger vs Projected Balance ─────────────────
+            if (accountProvider.accounts.isNotEmpty) ...[
+              ProjectedBalanceStrip(
+                provider: provider,
+                accountProvider: accountProvider,
+              ),
+              SizedBox(height: 16.h),
+            ],
+
             // ── Filters Bar ─────────────────────────────────
-            _FiltersBar(provider: provider),
+            _FiltersBar(provider: provider, accountProvider: accountProvider),
             SizedBox(height: 16.h),
 
             // ── Expense Table ───────────────────────────────
-            _ExpenseDataTable(provider: provider),
+            _ExpenseDataTable(
+              provider: provider,
+              accountProvider: accountProvider,
+            ),
           ],
         );
       },
@@ -40,10 +61,33 @@ class ExpenseListPage extends StatelessWidget {
 
 class _FiltersBar extends StatelessWidget {
   final FinanceProvider provider;
-  const _FiltersBar({required this.provider});
+  final FundAccountProvider accountProvider;
+  const _FiltersBar({required this.provider, required this.accountProvider});
 
   @override
   Widget build(BuildContext context) {
+    final accounts = accountProvider.activeAccounts;
+    // Keep dropdown value valid even if the selected account is inactive.
+    final selectedAccountId = provider.accountFilter;
+    final accountItems = accounts
+        .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
+        .toList();
+    if (selectedAccountId != null &&
+        !accounts.any((a) => a.id == selectedAccountId)) {
+      final inactive = accountProvider.accounts
+          .where((a) => a.id == selectedAccountId)
+          .toList();
+      if (inactive.isNotEmpty) {
+        accountItems.insert(
+          0,
+          DropdownMenuItem(
+            value: inactive.first.id,
+            child: Text(inactive.first.name),
+          ),
+        );
+      }
+    }
+
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -67,10 +111,10 @@ class _FiltersBar extends StatelessWidget {
               hint: 'Status',
               value: provider.statusFilter,
               items: ExpenseStatus.values
-                  .map((s) => DropdownMenuItem(
-                        value: s,
-                        child: Text(s.displayName),
-                      ))
+                  .map(
+                    (s) =>
+                        DropdownMenuItem(value: s, child: Text(s.displayName)),
+                  )
                   .toList(),
               onChanged: (s) => provider.setStatusFilter(s),
             ),
@@ -81,12 +125,46 @@ class _FiltersBar extends StatelessWidget {
               hint: 'Category',
               value: provider.categoryFilter,
               items: provider.categories
-                  .map((c) => DropdownMenuItem(
-                        value: c.name,
-                        child: Text(c.name),
-                      ))
+                  .map(
+                    (c) => DropdownMenuItem(value: c.name, child: Text(c.name)),
+                  )
                   .toList(),
               onChanged: (c) => provider.setCategoryFilter(c),
+            ),
+            SizedBox(width: 12.w),
+
+            // Expense type filter
+            _FilterDropdown<String>(
+              hint: 'Expense Type',
+              value: provider.typeFilter,
+              items: provider.availableExpenseTypes
+                  .map(
+                    (t) => DropdownMenuItem(value: t, child: Text(t)),
+                  )
+                  .toList(),
+              onChanged: (t) => provider.setTypeFilter(t),
+            ),
+            SizedBox(width: 12.w),
+
+            // Employee attribution filter
+            _FilterDropdown<String>(
+              hint: 'Employee',
+              value: provider.employeeFilter,
+              items: provider.expenseBeneficiaries.entries
+                  .map(
+                    (e) => DropdownMenuItem(value: e.key, child: Text(e.value)),
+                  )
+                  .toList(),
+              onChanged: (id) => provider.setEmployeeFilter(id),
+            ),
+            SizedBox(width: 12.w),
+
+            // Fund account filter
+            _FilterDropdown<String>(
+              hint: 'Account',
+              value: selectedAccountId,
+              items: accountItems,
+              onChanged: (id) => provider.setAccountFilter(id),
             ),
             SizedBox(width: 12.w),
 
@@ -95,11 +173,48 @@ class _FiltersBar extends StatelessWidget {
 
             if (provider.statusFilter != null ||
                 provider.categoryFilter != null ||
+                provider.typeFilter != null ||
+                provider.accountFilter != null ||
+                provider.employeeFilter != null ||
                 provider.searchQuery != null ||
                 provider.dateFrom != null) ...[
               SizedBox(width: 12.w),
               _ClearFilterButton(provider: provider),
             ],
+            SizedBox(width: 12.w),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final list = provider.filteredExpenses;
+                if (list.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('No expenses to export')),
+                  );
+                  return;
+                }
+                final name =
+                    'expenses_${DateFormat('yyyyMMdd_HHmm').format(DateTime.now())}.csv';
+                try {
+                  await FinanceExportService.shareCsv(
+                    fileName: name,
+                    csvContent: FinanceExportService.expensesToCsv(list),
+                  );
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Export failed: $e')),
+                    );
+                  }
+                }
+              },
+              icon: Icon(Icons.download_rounded, size: 16.sp),
+              label: Text(
+                'Export CSV',
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -114,13 +229,11 @@ class _SearchField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextField(
-      onChanged: (value) => provider.setSearchQuery(value.isEmpty ? null : value),
+      onChanged: (value) =>
+          provider.setSearchQuery(value.isEmpty ? null : value),
       decoration: InputDecoration(
         hintText: 'Search by ref #, name, type...',
-        hintStyle: GoogleFonts.inter(
-          fontSize: 12.sp,
-          color: FinDT.textMuted,
-        ),
+        hintStyle: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textMuted),
         prefixIcon: Icon(
           Icons.search_rounded,
           size: 18.sp,
@@ -155,6 +268,9 @@ class _FilterDropdown<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasMatch = value != null && items.any((item) => item.value == value);
+    final effectiveValue = hasMatch ? value : null;
+
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 12.w),
       decoration: BoxDecoration(
@@ -163,16 +279,13 @@ class _FilterDropdown<T> extends StatelessWidget {
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<T>(
-          value: value,
+          value: effectiveValue,
           hint: Text(
             hint,
-            style: GoogleFonts.inter(
-              fontSize: 12.sp,
-              color: FinDT.textMuted,
-            ),
+            style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textMuted),
           ),
-          items: items,
-          onChanged: onChanged,
+          items: items.isEmpty ? null : items,
+          onChanged: items.isEmpty ? null : onChanged,
           style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
           icon: Icon(
             Icons.keyboard_arrow_down_rounded,
@@ -198,9 +311,7 @@ class _DateRangeButton extends StatelessWidget {
         : 'Date Range';
 
     return Material(
-      color: hasDateFilter
-          ? FinDT.brand.withValues(alpha: 0.08)
-          : FinDT.bgPage,
+      color: hasDateFilter ? FinDT.brand.withValues(alpha: 0.08) : FinDT.bgPage,
       borderRadius: BorderRadius.circular(10.r),
       child: InkWell(
         onTap: () => _pickDateRange(context),
@@ -241,9 +352,9 @@ class _DateRangeButton extends StatelessWidget {
           : null,
       builder: (context, child) {
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(primary: FinDT.brand),
-          ),
+          data: Theme.of(
+            context,
+          ).copyWith(colorScheme: ColorScheme.light(primary: FinDT.brand)),
           child: child!,
         );
       },
@@ -288,7 +399,25 @@ class _ClearFilterButton extends StatelessWidget {
 
 class _ExpenseDataTable extends StatelessWidget {
   final FinanceProvider provider;
-  const _ExpenseDataTable({required this.provider});
+  final FundAccountProvider accountProvider;
+  const _ExpenseDataTable({
+    required this.provider,
+    required this.accountProvider,
+  });
+
+  String _resolveAccountName(ExpenseEntity expense) {
+    if (expense.fundAccountName != null &&
+        expense.fundAccountName!.trim().isNotEmpty) {
+      return expense.fundAccountName!;
+    }
+    try {
+      return accountProvider.accounts
+          .firstWhere((a) => a.id == expense.fundAccountId)
+          .name;
+    } catch (_) {
+      return expense.fundAccountId.isEmpty ? '—' : expense.fundAccountId;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -320,8 +449,10 @@ class _ExpenseDataTable extends StatelessWidget {
                 SizedBox(width: 8.w),
                 if (provider.totalFilteredAmount > 0)
                   Container(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 3.h,
+                    ),
                     decoration: BoxDecoration(
                       color: FinDT.brandLight,
                       borderRadius: BorderRadius.circular(6.r),
@@ -352,14 +483,64 @@ class _ExpenseDataTable extends StatelessWidget {
             )
           else if (expenses.isEmpty)
             _buildEmpty()
-          else
+          else ...[
             _buildTable(context, expenses, formatter),
+            if (provider.hasMore) ...[
+              Divider(height: 1, color: FinDT.borderLight),
+              Padding(
+                padding: EdgeInsets.symmetric(vertical: 14.h, horizontal: 20.w),
+                child: Center(
+                  child: provider.isLoadingMore
+                      ? SizedBox(
+                          height: 22.h,
+                          width: 22.h,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2.5,
+                            color: FinDT.brand,
+                          ),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: () => provider.fetchNextPage(),
+                          icon: Icon(Icons.arrow_downward_rounded, size: 15.sp),
+                          label: Text(
+                            'Load More Expenses',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: FinDT.brand,
+                            side: BorderSide(
+                              color: FinDT.brand.withValues(alpha: 0.35),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8.r),
+                            ),
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 10.h,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+            ],
+          ],
         ],
       ),
     );
   }
 
   Widget _buildAddButton(BuildContext context) {
+    final auth = context.read<AuthProvider>().user;
+    final policy = context.read<FinanceProvider>().policy;
+    final canSubmit = FinancePermissionService.canSubmitExpense(
+      user: auth,
+      policy: policy,
+    );
+    if (!canSubmit) return const SizedBox.shrink();
+
     return Material(
       color: FinDT.brand,
       borderRadius: BorderRadius.circular(10.r),
@@ -438,9 +619,7 @@ class _ExpenseDataTable extends StatelessWidget {
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
-          headingRowColor: WidgetStateProperty.all(
-            const Color(0xFFF9FAFB),
-          ),
+          headingRowColor: WidgetStateProperty.all(const Color(0xFFF9FAFB)),
           headingTextStyle: GoogleFonts.inter(
             fontSize: 11.sp,
             fontWeight: FontWeight.w600,
@@ -459,27 +638,57 @@ class _ExpenseDataTable extends StatelessWidget {
             DataColumn(label: Text('DATE')),
             DataColumn(label: Text('TYPE')),
             DataColumn(label: Text('CATEGORY')),
+            DataColumn(label: Text('ACCOUNT')),
             DataColumn(label: Text('SUBMITTED BY')),
             DataColumn(label: Text('AMOUNT'), numeric: true),
+            DataColumn(label: Text('RECEIPT')),
             DataColumn(label: Text('STATUS')),
             DataColumn(label: Text('ACTIONS')),
           ],
           rows: expenses.map((expense) {
+            final accountName = _resolveAccountName(expense);
+            final isVoidedOrRejected =
+                expense.status == ExpenseStatus.voided ||
+                expense.status == ExpenseStatus.rejected;
             return DataRow(
               cells: [
                 DataCell(
-                  Text(
-                    expense.referenceNumber,
-                    style: GoogleFonts.inter(
-                      fontWeight: FontWeight.w600,
-                      color: FinDT.brand,
-                      fontSize: 12.sp,
+                  InkWell(
+                    onTap: () =>
+                        _showExpenseLifecycleTimeline(context, expense),
+                    borderRadius: BorderRadius.circular(4.r),
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        vertical: 4.h,
+                        horizontal: 2.w,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            expense.referenceNumber,
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w700,
+                              color: FinDT.brand,
+                              fontSize: 12.sp,
+                              decoration: TextDecoration.underline,
+                              decorationColor: FinDT.brand.withValues(
+                                alpha: 0.4,
+                              ),
+                            ),
+                          ),
+                          SizedBox(width: 4.w),
+                          Icon(
+                            Icons.info_outline_rounded,
+                            size: 13.sp,
+                            color: FinDT.brand.withValues(alpha: 0.6),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-                DataCell(
-                  Text(DateFormat('dd MMM yy').format(expense.date)),
-                ),
+                DataCell(Text(DateFormat('dd MMM yy').format(expense.date))),
                 DataCell(
                   Row(
                     mainAxisSize: MainAxisSize.min,
@@ -493,8 +702,10 @@ class _ExpenseDataTable extends StatelessWidget {
                 ),
                 DataCell(
                   Container(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 8.w, vertical: 3.h),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 3.h,
+                    ),
                     decoration: BoxDecoration(
                       color: FinDT.bgPage,
                       borderRadius: BorderRadius.circular(6.r),
@@ -509,15 +720,48 @@ class _ExpenseDataTable extends StatelessWidget {
                     ),
                   ),
                 ),
+                DataCell(
+                  Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8.w,
+                      vertical: 3.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: FinDT.brandLight,
+                      borderRadius: BorderRadius.circular(6.r),
+                    ),
+                    child: Text(
+                      accountName,
+                      style: GoogleFonts.inter(
+                        fontSize: 10.sp,
+                        fontWeight: FontWeight.w600,
+                        color: FinDT.brand,
+                      ),
+                    ),
+                  ),
+                ),
                 DataCell(Text(expense.submittedBy)),
                 DataCell(
                   Text(
                     '${formatter.format(expense.amount)} ${expense.currency}',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+                    style: GoogleFonts.inter(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12.sp,
+                      color: isVoidedOrRejected
+                          ? FinDT.textMuted
+                          : FinDT.textPrimary,
+                      decoration: isVoidedOrRejected
+                          ? TextDecoration.lineThrough
+                          : null,
+                      decorationColor: isVoidedOrRejected
+                          ? FinDT.textMuted
+                          : null,
+                    ),
                   ),
                 ),
+                DataCell(_buildReceiptCell(context, expense, accountName)),
                 DataCell(ExpenseStatusBadge(status: expense.status)),
-                DataCell(_buildActions(context, expense)),
+                DataCell(_buildActions(context, expense, accountName)),
               ],
             );
           }).toList(),
@@ -526,17 +770,673 @@ class _ExpenseDataTable extends StatelessWidget {
     );
   }
 
-  Widget _buildActions(BuildContext context, ExpenseEntity expense) {
-    final isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
+  void _showExpenseLifecycleTimeline(
+    BuildContext context,
+    ExpenseEntity expense,
+  ) {
+    final formatter = NumberFormat('#,##0.00');
+    final isVoided = expense.status == ExpenseStatus.voided;
+    final isRejected = expense.status == ExpenseStatus.rejected;
+    final accountName = _resolveAccountName(expense);
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: finDialogShape,
+        title: Row(
+          children: [
+            Container(
+              padding: EdgeInsets.all(8.w),
+              decoration: BoxDecoration(
+                color: FinDT.brand.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Icon(
+                Icons.receipt_long_rounded,
+                color: FinDT.brand,
+                size: 20.sp,
+              ),
+            ),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Expense ${expense.referenceNumber}',
+                    style: GoogleFonts.inter(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w700,
+                      color: FinDT.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    '${expense.expenseCategory} • ${expense.expenseType}',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      color: FinDT.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ExpenseStatusBadge(status: expense.status),
+          ],
+        ),
+        content: SizedBox(
+          width: 480.w,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top overview card
+                Container(
+                  padding: EdgeInsets.all(14.w),
+                  decoration: BoxDecoration(
+                    color: FinDT.bgPage,
+                    borderRadius: BorderRadius.circular(12.r),
+                    border: Border.all(color: FinDT.border),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Amount',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w500,
+                              color: FinDT.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            '${formatter.format(expense.amount)} ${expense.currency}',
+                            style: GoogleFonts.inter(
+                              fontSize: 16.sp,
+                              fontWeight: FontWeight.w800,
+                              color: (isVoided || isRejected)
+                                  ? FinDT.textMuted
+                                  : FinDT.textPrimary,
+                              decoration: (isVoided || isRejected)
+                                  ? TextDecoration.lineThrough
+                                  : null,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Divider(height: 16.h, color: FinDT.border),
+                      _detailRow(
+                        'Payment Method',
+                        expense.paymentMethod.toUpperCase(),
+                      ),
+                      SizedBox(height: 6.h),
+                      _detailRow('Fund Account', accountName),
+                      if (expense.beneficiaryEmployeeName != null &&
+                          expense.beneficiaryEmployeeName!.isNotEmpty) ...[
+                        SizedBox(height: 6.h),
+                        _detailRow(
+                          'Expense For',
+                          expense.beneficiaryEmployeeName!,
+                        ),
+                      ],
+                      if (expense.vehicleName != null &&
+                          expense.vehicleName!.isNotEmpty) ...[
+                        SizedBox(height: 6.h),
+                        _detailRow(
+                          'Vehicle',
+                          '${expense.vehicleName!}${expense.mileageKm != null ? " (${expense.mileageKm} km)" : ""}',
+                        ),
+                      ],
+                      if (expense.description != null &&
+                          expense.description!.isNotEmpty) ...[
+                        SizedBox(height: 6.h),
+                        _detailRow('Description', expense.description!),
+                      ],
+                    ],
+                  ),
+                ),
+                SizedBox(height: 18.h),
+
+                // Lifecycle & Audit Trail Header
+                Text(
+                  'LIFECYCLE & AUDIT TRAIL',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                    color: FinDT.textSecondary,
+                  ),
+                ),
+                SizedBox(height: 12.h),
+
+                // Timeline events
+                _buildTimelineItem(
+                  icon: Icons.edit_note_rounded,
+                  iconColor: FinDT.brand,
+                  title: 'Expense Submitted',
+                  timestamp: DateFormat(
+                    'dd MMM yyyy, hh:mm a',
+                  ).format(expense.createdAt),
+                  subtitle:
+                      'Submitted by ${expense.submittedBy} (${expense.submittedByRole.toUpperCase()})',
+                  isFirst: true,
+                  isLast:
+                      expense.status == ExpenseStatus.draft ||
+                      expense.status == ExpenseStatus.pending,
+                ),
+
+                if (expense.approvedAt != null ||
+                    expense.paidAt != null ||
+                    expense.status == ExpenseStatus.paid ||
+                    expense.status == ExpenseStatus.voided) ...[
+                  _buildTimelineItem(
+                    icon: Icons.check_circle_outline_rounded,
+                    iconColor: FinDT.success,
+                    title: 'Approved & Paid',
+                    timestamp: DateFormat('dd MMM yyyy, hh:mm a').format(
+                      expense.paidAt ?? expense.approvedAt ?? expense.date,
+                    ),
+                    subtitle:
+                        'Paid by ${expense.paidBy ?? expense.approvedBy ?? "Admin"} from $accountName',
+                    extraWidget: (expense.status == ExpenseStatus.paid)
+                        ? _buildPaidBalanceAfterCard(
+                            context: context,
+                            expense: expense,
+                            accountName: accountName,
+                            formatter: formatter,
+                          )
+                        : null,
+                    extraNote: (expense.status != ExpenseStatus.paid &&
+                            expense.ledgerEntryId != null)
+                        ? 'Ledger Entry: ${expense.ledgerEntryId}'
+                        : null,
+                    isLast: !isVoided,
+                  ),
+                ],
+
+                if (isVoided) ...[
+                  _buildTimelineItem(
+                    icon: Icons.undo_rounded,
+                    iconColor: const Color(0xFF7C3AED),
+                    title: 'Payment Voided & Reversed',
+                    timestamp: expense.voidedAt != null
+                        ? DateFormat(
+                            'dd MMM yyyy, hh:mm a',
+                          ).format(expense.voidedAt!)
+                        : 'Recorded',
+                    subtitle: 'Voided by ${expense.voidedBy ?? "Admin"}',
+                    extraNote: expense.voidReason != null
+                        ? 'Reason: "${expense.voidReason}"\nFunds refunded (+${formatter.format(expense.amount)} ${expense.currency}) to $accountName.'
+                        : 'Funds refunded to $accountName.',
+                    isAlert: true,
+                    alertColor: const Color(0xFF7C3AED),
+                    isLast: true,
+                  ),
+                ],
+
+                if (isRejected) ...[
+                  _buildTimelineItem(
+                    icon: Icons.cancel_outlined,
+                    iconColor: FinDT.danger,
+                    title: 'Expense Rejected',
+                    timestamp: expense.updatedAt != null
+                        ? DateFormat(
+                            'dd MMM yyyy, hh:mm a',
+                          ).format(expense.updatedAt!)
+                        : 'Recorded',
+                    subtitle: 'Rejected by ${expense.approvedBy ?? "Admin"}',
+                    extraNote: expense.rejectionReason != null
+                        ? 'Reason: "${expense.rejectionReason}"'
+                        : null,
+                    isAlert: true,
+                    alertColor: FinDT.danger,
+                    isLast: true,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          finDialogCancelButton(
+            ctx,
+            onPressed: () => Navigator.pop(ctx),
+            label: 'Close',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.textSecondary),
+        ),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: GoogleFonts.inter(
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w600,
+              color: FinDT.textPrimary,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTimelineItem({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String timestamp,
+    required String subtitle,
+    String? extraNote,
+    Widget? extraWidget,
+    bool isFirst = false,
+    bool isLast = false,
+    bool isAlert = false,
+    Color? alertColor,
+  }) {
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                padding: EdgeInsets.all(6.w),
+                decoration: BoxDecoration(
+                  color: iconColor.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, size: 14.sp, color: iconColor),
+              ),
+              if (!isLast)
+                Expanded(
+                  child: Container(width: 2.w, color: FinDT.border),
+                ),
+            ],
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 12.h),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          fontWeight: FontWeight.w700,
+                          color: FinDT.textPrimary,
+                        ),
+                      ),
+                      Text(
+                        timestamp,
+                        style: GoogleFonts.inter(
+                          fontSize: 10.sp,
+                          color: FinDT.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      color: FinDT.textSecondary,
+                    ),
+                  ),
+                  if (extraWidget != null) ...[
+                    SizedBox(height: 6.h),
+                    extraWidget,
+                  ] else if (extraNote != null) ...[
+                    SizedBox(height: 6.h),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(8.w),
+                      decoration: BoxDecoration(
+                        color: isAlert && alertColor != null
+                            ? alertColor.withValues(alpha: 0.08)
+                            : FinDT.bgPage,
+                        borderRadius: BorderRadius.circular(6.r),
+                        border: Border.all(
+                          color: isAlert && alertColor != null
+                              ? alertColor.withValues(alpha: 0.25)
+                              : FinDT.border,
+                        ),
+                      ),
+                      child: Text(
+                        extraNote,
+                        style: GoogleFonts.inter(
+                          fontSize: 11.sp,
+                          color: isAlert && alertColor != null
+                              ? alertColor
+                              : FinDT.textSecondary,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Builds a card displaying the fund account's balance after this payment occurred.
+  /// Only rendered for paid expenses (`status == ExpenseStatus.paid`).
+  Widget _buildPaidBalanceAfterCard({
+    required BuildContext context,
+    required ExpenseEntity expense,
+    required String accountName,
+    required NumberFormat formatter,
+  }) {
+    if (expense.balanceAfter != null) {
+      return _buildBalanceAfterContainer(
+        balanceAfter: expense.balanceAfter!,
+        currency: expense.currency,
+        accountName: accountName,
+        ledgerEntryId: expense.ledgerEntryId,
+        formatter: formatter,
+      );
+    }
+
+    if (expense.ledgerEntryId == null || expense.ledgerEntryId!.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return FutureBuilder<FundTransactionEntity?>(
+      future: context
+          .read<FundAccountProvider>()
+          .getTransactionById(expense.ledgerEntryId!),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+            decoration: BoxDecoration(
+              color: FinDT.bgPage,
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: FinDT.border),
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 12.w,
+                  height: 12.w,
+                  child: const CircularProgressIndicator(
+                    strokeWidth: 1.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(FinDT.textMuted),
+                  ),
+                ),
+                SizedBox(width: 8.w),
+                Text(
+                  'Loading balance history...',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    color: FinDT.textMuted,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        final tx = snapshot.data;
+        if (tx != null) {
+          return _buildBalanceAfterContainer(
+            balanceAfter: tx.balanceAfter,
+            currency: expense.currency,
+            accountName: accountName,
+            ledgerEntryId: expense.ledgerEntryId,
+            formatter: formatter,
+          );
+        }
+
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(8.w),
+          decoration: BoxDecoration(
+            color: FinDT.bgPage,
+            borderRadius: BorderRadius.circular(6.r),
+            border: Border.all(color: FinDT.border),
+          ),
+          child: Text(
+            'Ledger Entry: ${expense.ledgerEntryId}',
+            style: GoogleFonts.inter(
+              fontSize: 11.sp,
+              color: FinDT.textSecondary,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBalanceAfterContainer({
+    required double balanceAfter,
+    required String currency,
+    required String accountName,
+    required String? ledgerEntryId,
+    required NumberFormat formatter,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+      decoration: BoxDecoration(
+        color: FinDT.brandLight.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: FinDT.brand.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.account_balance_wallet_outlined,
+                    size: 13.sp,
+                    color: FinDT.brand,
+                  ),
+                  SizedBox(width: 5.w),
+                  Text(
+                    'Balance After ($accountName)',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      fontWeight: FontWeight.w600,
+                      color: FinDT.brand,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                '${formatter.format(balanceAfter)} $currency',
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w800,
+                  color: FinDT.brand,
+                ),
+              ),
+            ],
+          ),
+          if (ledgerEntryId != null && ledgerEntryId.isNotEmpty) ...[
+            SizedBox(height: 4.h),
+            Text(
+              'Ledger Entry: $ledgerEntryId',
+              style: GoogleFonts.inter(
+                fontSize: 10.sp,
+                color: FinDT.textMuted,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Receipt column: the approver's entry point into the document.
+  ///
+  /// A missing receipt is shown loudly when policy demands one, so a reviewer
+  /// can spot unverifiable claims without opening every row.
+  Widget _buildReceiptCell(
+    BuildContext context,
+    ExpenseEntity expense,
+    String accountName,
+  ) {
+    final count = expense.receiptUrls.length;
+    final threshold = context
+        .read<FinanceProvider>()
+        .policy
+        .receiptRequiredAbove;
+    final isRequired = expense.amount >= threshold;
+
+    if (count == 0 && !isRequired) {
+      return Text(
+        '—',
+        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textMuted),
+      );
+    }
+
+    final hasReceipt = count > 0;
+    final color = hasReceipt ? FinDT.brand : FinDT.danger;
+
+    return Tooltip(
+      message: hasReceipt
+          ? 'View receipt${count > 1 ? 's' : ''}'
+          : 'Receipt required at or above '
+                '${threshold.toStringAsFixed(0)} SAR — none attached',
+      child: InkWell(
+        onTap: () => _openReview(
+          context,
+          expense,
+          accountName,
+          readOnly: !expense.status.canApprove,
+        ),
+        borderRadius: BorderRadius.circular(6.r),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(6.r),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                hasReceipt
+                    ? Icons.attachment_rounded
+                    : Icons.report_gmailerrorred_rounded,
+                size: 13.sp,
+                color: color,
+              ),
+              SizedBox(width: 4.w),
+              Text(
+                hasReceipt ? (count > 1 ? 'View ($count)' : 'View') : 'Missing',
+                style: GoogleFonts.inter(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w700,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Opens the receipt-first review flow. Approval happens in there, next to
+  /// the document, instead of behind a blind confirm dialog.
+  Future<void> _openReview(
+    BuildContext context,
+    ExpenseEntity expense,
+    String accountName, {
+    bool readOnly = false,
+  }) async {
+    final outcome = await showExpenseReviewDialog(
+      context: context,
+      expense: expense,
+      accountName: accountName,
+      readOnly: readOnly,
+    );
+    if (!context.mounted) return;
+
+    switch (outcome) {
+      case ExpenseReviewOutcome.approved:
+        AppSnackBar.showSuccess(
+          context,
+          expense.isNonWallet
+              ? 'Expense ${expense.referenceNumber} approved'
+              : 'Approved and paid from $accountName',
+        );
+      case ExpenseReviewOutcome.rejected:
+        AppSnackBar.showInfo(
+          context,
+          'Expense ${expense.referenceNumber} rejected',
+        );
+      case ExpenseReviewOutcome.editRequested:
+      case ExpenseReviewOutcome.dismissed:
+      case null:
+        break;
+    }
+  }
+
+  Widget _buildActions(
+    BuildContext context,
+    ExpenseEntity expense,
+    String accountName,
+  ) {
+    final auth = context.read<AuthProvider>().user;
+    final isSuperAdmin = auth?.isSuperAdmin ?? false;
+    final policy = context.read<FinanceProvider>().policy;
+    final canApprove = FinancePermissionService.canApproveExpense(
+      user: auth,
+      policy: policy,
+      amount: expense.amount,
+    );
+    final canReverse = FinancePermissionService.canVoidExpense(
+      user: auth,
+      policy: policy,
+    );
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (expense.status == ExpenseStatus.pending) ...[
+        if (expense.status.canApprove && canApprove) ...[
           _actionIcon(
-            icon: Icons.check_circle_outline,
+            icon: Icons.fact_check_outlined,
             color: FinDT.success,
-            tooltip: 'Approve',
-            onTap: () => _confirmApprove(context, expense),
+            tooltip: expense.isNonWallet
+                ? 'Review receipt & approve'
+                : 'Review receipt, approve & post to wallet',
+            onTap: () => _openReview(context, expense, accountName),
           ),
           SizedBox(width: 4.w),
           _actionIcon(
@@ -547,25 +1447,36 @@ class _ExpenseDataTable extends StatelessWidget {
           ),
           SizedBox(width: 4.w),
         ],
-        _actionIcon(
-          icon: Icons.edit_outlined,
-          color: FinDT.brand,
-          tooltip: 'Edit',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ExpenseFormPage(expense: expense),
+        if (expense.status.canVoid && canReverse) ...[
+          _actionIcon(
+            icon: Icons.undo_rounded,
+            color: const Color(0xFF7C3AED),
+            tooltip: 'Void & reverse payment',
+            onTap: () => _confirmVoid(context, expense),
+          ),
+          SizedBox(width: 4.w),
+        ],
+        if (expense.status.canEdit)
+          _actionIcon(
+            icon: Icons.edit_outlined,
+            color: FinDT.brand,
+            tooltip: 'Edit',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ExpenseFormPage(expense: expense),
+              ),
             ),
           ),
-        ),
-        SizedBox(width: 4.w),
-        if (isSuperAdmin)
+        if (isSuperAdmin && expense.status.canHardDelete) ...[
+          SizedBox(width: 4.w),
           _actionIcon(
             icon: Icons.delete_outline,
             color: FinDT.danger,
-            tooltip: 'Delete',
+            tooltip: 'Delete draft/pending',
             onTap: () => _confirmDelete(context, expense),
           ),
+        ],
       ],
     );
   }
@@ -589,100 +1500,241 @@ class _ExpenseDataTable extends StatelessWidget {
     );
   }
 
-  void _confirmApprove(BuildContext context, ExpenseEntity expense) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Approve Expense?'),
-        content: Text(
-          'Approve ${expense.referenceNumber} — ${expense.expenseType} for ${expense.amount} ${expense.currency}?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context
-                  .read<FinanceProvider>()
-                  .approveExpense(expense, 'Admin');
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.success),
-            child: const Text('Approve'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _confirmReject(BuildContext context, ExpenseEntity expense) {
+  Future<void> _confirmReject(
+    BuildContext context,
+    ExpenseEntity expense,
+  ) async {
+    final user = context.read<AuthProvider>().user;
+    if (user == null) return;
     final controller = TextEditingController();
-    showDialog(
+    bool isRejecting = false;
+
+    showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Reject Expense?'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Reject ${expense.referenceNumber}?'),
-            SizedBox(height: 12.h),
-            TextField(
-              controller: controller,
-              decoration: const InputDecoration(
-                hintText: 'Reason for rejection...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle(
+            'Reject Expense?',
+            icon: Icons.cancel_outlined,
+            iconColor: FinDT.danger,
+          ),
+          content: SizedBox(
+            width: 420.w,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Reject expense ${expense.referenceNumber} (${expense.expenseType} - ${expense.amount} ${expense.currency})?',
+                  style: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    color: FinDT.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+                SizedBox(height: 14.h),
+                TextField(
+                  controller: controller,
+                  maxLines: 2,
+                  decoration: finDialogInputDecoration(
+                    label: 'Rejection Reason *',
+                    hint: 'Explain why this expense is being rejected...',
+                    prefixIcon: Icons.edit_note_rounded,
+                  ),
+                  style: GoogleFonts.inter(
+                    fontSize: 12.sp,
+                    color: FinDT.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            finDialogCancelButton(ctx, onPressed: isRejecting ? () {} : null),
+            finDialogActionButton(
+              onPressed: () async {
+                if (controller.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Rejection reason is required'),
+                    ),
+                  );
+                  return;
+                }
+
+                setDialogState(() => isRejecting = true);
+                try {
+                  await context.read<FinanceProvider>().rejectExpense(
+                    expenseId: expense.id,
+                    actorName: user.actorLabel,
+                    actorUserId: user.id,
+                    reason: controller.text.trim(),
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx, true);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isRejecting = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('$e'),
+                        backgroundColor: FinDT.danger,
+                      ),
+                    );
+                  }
+                }
+              },
+              label: 'Reject Expense',
+              backgroundColor: FinDT.danger,
+              isLoading: isRejecting,
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<FinanceProvider>().rejectExpense(
-                    expense,
-                    'Admin',
-                    controller.text,
-                  );
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-            child: const Text('Reject'),
-          ),
-        ],
       ),
     );
   }
 
-  void _confirmDelete(BuildContext context, ExpenseEntity expense) {
-    showDialog(
+  Future<void> _confirmVoid(BuildContext context, ExpenseEntity expense) async {
+    final user = context.read<AuthProvider>().user;
+    if (user == null) return;
+    final controller = TextEditingController();
+    bool isVoiding = false;
+
+    showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Expense?'),
-        content: Text(
-          'This will permanently delete ${expense.referenceNumber}. This action cannot be undone.',
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle(
+            'Void Paid Expense?',
+            icon: Icons.restart_alt_rounded,
+            iconColor: const Color(0xFF7C3AED),
+          ),
+          content: SizedBox(
+            width: 420.w,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(12.w),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10.r),
+                    border: Border.all(
+                      color: const Color(0xFF7C3AED).withValues(alpha: 0.25),
+                    ),
+                  ),
+                  child: Text(
+                    'This reverses the wallet payment for ${expense.referenceNumber} (${expense.amount} ${expense.currency}) and keeps full audit history.',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: const Color(0xFF7C3AED),
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 14.h),
+                TextField(
+                  controller: controller,
+                  maxLines: 2,
+                  decoration: finDialogInputDecoration(
+                    label: 'Void Reason *',
+                    hint: 'Explain why this payment is being voided...',
+                    prefixIcon: Icons.edit_note_rounded,
+                  ),
+                  style: GoogleFonts.inter(
+                    fontSize: 12.sp,
+                    color: FinDT.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            finDialogCancelButton(ctx, onPressed: isVoiding ? () {} : null),
+            finDialogActionButton(
+              onPressed: () async {
+                if (controller.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Void reason is required')),
+                  );
+                  return;
+                }
+
+                setDialogState(() => isVoiding = true);
+                try {
+                  await context.read<FinanceProvider>().voidExpense(
+                    expenseId: expense.id,
+                    actorName: user.actorLabel,
+                    actorUserId: user.id,
+                    reason: controller.text.trim(),
+                  );
+                  if (context.mounted) {
+                    await context
+                        .read<FundAccountProvider>()
+                        .fetchAllAccounts();
+                  }
+                  if (ctx.mounted) Navigator.pop(ctx, true);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isVoiding = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('$e'),
+                        backgroundColor: FinDT.danger,
+                      ),
+                    );
+                  }
+                }
+              },
+              label: 'Void & Reverse',
+              backgroundColor: const Color(0xFF7C3AED),
+              isLoading: isVoiding,
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              context.read<FinanceProvider>().deleteExpense(expense.id);
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-            child: const Text('Delete'),
-          ),
-        ],
       ),
+    );
+  }
+
+  Future<void> _confirmDelete(
+    BuildContext context,
+    ExpenseEntity expense,
+  ) async {
+    if (!expense.status.canHardDelete) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Posted expenses cannot be deleted. Void them instead.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    await showFinConfirmationDialog(
+      context: context,
+      title: 'Delete Draft Expense?',
+      message:
+          'Delete ${expense.referenceNumber}? Only draft and pending expenses can be deleted before payment.',
+      confirmLabel: 'Delete Expense',
+      confirmColor: FinDT.danger,
+      icon: Icons.delete_outline_rounded,
+      onConfirm: () async {
+        await context.read<FinanceProvider>().deleteExpense(expense.id);
+        if (context.mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Expense deleted')));
+        }
+      },
     );
   }
 }

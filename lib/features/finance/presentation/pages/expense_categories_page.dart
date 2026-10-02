@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../providers/finance_provider.dart';
 import '../../domain/entities/expense_category_entity.dart';
+import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
 import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 
@@ -133,7 +134,7 @@ class ExpenseCategoriesPage extends StatelessWidget {
   Widget _buildAddCategoryButton(BuildContext context, FinanceProvider provider) {
     return ElevatedButton.icon(
       onPressed: () => _showAddCategoryDialog(context, provider),
-      icon: Icon(Icons.add, size: 16.sp),
+      icon: Icon(Icons.add_rounded, size: 16.sp),
       label: Text(
         'Add Category',
         style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
@@ -186,6 +187,19 @@ class ExpenseCategoriesPage extends StatelessWidget {
             defaultDuration: 'MONTHLY',
             submittedByRole: 'ADMIN',
           ),
+          // Company document costs, logged straight from the vault alerts.
+          ExpenseTypeEntity(
+            id: 'cr_renewal',
+            name: 'Commercial Registration (CR) Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'vat_certificate',
+            name: 'VAT Certificate Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
         ],
       ),
       ExpenseCategoryEntity(
@@ -217,6 +231,25 @@ class ExpenseCategoriesPage extends StatelessWidget {
             defaultDuration: 'YEARLY',
             submittedByRole: 'ADMIN',
           ),
+          // Vehicle document costs, logged straight from the expiry alerts.
+          ExpenseTypeEntity(
+            id: 'istimara_renewal',
+            name: 'Istimara Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'fahas_mvpi',
+            name: 'Fahas / MVPI',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'vehicle_authorization',
+            name: 'Vehicle Authorization (Tafweed)',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
         ],
       ),
       ExpenseCategoryEntity(
@@ -242,6 +275,70 @@ class ExpenseCategoriesPage extends StatelessWidget {
             defaultDuration: 'MONTHLY',
             submittedByRole: 'ADMIN',
           ),
+          // Company-borne document costs. These are attributed to the
+          // employee they were spent on, not paid by them.
+          ExpenseTypeEntity(
+            id: 'iqama_renewal',
+            name: 'Iqama Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'passport_renewal',
+            name: 'Passport Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'visa_renewal',
+            name: 'Visa Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'residence_renewal',
+            name: 'Residence Permit Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'driving_license_renewal',
+            name: 'Driving License Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'health_insurance',
+            name: 'Health Insurance',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'authorization_renewal',
+            name: 'Tafweed (Authorization) Renewal',
+            defaultDuration: 'YEARLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'phone_recharge',
+            name: 'Phone Recharge',
+            defaultDuration: 'MONTHLY',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'medical_exam',
+            name: 'Medical Examination',
+            defaultDuration: 'ONE_TIME',
+            priority: 'IF_REQUIRED',
+            submittedByRole: 'ADMIN',
+          ),
+          ExpenseTypeEntity(
+            id: 'exit_reentry',
+            name: 'Exit Re-entry Visa',
+            defaultDuration: 'ONE_TIME',
+            priority: 'IF_REQUIRED',
+            submittedByRole: 'ADMIN',
+          ),
         ],
       ),
     ];
@@ -260,39 +357,68 @@ class ExpenseCategoriesPage extends StatelessWidget {
   void _showAddCategoryDialog(BuildContext context, FinanceProvider provider) {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController();
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Add Expense Category'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: nameCtrl,
-            decoration: const InputDecoration(
-              labelText: 'Category Name *',
-              hintText: 'e.g., VEHICLES, MARKETING',
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle('Add Expense Category', icon: Icons.category_outlined),
+          content: SizedBox(
+            width: 420.w,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(height: 8.h),
+                  TextFormField(
+                    controller: nameCtrl,
+                    decoration: finDialogInputDecoration(
+                      label: 'Category Name *',
+                      hint: 'e.g., VEHICLES, MARKETING',
+                      prefixIcon: Icons.folder_outlined,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                  ),
+                ],
+              ),
             ),
-            validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
           ),
+          actions: [
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSaving ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final cat = ExpenseCategoryEntity(
+                  id: const Uuid().v4(),
+                  name: nameCtrl.text.toUpperCase().trim(),
+                  createdAt: DateTime.now(),
+                );
+                setDialogState(() => isSaving = true);
+                try {
+                  await provider.insertCategory(cat);
+                  if (ctx.mounted) finSafePop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isSaving = false);
+                  }
+                }
+              },
+              label: 'Create Category',
+              backgroundColor: FinDT.brand,
+              isLoading: isSaving,
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              final cat = ExpenseCategoryEntity(
-                id: const Uuid().v4(),
-                name: nameCtrl.text.toUpperCase().trim(),
-                createdAt: DateTime.now(),
-              );
-              provider.insertCategory(cat);
-              Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
-            child: const Text('Create'),
-          ),
-        ],
       ),
     );
   }
@@ -447,119 +573,140 @@ class _CategoryExpansionCard extends StatelessWidget {
     final nameCtrl = TextEditingController(text: type?.name);
     String duration = type?.defaultDuration ?? 'MONTHLY';
     String role = type?.submittedByRole ?? 'ADMIN';
+    bool isSaving = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isEditing ? 'Edit Expense Type' : 'Add Expense Type'),
-        content: Form(
-          key: formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Type Name *',
-                  hintText: 'e.g., fuel, electricity',
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle(
+            isEditing ? 'Edit Expense Type' : 'Add Expense Type',
+            icon: Icons.playlist_add_rounded,
+          ),
+          content: SizedBox(
+            width: 420.w,
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(height: 8.h),
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: finDialogInputDecoration(
+                        label: 'Type Name *',
+                        hint: 'e.g., Fuel, Office Rent, Electricity',
+                        prefixIcon: Icons.label_outline_rounded,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+                    ),
+                    SizedBox(height: 14.h),
+                    DropdownButtonFormField<String>(
+                      initialValue: duration,
+                      decoration: finDialogInputDecoration(
+                        label: 'Default Frequency',
+                        prefixIcon: Icons.calendar_today_outlined,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      items: ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY', 'ONE_TIME']
+                          .map((d) => DropdownMenuItem(value: d, child: Text(d)))
+                          .toList(),
+                      onChanged: isSaving ? null : (v) => setDialogState(() => duration = v ?? 'MONTHLY'),
+                    ),
+                    SizedBox(height: 14.h),
+                    DropdownButtonFormField<String>(
+                      initialValue: role,
+                      decoration: finDialogInputDecoration(
+                        label: 'Who Submits This?',
+                        prefixIcon: Icons.badge_outlined,
+                      ),
+                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                      items: ['ADMIN', 'COORDINATOR', 'DRIVER']
+                          .map((r) => DropdownMenuItem(value: r, child: Text(r)))
+                          .toList(),
+                      onChanged: isSaving ? null : (v) => setDialogState(() => role = v ?? 'ADMIN'),
+                    ),
+                  ],
                 ),
-                validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
               ),
-              SizedBox(height: 12.h),
-              DropdownButtonFormField<String>(
-                value: duration,
-                decoration: const InputDecoration(labelText: 'Default Frequency'),
-                items: ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY', 'ONE_TIME']
-                    .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                    .toList(),
-                onChanged: (v) => duration = v ?? 'MONTHLY',
-              ),
-              SizedBox(height: 12.h),
-              DropdownButtonFormField<String>(
-                value: role,
-                decoration: const InputDecoration(labelText: 'Who Submits This?'),
-                items: ['ADMIN', 'COORDINATOR', 'DRIVER']
-                    .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                    .toList(),
-                onChanged: (v) => role = v ?? 'ADMIN',
-              ),
-            ],
+            ),
           ),
+          actions: [
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSaving ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final newType = ExpenseTypeEntity(
+                  id: isEditing ? type.id : const Uuid().v4(),
+                  name: nameCtrl.text.trim(),
+                  defaultDuration: duration,
+                  submittedByRole: role,
+                );
+
+                final updatedTypes = List<ExpenseTypeEntity>.from(category.expenseTypes);
+                if (isEditing) {
+                  final idx = updatedTypes.indexWhere((t) => t.id == type.id);
+                  if (idx != -1) updatedTypes[idx] = newType;
+                } else {
+                  updatedTypes.add(newType);
+                }
+
+                setDialogState(() => isSaving = true);
+                try {
+                  await provider.updateCategory(category.copyWith(expenseTypes: updatedTypes));
+                  if (ctx.mounted) finSafePop(ctx);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isSaving = false);
+                  }
+                }
+              },
+              label: isEditing ? 'Save Changes' : 'Add Type',
+              backgroundColor: FinDT.brand,
+              isLoading: isSaving,
+            ),
+          ],
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              final newType = ExpenseTypeEntity(
-                id: isEditing ? type.id : const Uuid().v4(),
-                name: nameCtrl.text.trim(),
-                defaultDuration: duration,
-                submittedByRole: role,
-              );
-
-              final updatedTypes = List<ExpenseTypeEntity>.from(category.expenseTypes);
-              if (isEditing) {
-                final idx = updatedTypes.indexWhere((t) => t.id == type.id);
-                if (idx != -1) updatedTypes[idx] = newType;
-              } else {
-                updatedTypes.add(newType);
-              }
-
-              provider.updateCategory(category.copyWith(expenseTypes: updatedTypes));
-              Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.brand),
-            child: Text(isEditing ? 'Save' : 'Add'),
-          ),
-        ],
       ),
     );
   }
 
   void _deleteType(BuildContext context, String typeId) {
-    showDialog(
+    showFinConfirmationDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Expense Type?'),
-        content: const Text('This will remove this sub-type from the category list.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final updatedTypes =
-                  category.expenseTypes.where((t) => t.id != typeId).toList();
-              provider.updateCategory(category.copyWith(expenseTypes: updatedTypes));
-              Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Expense Type?',
+      message: 'This will remove this sub-type from the category list.',
+      confirmLabel: 'Delete',
+      confirmColor: FinDT.danger,
+      icon: Icons.delete_outline_rounded,
+      onConfirm: () async {
+        final updatedTypes =
+            category.expenseTypes.where((t) => t.id != typeId).toList();
+        await provider.updateCategory(category.copyWith(expenseTypes: updatedTypes));
+      },
     );
   }
 
   void _confirmDeleteCategory(BuildContext context) {
-    showDialog(
+    showFinConfirmationDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Category?'),
-        content: Text(
-          'Are you sure you want to delete the category "${category.name}" and all its sub-types?',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              provider.deleteCategory(category.id);
-              Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: 'Delete Category?',
+      message: 'Are you sure you want to delete the category "${category.name}" and all its sub-types?',
+      confirmLabel: 'Delete Category',
+      confirmColor: FinDT.danger,
+      icon: Icons.delete_outline_rounded,
+      onConfirm: () async {
+        await provider.deleteCategory(category.id);
+      },
     );
   }
 }

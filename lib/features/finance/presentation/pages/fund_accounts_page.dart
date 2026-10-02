@@ -6,14 +6,18 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/fund_transaction_entity.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../widgets/fund_account_card.dart';
 import '../widgets/currency_display.dart';
 import '../../domain/entities/fund_account_entity.dart';
+import '../../domain/entities/fund_account_type_entity.dart';
+import '../../domain/services/finance_permission_service.dart';
 import '../../../../features/employee/presentation/providers/employee_provider.dart';
 import '../../../../features/employee/domain/entities/employee_entity.dart';
+import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
-import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 
 /// Screen for managing virtual fund accounts and viewing transaction history.
 class FundAccountsPage extends StatefulWidget {
@@ -24,6 +28,10 @@ class FundAccountsPage extends StatefulWidget {
 }
 
 class _FundAccountsPageState extends State<FundAccountsPage> {
+  String _accountFilter = 'ALL';
+  String _txFilter = 'ALL';
+  final _txSearchController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -31,12 +39,19 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<FundAccountProvider>();
       provider.fetchAllAccounts().then((_) {
-        if (provider.activeAccounts.isNotEmpty &&
-            provider.selectedAccountId == null) {
-          provider.selectAccount(provider.activeAccounts.first.id);
+        if (provider.activeAccounts.isNotEmpty) {
+          final targetId =
+              provider.selectedAccountId ?? provider.activeAccounts.first.id;
+          provider.selectAccount(targetId);
         }
       });
     });
+  }
+
+  @override
+  void dispose() {
+    _txSearchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -58,7 +73,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Virtual Accounts',
+                      'Virtual Accounts & Treasury',
                       style: GoogleFonts.inter(
                         fontSize: 18.sp,
                         fontWeight: FontWeight.w700,
@@ -67,7 +82,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                     ),
                     SizedBox(height: 2.h),
                     Text(
-                      'Manage bank accounts, petty cash drawers, and payment ledgers',
+                      'Manage bank accounts, petty cash drawers, and live payment ledgers',
                       style: GoogleFonts.inter(
                         fontSize: 12.sp,
                         color: FinDT.textSecondary,
@@ -78,15 +93,19 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                 _buildCreateAccountButton(context, provider),
               ],
             ),
+            SizedBox(height: 16.h),
+
+            // Top Treasury Pulse Summary Bar
+            _buildTreasurySummaryBanner(provider),
             SizedBox(height: 20.h),
 
             // 2-Column Content Row
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Left Column: Accounts List
+                // Left Column: Accounts List & Filters
                 Expanded(flex: 4, child: _buildAccountsColumn(context, provider)),
-                SizedBox(width: 24.w),
+                SizedBox(width: 20.w),
 
                 // Right Column: Details & Transaction Log
                 Expanded(flex: 5, child: _buildDetailsColumn(context, provider)),
@@ -105,6 +124,165 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     );
   }
 
+  Widget _buildTreasurySummaryBanner(FundAccountProvider provider) {
+    final active = provider.activeAccounts;
+    final formatter = NumberFormat('#,##0.00', 'en_US');
+
+    double totalBalance = 0;
+    double totalCash = 0;
+    double totalStc = 0;
+    int pettyCount = 0;
+    int bankCount = 0;
+    int driverCount = 0;
+
+    for (final acc in active) {
+      totalBalance += acc.currentBalance;
+      if (acc.isPettyCash) {
+        totalCash += acc.cashBalance;
+        totalStc += acc.stcPayBalance;
+        pettyCount++;
+      } else if (acc.isBank || acc.isStcPay) {
+        totalStc += acc.currentBalance;
+        bankCount++;
+      } else {
+        driverCount++;
+      }
+    }
+
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16.r),
+        border: Border.all(color: FinDT.border),
+        boxShadow: [
+          BoxShadow(
+            color: FinDT.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Total Liquidity
+          Expanded(
+            child: _buildSummaryMetric(
+              title: 'TOTAL TREASURY LIQUIDITY',
+              value: '${formatter.format(totalBalance)} SAR',
+              icon: Icons.account_balance_wallet_rounded,
+              iconColor: FinDT.brand,
+              badgeText: '${active.length} Active Accounts',
+              badgeColor: FinDT.brand,
+            ),
+          ),
+          Container(height: 48.h, width: 1, color: FinDT.borderLight),
+
+          // Physical Cash in Hand
+          Expanded(
+            child: _buildSummaryMetric(
+              title: 'PHYSICAL CASH IN HAND',
+              value: '${formatter.format(totalCash)} SAR',
+              icon: Icons.payments_outlined,
+              iconColor: const Color(0xFF16A34A),
+              badgeText: '$pettyCount Petty Drawers',
+              badgeColor: const Color(0xFF16A34A),
+            ),
+          ),
+          Container(height: 48.h, width: 1, color: FinDT.borderLight),
+
+          // Digital & Bank Float
+          Expanded(
+            child: _buildSummaryMetric(
+              title: 'DIGITAL & BANK FLOAT',
+              value: '${formatter.format(totalStc)} SAR',
+              icon: Icons.phone_android_outlined,
+              iconColor: const Color(0xFF7C3AED),
+              badgeText: '$bankCount Bank / STC Wallets',
+              badgeColor: const Color(0xFF7C3AED),
+            ),
+          ),
+          Container(height: 48.h, width: 1, color: FinDT.borderLight),
+
+          // Custom / Driver & Operations
+          Expanded(
+            child: _buildSummaryMetric(
+              title: 'OPERATIONS & OTHER',
+              value: '$driverCount Accounts',
+              icon: Icons.category_outlined,
+              iconColor: const Color(0xFF2563EB),
+              badgeText: 'Custom & Ops',
+              badgeColor: const Color(0xFF2563EB),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryMetric({
+    required String title,
+    required String value,
+    required IconData icon,
+    required Color iconColor,
+    required String badgeText,
+    required Color badgeColor,
+  }) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 14.w),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(10.w),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Icon(icon, color: iconColor, size: 20.sp),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.inter(
+                    fontSize: 9.sp,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                    color: FinDT.textSecondary,
+                  ),
+                ),
+                SizedBox(height: 3.h),
+                Text(
+                  value,
+                  style: GoogleFonts.inter(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w800,
+                    color: FinDT.textPrimary,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  badgeText,
+                  style: GoogleFonts.inter(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w500,
+                    color: badgeColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAccountsColumn(
     BuildContext context,
     FundAccountProvider provider,
@@ -114,25 +292,121 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
       return _buildEmptyAccounts(context, provider);
     }
 
-    return GridView.builder(
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16.w,
-        mainAxisSpacing: 16.h,
-        childAspectRatio: 1.35,
+    final filtered = active.where((a) {
+      if (_accountFilter == 'ALL') return true;
+      if (_accountFilter == 'PETTY_CASH') return a.isPettyCash;
+      if (_accountFilter == 'BANK') return a.isBank;
+      if (_accountFilter == 'STC_PAY') return a.isStcPay;
+      return a.accountTypeId == _accountFilter ||
+          a.typeDisplayName.toUpperCase() == _accountFilter.toUpperCase();
+    }).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Category Filter Chips
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildAccountFilterChip('ALL', 'All (${active.length})'),
+              SizedBox(width: 8.w),
+              _buildAccountFilterChip(
+                'PETTY_CASH',
+                'Petty Cash (${active.where((a) => a.isPettyCash).length})',
+              ),
+              SizedBox(width: 8.w),
+              _buildAccountFilterChip(
+                'BANK',
+                'Bank (${active.where((a) => a.isBank).length})',
+              ),
+              SizedBox(width: 8.w),
+              _buildAccountFilterChip(
+                'STC_PAY',
+                'STC Pay (${active.where((a) => a.isStcPay).length})',
+              ),
+              // Dynamic custom types filter chips
+              ...provider.accountTypes
+                  .where((t) => !t.isSystemDefault)
+                  .map((customType) {
+                final count = active.where((a) =>
+                    a.accountTypeId == customType.id ||
+                    a.typeDisplayName.toLowerCase() ==
+                        customType.name.toLowerCase()).length;
+                return Padding(
+                  padding: EdgeInsets.only(left: 8.w),
+                  child: _buildAccountFilterChip(
+                    customType.id,
+                    '${customType.name} ($count)',
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        SizedBox(height: 14.h),
+
+        if (filtered.isEmpty)
+          Container(
+            padding: EdgeInsets.all(32.w),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16.r),
+              border: Border.all(color: FinDT.border),
+            ),
+            child: Center(
+              child: Text(
+                'No accounts matching this category',
+                style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
+              ),
+            ),
+          )
+        else
+          GridView.builder(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              crossAxisSpacing: 14.w,
+              mainAxisSpacing: 14.h,
+              childAspectRatio: 1.25,
+            ),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: filtered.length,
+            itemBuilder: (context, index) {
+              final account = filtered[index];
+              final isSelected = provider.selectedAccountId == account.id;
+              return FundAccountCard(
+                account: account,
+                isSelected: isSelected,
+                onTap: () => provider.selectAccount(account.id),
+              );
+            },
+          ),
+      ],
+    );
+  }
+
+  Widget _buildAccountFilterChip(String filterKey, String label) {
+    final isSelected = _accountFilter == filterKey;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (_) => setState(() => _accountFilter = filterKey),
+      labelStyle: GoogleFonts.inter(
+        fontSize: 11.sp,
+        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+        color: isSelected ? Colors.white : FinDT.textSecondary,
       ),
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: active.length,
-      itemBuilder: (context, index) {
-        final account = active[index];
-        final isSelected = provider.selectedAccountId == account.id;
-        return FundAccountCard(
-          account: account,
-          isSelected: isSelected,
-          onTap: () => provider.selectAccount(account.id),
-        );
-      },
+      selectedColor: FinDT.brand,
+      backgroundColor: Colors.white,
+      side: BorderSide(
+        color: isSelected ? FinDT.brand : FinDT.border,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20.r),
+      ),
+      showCheckmark: false,
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
     );
   }
 
@@ -213,21 +487,856 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     BuildContext context,
     FundAccountProvider provider,
   ) {
-    return ElevatedButton.icon(
-      onPressed: () => _showAccountFormDialog(context, provider),
-      icon: Icon(Icons.add_rounded, size: 16.sp),
-      label: Text(
-        'Add Account',
-        style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
-      ),
-      style: ElevatedButton.styleFrom(
-        foregroundColor: Colors.white,
-        backgroundColor: FinDT.brand,
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10.r),
+    final user = context.read<AuthProvider>().user;
+    final policy = context.read<FinanceProvider>().policy;
+    final canTransfer = FinancePermissionService.canTransferFunds(user: user, policy: policy);
+    final canManageAccounts = FinancePermissionService.canManageAccounts(user: user, policy: policy);
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (canTransfer)
+          OutlinedButton.icon(
+            onPressed: () => _showTransferDialog(context, provider),
+            icon: Icon(Icons.swap_horiz_rounded, size: 16.sp),
+            label: Text(
+              'Transfer',
+              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: FinDT.textPrimary,
+              side: const BorderSide(color: FinDT.border),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 11.h),
+            ),
+          ),
+        if (canTransfer && canManageAccounts) SizedBox(width: 8.w),
+        if (canManageAccounts)
+          ElevatedButton.icon(
+            onPressed: () => _showAccountFormDialog(context, provider),
+            icon: Icon(Icons.add_rounded, size: 16.sp),
+            label: Text(
+              'Add Account',
+              style:
+                  GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
+            ),
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.white,
+              backgroundColor: FinDT.brand,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 11.h),
+            ),
+          ),
+      ],
+    );
+  }
+
+  void _showAdjustmentDialog(
+    BuildContext context,
+    FundAccountProvider provider,
+    FundAccountEntity account,
+  ) {
+    final formKey = GlobalKey<FormState>();
+    final amountCtrl = TextEditingController();
+    final reasonCtrl = TextEditingController();
+    var increase = true;
+    bool isPosting = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle(
+            'Ledger Balance Adjustment',
+            icon: Icons.tune_rounded,
+            iconColor: FinDT.warning,
+          ),
+          content: SizedBox(
+            width: 440.w,
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(12.w),
+                      decoration: BoxDecoration(
+                        color: FinDT.warning.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(
+                          color: FinDT.warning.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            size: 18.sp,
+                            color: FinDT.warning,
+                          ),
+                          SizedBox(width: 10.w),
+                          Expanded(
+                            child: Text(
+                              'Direct balance adjustments are logged on the immutable audit trail with your user identity.',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.sp,
+                                color: const Color(0xFF92400E),
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 16.h),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: isPosting ? null : () => setDialogState(() => increase = true),
+                            borderRadius: BorderRadius.circular(10.r),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(vertical: 12.h),
+                              decoration: BoxDecoration(
+                                color: increase
+                                    ? FinDT.success.withValues(alpha: 0.12)
+                                    : FinDT.bgPage,
+                                borderRadius: BorderRadius.circular(10.r),
+                                border: Border.all(
+                                  color: increase
+                                      ? FinDT.success
+                                      : FinDT.border,
+                                  width: increase ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.add_circle_outline_rounded,
+                                    size: 16.sp,
+                                    color: increase
+                                        ? FinDT.success
+                                        : FinDT.textSecondary,
+                                  ),
+                                  SizedBox(width: 6.w),
+                                  Text(
+                                    'Increase (+)',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.sp,
+                                      fontWeight: FontWeight.w700,
+                                      color: increase
+                                          ? FinDT.success
+                                          : FinDT.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 10.w),
+                        Expanded(
+                          child: InkWell(
+                            onTap: isPosting ? null : () => setDialogState(() => increase = false),
+                            borderRadius: BorderRadius.circular(10.r),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(vertical: 12.h),
+                              decoration: BoxDecoration(
+                                color: !increase
+                                    ? FinDT.danger.withValues(alpha: 0.12)
+                                    : FinDT.bgPage,
+                                borderRadius: BorderRadius.circular(10.r),
+                                border: Border.all(
+                                  color: !increase
+                                      ? FinDT.danger
+                                      : FinDT.border,
+                                  width: !increase ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.remove_circle_outline_rounded,
+                                    size: 16.sp,
+                                    color: !increase
+                                        ? FinDT.danger
+                                        : FinDT.textSecondary,
+                                  ),
+                                  SizedBox(width: 6.w),
+                                  Text(
+                                    'Decrease (–)',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12.sp,
+                                      fontWeight: FontWeight.w700,
+                                      color: !increase
+                                          ? FinDT.danger
+                                          : FinDT.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 14.h),
+                    TextFormField(
+                      controller: amountCtrl,
+                      keyboardType:
+                          const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                      ],
+                      decoration: finDialogInputDecoration(
+                        label: 'Adjustment Amount *',
+                        hint: '0.00',
+                        prefixIcon: Icons.attach_money_rounded,
+                        suffixText: account.currency,
+                      ),
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        color: FinDT.textPrimary,
+                      ),
+                      validator: (v) {
+                        final n = double.tryParse(v ?? '');
+                        if (n == null || n <= 0) return 'Invalid amount';
+                        if (!increase && n > account.currentBalance) {
+                          return 'Cannot decrease below 0.00 (Current: ${account.currentBalance})';
+                        }
+                        return null;
+                      },
+                    ),
+                    SizedBox(height: 14.h),
+                    TextFormField(
+                      controller: reasonCtrl,
+                      decoration: finDialogInputDecoration(
+                        label: 'Audit Reason / Justification *',
+                        hint: 'e.g. Bank reconciliation correction',
+                        prefixIcon: Icons.edit_note_rounded,
+                      ),
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        color: FinDT.textPrimary,
+                      ),
+                      validator: (v) =>
+                          (v == null || v.trim().isEmpty) ? 'Reason required' : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            finDialogCancelButton(
+              ctx,
+              onPressed: isPosting ? () {} : null,
+            ),
+            finDialogActionButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final user = context.read<AuthProvider>().user;
+                final amount = double.parse(amountCtrl.text);
+                final reason = reasonCtrl.text.trim();
+                final isIncrease = increase;
+
+                setDialogState(() => isPosting = true);
+                try {
+                  await provider.recordMovement(
+                    fundAccountId: account.id,
+                    type: FundTransactionType.adjustment,
+                    amountMajor: amount,
+                    currency: account.currency,
+                    description:
+                        'ADJUSTMENT (${isIncrease ? '+' : '−'}): $reason',
+                    performedBy: user?.actorLabel ?? 'Unknown',
+                    performedByUserId: user?.id ?? '',
+                    bucket: FundBucket.total,
+                    credit: isIncrease,
+                  );
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isIncrease
+                              ? 'Balance increased by $amount'
+                              : 'Balance decreased by $amount',
+                        ),
+                        backgroundColor: FinDT.success,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setDialogState(() => isPosting = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('$e'),
+                        backgroundColor: FinDT.danger,
+                      ),
+                    );
+                  }
+                }
+              },
+              label: 'Post Adjustment',
+              backgroundColor: FinDT.warning,
+              isLoading: isPosting,
+            ),
+          ],
         ),
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 11.h),
+      ),
+    );
+  }
+
+  void _showTransferDialog(
+    BuildContext context,
+    FundAccountProvider provider,
+  ) {
+    final formKey = GlobalKey<FormState>();
+    final amountCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    String? fromId = provider.selectedAccountId;
+    String? toId;
+    final accounts = provider.activeAccounts;
+    bool isTransferring = false;
+    FundBucket fromBucket = FundBucket.cash;
+    FundBucket toBucket = FundBucket.cash;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final fromAcc = fromId != null
+              ? accounts.where((a) => a.id == fromId).firstOrNull
+              : null;
+          final toAcc = toId != null
+              ? accounts.where((a) => a.id == toId).firstOrNull
+              : null;
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: finDialogShape,
+            title: finDialogTitle(
+              'Transfer Between Accounts',
+              icon: Icons.swap_horiz_rounded,
+            ),
+            content: SizedBox(
+              width: 460.w,
+              child: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          color: FinDT.brand.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(
+                            color: FinDT.brand.withValues(alpha: 0.25),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.lock_outline_rounded,
+                              size: 18.sp,
+                              color: FinDT.brand,
+                            ),
+                            SizedBox(width: 10.w),
+                            Expanded(
+                              child: Text(
+                                'Transfers atomically debit the source account and credit the destination account within a single transactional ledger entry.',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11.sp,
+                                  color: FinDT.brand,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16.h),
+                      DropdownButtonFormField<String>(
+                        initialValue: fromId,
+                        decoration: finDialogInputDecoration(
+                          label: 'Source (Debit Account) *',
+                          prefixIcon: Icons.account_balance_wallet_outlined,
+                        ),
+                        items: accounts
+                            .map(
+                              (a) => DropdownMenuItem(
+                                value: a.id,
+                                child: Text(
+                                  '${a.name} (${a.currentBalance.toStringAsFixed(2)} ${a.currency})',
+                                  style: GoogleFonts.inter(fontSize: 12.sp),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: isTransferring
+                            ? null
+                            : (v) {
+                                setDialogState(() {
+                                  fromId = v;
+                                  final newFrom = accounts
+                                      .where((a) => a.id == v)
+                                      .firstOrNull;
+                                  if (newFrom != null && newFrom.isPettyCash) {
+                                    fromBucket = FundBucket.cash;
+                                  }
+                                });
+                              },
+                        validator: (v) => v == null ? 'Source required' : null,
+                      ),
+                      if (fromAcc != null && fromAcc.isPettyCash) ...[
+                        SizedBox(height: 10.h),
+                        Text(
+                          'Source Bucket (Debit From) *',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w600,
+                            color: FinDT.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 6.h),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: isTransferring
+                                    ? null
+                                    : () => setDialogState(
+                                        () => fromBucket = FundBucket.cash),
+                                borderRadius: BorderRadius.circular(8.r),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: 8.h, horizontal: 10.w),
+                                  decoration: BoxDecoration(
+                                    color: fromBucket == FundBucket.cash
+                                        ? FinDT.brand.withValues(alpha: 0.1)
+                                        : FinDT.bgPage,
+                                    borderRadius: BorderRadius.circular(8.r),
+                                    border: Border.all(
+                                      color: fromBucket == FundBucket.cash
+                                          ? FinDT.brand
+                                          : FinDT.border,
+                                      width: fromBucket == FundBucket.cash ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.payments_outlined,
+                                            size: 14.sp,
+                                            color: fromBucket == FundBucket.cash
+                                                ? FinDT.brand
+                                                : FinDT.textSecondary,
+                                          ),
+                                          SizedBox(width: 4.w),
+                                          Text(
+                                            'Physical Cash',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11.sp,
+                                              fontWeight:
+                                                  fromBucket == FundBucket.cash
+                                                      ? FontWeight.w700
+                                                      : FontWeight.w500,
+                                              color:
+                                                  fromBucket == FundBucket.cash
+                                                      ? FinDT.brand
+                                                      : FinDT.textPrimary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 2.h),
+                                      Text(
+                                        'Avail: ${fromAcc.currency} ${fromAcc.cashBalance.toStringAsFixed(2)}',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 10.sp,
+                                          fontWeight: FontWeight.w600,
+                                          color: fromAcc.cashBalance >= 0
+                                              ? (fromBucket == FundBucket.cash
+                                                  ? FinDT.brand
+                                                  : FinDT.textSecondary)
+                                              : FinDT.danger,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: InkWell(
+                                onTap: isTransferring
+                                    ? null
+                                    : () => setDialogState(
+                                        () => fromBucket = FundBucket.stcPay),
+                                borderRadius: BorderRadius.circular(8.r),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: 8.h, horizontal: 10.w),
+                                  decoration: BoxDecoration(
+                                    color: fromBucket == FundBucket.stcPay
+                                        ? const Color(0xFF6D28D9)
+                                            .withValues(alpha: 0.1)
+                                        : FinDT.bgPage,
+                                    borderRadius: BorderRadius.circular(8.r),
+                                    border: Border.all(
+                                      color: fromBucket == FundBucket.stcPay
+                                          ? const Color(0xFF6D28D9)
+                                          : FinDT.border,
+                                      width: fromBucket == FundBucket.stcPay ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.phone_android_outlined,
+                                            size: 14.sp,
+                                            color:
+                                                fromBucket == FundBucket.stcPay
+                                                    ? const Color(0xFF6D28D9)
+                                                    : FinDT.textSecondary,
+                                          ),
+                                          SizedBox(width: 4.w),
+                                          Text(
+                                            'STC Pay',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 11.sp,
+                                              fontWeight:
+                                                  fromBucket == FundBucket.stcPay
+                                                      ? FontWeight.w700
+                                                      : FontWeight.w500,
+                                              color:
+                                                  fromBucket == FundBucket.stcPay
+                                                      ? const Color(0xFF6D28D9)
+                                                      : FinDT.textPrimary,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      SizedBox(height: 2.h),
+                                      Text(
+                                        'Avail: ${fromAcc.currency} ${fromAcc.stcPayBalance.toStringAsFixed(2)}',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 10.sp,
+                                          fontWeight: FontWeight.w600,
+                                          color: fromAcc.stcPayBalance >= 0
+                                              ? (fromBucket == FundBucket.stcPay
+                                                  ? const Color(0xFF6D28D9)
+                                                  : FinDT.textSecondary)
+                                              : FinDT.danger,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      SizedBox(height: 14.h),
+                      DropdownButtonFormField<String>(
+                        initialValue: toId,
+                        decoration: finDialogInputDecoration(
+                          label: 'Destination (Credit Account) *',
+                          prefixIcon: Icons.account_balance_outlined,
+                        ),
+                        items: accounts
+                            .map(
+                              (a) => DropdownMenuItem(
+                                value: a.id,
+                                child: Text(
+                                  '${a.name} (${a.currentBalance.toStringAsFixed(2)} ${a.currency})',
+                                  style: GoogleFonts.inter(fontSize: 12.sp),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: isTransferring
+                            ? null
+                            : (v) {
+                                setDialogState(() {
+                                  toId = v;
+                                  final newTo = accounts
+                                      .where((a) => a.id == v)
+                                      .firstOrNull;
+                                  if (newTo != null && newTo.isPettyCash) {
+                                    toBucket = FundBucket.cash;
+                                  }
+                                });
+                              },
+                        validator: (v) {
+                          if (v == null) return 'Destination required';
+                          if (v == fromId) {
+                            return 'Destination must differ from source';
+                          }
+                          return null;
+                        },
+                      ),
+                      if (toAcc != null && toAcc.isPettyCash) ...[
+                        SizedBox(height: 10.h),
+                        Text(
+                          'Destination Bucket (Credit Into) *',
+                          style: GoogleFonts.inter(
+                            fontSize: 11.sp,
+                            fontWeight: FontWeight.w600,
+                            color: FinDT.textSecondary,
+                          ),
+                        ),
+                        SizedBox(height: 6.h),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: isTransferring
+                                    ? null
+                                    : () => setDialogState(
+                                        () => toBucket = FundBucket.cash),
+                                borderRadius: BorderRadius.circular(8.r),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: 8.h, horizontal: 10.w),
+                                  decoration: BoxDecoration(
+                                    color: toBucket == FundBucket.cash
+                                        ? FinDT.brand.withValues(alpha: 0.1)
+                                        : FinDT.bgPage,
+                                    borderRadius: BorderRadius.circular(8.r),
+                                    border: Border.all(
+                                      color: toBucket == FundBucket.cash
+                                          ? FinDT.brand
+                                          : FinDT.border,
+                                      width: toBucket == FundBucket.cash ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.payments_outlined,
+                                        size: 14.sp,
+                                        color: toBucket == FundBucket.cash
+                                            ? FinDT.brand
+                                            : FinDT.textSecondary,
+                                      ),
+                                      SizedBox(width: 4.w),
+                                      Text(
+                                        'Physical Cash',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11.sp,
+                                          fontWeight:
+                                              toBucket == FundBucket.cash
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                          color: toBucket == FundBucket.cash
+                                              ? FinDT.brand
+                                              : FinDT.textPrimary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: InkWell(
+                                onTap: isTransferring
+                                    ? null
+                                    : () => setDialogState(
+                                        () => toBucket = FundBucket.stcPay),
+                                borderRadius: BorderRadius.circular(8.r),
+                                child: Container(
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: 8.h, horizontal: 10.w),
+                                  decoration: BoxDecoration(
+                                    color: toBucket == FundBucket.stcPay
+                                        ? const Color(0xFF6D28D9)
+                                            .withValues(alpha: 0.1)
+                                        : FinDT.bgPage,
+                                    borderRadius: BorderRadius.circular(8.r),
+                                    border: Border.all(
+                                      color: toBucket == FundBucket.stcPay
+                                          ? const Color(0xFF6D28D9)
+                                          : FinDT.border,
+                                      width: toBucket == FundBucket.stcPay ? 1.5 : 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.phone_android_outlined,
+                                        size: 14.sp,
+                                        color: toBucket == FundBucket.stcPay
+                                            ? const Color(0xFF6D28D9)
+                                            : FinDT.textSecondary,
+                                      ),
+                                      SizedBox(width: 4.w),
+                                      Text(
+                                        'STC Pay',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 11.sp,
+                                          fontWeight:
+                                              toBucket == FundBucket.stcPay
+                                                  ? FontWeight.w700
+                                                  : FontWeight.w500,
+                                          color: toBucket == FundBucket.stcPay
+                                              ? const Color(0xFF6D28D9)
+                                              : FinDT.textPrimary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      SizedBox(height: 14.h),
+                      TextFormField(
+                        controller: amountCtrl,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                        ],
+                        decoration: finDialogInputDecoration(
+                          label: 'Transfer Amount *',
+                          hint: '0.00',
+                          prefixIcon: Icons.attach_money_rounded,
+                          suffixText: fromAcc?.currency ?? 'SAR',
+                        ),
+                        style: GoogleFonts.inter(
+                            fontSize: 12.sp, color: FinDT.textPrimary),
+                        validator: (v) {
+                          final n = double.tryParse(v ?? '');
+                          if (n == null || n <= 0) return 'Invalid amount';
+                          if (fromAcc != null) {
+                            if (fromAcc.isPettyCash) {
+                              if (fromBucket == FundBucket.cash &&
+                                  n > fromAcc.cashBalance) {
+                                return 'Exceeds Physical Cash balance (${fromAcc.cashBalance.toStringAsFixed(2)})';
+                              }
+                              if (fromBucket == FundBucket.stcPay &&
+                                  n > fromAcc.stcPayBalance) {
+                                return 'Exceeds STC Pay balance (${fromAcc.stcPayBalance.toStringAsFixed(2)})';
+                              }
+                            } else {
+                              if (n > fromAcc.currentBalance) {
+                                return 'Exceeds available balance (${fromAcc.currentBalance.toStringAsFixed(2)})';
+                              }
+                            }
+                          }
+                          return null;
+                        },
+                      ),
+                      SizedBox(height: 14.h),
+                      TextFormField(
+                        controller: descCtrl,
+                        decoration: finDialogInputDecoration(
+                          label: 'Purpose / Description *',
+                          hint: 'e.g. Seed petty cash fund',
+                          prefixIcon: Icons.description_outlined,
+                        ),
+                        style: GoogleFonts.inter(
+                            fontSize: 12.sp, color: FinDT.textPrimary),
+                        validator: (v) =>
+                            (v == null || v.trim().isEmpty) ? 'Purpose required' : null,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              finDialogCancelButton(
+                ctx,
+                onPressed: isTransferring ? () {} : null,
+              ),
+              finDialogActionButton(
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+                  final user = context.read<AuthProvider>().user;
+                  final from = accounts.firstWhere((a) => a.id == fromId);
+                  final amount = double.parse(amountCtrl.text);
+
+                  setDialogState(() => isTransferring = true);
+                  try {
+                    await provider.transfer(
+                      fromAccountId: fromId!,
+                      toAccountId: toId!,
+                      amountMajor: amount,
+                      currency: from.currency,
+                      description: descCtrl.text.trim(),
+                      performedBy: user?.actorLabel ?? 'Unknown',
+                      performedByUserId: user?.id ?? '',
+                      fromBucket: from.isPettyCash ? fromBucket : FundBucket.total,
+                      toBucket: (toAcc?.isPettyCash == true)
+                          ? toBucket
+                          : FundBucket.total,
+                    );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Transfer completed (both sides posted)'),
+                          backgroundColor: FinDT.success,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      setDialogState(() => isTransferring = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('$e'),
+                          backgroundColor: FinDT.danger,
+                        ),
+                      );
+                    }
+                  }
+                },
+                label: 'Transfer Funds',
+                backgroundColor: FinDT.brand,
+                isLoading: isTransferring,
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -279,7 +1388,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
             ),
             SizedBox(height: 6.h),
             Text(
-              'Select an account from the left to view transaction history and balances.',
+              'Select an account from the left to view live balances and transaction ledgers.',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 12.sp,
@@ -291,6 +1400,25 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
         ),
       );
     }
+
+    final formatter = NumberFormat('#,##0.00', 'en_US');
+
+    // Filter transactions
+    final query = _txSearchController.text.toLowerCase().trim();
+    final filteredTxs = provider.transactions.where((tx) {
+      final isIn = tx.balanceAfter >= tx.balanceBefore;
+      final isAdjust = tx.type == FundTransactionType.adjustment;
+
+      if (_txFilter == 'INFLOW' && !isIn) return false;
+      if (_txFilter == 'OUTFLOW' && (isIn || isAdjust)) return false;
+      if (_txFilter == 'ADJUST' && !isAdjust) return false;
+
+      if (query.isNotEmpty) {
+        return tx.description.toLowerCase().contains(query) ||
+            tx.performedBy.toLowerCase().contains(query);
+      }
+      return true;
+    }).toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -308,29 +1436,86 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header of details card
+          // ── Header Card ─────────────────────────────────────
           Padding(
-            padding: EdgeInsets.all(20.w),
+            padding: EdgeInsets.all(18.w),
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: [
-                      Text(
-                        selected.name,
-                        style: GoogleFonts.inter(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w700,
-                          color: FinDT.textPrimary,
+                      Container(
+                        padding: EdgeInsets.all(10.w),
+                        decoration: BoxDecoration(
+                          color: FinDT.brand.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12.r),
+                        ),
+                        child: Icon(
+                          Icons.account_balance_wallet_rounded,
+                          color: FinDT.brand,
+                          size: 20.sp,
                         ),
                       ),
-                      SizedBox(height: 2.h),
-                      Text(
-                        '${selected.code} • ${selected.type.displayName}',
-                        style: GoogleFonts.inter(
-                          fontSize: 11.sp,
-                          color: FinDT.textSecondary,
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    selected.name,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 16.sp,
+                                      fontWeight: FontWeight.w700,
+                                      color: FinDT.textPrimary,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                SizedBox(width: 8.w),
+                                Container(
+                                  padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
+                                  decoration: BoxDecoration(
+                                    color: FinDT.bgPage,
+                                    borderRadius: BorderRadius.circular(6.r),
+                                    border: Border.all(color: FinDT.border),
+                                  ),
+                                  child: Text(
+                                    selected.code,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.sp,
+                                      fontWeight: FontWeight.w600,
+                                      color: FinDT.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 3.h),
+                            Row(
+                              children: [
+                                Text(
+                                  selected.typeDisplayName,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11.sp,
+                                    color: FinDT.brand,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                if (selected.assignedTo != null && selected.assignedTo!.isNotEmpty) ...[
+                                  Text(
+                                    ' • Assigned to ${selected.assignedTo}',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11.sp,
+                                      color: FinDT.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -342,45 +1527,275 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
           ),
           Divider(height: 1, color: FinDT.borderLight),
 
-          // Deposit / Withdrawal buttons
-          Padding(
-            padding: EdgeInsets.all(20.w),
-            child: Row(
+          // ── Balance Hero Card ─────────────────────────────────
+          Container(
+            margin: EdgeInsets.all(18.w),
+            padding: EdgeInsets.all(18.w),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  FinDT.brand.withValues(alpha: 0.08),
+                  FinDT.brand.withValues(alpha: 0.02),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(14.r),
+              border: Border.all(color: FinDT.brand.withValues(alpha: 0.15)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: _buildTransactionActionBtn(
-                    context: context,
-                    provider: provider,
-                    account: selected,
-                    isDeposit: true,
+                Text(
+                  'CURRENT AVAILABLE BALANCE',
+                  style: GoogleFonts.inter(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.5,
+                    color: FinDT.brand,
                   ),
                 ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: _buildTransactionActionBtn(
-                    context: context,
-                    provider: provider,
-                    account: selected,
-                    isDeposit: false,
+                SizedBox(height: 6.h),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      formatter.format(selected.currentBalance),
+                      style: GoogleFonts.inter(
+                        fontSize: 24.sp,
+                        fontWeight: FontWeight.w900,
+                        color: selected.currentBalance >= 0
+                            ? FinDT.textPrimary
+                            : FinDT.danger,
+                      ),
+                    ),
+                    SizedBox(width: 6.w),
+                    Text(
+                      selected.currency,
+                      style: GoogleFonts.inter(
+                        fontSize: 13.sp,
+                        fontWeight: FontWeight.w700,
+                        color: FinDT.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // If Petty Cash, show dual cash/stc sub-cards
+                if (selected.isPettyCash) ...[
+                  SizedBox(height: 12.h),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10.r),
+                            border: Border.all(color: const Color(0xFF16A34A).withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(6.w),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF16A34A).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                child: Icon(Icons.payments_outlined, size: 16.sp, color: const Color(0xFF16A34A)),
+                              ),
+                              SizedBox(width: 8.w),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Physical Cash', style: GoogleFonts.inter(fontSize: 10.sp, color: FinDT.textSecondary)),
+                                    SizedBox(height: 1.h),
+                                    Text(
+                                      '${formatter.format(selected.cashBalance)} SAR',
+                                      style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w700, color: FinDT.textPrimary),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 10.w),
+                      Expanded(
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(10.r),
+                            border: Border.all(color: const Color(0xFF7C3AED).withValues(alpha: 0.2)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: EdgeInsets.all(6.w),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF7C3AED).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8.r),
+                                ),
+                                child: Icon(Icons.phone_android_outlined, size: 16.sp, color: const Color(0xFF7C3AED)),
+                              ),
+                              SizedBox(width: 8.w),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text('STC Pay Float', style: GoogleFonts.inter(fontSize: 10.sp, color: FinDT.textSecondary)),
+                                    SizedBox(height: 1.h),
+                                    Text(
+                                      '${formatter.format(selected.stcPayBalance)} SAR',
+                                      style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w700, color: FinDT.textPrimary),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+                ],
+              ],
+            ),
+          ),
+
+          // ── Quick Actions Bar ─────────────────────────────────
+          Builder(builder: (context) {
+            final user = context.read<AuthProvider>().user;
+            final policy = context.read<FinanceProvider>().policy;
+            final canMove = FinancePermissionService.canMoveFunds(
+              user: user,
+              account: selected,
+              policy: policy,
+            );
+            if (!canMove) return const SizedBox.shrink();
+
+            return Padding(
+              padding: EdgeInsets.symmetric(horizontal: 18.w),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildTransactionActionBtn(
+                      context: context,
+                      provider: provider,
+                      account: selected,
+                      isDeposit: true,
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  Expanded(
+                    child: _buildTransactionActionBtn(
+                      context: context,
+                      provider: provider,
+                      account: selected,
+                      isDeposit: false,
+                    ),
+                  ),
+                  SizedBox(width: 8.w),
+                  OutlinedButton.icon(
+                    onPressed: () => _showAdjustmentDialog(context, provider, selected),
+                    icon: Icon(Icons.tune_rounded, size: 15.sp),
+                    label: Text('Adjust', style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: FinDT.warning,
+                      side: BorderSide(color: FinDT.warning.withValues(alpha: 0.5)),
+                      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10.r)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+          SizedBox(height: 16.h),
+          Divider(height: 1, color: FinDT.borderLight),
+
+          // ── Transaction Timeline Header & Filter Tabs ──────────
+          Padding(
+            padding: EdgeInsets.all(18.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Transaction History',
+                      style: GoogleFonts.inter(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w700,
+                        color: FinDT.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      '${provider.transactions.length} total entries',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        color: FinDT.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12.h),
+
+                // Search & Filter Row
+                Row(
+                  children: [
+                    // Search box
+                    Expanded(
+                      flex: 4,
+                      child: SizedBox(
+                        height: 38.h,
+                        child: TextField(
+                          controller: _txSearchController,
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            hintText: 'Search transactions...',
+                            hintStyle: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.textMuted),
+                            prefixIcon: Icon(Icons.search, size: 16.sp, color: FinDT.textSecondary),
+                            filled: true,
+                            fillColor: FinDT.bgPage,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8.r),
+                              borderSide: const BorderSide(color: FinDT.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8.r),
+                              borderSide: const BorderSide(color: FinDT.border),
+                            ),
+                          ),
+                          style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.textPrimary),
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 8.w),
+
+                    // Filter tabs
+                    _buildTxFilterTab('ALL', 'All'),
+                    SizedBox(width: 4.w),
+                    _buildTxFilterTab('INFLOW', 'Inflow (+)'),
+                    SizedBox(width: 4.w),
+                    _buildTxFilterTab('OUTFLOW', 'Outflow (-)'),
+                    SizedBox(width: 4.w),
+                    _buildTxFilterTab('ADJUST', 'Adjust'),
+                  ],
                 ),
               ],
             ),
           ),
-          Divider(height: 1, color: FinDT.borderLight),
 
-          // Transaction Timeline List
-          Padding(
-            padding: EdgeInsets.all(20.w),
-            child: Text(
-              'Transaction History',
-              style: GoogleFonts.inter(
-                fontSize: 13.sp,
-                fontWeight: FontWeight.w700,
-                color: FinDT.textPrimary,
-              ),
-            ),
-          ),
+          // ── Transaction Timeline List ──────────────────────────
           if (provider.isTransactionsLoading)
             Padding(
               padding: EdgeInsets.symmetric(vertical: 40.h),
@@ -388,16 +1803,23 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                 child: CircularProgressIndicator(color: FinDT.brand),
               ),
             )
-          else if (provider.transactions.isEmpty)
+          else if (filteredTxs.isEmpty)
             Padding(
-              padding: EdgeInsets.symmetric(vertical: 40.h),
+              padding: EdgeInsets.symmetric(vertical: 40.h, horizontal: 20.w),
               child: Center(
-                child: Text(
-                  'No transactions recorded yet',
-                  style: GoogleFonts.inter(
-                    fontSize: 12.sp,
-                    color: FinDT.textSecondary,
-                  ),
+                child: Column(
+                  children: [
+                    Icon(Icons.receipt_long_outlined, size: 36.sp, color: FinDT.textMuted),
+                    SizedBox(height: 8.h),
+                    Text(
+                      'No matching transactions found',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        color: FinDT.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             )
@@ -405,32 +1827,33 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: provider.transactions.length,
-              separatorBuilder: (_, __) =>
-                  Divider(height: 1, color: FinDT.borderLight),
+              itemCount: filteredTxs.length,
+              separatorBuilder: (_, __) => Divider(height: 1, color: FinDT.borderLight),
               itemBuilder: (context, index) {
-                final tx = provider.transactions[index];
-                final isDeposit = tx.type == FundTransactionType.deposit;
-                return Padding(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 20.w,
-                    vertical: 14.h,
-                  ),
+                final tx = filteredTxs[index];
+                final isIn = tx.balanceAfter >= tx.balanceBefore;
+                final isAdjust = tx.type == FundTransactionType.adjustment;
+                final color = isAdjust
+                    ? FinDT.warning
+                    : (isIn ? const Color(0xFF16A34A) : const Color(0xFFDC2626));
+
+                return Container(
+                  padding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 12.h),
                   child: Row(
                     children: [
                       Container(
                         padding: EdgeInsets.all(8.w),
                         decoration: BoxDecoration(
-                          color: isDeposit
-                              ? FinDT.success.withValues(alpha: 0.08)
-                              : FinDT.danger.withValues(alpha: 0.08),
-                          shape: BoxShape.circle,
+                          color: color.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10.r),
                         ),
                         child: Icon(
-                          isDeposit
-                              ? Icons.add_circle_outline
-                              : Icons.remove_circle_outline,
-                          color: isDeposit ? FinDT.success : FinDT.danger,
+                          isAdjust
+                              ? Icons.tune_rounded
+                              : (isIn
+                                  ? Icons.arrow_downward_rounded
+                                  : Icons.arrow_upward_rounded),
+                          color: color,
                           size: 16.sp,
                         ),
                       ),
@@ -447,13 +1870,24 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                                 color: FinDT.textPrimary,
                               ),
                             ),
-                            SizedBox(height: 2.h),
-                            Text(
-                              '${DateFormat('dd MMM yy, hh:mm a').format(tx.date)} • By ${tx.performedBy}',
-                              style: GoogleFonts.inter(
-                                fontSize: 10.sp,
-                                color: FinDT.textSecondary,
-                              ),
+                            SizedBox(height: 3.h),
+                            Row(
+                              children: [
+                                Text(
+                                  DateFormat('dd MMM yyyy, hh:mm a').format(tx.date),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.sp,
+                                    color: FinDT.textSecondary,
+                                  ),
+                                ),
+                                Text(
+                                  ' • By ${tx.performedBy}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.sp,
+                                    color: FinDT.textMuted,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
@@ -466,13 +1900,14 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                             currency: tx.currency,
                             fontSize: 13.sp,
                             fontWeight: FontWeight.w700,
-                            color: isDeposit ? FinDT.success : FinDT.danger,
+                            color: color,
                           ),
                           SizedBox(height: 2.h),
                           Text(
-                            'Bal: ${tx.balanceAfter.toStringAsFixed(2)}',
+                            'Bal: ${formatter.format(tx.balanceAfter)} SAR',
                             style: GoogleFonts.inter(
-                              fontSize: 9.sp,
+                              fontSize: 10.sp,
+                              fontWeight: FontWeight.w500,
                               color: FinDT.textMuted,
                             ),
                           ),
@@ -488,12 +1923,41 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     );
   }
 
+  Widget _buildTxFilterTab(String key, String label) {
+    final isSelected = _txFilter == key;
+    return InkWell(
+      onTap: () => setState(() => _txFilter = key),
+      borderRadius: BorderRadius.circular(8.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 7.h),
+        decoration: BoxDecoration(
+          color: isSelected ? FinDT.brand : FinDT.bgPage,
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: isSelected ? FinDT.brand : FinDT.border),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 11.sp,
+            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+            color: isSelected ? Colors.white : FinDT.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDetailsActions(
     BuildContext context,
     FundAccountProvider provider,
     FundAccountEntity selected,
   ) {
-    final isSuperAdmin = context.read<AuthProvider>().user?.isSuperAdmin ?? false;
+    final user = context.read<AuthProvider>().user;
+    final isSuperAdmin = user?.isSuperAdmin ?? false;
+    final policy = context.read<FinanceProvider>().policy;
+    final canManageAccounts = FinancePermissionService.canManageAccounts(user: user, policy: policy);
+    if (!canManageAccounts) return const SizedBox.shrink();
+
     return Row(
       children: [
         IconButton(
@@ -509,8 +1973,22 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
         if (isSuperAdmin)
           IconButton(
             onPressed: () => _confirmDeleteAccount(context, provider, selected),
-            icon: Icon(Icons.delete_outline, size: 18.sp, color: FinDT.danger),
-            tooltip: 'Delete Account',
+            icon: Icon(
+              selected.currentBalanceMinor > 0
+                  ? Icons.delete_outline
+                  : (provider.transactions.isNotEmpty
+                      ? Icons.archive_outlined
+                      : Icons.delete_outline),
+              size: 18.sp,
+              color: selected.currentBalanceMinor > 0
+                  ? FinDT.textMuted
+                  : FinDT.danger,
+            ),
+            tooltip: selected.currentBalanceMinor > 0
+                ? 'Cannot close account with active balance'
+                : (provider.transactions.isNotEmpty
+                    ? 'Deactivate Account'
+                    : 'Delete Account'),
           ),
       ],
     );
@@ -522,13 +2000,13 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     required FundAccountEntity account,
     required bool isDeposit,
   }) {
-    final color = isDeposit ? FinDT.success : FinDT.danger;
+    final color = isDeposit ? const Color(0xFF16A34A) : const Color(0xFFDC2626);
     return OutlinedButton.icon(
       onPressed: () =>
           _showTransactionDialog(context, provider, account, isDeposit),
       icon: Icon(
         isDeposit ? Icons.add_rounded : Icons.remove_rounded,
-        size: 14.sp,
+        size: 15.sp,
       ),
       label: Text(isDeposit ? 'Deposit Cash' : 'Withdraw Cash'),
       style: OutlinedButton.styleFrom(
@@ -597,7 +2075,10 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
         String searchQuery = '';
         return StatefulBuilder(
           builder: (ctx, setStateDialog) {
+            // A coordinator is custodian of a company fund account, so
+            // external (contracted) staff are not eligible.
             final filtered = empProv.employees.where((e) {
+              if (e.isExternal) return false;
               final q = searchQuery.toLowerCase();
               return e.fullName.toLowerCase().contains(q) ||
                   e.position.toLowerCase().contains(q);
@@ -606,17 +2087,8 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
             return AlertDialog(
               backgroundColor: Colors.white,
               surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16.r),
-              ),
-              title: Text(
-                'Select Coordinator',
-                style: GoogleFonts.inter(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w700,
-                  color: FinDT.textPrimary,
-                ),
-              ),
+              shape: finDialogShape,
+              title: finDialogTitle('Select Coordinator', icon: Icons.person_search_outlined),
               content: SizedBox(
                 width: 400.w,
                 child: Column(
@@ -728,6 +2200,21 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     );
   }
 
+  FundAccountType _mapTypeToEnum(FundAccountTypeEntity entity) {
+    switch (entity.id) {
+      case 'pettyCash':
+      case 'petty_cash':
+        return FundAccountType.pettyCash;
+      case 'bank':
+        return FundAccountType.bank;
+      case 'stcPay':
+      case 'stc_pay':
+        return FundAccountType.stcPay;
+      default:
+        return FundAccountType.other;
+    }
+  }
+
   void _showAccountFormDialog(
     BuildContext context,
     FundAccountProvider provider, {
@@ -737,30 +2224,42 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     final isEditing = account != null;
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: account?.name);
-    final codeCtrl = TextEditingController(text: account?.code);
+
+    final availableTypes = provider.accountTypes;
+    FundAccountTypeEntity selectedType = availableTypes.firstWhere(
+      (t) =>
+          (account?.accountTypeId != null && t.id == account!.accountTypeId) ||
+          t.name.toLowerCase() == account?.typeDisplayName.toLowerCase(),
+      orElse: () => availableTypes.firstWhere(
+        (t) => t.id == 'pettyCash',
+        orElse: () => availableTypes.isNotEmpty
+            ? availableTypes.first
+            : FundAccountTypeEntity.defaultTypes[1],
+      ),
+    );
+
+    final initialCode = isEditing
+        ? (account.code.isNotEmpty ? account.code : provider.generateUniqueCode(selectedType))
+        : provider.generateUniqueCode(selectedType);
+    final codeCtrl = TextEditingController(text: initialCode);
     String? assignedName = account?.assignedTo;
-    FundAccountType selectedType = account?.type ?? FundAccountType.pettyCash;
     String currency = account?.currency ?? 'SAR';
+    bool isSaving = false;
 
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setStateDialog) => AlertDialog(
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.r),
-          ),
-          title: Text(
+          shape: finDialogShape,
+          title: finDialogTitle(
             isEditing ? 'Edit Fund Account' : 'New Fund Account',
-            style: GoogleFonts.inter(
-              fontSize: 18.sp,
-              fontWeight: FontWeight.w700,
-              color: FinDT.textPrimary,
-            ),
+            icon: Icons.account_balance_wallet_outlined,
           ),
           content: SizedBox(
-            width: 420.w,
+            width: 440.w,
             child: SingleChildScrollView(
               child: Form(
                 key: formKey,
@@ -779,33 +2278,102 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                       validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                     ),
                     SizedBox(height: 14.h),
-                    TextFormField(
-                      controller: codeCtrl,
+
+                    // Account Type Dropdown
+                    DropdownButtonFormField<String>(
+                      key: ValueKey(selectedType.id),
+                      initialValue: provider.accountTypes.any((t) => t.id == selectedType.id)
+                          ? selectedType.id
+                          : (provider.accountTypes.isNotEmpty ? provider.accountTypes.first.id : null),
                       decoration: _dialogInputDecoration(
-                        label: 'Account Code *',
-                        hint: 'e.g. ACC-PETTY-01',
-                        prefixIcon: Icons.qr_code_rounded,
-                      ),
-                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                      validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-                    ),
-                    SizedBox(height: 14.h),
-                    DropdownButtonFormField<FundAccountType>(
-                      initialValue: selectedType,
-                      decoration: _dialogInputDecoration(
-                        label: 'Account Type',
+                        label: 'Account Type *',
                         prefixIcon: Icons.category_outlined,
                       ),
                       style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                      items: FundAccountType.values
+                      items: provider.accountTypes
                           .map(
                             (t) => DropdownMenuItem(
-                              value: t,
-                              child: Text(t.displayName),
+                              value: t.id,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(t.name),
+                                  SizedBox(width: 6.w),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.h),
+                                    decoration: BoxDecoration(
+                                      color: FinDT.brand.withValues(alpha: 0.08),
+                                      borderRadius: BorderRadius.circular(4.r),
+                                    ),
+                                    child: Text(
+                                      t.codePrefix,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 9.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: FinDT.brand,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           )
                           .toList(),
-                      onChanged: (v) => setStateDialog(() => selectedType = v ?? FundAccountType.pettyCash),
+                      onChanged: (val) {
+                        if (val == null) return;
+                        final found = provider.accountTypes.firstWhere(
+                          (t) => t.id == val,
+                          orElse: () => selectedType,
+                        );
+                        setStateDialog(() {
+                          selectedType = found;
+                          if (!isEditing) {
+                            codeCtrl.text = provider.generateUniqueCode(found);
+                          }
+                        });
+                      },
+                    ),
+                    SizedBox(height: 14.h),
+                    TextFormField(
+                      controller: codeCtrl,
+                      readOnly: true,
+                      decoration: _dialogInputDecoration(
+                        label: 'Account Code',
+                        hint: 'Auto-generated',
+                        prefixIcon: Icons.qr_code_rounded,
+                      ).copyWith(
+                        fillColor: FinDT.bgPage,
+                        suffixIcon: Container(
+                          margin: EdgeInsets.only(right: 8.w),
+                          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
+                          decoration: BoxDecoration(
+                            color: FinDT.brand.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(6.r),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.auto_awesome_rounded, size: 12.sp, color: FinDT.brand),
+                              SizedBox(width: 4.w),
+                              Text(
+                                'Auto',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: FinDT.brand,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        fontWeight: FontWeight.w600,
+                        color: FinDT.textPrimary,
+                        letterSpacing: 0.5,
+                      ),
+                      validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                     ),
                     SizedBox(height: 14.h),
                     DropdownButtonFormField<String>(
@@ -874,51 +2442,135 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                         ),
                       ),
                     ),
+
+                    // Account creation guard notice
+                    Builder(
+                      builder: (_) {
+                        bool hasConflict = false;
+                        if (assignedName != null && assignedName!.isNotEmpty) {
+                          if (selectedType.id == 'stcPay') {
+                            hasConflict = provider.accounts.any((a) =>
+                                a.assignedTo == assignedName &&
+                                a.isPettyCash &&
+                                a.id != account?.id);
+                          } else if (selectedType.id == 'pettyCash') {
+                            hasConflict = provider.accounts.any((a) =>
+                                a.assignedTo == assignedName &&
+                                a.isStcPay &&
+                                a.id != account?.id);
+                          }
+                        }
+
+                        if (!hasConflict) return const SizedBox.shrink();
+
+                        return Padding(
+                          padding: EdgeInsets.only(top: 14.h),
+                          child: Container(
+                            padding: EdgeInsets.all(12.w),
+                            decoration: BoxDecoration(
+                              color: FinDT.danger.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10.r),
+                              border: Border.all(color: FinDT.danger.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.error_outline_rounded, size: 18.sp, color: FinDT.danger),
+                                SizedBox(width: 10.w),
+                                Expanded(
+                                  child: Text(
+                                    selectedType.id == 'stcPay'
+                                        ? '$assignedName already has a Petty Cash account. STC Pay balances for coordinators should be managed directly inside Petty Cash.'
+                                        : '$assignedName already has a standalone STC Pay account.',
+                                    style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.danger, height: 1.3),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
               ),
             ),
           ),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.inter(color: FinDT.textSecondary),
-              ),
+            finDialogCancelButton(
+              ctx,
+              onPressed: isSaving ? () {} : null,
             ),
-            FilledButton(
-              onPressed: () {
+            finDialogActionButton(
+              onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
+
+                // Check conflict guard
+                bool hasConflict = false;
+                if (assignedName != null && assignedName!.isNotEmpty) {
+                  if (selectedType.id == 'stcPay') {
+                    hasConflict = provider.accounts.any((a) =>
+                        a.assignedTo == assignedName &&
+                        a.isPettyCash &&
+                        a.id != account?.id);
+                  }
+                }
+                if (hasConflict) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Cannot create standalone STC Pay account for a coordinator who already has Petty Cash.',
+                        style: GoogleFonts.inter(color: Colors.white),
+                      ),
+                      backgroundColor: FinDT.danger,
+                    ),
+                  );
+                  return;
+                }
+
+                final entityType = _mapTypeToEnum(selectedType);
                 final acc = FundAccountEntity(
                   id: isEditing ? account.id : const Uuid().v4(),
-                  name: nameCtrl.text,
-                  code: codeCtrl.text,
-                  type: selectedType,
+                  name: nameCtrl.text.trim(),
+                  code: codeCtrl.text.trim(),
+                  type: entityType,
+                  accountTypeId: selectedType.id,
+                  accountTypeName: selectedType.name,
                   currency: currency,
                   assignedTo: assignedName,
-                  currentBalance: isEditing ? account.currentBalance : 0.0,
+                  currentBalanceMinor: isEditing ? account.currentBalanceMinor : 0,
+                  cashBalanceMinor: isEditing ? account.cashBalanceMinor : 0,
+                  stcPayBalanceMinor: isEditing ? account.stcPayBalanceMinor : 0,
                   createdAt: isEditing ? account.createdAt : DateTime.now(),
                 );
 
-                if (isEditing) {
-                  provider.updateAccount(acc);
-                } else {
-                  provider.insertAccount(acc);
+                setStateDialog(() => isSaving = true);
+                try {
+                  if (isEditing) {
+                    await provider.updateAccount(acc);
+                  } else {
+                    await provider.insertAccount(acc);
+                  }
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(isEditing ? 'Account updated' : 'Account created'),
+                        backgroundColor: FinDT.success,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setStateDialog(() => isSaving = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
+                    );
+                  }
                 }
-                Navigator.pop(ctx);
               },
-              style: FilledButton.styleFrom(
-                backgroundColor: FinDT.brand,
-                padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10.r),
-                ),
-              ),
-              child: Text(
-                isEditing ? 'Save Account' : 'Create Account',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-              ),
+              label: isEditing ? 'Save Account' : 'Create Account',
+              backgroundColor: FinDT.brand,
+              isLoading: isSaving,
             ),
           ],
         ),
@@ -926,155 +2578,725 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     );
   }
 
-  void _showTransactionDialog(
+  Future<void> _showTransactionDialog(
     BuildContext context,
     FundAccountProvider provider,
     FundAccountEntity account,
     bool isDeposit,
-  ) {
+  ) async {
     final formKey = GlobalKey<FormState>();
-    final amountCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
+    final isPettyCash = account.isPettyCash;
 
-    showDialog(
+    final amountCtrl = TextEditingController();
+    final cashAmountCtrl = TextEditingController();
+    final stcAmountCtrl = TextEditingController();
+    final descCtrl = TextEditingController();
+    bool isSubmitting = false;
+
+    await showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        surfaceTintColor: Colors.transparent,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16.r),
-        ),
-        title: Text(
-          isDeposit ? 'Deposit Cash' : 'Withdraw Cash',
-          style: GoogleFonts.inter(
-            fontSize: 18.sp,
-            fontWeight: FontWeight.w700,
-            color: FinDT.textPrimary,
-          ),
-        ),
-        content: SizedBox(
-          width: 400.w,
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.all(12.w),
-                  decoration: BoxDecoration(
-                    color: FinDT.bgPage,
-                    borderRadius: BorderRadius.circular(10.r),
-                    border: Border.all(color: FinDT.border),
-                  ),
-                  child: Row(
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final formatter = NumberFormat('#,##0.00', 'en_US');
+          final cashAmt = double.tryParse(cashAmountCtrl.text) ?? 0.0;
+          final stcAmt = double.tryParse(stcAmountCtrl.text) ?? 0.0;
+          final singleAmt = double.tryParse(amountCtrl.text) ?? 0.0;
+          final totalAmt = isPettyCash ? (cashAmt + stcAmt) : singleAmt;
+
+          final projectedTotal = isDeposit
+              ? (account.currentBalance + totalAmt)
+              : (account.currentBalance - totalAmt);
+
+          final projectedCash = isDeposit
+              ? (account.cashBalance + cashAmt)
+              : (account.cashBalance - cashAmt);
+
+          final projectedStc = isDeposit
+              ? (account.stcPayBalance + stcAmt)
+              : (account.stcPayBalance - stcAmt);
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: finDialogShape,
+            title: finDialogTitle(
+              isDeposit ? 'Deposit Funds' : 'Withdraw Funds',
+              icon: isDeposit
+                  ? Icons.add_circle_outline_rounded
+                  : Icons.remove_circle_outline_rounded,
+              iconColor: isDeposit ? FinDT.success : FinDT.danger,
+            ),
+            content: SizedBox(
+              width: 440.w,
+              child: SingleChildScrollView(
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.account_balance_wallet_outlined, size: 16.sp, color: FinDT.brand),
-                      SizedBox(width: 8.w),
-                      Text(
-                        'Account: ',
-                        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
+                      // ── Account Header ──
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(
+                            horizontal: 14.w, vertical: 10.h),
+                        decoration: BoxDecoration(
+                          color: FinDT.bgPage,
+                          borderRadius: BorderRadius.circular(10.r),
+                          border: Border.all(color: FinDT.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.account_balance_wallet_outlined,
+                              size: 16.sp,
+                              color: FinDT.brand,
+                            ),
+                            SizedBox(width: 8.w),
+                            Text(
+                              'Account: ',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.sp,
+                                color: FinDT.textSecondary,
+                              ),
+                            ),
+                            Expanded(
+                              child: Text(
+                                '${account.name} (${account.code})',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: FinDT.textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 7.w, vertical: 2.h),
+                              decoration: BoxDecoration(
+                                color: FinDT.brand.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6.r),
+                              ),
+                              child: Text(
+                                account.typeDisplayName,
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.sp,
+                                  fontWeight: FontWeight.w600,
+                                  color: FinDT.brand,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      Text(
-                        '${account.name} (${account.code})',
-                        style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
+                      SizedBox(height: 12.h),
+
+                      // ── Live Balance & Projection Card ──
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(12.w),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              FinDT.brand.withValues(alpha: 0.06),
+                              FinDT.brand.withValues(alpha: 0.02),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12.r),
+                          border: Border.all(
+                            color: FinDT.brand.withValues(alpha: 0.16),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.query_stats_rounded,
+                                      size: 14.sp,
+                                      color: FinDT.brand,
+                                    ),
+                                    SizedBox(width: 6.w),
+                                    Text(
+                                      'BALANCE OVERVIEW',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10.sp,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: 0.5,
+                                        color: FinDT.brand,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (totalAmt > 0)
+                                  Container(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 7.w,
+                                      vertical: 2.h,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: (isDeposit
+                                              ? FinDT.success
+                                              : FinDT.danger)
+                                          .withValues(alpha: 0.12),
+                                      borderRadius:
+                                          BorderRadius.circular(8.r),
+                                      border: Border.all(
+                                        color: (isDeposit
+                                                ? FinDT.success
+                                                : FinDT.danger)
+                                            .withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      '${isDeposit ? "+" : "-"}${formatter.format(totalAmt)} ${account.currency}',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: isDeposit
+                                            ? FinDT.success
+                                            : FinDT.danger,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            SizedBox(height: 8.h),
+                            // Total balance comparison
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 12.w,
+                                vertical: 8.h,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10.r),
+                                border: Border.all(color: FinDT.borderLight),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Current Total',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 10.sp,
+                                            color: FinDT.textSecondary,
+                                          ),
+                                        ),
+                                        SizedBox(height: 2.h),
+                                        Text(
+                                          '${formatter.format(account.currentBalance)} ${account.currency}',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13.sp,
+                                            fontWeight: FontWeight.w700,
+                                            color: FinDT.textPrimary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 16.sp,
+                                    color: FinDT.textMuted,
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          'Projected Total',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 10.sp,
+                                            fontWeight: FontWeight.w600,
+                                            color: projectedTotal < 0
+                                                ? FinDT.danger
+                                                : (isDeposit && totalAmt > 0
+                                                    ? FinDT.success
+                                                    : FinDT.brand),
+                                          ),
+                                        ),
+                                        SizedBox(height: 2.h),
+                                        Text(
+                                          '${formatter.format(projectedTotal)} ${account.currency}',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13.sp,
+                                            fontWeight: FontWeight.w800,
+                                            color: projectedTotal < 0
+                                                ? FinDT.danger
+                                                : (isDeposit && totalAmt > 0
+                                                    ? FinDT.success
+                                                    : FinDT.brand),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // If Petty Cash, show physical & stc dual breakdown
+                            if (isPettyCash) ...[
+                              SizedBox(height: 8.h),
+                              Row(
+                                children: [
+                                  // Physical Cash Sub-card
+                                  Expanded(
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 10.w,
+                                        vertical: 8.h,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius:
+                                            BorderRadius.circular(8.r),
+                                        border: Border.all(
+                                          color: const Color(0xFF16A34A)
+                                              .withValues(alpha: 0.25),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: EdgeInsets.all(4.w),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF16A34A)
+                                                      .withValues(alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          6.r),
+                                                ),
+                                                child: Icon(
+                                                  Icons.payments_outlined,
+                                                  size: 12.sp,
+                                                  color:
+                                                      const Color(0xFF16A34A),
+                                                ),
+                                              ),
+                                              SizedBox(width: 5.w),
+                                              Expanded(
+                                                child: Text(
+                                                  'Physical Cash',
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 10.sp,
+                                                    fontWeight:
+                                                        FontWeight.w600,
+                                                    color:
+                                                        const Color(0xFF16A34A),
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(height: 6.h),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                'Current:',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.sp,
+                                                  color: FinDT.textSecondary,
+                                                ),
+                                              ),
+                                              Text(
+                                                formatter.format(
+                                                    account.cashBalance),
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.sp,
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                  color: FinDT.textPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(height: 2.h),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                'Projected:',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.sp,
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                  color:
+                                                      const Color(0xFF16A34A),
+                                                ),
+                                              ),
+                                              Text(
+                                                '${formatter.format(projectedCash)} ${account.currency}',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 10.sp,
+                                                  fontWeight:
+                                                      FontWeight.w700,
+                                                  color: projectedCash < 0
+                                                      ? FinDT.danger
+                                                      : (cashAmt > 0
+                                                          ? const Color(
+                                                              0xFF16A34A)
+                                                          : FinDT.textPrimary),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  SizedBox(width: 8.w),
+                                  // STC Pay Sub-card
+                                  Expanded(
+                                    child: Container(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 10.w,
+                                        vertical: 8.h,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        borderRadius:
+                                            BorderRadius.circular(8.r),
+                                        border: Border.all(
+                                          color: const Color(0xFF7C3AED)
+                                              .withValues(alpha: 0.25),
+                                        ),
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              Container(
+                                                padding: EdgeInsets.all(4.w),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFF7C3AED)
+                                                      .withValues(alpha: 0.1),
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          6.r),
+                                                ),
+                                                child: Icon(
+                                                  Icons.phone_android_outlined,
+                                                  size: 12.sp,
+                                                  color:
+                                                      const Color(0xFF7C3AED),
+                                                ),
+                                              ),
+                                              SizedBox(width: 5.w),
+                                              Expanded(
+                                                child: Text(
+                                                  'STC Pay Float',
+                                                  style: GoogleFonts.inter(
+                                                    fontSize: 10.sp,
+                                                    fontWeight:
+                                                        FontWeight.w600,
+                                                    color:
+                                                        const Color(0xFF7C3AED),
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(height: 6.h),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                'Current:',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.sp,
+                                                  color: FinDT.textSecondary,
+                                                ),
+                                              ),
+                                              Text(
+                                                formatter.format(
+                                                    account.stcPayBalance),
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.sp,
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                  color: FinDT.textPrimary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(height: 2.h),
+                                          Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Text(
+                                                'Projected:',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 9.sp,
+                                                  fontWeight:
+                                                      FontWeight.w600,
+                                                  color:
+                                                      const Color(0xFF7C3AED),
+                                                ),
+                                              ),
+                                              Text(
+                                                '${formatter.format(projectedStc)} ${account.currency}',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 10.sp,
+                                                  fontWeight:
+                                                      FontWeight.w700,
+                                                  color: projectedStc < 0
+                                                      ? FinDT.danger
+                                                      : (stcAmt > 0
+                                                          ? const Color(
+                                                              0xFF7C3AED)
+                                                          : FinDT.textPrimary),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 16.h),
+
+                      if (isPettyCash) ...[
+                        // Dual Bucket deposit/withdrawal for Petty Cash
+                        Text(
+                          'Specify breakdown for ${isDeposit ? "deposit" : "withdrawal"}:',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                            color: FinDT.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 10.h),
+                        TextFormField(
+                          controller: cashAmountCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d*')),
+                          ],
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: _dialogInputDecoration(
+                            label: 'Cash Amount (${account.currency})',
+                            hint: '0.00',
+                            prefixIcon: Icons.payments_outlined,
+                          ),
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: FinDT.textPrimary,
+                          ),
+                          validator: (v) {
+                            final cash =
+                                double.tryParse(cashAmountCtrl.text) ?? 0.0;
+                            final stc =
+                                double.tryParse(stcAmountCtrl.text) ?? 0.0;
+                            if (cash <= 0 && stc <= 0) {
+                              return 'Enter at least one amount';
+                            }
+                            if (!isDeposit && cash > account.cashBalance) {
+                              return 'Exceeds cash balance (${formatter.format(account.cashBalance)})';
+                            }
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: 12.h),
+                        TextFormField(
+                          controller: stcAmountCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d*')),
+                          ],
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: _dialogInputDecoration(
+                            label: 'STC Pay Amount (${account.currency})',
+                            hint: '0.00',
+                            prefixIcon: Icons.phone_android_outlined,
+                          ),
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: FinDT.textPrimary,
+                          ),
+                          validator: (v) {
+                            final cash =
+                                double.tryParse(cashAmountCtrl.text) ?? 0.0;
+                            final stc =
+                                double.tryParse(stcAmountCtrl.text) ?? 0.0;
+                            if (cash <= 0 && stc <= 0) {
+                              return 'Enter at least one amount';
+                            }
+                            if (!isDeposit && stc > account.stcPayBalance) {
+                              return 'Exceeds STC Pay balance (${formatter.format(account.stcPayBalance)})';
+                            }
+                            return null;
+                          },
+                        ),
+                      ] else ...[
+                        TextFormField(
+                          controller: amountCtrl,
+                          keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                                RegExp(r'^\d*\.?\d*')),
+                          ],
+                          onChanged: (_) => setDialogState(() {}),
+                          decoration: _dialogInputDecoration(
+                            label: 'Amount *',
+                            hint: '0.00',
+                            prefixIcon: Icons.payments_outlined,
+                            suffixText: account.currency,
+                          ),
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: FinDT.textPrimary,
+                          ),
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Required';
+                            final val = double.tryParse(v);
+                            if (val == null || val <= 0) {
+                              return 'Invalid amount';
+                            }
+                            if (!isDeposit && val > account.currentBalance) {
+                              return 'Insufficient balance (${formatter.format(account.currentBalance)})';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                      SizedBox(height: 14.h),
+                      TextFormField(
+                        controller: descCtrl,
+                        decoration: _dialogInputDecoration(
+                          label: 'Description / Purpose *',
+                          hint: isDeposit
+                              ? 'e.g., Seed petty cash fund'
+                              : 'e.g., Return funds to treasury',
+                          prefixIcon: Icons.description_outlined,
+                        ),
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          color: FinDT.textPrimary,
+                        ),
+                        validator: (v) =>
+                            (v == null || v.isEmpty) ? 'Required' : null,
                       ),
                     ],
                   ),
                 ),
-                SizedBox(height: 16.h),
-                TextFormField(
-                  controller: amountCtrl,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                  ],
-                  decoration: _dialogInputDecoration(
-                    label: 'Amount *',
-                    hint: '0.00',
-                    prefixIcon: Icons.payments_outlined,
-                    suffixText: 'SAR',
-                  ),
-                  style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Required';
-                    final val = double.tryParse(v);
-                    if (val == null || val <= 0) return 'Invalid amount';
-                    if (!isDeposit && val > account.currentBalance) {
-                      return 'Insufficient balance';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 14.h),
-                TextFormField(
-                  controller: descCtrl,
-                  decoration: _dialogInputDecoration(
-                    label: 'Description / Purpose *',
-                    hint: 'e.g., Seed petty cash fund',
-                    prefixIcon: Icons.description_outlined,
-                  ),
-                  style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                  validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.inter(color: FinDT.textSecondary),
-            ),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (!formKey.currentState!.validate()) return;
-              final amount = double.parse(amountCtrl.text);
-              final balanceBefore = account.currentBalance;
-              final balanceAfter = isDeposit
-                  ? balanceBefore + amount
-                  : balanceBefore - amount;
-
-              final tx = FundTransactionEntity(
-                id: const Uuid().v4(),
-                fundAccountId: account.id,
-                type: isDeposit
-                    ? FundTransactionType.deposit
-                    : FundTransactionType.withdrawal,
-                amount: amount,
-                currency: account.currency,
-                description: descCtrl.text,
-                performedBy: 'Admin',
-                date: DateTime.now(),
-                createdAt: DateTime.now(),
-                balanceBefore: balanceBefore,
-                balanceAfter: balanceAfter,
-              );
-
-              provider.recordTransaction(tx);
-              Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: isDeposit ? FinDT.success : FinDT.danger,
-              padding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 12.h),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10.r),
               ),
             ),
-            child: Text(
-              isDeposit ? 'Deposit Funds' : 'Withdraw Funds',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
+            actions: [
+              finDialogCancelButton(
+                ctx,
+                onPressed: isSubmitting ? () {} : null,
+              ),
+              finDialogActionButton(
+                onPressed: () async {
+                  if (!formKey.currentState!.validate()) return;
+                  final cashAmt = double.tryParse(cashAmountCtrl.text) ?? 0.0;
+                  final stcAmt = double.tryParse(stcAmountCtrl.text) ?? 0.0;
+                  final totalAmt = isPettyCash
+                      ? (cashAmt + stcAmt)
+                      : (double.tryParse(amountCtrl.text) ?? 0.0);
+
+                  final auth = context.read<AuthProvider>().user;
+                  final actorName = auth?.actorLabel ?? 'Unknown';
+                  final actorId = auth?.id ?? '';
+
+                  setDialogState(() => isSubmitting = true);
+                  try {
+                    await provider.recordMovement(
+                      fundAccountId: account.id,
+                      type: isDeposit
+                          ? FundTransactionType.deposit
+                          : FundTransactionType.withdrawal,
+                      amountMajor: totalAmt,
+                      currency: account.currency,
+                      description: isPettyCash
+                          ? '${descCtrl.text} [Cash: $cashAmt, STC: $stcAmt]'
+                          : descCtrl.text,
+                      performedBy: actorName,
+                      performedByUserId: actorId,
+                      bucket: isPettyCash ? FundBucket.total : FundBucket.total,
+                      cashDelta:
+                          isPettyCash ? (isDeposit ? cashAmt : -cashAmt) : null,
+                      stcPayDelta:
+                          isPettyCash ? (isDeposit ? stcAmt : -stcAmt) : null,
+                    );
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(isDeposit
+                              ? 'Funds deposited successfully'
+                              : 'Funds withdrawn successfully'),
+                          backgroundColor: FinDT.success,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      setDialogState(() => isSubmitting = false);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                            content: Text('$e'),
+                            backgroundColor: FinDT.danger),
+                      );
+                    }
+                  }
+                },
+                label: isDeposit ? 'Deposit Funds' : 'Withdraw Funds',
+                backgroundColor: isDeposit ? FinDT.success : FinDT.danger,
+                isLoading: isSubmitting,
+              ),
+            ],
+          );
+        },
       ),
     );
+    amountCtrl.dispose();
+    cashAmountCtrl.dispose();
+    stcAmountCtrl.dispose();
+    descCtrl.dispose();
   }
 
   void _confirmDeleteAccount(
@@ -1082,28 +3304,45 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     FundAccountProvider provider,
     FundAccountEntity account,
   ) {
-    showDialog(
+    if (account.currentBalanceMinor > 0) {
+      showFinConfirmationDialog(
+        context: context,
+        title: 'Cannot Close Active Account',
+        icon: Icons.account_balance_wallet_outlined,
+        confirmColor: FinDT.brand,
+        message:
+            'Account "${account.name}" holds an active balance of ${account.currentBalance.toStringAsFixed(2)} ${account.currency}.\n\n'
+            'Financial Safety Rule: You cannot close or delete an account with active funds. Please transfer or withdraw all funds to reach 0.00 ${account.currency} first.',
+        confirmLabel: 'Understood',
+      );
+      return;
+    }
+
+    final hasHistory = provider.transactions.isNotEmpty;
+    showFinConfirmationDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Account?'),
-        content: Text(
-          'This will permanently delete ${account.name}. Historical transactions will be preserved in logs.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              provider.deleteAccount(account.id);
-              Navigator.pop(ctx);
-            },
-            style: FilledButton.styleFrom(backgroundColor: FinDT.danger),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+      title: hasHistory ? 'Deactivate Account?' : 'Delete Unused Account?',
+      message: hasHistory
+          ? 'This will deactivate "${account.name}".\n\nAll historical ledger entries, transaction receipts, and accounting audit logs are permanently locked and preserved. The account will simply be hidden from new transaction forms.'
+          : 'This unused account has zero transactions and will be deleted.',
+      confirmLabel: hasHistory ? 'Deactivate Account' : 'Delete Account',
+      confirmColor: FinDT.danger,
+      icon: hasHistory ? Icons.archive_outlined : Icons.delete_outline_rounded,
+      onConfirm: () async {
+        await provider.deleteAccount(account.id);
+        if (context.mounted && provider.error == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                hasHistory
+                    ? 'Account "${account.name}" deactivated. Historical ledger remains safe.'
+                    : 'Account "${account.name}" deleted.',
+              ),
+              backgroundColor: FinDT.brand,
+            ),
+          );
+        }
+      },
     );
   }
 }

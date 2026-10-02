@@ -64,6 +64,9 @@ class RbacManager {
   static bool canManageRoles(UserEntity? user) =>
       hasPermission(user, AppPermission.manageRoles);
 
+  static bool canManageFinance(UserEntity? user) =>
+      hasPermission(user, AppPermission.manageFinance);
+
   /// Whether the user may open a top-level nav item.
   /// [requiredPermission] null means any authenticated user.
   static bool canAccessNav(

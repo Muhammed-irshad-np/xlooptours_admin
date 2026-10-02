@@ -1,17 +1,33 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:image_picker/image_picker.dart';
+import '../entities/cash_advance_entity.dart';
 import '../entities/expense_entity.dart';
-import '../entities/fund_account_entity.dart';
-import '../entities/fund_transaction_entity.dart';
-import '../entities/petty_cash_session_entity.dart';
 import '../entities/expense_category_entity.dart';
+import '../entities/finance_policy_entity.dart';
+import '../entities/fund_account_entity.dart';
+import '../entities/fund_account_type_entity.dart';
+import '../entities/fund_transaction_entity.dart';
+import '../entities/ledger_day_totals.dart';
+import '../entities/petty_cash_session_entity.dart';
+import '../entities/post_fund_request.dart';
+import '../entities/salary_entity.dart';
+import '../entities/session_expense_item.dart';
 
-/// Repository interface for all finance-related data operations.
-///
-/// Covers expenses, fund accounts, fund transactions,
-/// petty cash sessions, and expense categories.
 abstract class FinanceRepository {
-  // ─── Expenses ───────────────────────────────────────────────
   Future<List<ExpenseEntity>> getAllExpenses();
+
+  /// Paginated fetch. Returns a tuple of [expenses, lastDocCursor].
+  /// Pass the cursor from the previous call to get the next page.
+  /// Returns an empty list when no more pages are available.
+  Future<(List<ExpenseEntity>, DocumentSnapshot?)> getExpensesPage({
+    DocumentSnapshot? cursor,
+    int pageSize = 150,
+  });
+
+  /// Expenses committed but not yet posted to a wallet (pending / approved).
+  /// Drives the projected ("if everything is approved") balance.
+  Future<List<ExpenseEntity>> getOutstandingExpenses();
+
   Future<List<ExpenseEntity>> getExpensesByDateRange(
     DateTime start,
     DateTime end,
@@ -23,31 +39,149 @@ abstract class FinanceRepository {
   Future<String> generateReferenceNumber();
   Future<String> uploadReceipt(XFile file, String expenseId);
 
-  // ─── Fund Accounts ──────────────────────────────────────────
+  Future<ExpenseEntity> approveAndPostExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String actorRole,
+    bool allowSelfApprove = false,
+  });
+
+  Future<ExpenseEntity> rejectExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String reason,
+  });
+
+  Future<ExpenseEntity> voidPaidExpense({
+    required String expenseId,
+    required String actorName,
+    required String actorUserId,
+    required String reason,
+  });
+
   Future<List<FundAccountEntity>> getAllFundAccounts();
   Future<void> insertFundAccount(FundAccountEntity account);
   Future<void> updateFundAccount(FundAccountEntity account);
   Future<void> deleteFundAccount(String id);
 
-  // ─── Fund Transactions ──────────────────────────────────────
+  Future<FundTransactionEntity?> getTransactionById(String id);
   Future<List<FundTransactionEntity>> getTransactionsForAccount(
     String accountId,
   );
-  Future<void> insertTransaction(FundTransactionEntity transaction);
+  Future<FundTransactionEntity> postFundMovement(PostFundRequest request);
+  Future<void> transferBetweenAccounts({
+    required String fromAccountId,
+    required String toAccountId,
+    required double amountMajor,
+    required String currency,
+    required String description,
+    required String performedBy,
+    required String performedByUserId,
+    FundBucket fromBucket = FundBucket.total,
+    FundBucket toBucket = FundBucket.total,
+  });
 
-  // ─── Petty Cash Sessions ────────────────────────────────────
-  Future<List<PettyCashSessionEntity>> getPettyCashSessions(
-    String accountId,
-  );
+  /// Rebalances money between Cash and STC Pay buckets within the same
+  /// fund account. The total account balance remains unchanged.
+  Future<void> transferBucket({
+    required String fundAccountId,
+    required double amountMajor,
+    required FundBucket fromBucket,
+    required FundBucket toBucket,
+    required String performedBy,
+    required String? performedByUserId,
+  });
+
+  Future<List<PettyCashSessionEntity>> getPettyCashSessions(String accountId);
   Future<PettyCashSessionEntity?> getOpenSession(String accountId);
   Future<void> openPettyCashSession(PettyCashSessionEntity session);
-  Future<void> closePettyCashSession(PettyCashSessionEntity session);
-  Future<void> verifyPettyCashSession(String sessionId, String verifiedBy);
+  Future<PettyCashSessionEntity> closePettyCashSession({
+    required PettyCashSessionEntity session,
+    required String closedBy,
+    required String? closedByUserId,
+  });
+  Future<void> verifyPettyCashSession({
+    required String sessionId,
+    required String verifiedBy,
+    required String? verifiedByUserId,
+    String? resolutionNotes,
+  });
   Future<String> uploadClosingSheet(XFile file, String sessionId);
+  Future<List<SessionExpenseItem>> getSessionExpenses(PettyCashSessionEntity session);
+  Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt});
+  Future<bool> isDayLocked(String fundAccountId, DateTime day);
 
-  // ─── Expense Categories ─────────────────────────────────────
+  Future<List<CashAdvanceEntity>> getCashAdvances({String? fundAccountId});
+  Future<CashAdvanceEntity> issueCashAdvance(CashAdvanceEntity advance);
+  Future<CashAdvanceEntity> settleCashAdvance({
+    required String advanceId,
+    required double settleAmountMajor,
+    required String actorName,
+    required String actorUserId,
+    required bool returnToFund,
+  });
+
+  Future<CashAdvanceEntity> writeOffCashAdvance({
+    required String advanceId,
+    required String reason,
+    required String actorName,
+    required String actorUserId,
+  });
+
+  Future<List<SalaryStructureEntity>> getSalaryStructures();
+  Future<SalaryStructureEntity> saveSalaryStructure(
+    SalaryStructureEntity structure,
+  );
+  Future<void> deleteSalaryStructure(String employeeId);
+
+  Future<List<SalaryPaymentEntity>> getSalaryPayments({String? period});
+
+  /// Creates a pending salary row for every active salary structure that has
+  /// no row for [period] yet. Safe to rerun.
+  Future<List<SalaryPaymentEntity>> generateSalaryRun({
+    required String period,
+    required String actorName,
+    String? actorUserId,
+  });
+
+  Future<SalaryPaymentEntity> saveSalaryPayment(SalaryPaymentEntity payment);
+
+  /// Pays the net salary, applying the same wallet rules as an expense
+  /// payment, recovering [advanceRecoveries] (advanceId → amount) against the
+  /// employee's cash advances, and mirroring the payment into `expenses`.
+  Future<SalaryPaymentEntity> paySalary({
+    required String paymentId,
+    required String fundAccountId,
+    required String actorName,
+    String? actorUserId,
+    String paymentMethod = 'cash',
+    Map<String, double> advanceRecoveries = const {},
+  });
+
+  Future<void> deleteSalaryPayment(String paymentId);
+
+  Future<SalaryPaymentEntity> voidSalaryPayment({
+    required String paymentId,
+    required String reason,
+    required String actorName,
+    String? actorUserId,
+  });
+
+  Future<FinancePolicyEntity> getFinancePolicy();
+  Future<void> saveFinancePolicy(FinancePolicyEntity policy);
+
   Future<List<ExpenseCategoryEntity>> getExpenseCategories();
   Future<void> insertExpenseCategory(ExpenseCategoryEntity category);
   Future<void> updateExpenseCategory(ExpenseCategoryEntity category);
   Future<void> deleteExpenseCategory(String id);
+
+  Future<List<FundAccountTypeEntity>> getFundAccountTypes();
+  Future<void> insertFundAccountType(FundAccountTypeEntity type);
+  Future<void> updateFundAccountType(FundAccountTypeEntity type);
+  Future<void> deleteFundAccountType(String id);
+
+  /// Development-only tool: wipes test data across all finance collections.
+  Future<void> resetFinanceModuleData();
 }
