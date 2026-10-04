@@ -26,6 +26,7 @@ import '../features/xloop_vault/presentation/providers/vault_provider.dart';
 import '../core/utils/capitalize_first_letter_formatter.dart';
 import '../core/constants/nationalities.dart';
 import '../widgets/searchable_dropdown.dart';
+import '../core/utils/form_validation_helper.dart';
 import '../core/widgets/confirm_save_dialog.dart';
 import '../core/widgets/unsaved_changes_guard.dart';
 
@@ -662,7 +663,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   }
 
   Future<void> _saveEmployee() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!validateAndRevealFirstError(_formKey.currentState!)) return;
     if (!await _confirmConversionToExternal()) return;
 
     // Show confirmation dialog with entered details
