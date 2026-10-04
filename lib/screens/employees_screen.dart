@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
+import '../features/employee/domain/entities/employee_role_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
@@ -79,7 +80,12 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     _isLoading.value = true;
     try {
       if (mounted) {
-        await context.read<EmployeeProvider>().fetchAllEmployees();
+        final provider = context.read<EmployeeProvider>();
+        await Future.wait([
+          provider.fetchAllEmployees(),
+          // Roles only drive the Management/Office tabs; don't fail the list.
+          provider.fetchEmployeeRoles().catchError((_) {}),
+        ]);
       }
       _allEmployees = context.read<EmployeeProvider>().employees;
       _isLoading.value = false;
@@ -121,21 +127,16 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     if (_tabController.index != 0) {
       // 0 is All
       String selectedTab = _tabs[_tabController.index];
-      if (selectedTab == 'Management') {
-        temp = temp
-            .where(
-              (e) => ['CEO', 'COO', 'CFO'].contains(e.position),
-            ) // Simplified logic
-            .toList();
-      } else if (selectedTab == 'Office') {
-        temp = temp
-            .where(
-              (e) => [
-                'Administrative Officer',
-                'Senior Software Developer',
-              ].contains(e.position),
-            )
-            .toList();
+      if (selectedTab == EmployeeRoleCategory.management ||
+          selectedTab == EmployeeRoleCategory.office) {
+        // Grouping comes from each role's group in the Employee Roles master.
+        final positions = context
+            .read<EmployeeProvider>()
+            .roles
+            .where((r) => r.category == selectedTab)
+            .map((r) => r.name)
+            .toSet();
+        temp = temp.where((e) => positions.contains(e.position)).toList();
       } else if (selectedTab == 'Drivers') {
         temp = temp.where((e) => e.isDriver).toList();
       } else if (selectedTab == 'External') {

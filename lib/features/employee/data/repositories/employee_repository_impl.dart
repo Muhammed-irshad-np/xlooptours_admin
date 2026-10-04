@@ -1,9 +1,11 @@
 import 'package:image_picker/image_picker.dart';
 import '../../domain/entities/employee_entity.dart';
+import '../../domain/entities/employee_role_entity.dart';
 import '../../domain/entities/employee_settings_entity.dart';
 import '../../domain/repositories/employee_repository.dart';
 import '../datasources/employee_remote_data_source.dart';
 import '../models/employee_model.dart';
+import '../models/employee_role_model.dart';
 import '../models/employee_settings_model.dart';
 
 class EmployeeRepositoryImpl implements EmployeeRepository {
@@ -60,5 +62,26 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   Future<void> updateEmployeeSettings(EmployeeSettingsEntity settings) async {
     final model = EmployeeSettingsModel.fromEntity(settings);
     await remoteDataSource.updateEmployeeSettings(model);
+  }
+
+  @override
+  Future<List<EmployeeRoleEntity>> getEmployeeRoles() async {
+    return await remoteDataSource.getEmployeeRoles();
+  }
+
+  @override
+  Future<void> saveEmployeeRole(
+    EmployeeRoleEntity role, {
+    String? previousName,
+  }) async {
+    await remoteDataSource.saveEmployeeRole(
+      EmployeeRoleModel.fromEntity(role),
+      previousName: previousName,
+    );
+  }
+
+  @override
+  Future<void> deleteEmployeeRole(String id) async {
+    await remoteDataSource.deleteEmployeeRole(id);
   }
 }

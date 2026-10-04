@@ -24,6 +24,9 @@ import 'features/notifications/presentation/providers/notification_provider.dart
 import 'features/employee/domain/usecases/get_employee_expiry_alerts_usecase.dart';
 import 'features/employee/domain/usecases/get_employee_settings_usecase.dart';
 import 'features/employee/domain/usecases/update_employee_settings_usecase.dart';
+import 'features/employee/domain/usecases/get_employee_roles_usecase.dart';
+import 'features/employee/domain/usecases/save_employee_role_usecase.dart';
+import 'features/employee/domain/usecases/delete_employee_role_usecase.dart';
 
 import 'features/employee/data/datasources/employee_remote_data_source.dart';
 import 'features/employee/data/repositories/employee_repository_impl.dart';
@@ -333,6 +336,9 @@ Future<void> init() async {
       uploadDocumentAttachmentUseCase: sl(),
       getEmployeeSettingsUseCase: sl(),
       updateEmployeeSettingsUseCase: sl(),
+      getEmployeeRolesUseCase: sl(),
+      saveEmployeeRoleUseCase: sl(),
+      deleteEmployeeRoleUseCase: sl(),
     ),
   );
 
@@ -346,6 +352,9 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetEmployeeExpiryAlertsUseCase(sl()));
   sl.registerLazySingleton(() => GetEmployeeSettingsUseCase(sl()));
   sl.registerLazySingleton(() => UpdateEmployeeSettingsUseCase(sl()));
+  sl.registerLazySingleton(() => GetEmployeeRolesUseCase(sl()));
+  sl.registerLazySingleton(() => SaveEmployeeRoleUseCase(sl()));
+  sl.registerLazySingleton(() => DeleteEmployeeRoleUseCase(sl()));
 
   // Repositories
   sl.registerLazySingleton<EmployeeRepository>(
