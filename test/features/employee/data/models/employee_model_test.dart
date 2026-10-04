@@ -135,4 +135,34 @@ void main() {
       expect(model.lastName, isNull);
     });
   });
+
+  group('employeeCode', () {
+    test('round-trips through JSON', () {
+      final model = EmployeeModel.fromJson(
+        baseJson()..['employeeCode'] = 'EMP#X1001',
+      );
+
+      expect(model.employeeCode, 'EMP#X1001');
+      expect(model.toJson()['employeeCode'], 'EMP#X1001');
+    });
+
+    test('is left out of JSON when not yet assigned', () {
+      // update() must never overwrite an existing code with null.
+      final json = EmployeeModel.fromJson(baseJson()).toJson();
+
+      expect(json.containsKey('employeeCode'), isFalse);
+    });
+
+    test('survives fromEntity and copyWith', () {
+      final model = EmployeeModel.fromEntity(
+        EmployeeModel.fromJson(baseJson()).copyWith(employeeCode: 'EMP#X1002'),
+      ).copyWith(fullName: 'Renamed');
+
+      expect(model.employeeCode, 'EMP#X1002');
+    });
+
+    test('formats with the EMP#X prefix', () {
+      expect(EmployeeCode.format(EmployeeCode.firstNumber), 'EMP#X1001');
+    });
+  });
 }

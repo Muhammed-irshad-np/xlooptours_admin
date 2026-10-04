@@ -15,8 +15,26 @@ class EmploymentType {
   const EmploymentType._();
 }
 
+/// Human-readable employee code, e.g. `EMP#X1001`. Numbers come from the
+/// `counters/employee_code` document and are never reused.
+class EmployeeCode {
+  static const String prefix = 'EMP#X';
+
+  /// Number of the first code ever issued.
+  static const int firstNumber = 1001;
+
+  static String format(int number) => '$prefix$number';
+
+  const EmployeeCode._();
+}
+
 class EmployeeEntity extends Equatable {
   final String id;
+
+  /// Unique [EmployeeCode] assigned by the data layer when the employee is
+  /// first saved, and never edited afterwards. Null only until a record saved
+  /// before codes existed has been backfilled.
+  final String? employeeCode;
   final String fullName;
   final String? firstName;
   final String? lastName;
@@ -55,6 +73,7 @@ class EmployeeEntity extends Equatable {
 
   const EmployeeEntity({
     required this.id,
+    this.employeeCode,
     required this.fullName,
     this.firstName,
     this.lastName,
@@ -116,6 +135,7 @@ class EmployeeEntity extends Equatable {
 
   EmployeeEntity copyWith({
     String? id,
+    String? employeeCode,
     String? fullName,
     String? firstName,
     String? lastName,
@@ -159,6 +179,7 @@ class EmployeeEntity extends Equatable {
   }) {
     return EmployeeEntity(
       id: id ?? this.id,
+      employeeCode: employeeCode ?? this.employeeCode,
       fullName: fullName ?? this.fullName,
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
@@ -196,6 +217,7 @@ class EmployeeEntity extends Equatable {
   @override
   List<Object?> get props => [
     id,
+    employeeCode,
     fullName,
     firstName,
     lastName,
