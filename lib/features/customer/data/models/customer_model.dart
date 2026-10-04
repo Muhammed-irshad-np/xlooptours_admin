@@ -4,6 +4,8 @@ class CustomerModel extends CustomerEntity {
   const CustomerModel({
     required super.id,
     required super.name,
+    super.firstName,
+    super.lastName,
     required super.phone,
     super.email,
     super.companyId,
@@ -17,6 +19,8 @@ class CustomerModel extends CustomerEntity {
     return {
       'id': id,
       'name': name,
+      'firstName': firstName,
+      'lastName': lastName,
       'phone': phone,
       'email': email,
       'companyId': companyId,
@@ -41,6 +45,8 @@ class CustomerModel extends CustomerEntity {
     return CustomerModel(
       id: json['id'] as String,
       name: json['name'] as String,
+      firstName: json['firstName'] as String?,
+      lastName: json['lastName'] as String?,
       phone: rawPhone,
       email: json['email'] as String?,
       companyId: json['companyId'] as String?,
@@ -61,6 +67,8 @@ class CustomerModel extends CustomerEntity {
     return CustomerModel(
       id: entity.id,
       name: entity.name,
+      firstName: entity.firstName,
+      lastName: entity.lastName,
       phone: entity.phone,
       email: entity.email,
       companyId: entity.companyId,
@@ -75,6 +83,8 @@ class CustomerModel extends CustomerEntity {
   CustomerModel copyWith({
     String? id,
     String? name,
+    String? firstName,
+    String? lastName,
     String? phone,
     String? email,
     String? companyId,
@@ -86,6 +96,8 @@ class CustomerModel extends CustomerEntity {
     return CustomerModel(
       id: id ?? this.id,
       name: name ?? this.name,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
       phone: phone ?? this.phone,
       companyId: companyId ?? this.companyId,
       companyName: companyName ?? this.companyName,
