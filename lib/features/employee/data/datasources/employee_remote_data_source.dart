@@ -4,6 +4,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/employee_model.dart';
+import '../models/employee_role_model.dart';
 import '../models/employee_settings_model.dart';
 
 abstract class EmployeeRemoteDataSource {
@@ -22,6 +23,12 @@ abstract class EmployeeRemoteDataSource {
   );
   Future<EmployeeSettingsModel> getEmployeeSettings();
   Future<void> updateEmployeeSettings(EmployeeSettingsModel settings);
+
+  /// Roles created from the master (stored in `employee_roles`); the
+  /// built-in [EmployeeRoleEntity.defaults] are not stored.
+  Future<List<EmployeeRoleModel>> getEmployeeRoles();
+  Future<void> saveEmployeeRole(EmployeeRoleModel role, {String? previousName});
+  Future<void> deleteEmployeeRole(String id);
 }
 
 class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
@@ -147,5 +154,45 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
         .collection('Settings')
         .doc('employee_settings')
         .set(settings.toJson(), SetOptions(merge: true));
+  }
+
+  @override
+  Future<List<EmployeeRoleModel>> getEmployeeRoles() async {
+    final snapshot = await firestore
+        .collection('employee_roles')
+        .orderBy('name')
+        .get();
+    return snapshot.docs
+        .map((doc) => EmployeeRoleModel.fromJson(doc.data()..['id'] = doc.id))
+        .toList();
+  }
+
+  @override
+  Future<void> saveEmployeeRole(
+    EmployeeRoleModel role, {
+    String? previousName,
+  }) async {
+    final batch = firestore.batch();
+    batch.set(
+      firestore.collection('employee_roles').doc(role.id),
+      role.toJson(),
+    );
+    // Employees store the role name as their position, so carry a rename
+    // over to everyone holding it.
+    if (previousName != null && previousName != role.name) {
+      final holders = await firestore
+          .collection('employees')
+          .where('position', isEqualTo: previousName)
+          .get();
+      for (final doc in holders.docs) {
+        batch.update(doc.reference, {'position': role.name});
+      }
+    }
+    await batch.commit();
+  }
+
+  @override
+  Future<void> deleteEmployeeRole(String id) async {
+    await firestore.collection('employee_roles').doc(id).delete();
   }
 }

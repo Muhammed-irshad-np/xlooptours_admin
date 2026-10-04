@@ -160,15 +160,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   final ValueNotifier<bool> _isSaving = ValueNotifier(false);
   late final ValueNotifier<String> _primaryCountryCode;
 
-  final List<String> _positions = [
-    'CEO',
-    'COO',
-    'CFO',
-    'Driver',
-    'Senior Software Developer',
-    'Administrative Officer',
-    'Other',
-  ];
+  // Role names from Employee Masters → Employee Roles.
+  final ValueNotifier<List<String>> _positions = ValueNotifier([]);
 
   final List<String> _idTypes = ['Iqama', 'National ID', 'Passport'];
   final List<String> _genders = ['Male', 'Female'];
@@ -205,6 +198,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         ? e!.externalVehicle!.vehicleColor
         : null;
     _loadVehicleMakes();
+    _loadPositions();
     _primaryCountryCode = ValueNotifier(e?.countryCode ?? '+966');
 
     _iqamaNumberController = TextEditingController(
@@ -289,10 +283,10 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _licenseAttachmentUrl.value = e?.drivingLicense?.attachmentUrl;
 
     if (e != null) {
-      if (_positions.contains(e.position)) {
+      // Kept as-is even if the role was since removed from the master, so
+      // saving the form never silently changes someone's position.
+      if (e.position.isNotEmpty) {
         _selectedPosition.value = e.position;
-      } else {
-        _selectedPosition.value = 'Other';
       }
 
       if (_idTypes.contains(e.idType)) {
@@ -341,6 +335,17 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     if (!mounted) return;
     _allVehicleMakes.value = provider.vehicleMakes;
     _updateAvailableVehicleOptions(_selectedVehicleMake.value);
+  }
+
+  Future<void> _loadPositions() async {
+    final provider = context.read<EmployeeProvider>();
+    try {
+      if (provider.roles.isEmpty) await provider.fetchEmployeeRoles();
+    } catch (e) {
+      if (mounted) AppSnackBar.showError(context, 'Error loading roles: $e');
+    }
+    if (!mounted) return;
+    _positions.value = provider.roles.map((r) => r.name).toList();
   }
 
   /// Cascades model/year/color options from the selected make, mirroring the
@@ -402,6 +407,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _availableVehicleColors.dispose();
     _primaryCountryCode.dispose();
     _selectedPosition.dispose();
+    _positions.dispose();
     _selectedIdType.dispose();
     _selectedGender.dispose();
     _employmentType.dispose();
@@ -1030,13 +1036,23 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                       ),
                       SizedBox(width: 16.w),
                       Expanded(
-                        child: ValueListenableBuilder<String>(
-                          valueListenable: _selectedPosition,
-                          builder: (context, selectedPosition, _) {
+                        child: AnimatedBuilder(
+                          animation: Listenable.merge([
+                            _selectedPosition,
+                            _positions,
+                          ]),
+                          builder: (context, _) {
+                            final selectedPosition = _selectedPosition.value;
                             return _buildDropdown(
                               label: 'Position',
                               value: selectedPosition,
-                              items: _positions,
+                              items: [
+                                if (!_positions.value.contains(
+                                  selectedPosition,
+                                ))
+                                  selectedPosition,
+                                ..._positions.value,
+                              ],
                               onChanged: (val) {
                                 _selectedPosition.value = val!;
                               },

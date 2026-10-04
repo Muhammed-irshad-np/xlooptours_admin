@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'employee_expiry_alert_settings_screen.dart';
+import 'employee_role_master_screen.dart';
 
 class EmployeeMasterScreen extends StatelessWidget {
   const EmployeeMasterScreen({super.key});
@@ -15,6 +16,20 @@ class EmployeeMasterScreen extends StatelessWidget {
         mainAxisSpacing: 16.h,
         crossAxisSpacing: 16.w,
         children: [
+          _buildMenuCard(
+            context,
+            title: 'Employee Roles',
+            icon: Icons.badge,
+            color: Colors.indigo,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const EmployeeRoleMasterScreen(),
+                ),
+              );
+            },
+          ),
           _buildMenuCard(
             context,
             title: 'Alert Settings',
