@@ -8,6 +8,8 @@ class EmployeeModel extends EmployeeEntity {
   const EmployeeModel({
     required super.id,
     required super.fullName,
+    super.firstName,
+    super.lastName,
     required super.position,
     required super.email,
     required super.phoneNumber,
@@ -39,6 +41,8 @@ class EmployeeModel extends EmployeeEntity {
     return {
       'id': id,
       'fullName': fullName,
+      'firstName': firstName,
+      'lastName': lastName,
       'position': position,
       'email': email,
       'phoneNumber': phoneNumber,
@@ -138,6 +142,8 @@ class EmployeeModel extends EmployeeEntity {
     return EmployeeModel(
       id: json['id'] as String,
       fullName: json['fullName'] as String,
+      firstName: json['firstName'] as String?,
+      lastName: json['lastName'] as String?,
       position: json['position'] as String,
       email: json['email'] as String? ?? '',
       phoneNumber: json['phoneNumber'] as String? ?? '',
@@ -242,6 +248,8 @@ class EmployeeModel extends EmployeeEntity {
     return EmployeeModel(
       id: entity.id,
       fullName: entity.fullName,
+      firstName: entity.firstName,
+      lastName: entity.lastName,
       position: entity.position,
       email: entity.email,
       phoneNumber: entity.phoneNumber,
@@ -274,6 +282,8 @@ class EmployeeModel extends EmployeeEntity {
   EmployeeModel copyWith({
     String? id,
     String? fullName,
+    String? firstName,
+    String? lastName,
     String? position,
     String? email,
     String? phoneNumber,
@@ -314,6 +324,8 @@ class EmployeeModel extends EmployeeEntity {
     return EmployeeModel(
       id: id ?? this.id,
       fullName: fullName ?? this.fullName,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
       position: position ?? this.position,
       email: email ?? this.email,
       phoneNumber: phoneNumber ?? this.phoneNumber,
