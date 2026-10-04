@@ -6,7 +6,7 @@ abstract class EmployeeRepository {
   Future<List<EmployeeEntity>> getAllEmployees();
   /// Returns the employee code issued to the new record.
   Future<String> insertEmployee(EmployeeEntity employee);
-  Future<int> assignMissingEmployeeCodes();
+  Future<int> ensureEmployeeCodes();
   Future<void> updateEmployee(EmployeeEntity employee);
   Future<void> deleteEmployee(String id);
   Future<String> uploadEmployeeImage(XFile image, String employeeId);

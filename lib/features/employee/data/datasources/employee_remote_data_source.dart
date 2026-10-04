@@ -16,10 +16,10 @@ abstract class EmployeeRemoteDataSource {
   Future<String> insertEmployee(EmployeeModel employee);
 
   /// Issues a code to every employee that has none (records saved before
-  /// codes existed, or by an older app build), oldest join date first.
-  /// Safe to run repeatedly and from several devices at once.
-  /// Returns how many employees were given a code.
-  Future<int> assignMissingEmployeeCodes();
+  /// codes existed, or by an older app build), and renumbers everyone once
+  /// when the numbering order changes. Safe to run repeatedly and from
+  /// several devices at once. Returns how many employees were (re)coded.
+  Future<int> ensureEmployeeCodes();
   Future<void> updateEmployee(EmployeeModel employee);
   Future<void> deleteEmployee(String id);
   Future<String> uploadEmployeeImage(XFile image, String employeeId);
@@ -77,71 +77,82 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     });
   }
 
+  /// Version of the numbering order, kept on the counter doc as `scheme`.
+  /// Scheme 1 went by join date alone, which put leadership (no join date on
+  /// record) mid-list. Raising it renumbers every employee once.
+  static const int _codeScheme = 2;
+
+  /// Leadership takes the first codes, in this order.
+  static const List<String> _leadershipOrder = ['CEO', 'COO', 'CFO'];
+
+  /// Order codes are issued in: [_leadershipOrder] first, then
+  /// longest-serving, then anyone without a join date. Name breaks ties so
+  /// every device agrees.
+  @visibleForTesting
+  static int compareForCodes(
+    Map<String, dynamic> a,
+    Map<String, dynamic> b,
+  ) {
+    int rank(Map<String, dynamic> e) {
+      final index = _leadershipOrder.indexOf(e['position'] as String? ?? '');
+      return index == -1 ? _leadershipOrder.length : index;
+    }
+
+    final byRank = rank(a).compareTo(rank(b));
+    if (byRank != 0) return byRank;
+
+    final da = DateTime.tryParse(a['joinDate'] as String? ?? '');
+    final db = DateTime.tryParse(b['joinDate'] as String? ?? '');
+    if (da != null && db != null && da != db) return da.compareTo(db);
+    if (da != null && db == null) return -1;
+    if (da == null && db != null) return 1;
+
+    final na = (a['fullName'] as String? ?? '').toLowerCase();
+    final nb = (b['fullName'] as String? ?? '').toLowerCase();
+    return na.compareTo(nb);
+  }
+
   @override
-  Future<int> assignMissingEmployeeCodes() async {
+  Future<int> ensureEmployeeCodes() async {
+    final counterBefore = await _codeCounter.get();
     final snapshot = await firestore.collection('employees').get();
+    final scheme = (counterBefore.data()?['scheme'] as num?)?.toInt() ?? 1;
+    final renumber = scheme < _codeScheme;
 
-    // Guards against a missing or reset counter handing out a code that is
-    // already in use.
-    var highestInUse = EmployeeCode.firstNumber - 1;
-    for (final doc in snapshot.docs) {
-      final code = doc.data()['employeeCode'] as String?;
-      final number = code != null && code.startsWith(EmployeeCode.prefix)
-          ? int.tryParse(code.substring(EmployeeCode.prefix.length))
-          : null;
-      if (number != null && number > highestInUse) highestInUse = number;
-    }
-
-    DateTime? joinDateOf(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
-        DateTime.tryParse(doc.data()['joinDate'] as String? ?? '');
-    String nameOf(QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
-        (doc.data()['fullName'] as String? ?? '').toLowerCase();
-
-    // Longest-serving staff get the lowest codes; anyone without a join date
-    // goes last. Name breaks ties so the order is the same on every device.
-    final missing = snapshot.docs
-        .where((doc) => doc.data()['employeeCode'] == null)
+    final docs = snapshot.docs
+        .where((doc) => renumber || doc.data()['employeeCode'] == null)
         .toList()
-      ..sort((a, b) {
-        final da = joinDateOf(a);
-        final db = joinDateOf(b);
-        if (da != null && db != null && da != db) return da.compareTo(db);
-        if (da != null && db == null) return -1;
-        if (da == null && db != null) return 1;
-        return nameOf(a).compareTo(nameOf(b));
-      });
+      ..sort((a, b) => compareForCodes(a.data(), b.data()));
+    if (docs.isEmpty && !renumber) return 0;
+    final refs = docs.map((doc) => doc.reference).toList();
 
-    // A transaction allows at most 500 writes, the counter included.
-    const chunkSize = 400;
-    var assigned = 0;
-    for (var start = 0; start < missing.length; start += chunkSize) {
-      final refs = missing
-          .skip(start)
-          .take(chunkSize)
-          .map((doc) => doc.reference)
-          .toList();
-      assigned += await firestore.runTransaction((txn) async {
-        final counter = await txn.get(_codeCounter);
-        final fresh = await Future.wait(refs.map(txn.get));
-        var last = _lastIssuedNumber(counter);
-        if (last < highestInUse) last = highestInUse;
-        var count = 0;
-        for (final doc in fresh) {
-          // Another device may have coded or deleted it since the query.
-          if (!doc.exists || doc.data()?['employeeCode'] != null) continue;
-          last++;
-          txn.update(doc.reference, {
-            'employeeCode': EmployeeCode.format(last),
-          });
-          count++;
-        }
-        if (count > 0) {
-          txn.set(_codeCounter, {'value': last}, SetOptions(merge: true));
-        }
-        return count;
-      });
-    }
-    return assigned;
+    // One transaction, so a renumber is all-or-nothing. Firestore allows 500
+    // writes per transaction, far more than our headcount.
+    return firestore.runTransaction((txn) async {
+      final counter = await txn.get(_codeCounter);
+      final issued = _lastIssuedNumber(counter);
+      // An employee added since the query holds a number this renumber would
+      // hand out again. Leave it to the next load, which will see them.
+      if (renumber && issued != _lastIssuedNumber(counterBefore)) return 0;
+
+      final fresh = await Future.wait(refs.map(txn.get));
+      var last = renumber ? EmployeeCode.firstNumber - 1 : issued;
+      var count = 0;
+      for (final doc in fresh) {
+        if (!doc.exists) continue;
+        // Another device may have coded it since the query.
+        if (!renumber && doc.data()?['employeeCode'] != null) continue;
+        last++;
+        txn.update(doc.reference, {'employeeCode': EmployeeCode.format(last)});
+        count++;
+      }
+      txn.set(
+        _codeCounter,
+        {'value': last, 'scheme': _codeScheme},
+        SetOptions(merge: true),
+      );
+      return count;
+    });
   }
 
   @override
