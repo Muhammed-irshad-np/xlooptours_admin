@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../domain/entities/employee_entity.dart';
+import '../../domain/usecases/assign_missing_employee_codes_usecase.dart';
 import '../../domain/usecases/delete_employee_usecase.dart';
 import '../../domain/usecases/get_all_employees_usecase.dart';
 import '../../domain/usecases/insert_employee_usecase.dart';
@@ -14,6 +15,7 @@ import '../../domain/entities/employee_settings_entity.dart';
 class EmployeeProvider with ChangeNotifier {
   final GetAllEmployeesUseCase getAllEmployeesUseCase;
   final InsertEmployeeUseCase insertEmployeeUseCase;
+  final AssignMissingEmployeeCodesUseCase assignMissingEmployeeCodesUseCase;
   final UpdateEmployeeUseCase updateEmployeeUseCase;
   final DeleteEmployeeUseCase deleteEmployeeUseCase;
   final UploadEmployeeImageUseCase uploadEmployeeImageUseCase;
@@ -24,6 +26,7 @@ class EmployeeProvider with ChangeNotifier {
   EmployeeProvider({
     required this.getAllEmployeesUseCase,
     required this.insertEmployeeUseCase,
+    required this.assignMissingEmployeeCodesUseCase,
     required this.updateEmployeeUseCase,
     required this.deleteEmployeeUseCase,
     required this.uploadEmployeeImageUseCase,
@@ -48,7 +51,10 @@ class EmployeeProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final fetchedEmployees = await getAllEmployeesUseCase();
+      var fetchedEmployees = await getAllEmployeesUseCase();
+      if (fetchedEmployees.any((e) => e.employeeCode == null)) {
+        fetchedEmployees = await _backfillEmployeeCodes(fetchedEmployees);
+      }
       _employees = List<EmployeeEntity>.from(fetchedEmployees);
     } catch (e) {
       _error = e.toString();
@@ -59,15 +65,33 @@ class EmployeeProvider with ChangeNotifier {
     }
   }
 
-  Future<void> addEmployee(EmployeeEntity employee) async {
+  /// Gives a code to employees saved before codes existed (or by an older app
+  /// build). A failure here must not hide the list, so it falls back to
+  /// [current] and is retried on the next fetch.
+  Future<List<EmployeeEntity>> _backfillEmployeeCodes(
+    List<EmployeeEntity> current,
+  ) async {
+    try {
+      final assigned = await assignMissingEmployeeCodesUseCase();
+      return assigned > 0 ? await getAllEmployeesUseCase() : current;
+    } catch (e) {
+      debugPrint('Error assigning employee codes: $e');
+      return current;
+    }
+  }
+
+  /// Returns the saved employee, carrying its newly issued employee code.
+  Future<EmployeeEntity> addEmployee(EmployeeEntity employee) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await insertEmployeeUseCase(employee);
-      _employees.add(employee);
+      final code = await insertEmployeeUseCase(employee);
+      final saved = employee.copyWith(employeeCode: code);
+      _employees.add(saved);
       _employees.sort((a, b) => a.fullName.compareTo(b.fullName));
+      return saved;
     } catch (e) {
       _error = e.toString();
       debugPrint('Error adding employee: $e');

@@ -852,6 +852,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
       final newEmployee = EmployeeEntity(
         id: id,
+        employeeCode: widget.employee?.employeeCode,
         fullName: _nameController.text.trim(),
         position: _selectedPosition.value,
         // Everything below the minimal external set is deliberately blanked so
@@ -893,13 +894,14 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
       if (mounted) {
         if (widget.employee == null) {
-          await provider.addEmployee(newEmployee);
+          final saved = await provider.addEmployee(newEmployee);
           if (mounted) {
             await ActivityLogger.log(
               context,
               title: 'Employee Added',
-              message: 'Employee ${newEmployee.fullName} has been added.',
-              relatedId: newEmployee.id,
+              message:
+                  'Employee ${saved.fullName} (${saved.employeeCode}) has been added.',
+              relatedId: saved.id,
             );
           }
         } else {
@@ -1013,6 +1015,23 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           ),
                         ),
                       ],
+                    ),
+                  ),
+                  SizedBox(height: 12.h),
+                  // Read-only: the code is issued by the data layer on first
+                  // save and never changes.
+                  Center(
+                    child: Chip(
+                      avatar: Icon(Icons.badge_outlined, size: 18.sp),
+                      label: Text(
+                        widget.employee?.employeeCode ??
+                            'Employee code assigned automatically',
+                        style: TextStyle(
+                          fontWeight: widget.employee?.employeeCode != null
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
                     ),
                   ),
                   SizedBox(height: 24.h),

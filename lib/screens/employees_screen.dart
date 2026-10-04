@@ -109,6 +109,9 @@ class _EmployeesScreenState extends State<EmployeesScreen>
           .where(
             (e) =>
                 e.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                (e.employeeCode ?? '')
+                    .toLowerCase()
+                    .contains(_searchQuery.toLowerCase()) ||
                 e.position.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                 e.phoneNumber.contains(_searchQuery) ||
                 (e.externalVehicle?.plateNumber ?? '')
@@ -293,7 +296,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                   padding: const EdgeInsets.all(16.0),
                   child: TextField(
                     decoration: InputDecoration(
-                      hintText: 'Search employees...',
+                      hintText: 'Search by name, code, phone...',
                       prefixIcon: const Icon(Icons.search),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
@@ -454,6 +457,18 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
+                      if (employee.employeeCode != null) ...[
+                        SizedBox(height: 2.h),
+                        Text(
+                          employee.employeeCode!,
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: Colors.blue,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
                       SizedBox(height: 4.h),
                       Wrap(
                         crossAxisAlignment: WrapCrossAlignment.center,

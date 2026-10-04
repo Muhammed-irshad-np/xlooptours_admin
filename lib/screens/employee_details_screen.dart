@@ -214,6 +214,28 @@ class EmployeeDetailsScreen extends StatelessWidget {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
+                  if (employee.employeeCode != null) ...[
+                    SizedBox(height: 4.h),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.badge_outlined,
+                          size: 16.sp,
+                          color: Colors.blue,
+                        ),
+                        SizedBox(width: 4.w),
+                        SelectableText(
+                          employee.employeeCode!,
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                   SizedBox(height: 4.h),
                   Text(
                     employee.position,

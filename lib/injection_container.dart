@@ -31,6 +31,7 @@ import 'features/employee/domain/repositories/employee_repository.dart';
 import 'features/employee/domain/usecases/delete_employee_usecase.dart';
 import 'features/employee/domain/usecases/get_all_employees_usecase.dart';
 import 'features/employee/domain/usecases/insert_employee_usecase.dart';
+import 'features/employee/domain/usecases/assign_missing_employee_codes_usecase.dart';
 import 'features/employee/domain/usecases/update_employee_usecase.dart';
 import 'features/employee/domain/usecases/upload_document_attachment_usecase.dart';
 import 'features/employee/domain/usecases/upload_employee_image_usecase.dart';
@@ -327,6 +328,7 @@ Future<void> init() async {
     () => EmployeeProvider(
       getAllEmployeesUseCase: sl(),
       insertEmployeeUseCase: sl(),
+      assignMissingEmployeeCodesUseCase: sl(),
       updateEmployeeUseCase: sl(),
       deleteEmployeeUseCase: sl(),
       uploadEmployeeImageUseCase: sl(),
@@ -339,6 +341,7 @@ Future<void> init() async {
   // UseCases
   sl.registerLazySingleton(() => GetAllEmployeesUseCase(sl()));
   sl.registerLazySingleton(() => InsertEmployeeUseCase(sl()));
+  sl.registerLazySingleton(() => AssignMissingEmployeeCodesUseCase(sl()));
   sl.registerLazySingleton(() => UpdateEmployeeUseCase(sl()));
   sl.registerLazySingleton(() => DeleteEmployeeUseCase(sl()));
   sl.registerLazySingleton(() => UploadEmployeeImageUseCase(sl()));
