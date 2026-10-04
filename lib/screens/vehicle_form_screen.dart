@@ -23,6 +23,7 @@ import 'document_viewer_screen.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
 import '../core/widgets/confirm_save_dialog.dart';
+import '../core/widgets/unsaved_changes_guard.dart';
 
 class VehicleFormScreen extends StatefulWidget {
   final VehicleEntity? vehicle;
@@ -35,6 +36,7 @@ class VehicleFormScreen extends StatefulWidget {
 
 class _VehicleFormScreenState extends State<VehicleFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _unsavedChangesKey = GlobalKey<UnsavedChangesGuardState>();
   // Replaced controllers with selected value variables for Dropdowns
   final ValueNotifier<String?> _selectedMake = ValueNotifier(null);
   final ValueNotifier<String?> _selectedModel = ValueNotifier(null);
@@ -187,6 +189,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       if (widget.vehicle != null) {
         _populateFormData();
       }
+      _unsavedChangesKey.currentState?.markClean();
 
       if (mounted) _isLoading.value = false;
     } catch (e) {
@@ -852,8 +855,52 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     }
   }
 
+  /// Everything the user can edit, for the unsaved-changes warning on back.
+  List<Object?> _editableFields() => [
+    _selectedMake,
+    _selectedModel,
+    _selectedYear,
+    _selectedColor,
+    _plateNumberController,
+    _typeController,
+    _selectedImage,
+    _currentImageUrl,
+    _insuranceExpiryDate,
+    _insuranceAttachment,
+    _insuranceAttachmentUrl,
+    _registrationExpiryDate,
+    _isthimaraAttachment,
+    _isthimaraAttachmentUrl,
+    _fahasExpiryDate,
+    _fahasAttachment,
+    _fahasAttachmentUrl,
+    _bahrainInsuranceExpiryDate,
+    _bahrainInsuranceAttachment,
+    _bahrainInsuranceAttachmentUrl,
+    _departmentController,
+    _vinNumberController,
+    _engineNumberController,
+    _gvwrController,
+    _tireSizeController,
+    _purchasePriceController,
+    _purchaseOdometerController,
+    _currentOdometerController,
+    _purchaseDate,
+    _fuelType,
+    _transmission,
+    _status,
+  ];
+
   @override
   Widget build(BuildContext context) {
+    return UnsavedChangesGuard(
+      key: _unsavedChangesKey,
+      fields: _editableFields,
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     final isAdmin = context.watch<AuthProvider>().user?.isAdmin ?? false;
     return Scaffold(
       appBar: ModernAppBar(

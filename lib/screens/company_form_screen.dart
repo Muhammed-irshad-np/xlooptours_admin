@@ -6,6 +6,7 @@ import '../features/company/presentation/providers/company_provider.dart';
 import '../widgets/responsive_layout.dart';
 import '../core/widgets/confirm_save_dialog.dart';
 import '../core/utils/capitalize_first_letter_formatter.dart';
+import '../core/widgets/unsaved_changes_guard.dart';
 
 class CompanyFormScreen extends StatefulWidget {
   final CompanyEntity? company;
@@ -267,8 +268,34 @@ class _CompanyFormScreenState extends State<CompanyFormScreen> {
     _caseCodes.value = _caseCodes.value.where((c) => c != code).toList();
   }
 
+  /// Everything the user can edit, for the unsaved-changes warning on back.
+  List<Object?> _editableFields() => [
+    _companyNameController,
+    _emailController,
+    _countryController,
+    _vatRegisteredInKSA,
+    _taxRegController,
+    _cityController,
+    _streetController,
+    _buildingNumberController,
+    _districtController,
+    _addressAdditionalController,
+    _postalCodeController,
+    _usesCaseCode,
+    _caseCodeLabelController,
+    _newCaseCodeController,
+    _caseCodes,
+  ];
+
   @override
   Widget build(BuildContext context) {
+    return UnsavedChangesGuard(
+      fields: _editableFields,
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.company == null ? 'Add Company' : 'Edit Company'),

@@ -12,6 +12,7 @@ import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
 import '../core/widgets/confirm_save_dialog.dart';
 import '../core/utils/capitalize_first_letter_formatter.dart';
+import '../core/widgets/unsaved_changes_guard.dart';
 
 class CustomerFormScreen extends StatefulWidget {
   final CustomerEntity? customer;
@@ -24,6 +25,7 @@ class CustomerFormScreen extends StatefulWidget {
 
 class _CustomerFormScreenState extends State<CustomerFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _unsavedChangesKey = GlobalKey<UnsavedChangesGuardState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
@@ -127,6 +129,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
             );
           }
         }
+        _unsavedChangesKey.currentState?.markClean();
       }
     } catch (e) {
       debugPrint('Error loading companies: $e');
@@ -319,8 +322,27 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
     }
   }
 
+  /// Everything the user can edit, for the unsaved-changes warning on back.
+  List<Object?> _editableFields() => [
+    _firstNameController,
+    _lastNameController,
+    _countryCode,
+    _phoneController,
+    _selectedCompany.value?.id,
+    _assignedCaseCodes,
+    _newCaseCodeController,
+  ];
+
   @override
   Widget build(BuildContext context) {
+    return UnsavedChangesGuard(
+      key: _unsavedChangesKey,
+      fields: _editableFields,
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.customer == null ? 'Add Customer' : 'Edit Customer'),

@@ -27,6 +27,7 @@ import '../core/utils/capitalize_first_letter_formatter.dart';
 import '../core/constants/nationalities.dart';
 import '../widgets/searchable_dropdown.dart';
 import '../core/widgets/confirm_save_dialog.dart';
+import '../core/widgets/unsaved_changes_guard.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
   // ... (rest of class)
@@ -167,9 +168,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   // document instead of creating a duplicate when the queued write syncs.
   late final String _employeeId = widget.employee?.id ?? const Uuid().v4();
   late final ValueNotifier<String> _primaryCountryCode;
-
-  // What the form held when it opened, to tell whether leaving loses edits.
-  late final List<Object?> _initialFormValues;
 
   final List<String> _positions = [
     'CEO',
@@ -336,10 +334,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _idNumberController.addListener(_syncIqamaNumber);
     _selectedIdType.addListener(_syncIqamaNumber);
 
-    _initialFormValues = _formValues;
   }
 
-  /// Every value the user can edit on this form.
+  /// Every value the user can edit, for the unsaved-changes warning on back.
   List<Object?> get _formValues => [
     _firstNameController.text,
     _lastNameController.text,
@@ -412,37 +409,6 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       c.rechargeExpiry.value,
     ],
   ];
-
-  /// Back navigation (app bar, system back) asks before throwing away edits.
-  /// Saving pops with [Navigator.pop], which PopScope doesn't intercept.
-  Future<void> _onPopInvoked(bool didPop, Object? result) async {
-    if (didPop) return;
-    if (!_isSaving.value && !listEquals(_formValues, _initialFormValues)) {
-      final discard = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Discard changes?'),
-          content: const Text(
-            'You have unsaved employee details. If you leave now, they will '
-            'be lost.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Keep Editing'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
-              child: const Text('Discard'),
-            ),
-          ],
-        ),
-      );
-      if (discard != true) return;
-    }
-    if (mounted) Navigator.pop(context);
-  }
 
   /// While ID Type is Iqama, the Iqama Number mirrors the ID Number so it
   /// isn't typed twice. Once the user enters a different Iqama Number it is
@@ -1111,9 +1077,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: _onPopInvoked,
+    return UnsavedChangesGuard(
+      fields: () => _formValues,
       child: _buildScaffold(context),
     );
   }
