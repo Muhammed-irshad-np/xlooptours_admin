@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../domain/entities/employee_entity.dart';
-import '../../domain/usecases/assign_missing_employee_codes_usecase.dart';
+import '../../domain/usecases/ensure_employee_codes_usecase.dart';
 import '../../domain/usecases/delete_employee_usecase.dart';
 import '../../domain/usecases/get_all_employees_usecase.dart';
 import '../../domain/usecases/insert_employee_usecase.dart';
@@ -19,7 +19,7 @@ import '../../domain/usecases/delete_employee_role_usecase.dart';
 class EmployeeProvider with ChangeNotifier {
   final GetAllEmployeesUseCase getAllEmployeesUseCase;
   final InsertEmployeeUseCase insertEmployeeUseCase;
-  final AssignMissingEmployeeCodesUseCase assignMissingEmployeeCodesUseCase;
+  final EnsureEmployeeCodesUseCase ensureEmployeeCodesUseCase;
   final UpdateEmployeeUseCase updateEmployeeUseCase;
   final DeleteEmployeeUseCase deleteEmployeeUseCase;
   final UploadEmployeeImageUseCase uploadEmployeeImageUseCase;
@@ -33,7 +33,7 @@ class EmployeeProvider with ChangeNotifier {
   EmployeeProvider({
     required this.getAllEmployeesUseCase,
     required this.insertEmployeeUseCase,
-    required this.assignMissingEmployeeCodesUseCase,
+    required this.ensureEmployeeCodesUseCase,
     required this.updateEmployeeUseCase,
     required this.deleteEmployeeUseCase,
     required this.uploadEmployeeImageUseCase,
@@ -51,6 +51,10 @@ class EmployeeProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
 
+  /// Whether employee codes have been checked this session. A renumber (see
+  /// ensureEmployeeCodes) can be due even when every employee has a code.
+  bool _codesChecked = false;
+
   List<EmployeeEntity> get employees => _employees;
   EmployeeSettingsEntity? get settings => _settings;
   List<EmployeeRoleEntity> get roles => _roles;
@@ -64,8 +68,9 @@ class EmployeeProvider with ChangeNotifier {
 
     try {
       var fetchedEmployees = await getAllEmployeesUseCase();
-      if (fetchedEmployees.any((e) => e.employeeCode == null)) {
-        fetchedEmployees = await _backfillEmployeeCodes(fetchedEmployees);
+      if (!_codesChecked ||
+          fetchedEmployees.any((e) => e.employeeCode == null)) {
+        fetchedEmployees = await _ensureEmployeeCodes(fetchedEmployees);
       }
       _employees = List<EmployeeEntity>.from(fetchedEmployees);
     } catch (e) {
@@ -77,14 +82,15 @@ class EmployeeProvider with ChangeNotifier {
     }
   }
 
-  /// Gives a code to employees saved before codes existed (or by an older app
-  /// build). A failure here must not hide the list, so it falls back to
-  /// [current] and is retried on the next fetch.
-  Future<List<EmployeeEntity>> _backfillEmployeeCodes(
+  /// Codes employees saved before codes existed (or by an older app build)
+  /// and applies any pending renumber. A failure here must not hide the list,
+  /// so it falls back to [current] and is retried on the next fetch.
+  Future<List<EmployeeEntity>> _ensureEmployeeCodes(
     List<EmployeeEntity> current,
   ) async {
     try {
-      final assigned = await assignMissingEmployeeCodesUseCase();
+      final assigned = await ensureEmployeeCodesUseCase();
+      _codesChecked = true;
       return assigned > 0 ? await getAllEmployeesUseCase() : current;
     } catch (e) {
       debugPrint('Error assigning employee codes: $e');

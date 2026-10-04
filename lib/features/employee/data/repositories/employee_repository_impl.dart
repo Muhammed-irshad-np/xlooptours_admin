@@ -25,8 +25,8 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   }
 
   @override
-  Future<int> assignMissingEmployeeCodes() async {
-    return await remoteDataSource.assignMissingEmployeeCodes();
+  Future<int> ensureEmployeeCodes() async {
+    return await remoteDataSource.ensureEmployeeCodes();
   }
 
   @override
