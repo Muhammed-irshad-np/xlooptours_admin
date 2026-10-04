@@ -26,7 +26,8 @@ class _VehicleMaintenanceHistoryScreenState
     extends State<VehicleMaintenanceHistoryScreen> {
   String _selectedFilter = 'All'; // 'All', 'Follow-ups', 'Extensions'
   String _selectedShopFilter = 'All Shops';
-  DateTimeRange? _selectedDateRange;
+  DateTime? _fromDate;
+  DateTime? _toDate;
 
   @override
   Widget build(BuildContext context) {
@@ -71,23 +72,18 @@ class _VehicleMaintenanceHistoryScreenState
           }();
 
           final matchesDate = () {
-            if (_selectedDateRange == null) return true;
             final recordDate = DateTime(
               record.date.year,
               record.date.month,
               record.date.day,
             );
-            final start = DateTime(
-              _selectedDateRange!.start.year,
-              _selectedDateRange!.start.month,
-              _selectedDateRange!.start.day,
-            );
-            final end = DateTime(
-              _selectedDateRange!.end.year,
-              _selectedDateRange!.end.month,
-              _selectedDateRange!.end.day,
-            );
-            return !recordDate.isBefore(start) && !recordDate.isAfter(end);
+            if (_fromDate != null && recordDate.isBefore(_fromDate!)) {
+              return false;
+            }
+            if (_toDate != null && recordDate.isAfter(_toDate!)) {
+              return false;
+            }
+            return true;
           }();
 
           return matchesCategory && matchesShop && matchesDate;
@@ -299,109 +295,138 @@ class _VehicleMaintenanceHistoryScreenState
   }
 
   Widget _buildDateRangeFilterRow() {
-    final hasDateFilter = _selectedDateRange != null;
-    final dateFormat = DateFormat('MMM dd, yyyy');
-    final label = hasDateFilter
-        ? '${dateFormat.format(_selectedDateRange!.start)} – ${dateFormat.format(_selectedDateRange!.end)}'
-        : 'All Dates';
-
     return Row(
       children: [
         Expanded(
-          child: InkWell(
-            onTap: () async {
-              final now = DateTime.now();
-              final picked = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(2020),
-                lastDate: now,
-                initialDateRange: _selectedDateRange ??
-                    DateTimeRange(
-                      start: now.subtract(const Duration(days: 30)),
-                      end: now,
-                    ),
-                builder: (context, child) {
-                  return Theme(
-                    data: Theme.of(context).copyWith(
-                      colorScheme: ColorScheme.light(
-                        primary: Colors.blue.shade700,
-                        onPrimary: Colors.white,
-                        surface: Colors.white,
-                        onSurface: Colors.black87,
-                      ),
-                    ),
-                    child: child!,
-                  );
-                },
-              );
-              if (picked != null) {
-                setState(() {
-                  _selectedDateRange = picked;
-                });
-              }
+          child: _buildDateField(
+            hint: 'From',
+            date: _fromDate,
+            onTap: () => _pickFilterDate(isFrom: true),
+            onClear: () {
+              setState(() {
+                _fromDate = null;
+              });
             },
-            borderRadius: BorderRadius.circular(8.r),
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: hasDateFilter
-                    ? Colors.blue.withValues(alpha: 0.08)
-                    : Colors.grey[100],
-                borderRadius: BorderRadius.circular(8.r),
-                border: Border.all(
-                  color: hasDateFilter
-                      ? Colors.blue.shade400
-                      : Colors.grey.shade300,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.date_range,
-                    size: 16.sp,
-                    color: hasDateFilter
-                        ? Colors.blue.shade700
-                        : Colors.grey[600],
-                  ),
-                  SizedBox(width: 8.w),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 11.sp,
-                        color: hasDateFilter
-                            ? Colors.blue.shade800
-                            : Colors.grey[700],
-                        fontWeight: hasDateFilter
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (hasDateFilter)
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          _selectedDateRange = null;
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(12.r),
-                      child: Padding(
-                        padding: EdgeInsets.all(2.w),
-                        child: Icon(
-                          Icons.close,
-                          size: 16.sp,
-                          color: Colors.blue.shade700,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 6.w),
+          child: Text(
+            '–',
+            style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
+          ),
+        ),
+        Expanded(
+          child: _buildDateField(
+            hint: 'To',
+            date: _toDate,
+            onTap: () => _pickFilterDate(isFrom: false),
+            onClear: () {
+              setState(() {
+                _toDate = null;
+              });
+            },
           ),
         ),
       ],
+    );
+  }
+
+  Future<void> _pickFilterDate({required bool isFrom}) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    // From can't be after To, and To can't be before From.
+    final firstDate = isFrom ? DateTime(2020) : (_fromDate ?? DateTime(2020));
+    final lastDate = isFrom ? (_toDate ?? today) : today;
+    var initialDate = (isFrom ? _fromDate : _toDate) ?? lastDate;
+    if (initialDate.isBefore(firstDate)) initialDate = firstDate;
+    if (initialDate.isAfter(lastDate)) initialDate = lastDate;
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: isFrom ? 'Select From Date' : 'Select To Date',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.blue.shade700,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: Colors.black87,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        if (isFrom) {
+          _fromDate = picked;
+        } else {
+          _toDate = picked;
+        }
+      });
+    }
+  }
+
+  Widget _buildDateField({
+    required String hint,
+    required DateTime? date,
+    required VoidCallback onTap,
+    required VoidCallback onClear,
+  }) {
+    final hasDate = date != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          color: hasDate ? Colors.blue.withValues(alpha: 0.08) : Colors.grey[100],
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(
+            color: hasDate ? Colors.blue.shade400 : Colors.grey.shade300,
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                hasDate ? DateFormat('MMM dd, yyyy').format(date) : hint,
+                style: TextStyle(
+                  fontSize: 11.sp,
+                  color: hasDate ? Colors.blue.shade800 : Colors.grey[600],
+                  fontWeight: hasDate ? FontWeight.w600 : FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (hasDate)
+              InkWell(
+                onTap: onClear,
+                borderRadius: BorderRadius.circular(12.r),
+                child: Padding(
+                  padding: EdgeInsets.all(2.w),
+                  child: Icon(
+                    Icons.close,
+                    size: 16.sp,
+                    color: Colors.blue.shade700,
+                  ),
+                ),
+              )
+            else
+              Icon(
+                Icons.calendar_today_outlined,
+                size: 16.sp,
+                color: Colors.grey[600],
+              ),
+          ],
+        ),
+      ),
     );
   }
 
