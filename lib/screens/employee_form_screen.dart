@@ -25,6 +25,7 @@ import '../core/utils/change_diff_helper.dart';
 import '../core/constants/nationalities.dart';
 import '../widgets/searchable_dropdown.dart';
 import '../core/widgets/confirm_save_dialog.dart';
+import '../core/widgets/unsaved_changes_guard.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
   // ... (rest of class)
@@ -939,8 +940,88 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     }
   }
 
+  /// Everything the user can edit, for the unsaved-changes warning on back.
+  List<Object?> _editableFields() => [
+    _nameController,
+    _emailController,
+    _phoneController,
+    _primaryCountryCode,
+    _idNumberController,
+    _nationalityController,
+    _plateNumberController,
+    _selectedVehicleMake,
+    _selectedVehicleModel,
+    _selectedVehicleYear,
+    _selectedVehicleColor,
+    _selectedPosition,
+    _selectedIdType,
+    _selectedGender,
+    _employmentType,
+    _joinDate,
+    _birthDate,
+    _isActive,
+    _currentImageUrl,
+    _pickedImage,
+    _iqamaNumberController,
+    _iqamaExpiryDate,
+    _iqamaAttachment,
+    _iqamaAttachmentUrl,
+    _bahrainResidenceNumberController,
+    _bahrainResidenceExpiryDate,
+    _bahrainResidenceAttachment,
+    _bahrainResidenceAttachmentUrl,
+    _healthInsuranceExpiryDate,
+    _healthInsuranceAttachment,
+    _healthInsuranceAttachmentUrl,
+    _passportNameController,
+    _passportNumberController,
+    _passportExpiryDate,
+    _passportAttachment,
+    _passportAttachmentUrl,
+    _saudiVisaNumberController,
+    _saudiVisaExpiryDate,
+    _selectedSaudiVisaType,
+    _saudiVisaAttachment,
+    _saudiVisaAttachmentUrl,
+    _bahrainVisaNumberController,
+    _bahrainVisaExpiryDate,
+    _selectedBahrainVisaType,
+    _bahrainVisaAttachment,
+    _bahrainVisaAttachmentUrl,
+    _dubaiVisaNumberController,
+    _dubaiVisaExpiryDate,
+    _selectedDubaiVisaType,
+    _dubaiVisaAttachment,
+    _dubaiVisaAttachmentUrl,
+    _qatarVisaNumberController,
+    _qatarVisaExpiryDate,
+    _selectedQatarVisaType,
+    _qatarVisaAttachment,
+    _qatarVisaAttachmentUrl,
+    _licenseCountryController,
+    _licenseNumberController,
+    _licenseExpiryDate,
+    _selectedLicenseType,
+    _licenseAttachment,
+    _licenseAttachmentUrl,
+    for (final c in _contactEntries.value) ...[
+      c.id,
+      c.phoneController,
+      c.labelController,
+      c.countryCode,
+      c.rechargeExpiry,
+    ],
+  ];
+
   @override
   Widget build(BuildContext context) {
+    return UnsavedChangesGuard(
+      fields: _editableFields,
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       appBar: ModernAppBar(
         title: widget.employee == null ? 'Add New Employee' : 'Edit Employee',
