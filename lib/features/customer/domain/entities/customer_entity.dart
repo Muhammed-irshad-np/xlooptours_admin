@@ -3,6 +3,8 @@ import 'package:equatable/equatable.dart';
 class CustomerEntity extends Equatable {
   final String id;
   final String name;
+  final String? firstName;
+  final String? lastName;
   final String phone;
   final String? companyId; // Null if independent
   final String? companyName; // Snapshot for easier display
@@ -14,6 +16,8 @@ class CustomerEntity extends Equatable {
   const CustomerEntity({
     required this.id,
     required this.name,
+    this.firstName,
+    this.lastName,
     required this.phone,
     this.email,
     this.companyId,
@@ -26,6 +30,8 @@ class CustomerEntity extends Equatable {
   CustomerEntity copyWith({
     String? id,
     String? name,
+    String? firstName,
+    String? lastName,
     String? phone,
     String? companyId,
     String? companyName,
@@ -37,6 +43,8 @@ class CustomerEntity extends Equatable {
     return CustomerEntity(
       id: id ?? this.id,
       name: name ?? this.name,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
       phone: phone ?? this.phone,
       companyId: companyId ?? this.companyId,
       companyName: companyName ?? this.companyName,
@@ -51,6 +59,8 @@ class CustomerEntity extends Equatable {
   List<Object?> get props => [
     id,
     name,
+    firstName,
+    lastName,
     phone,
     companyId,
     companyName,

@@ -24,7 +24,8 @@ class CustomerFormScreen extends StatefulWidget {
 
 class _CustomerFormScreenState extends State<CustomerFormScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
 
   // Country Code
@@ -52,7 +53,12 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
     _newCaseCodeController.addListener(_updateCaseCodePreview);
     if (widget.customer != null) {
       final customer = widget.customer!;
-      _nameController.text = customer.name;
+      // Customers saved before the name was split only have name, so
+      // fall back to splitting it at the first space.
+      final nameParts = customer.name.trim().split(RegExp(r'\s+'));
+      _firstNameController.text = customer.firstName ?? nameParts.first;
+      _lastNameController.text =
+          customer.lastName ?? nameParts.skip(1).join(' ');
       
       // Parse phone number to extract country code and actual number
       if (customer.phone.contains(' ')) {
@@ -130,9 +136,14 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
     }
   }
 
+  String get _fullName =>
+      '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+          .trim();
+
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _phoneController.dispose();
     _newCaseCodeController.dispose();
     _searchCaseCodeController.dispose();
@@ -155,7 +166,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
           entries: [
             ConfirmDetailEntry(
               label: 'Name',
-              value: _nameController.text.trim(),
+              value: _fullName,
             ),
             ConfirmDetailEntry(
               label: 'Phone',
@@ -186,7 +197,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
         title: widget.customer == null
             ? 'Confirm Add Customer'
             : 'Confirm Update Customer',
-        entityName: _nameController.text.trim(),
+        entityName: _fullName,
         sections: sections,
       );
       if (confirmed != true) return;
@@ -223,7 +234,9 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
           id:
               widget.customer?.id ??
               DateTime.now().millisecondsSinceEpoch.toString(),
-          name: _nameController.text.trim(),
+          name: _fullName,
+          firstName: _firstNameController.text.trim(),
+          lastName: _lastNameController.text.trim(),
           phone: phoneWithCode,
           companyId: _selectedCompany.value?.id,
           companyName: _selectedCompany.value?.companyName,
@@ -395,18 +408,38 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _nameController,
-              textCapitalization: TextCapitalization.words,
-              inputFormatters: const [CapitalizeFirstLetterFormatter()],
-              decoration: const InputDecoration(
-                labelText: 'Full Name *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.person),
-              ),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Enter full name'
-                  : null,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _firstNameController,
+                    textCapitalization: TextCapitalization.words,
+                    inputFormatters: const [CapitalizeFirstLetterFormatter()],
+                    decoration: const InputDecoration(
+                      labelText: 'First Name *',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    validator: (value) => value == null || value.trim().isEmpty
+                        ? 'Enter first name'
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextFormField(
+                    controller: _lastNameController,
+                    textCapitalization: TextCapitalization.words,
+                    inputFormatters: const [CapitalizeFirstLetterFormatter()],
+                    decoration: const InputDecoration(
+                      labelText: 'Last Name',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             TextFormField(
