@@ -42,7 +42,8 @@ class EmployeeFormScreen extends StatefulWidget {
 class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  late TextEditingController _nameController;
+  late TextEditingController _firstNameController;
+  late TextEditingController _lastNameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   late TextEditingController _idNumberController;
@@ -194,7 +195,15 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   void initState() {
     super.initState();
     final e = widget.employee;
-    _nameController = TextEditingController(text: e?.fullName ?? '');
+    // Employees saved before the name was split only have fullName, so
+    // fall back to splitting it at the first space.
+    final nameParts = (e?.fullName ?? '').trim().split(RegExp(r'\s+'));
+    _firstNameController = TextEditingController(
+      text: e?.firstName ?? nameParts.first,
+    );
+    _lastNameController = TextEditingController(
+      text: e?.lastName ?? nameParts.skip(1).join(' '),
+    );
     _emailController = TextEditingController(text: e?.email ?? '');
     _phoneController = TextEditingController(text: e?.phoneNumber ?? '');
     _idNumberController = TextEditingController(text: e?.idNumber ?? '');
@@ -332,7 +341,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   /// Every value the user can edit on this form.
   List<Object?> get _formValues => [
-    _nameController.text,
+    _firstNameController.text,
+    _lastNameController.text,
     _emailController.text,
     _phoneController.text,
     _idNumberController.text,
@@ -515,9 +525,14 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     );
   }
 
+  String get _fullName =>
+      '${_firstNameController.text.trim()} ${_lastNameController.text.trim()}'
+          .trim();
+
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _idNumberController.dispose();
@@ -690,7 +705,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         title: 'Basic Information',
         icon: Icons.person_outline,
         entries: [
-          ConfirmDetailEntry(label: 'Name', value: _nameController.text.trim()),
+          ConfirmDetailEntry(label: 'Name', value: _fullName),
           ConfirmDetailEntry(label: 'Position', value: _selectedPosition.value),
           ConfirmDetailEntry(
             label: 'Type',
@@ -800,7 +815,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       title: widget.employee == null
           ? 'Confirm Add Employee'
           : 'Confirm Update Employee',
-      entityName: _nameController.text.trim(),
+      entityName: _fullName,
       sections: sections,
     );
     if (confirmed != true) return;
@@ -1001,7 +1016,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
       final newEmployee = EmployeeEntity(
         id: id,
-        fullName: _nameController.text.trim(),
+        fullName: _fullName,
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
         position: _selectedPosition.value,
         // Everything below the minimal external set is deliberately blanked so
         // an Internal → External switch does not leave stale data behind.
@@ -1193,31 +1210,39 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                     children: [
                       Expanded(
                         child: _buildTextField(
-                          controller: _nameController,
-                          label: 'Full Name',
+                          controller: _firstNameController,
+                          label: 'First Name',
                           icon: Icons.person,
                           isName: true,
-                          validator: (v) =>
-                              v!.isEmpty ? 'Please enter full name' : null,
+                          validator: (v) => v!.trim().isEmpty
+                              ? 'Please enter first name'
+                              : null,
                         ),
                       ),
                       SizedBox(width: 16.w),
                       Expanded(
-                        child: ValueListenableBuilder<String>(
-                          valueListenable: _selectedPosition,
-                          builder: (context, selectedPosition, _) {
-                            return _buildDropdown(
-                              label: 'Position',
-                              value: selectedPosition,
-                              items: _positions,
-                              onChanged: (val) {
-                                _selectedPosition.value = val!;
-                              },
-                            );
-                          },
+                        child: _buildTextField(
+                          controller: _lastNameController,
+                          label: 'Last Name',
+                          icon: Icons.person_outline,
+                          isName: true,
                         ),
                       ),
                     ],
+                  ),
+                  SizedBox(height: 16.h),
+                  ValueListenableBuilder<String>(
+                    valueListenable: _selectedPosition,
+                    builder: (context, selectedPosition, _) {
+                      return _buildDropdown(
+                        label: 'Position',
+                        value: selectedPosition,
+                        items: _positions,
+                        onChanged: (val) {
+                          _selectedPosition.value = val!;
+                        },
+                      );
+                    },
                   ),
                   SizedBox(height: 16.h),
                   ValueListenableBuilder<String>(

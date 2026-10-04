@@ -111,4 +111,28 @@ void main() {
       expect(model.isDriver, isFalse);
     });
   });
+
+  group('first and last name', () {
+    test('round-trips through JSON', () {
+      final json = EmployeeModel.fromJson(
+        baseJson()
+          ..['fullName'] = 'Mohammed Ali'
+          ..['firstName'] = 'Mohammed'
+          ..['lastName'] = 'Ali',
+      ).toJson();
+
+      final restored = EmployeeModel.fromJson(json);
+      expect(restored.fullName, 'Mohammed Ali');
+      expect(restored.firstName, 'Mohammed');
+      expect(restored.lastName, 'Ali');
+    });
+
+    test('are null for employees saved before the name was split', () {
+      final model = EmployeeModel.fromJson(baseJson());
+
+      expect(model.fullName, 'Wahid');
+      expect(model.firstName, isNull);
+      expect(model.lastName, isNull);
+    });
+  });
 }

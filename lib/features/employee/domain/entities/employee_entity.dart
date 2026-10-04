@@ -18,6 +18,8 @@ class EmploymentType {
 class EmployeeEntity extends Equatable {
   final String id;
   final String fullName;
+  final String? firstName;
+  final String? lastName;
   final String position;
   final String email;
   final String phoneNumber;
@@ -54,6 +56,8 @@ class EmployeeEntity extends Equatable {
   const EmployeeEntity({
     required this.id,
     required this.fullName,
+    this.firstName,
+    this.lastName,
     required this.position,
     required this.email,
     required this.phoneNumber,
@@ -113,6 +117,8 @@ class EmployeeEntity extends Equatable {
   EmployeeEntity copyWith({
     String? id,
     String? fullName,
+    String? firstName,
+    String? lastName,
     String? position,
     String? email,
     String? phoneNumber,
@@ -154,6 +160,8 @@ class EmployeeEntity extends Equatable {
     return EmployeeEntity(
       id: id ?? this.id,
       fullName: fullName ?? this.fullName,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
       position: position ?? this.position,
       email: email ?? this.email,
       phoneNumber: phoneNumber ?? this.phoneNumber,
@@ -189,6 +197,8 @@ class EmployeeEntity extends Equatable {
   List<Object?> get props => [
     id,
     fullName,
+    firstName,
+    lastName,
     position,
     email,
     phoneNumber,
