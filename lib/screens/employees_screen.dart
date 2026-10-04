@@ -591,7 +591,9 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                 Icon(Icons.phone, size: 14.sp, color: Colors.grey),
                 SizedBox(width: 8.w),
                 Text(
-                  employee.phoneNumber,
+                  employee.phoneNumber.isEmpty
+                      ? ''
+                      : '${employee.countryCode ?? '+966'} ${employee.phoneNumber}',
                   style: TextStyle(fontSize: 13.sp, color: Colors.grey[800]),
                 ),
               ],
