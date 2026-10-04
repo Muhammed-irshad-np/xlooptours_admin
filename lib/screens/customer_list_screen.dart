@@ -146,10 +146,14 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
   Widget build(BuildContext context) {
     return Consumer<CustomerProvider>(
       builder: (context, provider, child) {
-        final filteredCustomers = provider.customers.where((c) {
-          final matchesStatus =
-              _showInactive ? c.status == 'INACTIVE' : c.status == 'ACTIVE';
-          if (!matchesStatus) return false;
+        final matchedCustomers = provider.customers.where((c) {
+          // Searching spans both statuses so an existing inactive customer
+          // can be found and reactivated instead of re-created as a duplicate.
+          if (_searchQuery.isEmpty) {
+            final matchesStatus =
+                _showInactive ? c.status == 'INACTIVE' : c.status == 'ACTIVE';
+            if (!matchesStatus) return false;
+          }
 
           if (_searchQuery.isNotEmpty) {
             final query = _searchQuery.toLowerCase();
@@ -172,6 +176,12 @@ class _CustomerListScreenState extends State<CustomerListScreen> {
 
           return true;
         }).toList();
+
+        // Keep active customers ahead of inactive ones in search results.
+        final filteredCustomers = [
+          ...matchedCustomers.where((c) => c.status == 'ACTIVE'),
+          ...matchedCustomers.where((c) => c.status != 'ACTIVE'),
+        ];
 
         return Scaffold(
           appBar: AppBar(
