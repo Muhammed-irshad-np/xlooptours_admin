@@ -584,10 +584,10 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   Future<void> _selectDate(BuildContext context, bool isJoinDate) async {
     final today = DateUtils.dateOnly(DateTime.now());
-    // Join Date: any past date, never in the future.
+    // Join Date: from 5 years before the current year up to today.
     // Date of Birth: the employee must be 18 to 70 years old today.
     final firstDate = isJoinDate
-        ? DateTime(1950)
+        ? DateTime(today.year - 5)
         : DateTime(today.year - 71, today.month, today.day + 1);
     final lastDate = isJoinDate
         ? today
