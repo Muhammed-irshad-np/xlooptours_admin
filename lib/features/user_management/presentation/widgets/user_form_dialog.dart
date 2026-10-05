@@ -269,6 +269,11 @@ class _UserFormDialogState extends State<UserFormDialog> {
         )
         .toList();
 
+    // Logins are only issued to company employees, so a link is mandatory.
+    // Legacy accounts created before this rule can still be edited unlinked.
+    final employeeRequired = !isEditing ||
+        (widget.userToEdit!.employeeId?.isNotEmpty ?? false);
+
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
       child: Container(
@@ -303,7 +308,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
 
                 // Link to employee
                 Text(
-                  'Link to employee (optional)',
+                  employeeRequired
+                      ? 'Link to employee *'
+                      : 'Link to employee',
                   style: GoogleFonts.notoSans(
                     fontSize: 12.sp,
                     fontWeight: FontWeight.w600,
@@ -317,6 +324,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   isExpanded: true,
                   decoration: InputDecoration(
                     labelText: 'Employee',
+                    hintText: 'Select an employee',
                     prefixIcon: const Icon(Icons.badge_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8.r),
@@ -325,10 +333,11 @@ class _UserFormDialogState extends State<UserFormDialog> {
                         'Photo & name come from the employee. Login email is separate.',
                   ),
                   items: [
-                    const DropdownMenuItem<String?>(
-                      value: null,
-                      child: Text('— Not linked —'),
-                    ),
+                    if (!employeeRequired)
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('— Not linked —'),
+                      ),
                     ...selectableEmployees.map((e) {
                       final label = e.email.isNotEmpty
                           ? '${e.fullName} (${e.position}) · ${e.email}'
@@ -341,6 +350,16 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   ],
                   onChanged: (val) =>
                       _onEmployeeSelected(val, selectableEmployees),
+                  validator: (val) {
+                    if (!employeeRequired || (val != null && val.isNotEmpty)) {
+                      return null;
+                    }
+                    if (!employeeProvider.isLoading &&
+                        selectableEmployees.isEmpty) {
+                      return 'No unlinked employees available. Add the employee first.';
+                    }
+                    return 'Select an employee to link';
+                  },
                 ),
                 if (employeeProvider.isLoading)
                   Padding(
