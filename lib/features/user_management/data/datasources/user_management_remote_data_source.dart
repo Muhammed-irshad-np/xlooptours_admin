@@ -17,6 +17,7 @@ abstract class UserManagementRemoteDataSource {
     required String roleId,
     String? employeeId,
     String? employeeName,
+    String? ownDisplayName,
   });
   Future<void> updateUser(ManagedUserModel user);
   Future<void> toggleUserStatus(String uid, bool isActive);
@@ -164,11 +165,16 @@ class UserManagementRemoteDataSourceImpl
           .toList();
 
       final photoByEmployeeId = <String, String>{};
+      final deletedEmployeeIds = <String>{};
       // Firestore getAll in chunks of 10 via Future.wait individual gets (simple & reliable)
       await Future.wait(
         employeeIds.map((id) async {
           try {
             final snap = await firestore.collection('employees').doc(id).get();
+            if (!snap.exists) {
+              deletedEmployeeIds.add(id);
+              return;
+            }
             final url = snap.data()?['imageUrl'] as String?;
             if (url != null && url.trim().isNotEmpty) {
               photoByEmployeeId[id] = url.trim();
@@ -176,6 +182,23 @@ class UserManagementRemoteDataSourceImpl
           } catch (_) {}
         }),
       );
+
+      // Links left behind by employees deleted before deletion unlinked them.
+      for (final entry in byUid.entries.toList()) {
+        final u = entry.value;
+        if (!deletedEmployeeIds.contains(u.employeeId)) continue;
+        final unlinked = u.copyWithoutEmployee();
+        byUid[entry.key] = unlinked;
+        if (!entry.key.startsWith('legacy_')) {
+          try {
+            await firestore.collection('users').doc(u.uid).update({
+              'employeeId': null,
+              'employeeName': null,
+              'displayName': unlinked.displayName,
+            });
+          } catch (_) {}
+        }
+      }
 
       final list = byUid.values.map((u) {
         final empId = u.employeeId;
@@ -203,6 +226,7 @@ class UserManagementRemoteDataSourceImpl
     required String roleId,
     String? employeeId,
     String? employeeName,
+    String? ownDisplayName,
   }) async {
     try {
       final normalizedEmail = email.trim().toLowerCase();
@@ -280,6 +304,7 @@ class UserManagementRemoteDataSourceImpl
         createdBy: currentUserUid,
         employeeId: employeeId,
         employeeName: employeeName,
+        ownDisplayName: ownDisplayName,
       );
 
       // Single canonical document: users/{uid}
