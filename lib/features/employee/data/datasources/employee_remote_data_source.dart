@@ -174,11 +174,33 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
 
   @override
   Future<void> deleteEmployee(String id) async {
+    await _unlinkLoginAccounts(id);
     await firestore
         .collection('employees')
         .doc(id)
         .delete()
         .withNetworkTimeout();
+  }
+
+  /// A login account outlives its employee: drop the link and restore the
+  /// display name the admin gave the account before it was linked.
+  Future<void> _unlinkLoginAccounts(String employeeId) async {
+    final linked = await firestore
+        .collection('users')
+        .where('employeeId', isEqualTo: employeeId)
+        .get()
+        .withNetworkTimeout();
+    if (linked.docs.isEmpty) return;
+    final batch = firestore.batch();
+    for (final doc in linked.docs) {
+      final ownName = (doc.data()['ownDisplayName'] as String?)?.trim() ?? '';
+      batch.update(doc.reference, {
+        'employeeId': null,
+        'employeeName': null,
+        if (ownName.isNotEmpty) 'displayName': ownName,
+      });
+    }
+    await batch.commit().withNetworkTimeout();
   }
 
   String _getMimeType(String ext) {
@@ -297,7 +319,7 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
         batch.update(doc.reference, {'position': role.name});
       }
     }
-    await batch.commit();
+    await batch.commit().withNetworkTimeout();
   }
 
   @override

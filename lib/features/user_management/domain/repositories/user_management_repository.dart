@@ -12,6 +12,7 @@ abstract class UserManagementRepository {
     required String roleId,
     String? employeeId,
     String? employeeName,
+    String? ownDisplayName,
   });
   Future<Either<Failure, void>> updateUser(ManagedUserEntity user);
   Future<Either<Failure, void>> toggleUserStatus(String uid, bool isActive);

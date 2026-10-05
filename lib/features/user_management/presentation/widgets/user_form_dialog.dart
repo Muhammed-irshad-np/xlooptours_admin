@@ -28,6 +28,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
   late TextEditingController _passwordController;
   String? _selectedRoleId;
   String? _selectedEmployeeId;
+  /// Display name the admin typed, restored when the employee is unlinked.
+  String? _ownName;
   bool _isActive = true;
   bool _obscurePassword = true;
   bool _isSubmitting = false;
@@ -41,6 +43,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
     _passwordController = TextEditingController();
     _selectedRoleId = user?.roleId;
     _selectedEmployeeId = user?.employeeId;
+    _ownName = user?.ownDisplayName ??
+        (user != null && !user.hasEmployeeLink ? user.displayName : null);
     _isActive = user?.isActive ?? true;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -65,7 +69,12 @@ class _UserFormDialogState extends State<UserFormDialog> {
   /// admin can still change the login email before saving.
   void _onEmployeeSelected(String? employeeId, List<EmployeeEntity> employees) {
     setState(() => _selectedEmployeeId = employeeId);
-    if (employeeId == null) return;
+    if (employeeId == null) {
+      // Unlinking drops the employee's name in favour of the admin's own.
+      final own = _ownNameOrNull;
+      if (own != null) _nameController.text = own;
+      return;
+    }
     if (widget.userToEdit != null)
       return; // editing: don't overwrite login email
 
@@ -101,6 +110,11 @@ class _UserFormDialogState extends State<UserFormDialog> {
       if (e.id == _selectedEmployeeId) return e.fullName;
     }
     return widget.userToEdit?.employeeName;
+  }
+
+  String? get _ownNameOrNull {
+    final own = _ownName?.trim() ?? '';
+    return own.isEmpty ? null : own;
   }
 
   Future<void> _submit() async {
@@ -199,6 +213,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
         createdBy: widget.userToEdit!.createdBy,
         employeeId: _selectedEmployeeId,
         employeeName: employeeName,
+        ownDisplayName: _ownNameOrNull,
         photoUrl: photoUrl,
         lastLoginAt: widget.userToEdit!.lastLoginAt,
         lastActiveAt: widget.userToEdit!.lastActiveAt,
@@ -215,6 +230,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
         roleId: RbacManager.normalizeRoleId(_selectedRoleId),
         employeeId: _selectedEmployeeId,
         employeeName: employeeName,
+        ownDisplayName: _ownNameOrNull,
       );
     }
 
@@ -390,6 +406,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   controller: _nameController,
                   textCapitalization: TextCapitalization.words,
                   inputFormatters: const [CapitalizeFirstLetterFormatter()],
+                  onChanged: (val) => _ownName = val,
                   decoration: InputDecoration(
                     labelText: 'Display name',
                     prefixIcon: const Icon(Icons.person_outline),

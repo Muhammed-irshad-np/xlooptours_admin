@@ -16,6 +16,9 @@ class ManagedUserEntity extends Equatable {
   final String? employeeId;
   /// Cached employee display name for lists.
   final String? employeeName;
+  /// Display name the admin typed, kept so it can be restored when the
+  /// employee link (which overwrites [displayName]) is removed.
+  final String? ownDisplayName;
   /// Profile photo from linked employee (`employees.imageUrl`).
   final String? photoUrl;
   /// Last successful sign-in (session start).
@@ -40,6 +43,7 @@ class ManagedUserEntity extends Equatable {
     this.createdBy,
     this.employeeId,
     this.employeeName,
+    this.ownDisplayName,
     this.photoUrl,
     this.lastLoginAt,
     this.lastActiveAt,
@@ -112,6 +116,7 @@ class ManagedUserEntity extends Equatable {
         createdBy,
         employeeId,
         employeeName,
+        ownDisplayName,
         photoUrl,
         lastLoginAt,
         lastActiveAt,
