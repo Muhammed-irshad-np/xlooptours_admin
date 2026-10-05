@@ -41,14 +41,19 @@ import '../features/user_management/presentation/pages/user_management_screen.da
 
 /// The main admin scaffold with a professional, dark-themed sidebar.
 class AdminLayout extends StatefulWidget {
-  const AdminLayout({super.key});
+  /// Slug of the sidebar module to show (from `/home?tab=`), so a page
+  /// refresh keeps the user on the module they were working in.
+  final String? tab;
+
+  const AdminLayout({super.key, this.tab});
 
   @override
   State<AdminLayout> createState() => _AdminLayoutState();
 }
 
 class _AdminLayoutState extends State<AdminLayout> {
-  final ValueNotifier<int> _selectedIndex = ValueNotifier<int>(0);
+  late final ValueNotifier<String?> _selectedTab =
+      ValueNotifier<String?>(widget.tab);
 
   final List<Widget> _screens = [
     const DashboardScreen(),
@@ -772,9 +777,25 @@ class _AdminLayoutState extends State<AdminLayout> {
     return RbacManager.canAccessNav(user, item.requiredPermission);
   }
 
+  /// Falls back to the first module when the tab is missing, unknown, or
+  /// not accessible to the current user's role.
+  int _indexOfTab(List<_NavItem> items, String? tab) {
+    final index = items.indexWhere((item) => item.slug == tab);
+    return index < 0 ? 0 : index;
+  }
+
+  @override
+  void didUpdateWidget(covariant AdminLayout oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // URL changed from outside the sidebar (browser back/forward).
+    if (widget.tab != oldWidget.tab) {
+      _selectedTab.value = widget.tab;
+    }
+  }
+
   @override
   void dispose() {
-    _selectedIndex.dispose();
+    _selectedTab.dispose();
     super.dispose();
   }
 
@@ -804,11 +825,11 @@ class _AdminLayoutState extends State<AdminLayout> {
       body: Row(
         children: [
           // Sidebar
-          ValueListenableBuilder<int>(
-            valueListenable: _selectedIndex,
-            builder: (context, selectedIndex, _) {
+          ValueListenableBuilder<String?>(
+            valueListenable: _selectedTab,
+            builder: (context, selectedTab, _) {
               return _Sidebar(
-                selectedIndex: selectedIndex,
+                selectedIndex: _indexOfTab(allowedNavItems, selectedTab),
                 items: allowedNavItems,
                 sidebarBg: _sidebarBg,
                 brandBlue: _brandBlue,
@@ -817,7 +838,12 @@ class _AdminLayoutState extends State<AdminLayout> {
                 dividerColor: _dividerColor,
                 isAdmin: isAdmin,
                 onItemSelected: (index) {
-                  _selectedIndex.value = index;
+                  final tab = allowedNavItems[index].slug;
+                  _selectedTab.value = tab;
+                  context.go(
+                    Uri(path: '/home', queryParameters: {'tab': tab})
+                        .toString(),
+                  );
                 },
                 onLogout: () async {
                   await context.read<AuthProvider>().logout();
@@ -827,14 +853,11 @@ class _AdminLayoutState extends State<AdminLayout> {
           ),
           // Main content
           Expanded(
-            child: ValueListenableBuilder<int>(
-              valueListenable: _selectedIndex,
-              builder: (context, selectedIndex, _) {
-                // Failsafe in case index is out of bounds due to role changes
-                final index = selectedIndex < allowedScreens.length
-                    ? selectedIndex
-                    : 0;
-                return allowedScreens[index];
+            child: ValueListenableBuilder<String?>(
+              valueListenable: _selectedTab,
+              builder: (context, selectedTab, _) {
+                return allowedScreens[
+                    _indexOfTab(allowedNavItems, selectedTab)];
               },
             ),
           ),
@@ -875,6 +898,10 @@ class _NavItem {
     this.subItems,
     this.requiredPermission,
   });
+
+  /// URL-safe id used in `/home?tab=`, e.g. 'System Settings' → 'system-settings'.
+  String get slug =>
+      label.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-');
 }
 
 class _Sidebar extends StatefulWidget {
