@@ -9,16 +9,14 @@ import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 
+import '../widgets/employee_table.dart';
 import '../widgets/responsive_layout.dart';
-import '../widgets/web_safe_image.dart';
 import 'employee_details_screen.dart';
 import 'employee_form_screen.dart';
 import 'employee_master_screen.dart';
 import 'employee_expiry_tracker_screen.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
-import '../features/notifications/presentation/providers/notification_provider.dart';
-import '../core/widgets/action_items_dialog.dart';
 import '../core/utils/activity_logger.dart';
 
 class EmployeesScreen extends StatefulWidget {
@@ -37,7 +35,8 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   bool _isSuperAdmin = false;
 
   final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(true);
-  final ValueNotifier<bool> _showInactive = ValueNotifier<bool>(false);
+  // 'Active', 'Inactive' or 'All'
+  final ValueNotifier<String> _statusFilter = ValueNotifier<String>('Active');
   final ValueNotifier<List<EmployeeEntity>> _filteredEmployees =
       ValueNotifier<List<EmployeeEntity>>([]);
 
@@ -70,7 +69,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   void dispose() {
     _tabController.dispose();
     _isLoading.dispose();
-    _showInactive.dispose();
+    _statusFilter.dispose();
     _filteredEmployees.dispose();
 
     super.dispose();
@@ -103,10 +102,10 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     List<EmployeeEntity> temp = _allEmployees;
 
     // 1. Filter by Active/Inactive
-    if (_showInactive.value) {
-      temp = temp.where((e) => !e.isActive).toList();
-    } else {
+    if (_statusFilter.value == 'Active') {
       temp = temp.where((e) => e.isActive).toList();
+    } else if (_statusFilter.value == 'Inactive') {
+      temp = temp.where((e) => !e.isActive).toList();
     }
 
     // 2. Filter by Search
@@ -223,30 +222,6 @@ class _EmployeesScreenState extends State<EmployeesScreen>
       appBar: ModernAppBar(
         title: 'Employees',
         actions: [
-          // Filter Toggle
-          Row(
-            children: [
-              Text(
-                'Show Inactive',
-                style: TextStyle(fontSize: 10.sp, color: Colors.grey[600]),
-              ),
-              ValueListenableBuilder<bool>(
-                valueListenable: _showInactive,
-                builder: (context, showInactive, _) {
-                  return Transform.scale(
-                    scale: 0.7,
-                    child: Switch(
-                      value: showInactive,
-                      onChanged: (val) {
-                        _showInactive.value = val;
-                        _filterEmployees();
-                      },
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
           Padding(
             padding: EdgeInsets.symmetric(vertical: 8.h),
             child: TextButton.icon(
@@ -293,23 +268,44 @@ class _EmployeesScreenState extends State<EmployeesScreen>
           : Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search by name, code, phone...',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          decoration: InputDecoration(
+                            hintText: 'Search by name, code, phone...',
+                            prefixIcon: const Icon(Icons.search),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                          ),
+                          onChanged: (val) {
+                            _searchQuery = val;
+                            _filterEmployees();
+                          },
+                        ),
                       ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                    onChanged: (val) {
-                      _searchQuery = val;
-                      _filterEmployees();
-                    },
+                      SizedBox(width: 12.w),
+                      _buildStatusFilter(),
+                      if (!ResponsiveLayout.isMobile(context)) ...[
+                        SizedBox(width: 16.w),
+                        ValueListenableBuilder<List<EmployeeEntity>>(
+                          valueListenable: _filteredEmployees,
+                          builder: (context, filteredEmployees, _) => Text(
+                            '${filteredEmployees.length} employees',
+                            style: TextStyle(
+                              fontSize: 13.sp,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 Expanded(
@@ -345,29 +341,17 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                             );
                           }
 
-                          return ResponsiveLayout(
-                            mobile: ListView.builder(
-                              itemCount: filteredEmployees.length,
-                              padding: const EdgeInsets.all(8),
-                              itemBuilder: (context, index) =>
-                                  _buildEmployeeCard(
-                                    filteredEmployees[index],
-                                  ),
-                            ),
-                            desktop: GridView.builder(
-                              padding: const EdgeInsets.all(16),
-                              gridDelegate:
-                                  SliverGridDelegateWithMaxCrossAxisExtent(
-                                    maxCrossAxisExtent: 430.w,
-                                    childAspectRatio: 1.4,
-                                    crossAxisSpacing: 16,
-                                    mainAxisSpacing: 16,
-                                  ),
-                              itemCount: filteredEmployees.length,
-                              itemBuilder: (context, index) =>
-                                  _buildEmployeeCard(
-                                    filteredEmployees[index],
-                                  ),
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            child: EmployeeTable(
+                              employees: filteredEmployees,
+                              filterKey:
+                                  '$_searchQuery|${_tabController.index}|${_statusFilter.value}',
+                              canDelete: _isSuperAdmin,
+                              onOpen: _showDetails,
+                              onEdit: _navigateToForm,
+                              onDelete: _deleteEmployee,
+                              onToggleStatus: _toggleStatus,
                             ),
                           );
                         },
@@ -384,306 +368,42 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     );
   }
 
-  Widget _buildEmployeeCard(EmployeeEntity employee) {
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 56, // Increased from 40
-                  height: 56, // Increased from 40
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: ClipOval(
-                    child:
-                        (employee.imageUrl != null &&
-                            employee.imageUrl!.isNotEmpty)
-                        ? WebSafeImage(
-                            imageUrl: employee.imageUrl!,
-                            fit: BoxFit.cover,
-                            width: 56,
-                            height: 56,
-                            placeholder: const Center(
-                              child: SizedBox(
-                                width: 24, // Increased slightly
-                                height: 24, // Increased slightly
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            ),
-                            errorWidget: const Icon(
-                              Icons.broken_image,
-                              color: Colors.red,
-                              size: 28,
-                            ), // Increased slightly
-                          )
-                        : Center(
-                            child: Text(
-                              employee.fullName.isNotEmpty
-                                  ? employee.fullName[0].toUpperCase()
-                                  : '?',
-                              style: const TextStyle(
-                                fontSize: 20, // Added larger font size
-                                color: Colors.blue,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                  ),
-                ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        employee.fullName,
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (employee.employeeCode != null) ...[
-                        SizedBox(height: 2.h),
-                        Text(
-                          employee.employeeCode!,
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            color: Colors.blue,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ],
-                      SizedBox(height: 4.h),
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          Text(
-                            employee.position,
-                            style: TextStyle(
-                              fontSize: 14.sp,
-                              color: Colors.grey[600],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          if (employee.isExternal || employee.isDriver) ...[
-                            SizedBox(width: 8.w),
-                            Container(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: 6.w,
-                                vertical: 2.h,
-                              ),
-                              decoration: BoxDecoration(
-                                color: employee.isExternal
-                                    ? Colors.orange.withValues(alpha: 0.1)
-                                    : Colors.green.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(4.r),
-                                border: Border.all(
-                                  color: employee.isExternal
-                                      ? Colors.orange
-                                      : Colors.green,
-                                  width: 0.5,
-                                ),
-                              ),
-                              child: Text(
-                                employee.employmentType,
-                                style: TextStyle(
-                                  fontSize: 10.sp,
-                                  color: employee.isExternal
-                                      ? Colors.orange
-                                      : Colors.green,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(
-                        Icons.remove_red_eye,
-                        color: Colors.blue,
-                      ),
-                      tooltip: 'View Details',
-                      onPressed: () => _showDetails(employee),
-                    ),
-                    Consumer<NotificationProvider>(
-                      builder: (context, provider, _) {
-                        final alerts = provider.getNotificationsByRelatedId(
-                          employee.id,
-                        );
-                        if (alerts.isEmpty) return const SizedBox.shrink();
-
-                        return IconButton(
-                          onPressed:
-                              () => ActionItemsDialog.show(
-                                context,
-                                employee.fullName,
-                                employee.id,
-                              ),
-                          icon: Badge(
-                            label: Text(
-                              alerts.length.toString(),
-                              style: TextStyle(
-                                fontSize: 10.sp,
-                                color: Colors.white,
-                              ),
-                            ),
-                            backgroundColor: Colors.red,
-                            child: Icon(
-                              Icons.warning_amber_rounded,
-                              color: Colors.red,
-                              size: 24.sp,
-                            ),
-                          ),
-                          tooltip: 'Action Items',
-                        );
-                      },
-                    ),
-                    PopupMenuButton<String>(
-                      onSelected: (value) {
-                        if (value == 'edit') {
-                          _navigateToForm(employee);
-                        } else if (value == 'delete') {
-                          _deleteEmployee(employee);
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit, size: 20),
-                              SizedBox(width: 8),
-                              Text('Edit'),
-                            ],
-                          ),
-                        ),
-                        if (_isSuperAdmin)
-                          const PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete, size: 20, color: Colors.red),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Delete',
-                                  style: TextStyle(color: Colors.red),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-            SizedBox(height: 12.h),
-            Row(
-              children: [
-                Icon(Icons.phone, size: 14.sp, color: Colors.grey),
-                SizedBox(width: 8.w),
-                Text(
-                  employee.phoneNumber.isEmpty
-                      ? ''
-                      : '${employee.countryCode ?? '+966'} ${employee.phoneNumber}',
-                  style: TextStyle(fontSize: 13.sp, color: Colors.grey[800]),
-                ),
-              ],
-            ),
-            if (employee.email.isNotEmpty) ...[
-              SizedBox(height: 4.h),
-              Row(
-                children: [
-                  Icon(Icons.email, size: 14.sp, color: Colors.grey),
-                  SizedBox(width: 8.w),
-                  Expanded(
-                    child: Text(
-                      employee.email,
-                      style: TextStyle(
-                        fontSize: 13.sp,
-                        color: Colors.grey[800],
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
+  Widget _buildStatusFilter() {
+    return ValueListenableBuilder<String>(
+      valueListenable: _statusFilter,
+      builder: (context, status, _) {
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.grey.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: status,
+              borderRadius: BorderRadius.circular(12),
+              style: TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[800],
               ),
-            ],
-            if (employee.externalVehicle != null &&
-                !employee.externalVehicle!.isEmpty) ...[
-              SizedBox(height: 4.h),
-              Row(
-                children: [
-                  Icon(
-                    Icons.directions_car,
-                    size: 14.sp,
-                    color: Colors.grey,
-                  ),
-                  SizedBox(width: 8.w),
-                  Expanded(
-                    child: Text(
-                      employee.externalVehicle!.summary,
-                      style: TextStyle(
-                        fontSize: 13.sp,
-                        color: Colors.grey[800],
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-
-            SizedBox(height: 16.h),
-            Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  employee.isActive ? 'Active' : 'Inactive',
-                  style: TextStyle(
-                    color: employee.isActive ? Colors.green : Colors.grey,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12.sp,
-                  ),
-                ),
-                Switch(
-                  value: employee.isActive,
-                  onChanged: (val) => _toggleStatus(employee, val),
-                  activeThumbColor: Colors.white,
-                  activeTrackColor: Colors.green,
-                ),
-              ],
+              selectedItemBuilder: (context) => ['Active', 'Inactive', 'All']
+                  .map(
+                    (s) => Center(child: Text('Status: $s')),
+                  )
+                  .toList(),
+              items: ['Active', 'Inactive', 'All']
+                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                  .toList(),
+              onChanged: (val) {
+                if (val == null) return;
+                _statusFilter.value = val;
+                _filterEmployees();
+              },
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
