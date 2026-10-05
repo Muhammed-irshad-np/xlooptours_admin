@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../core/utils/return_location.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -58,6 +59,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     _isLoading.value = true;
     _errorMessage.value = null;
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
 
     try {
       final success = await context.read<AuthProvider>().login(
@@ -69,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
             context.read<AuthProvider>().errorMessage ??
             'Invalid email or password.';
       } else if (success && mounted) {
-        context.go('/home');
+        context.go(safeReturnLocation(from));
       }
     } catch (e) {
       if (mounted) {
