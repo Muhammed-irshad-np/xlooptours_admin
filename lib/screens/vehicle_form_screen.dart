@@ -24,6 +24,7 @@ import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
 import '../core/widgets/confirm_save_dialog.dart';
 import '../core/widgets/unsaved_changes_guard.dart';
+import '../core/constants/vehicle_types.dart';
 
 class VehicleFormScreen extends StatefulWidget {
   final VehicleEntity? vehicle;
@@ -223,7 +224,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _selectedColor.value = v.color;
 
     _plateNumberController.text = v.plateNumber;
-    _typeController.text = v.type;
+    _typeController.text = normalizeVehicleType(v.type);
     _currentImageUrl.value = v.imageUrl;
 
     _insuranceExpiryDate.value = v.insurance?.expiryDate;
@@ -1010,11 +1011,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                             Expanded(
                               child: Container(
                                 key: _typeFieldKey,
-                                child: _buildTextField(
-                                  'Type (e.g. SUV)',
-                                  _typeController,
-                                  focusNode: _typeFocusNode,
-                                ),
+                                child: _buildTypeDropdown(),
                               ),
                             ),
                           ],
@@ -1539,7 +1536,9 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                               VehicleModelDetailEntity(name: val, type: ''),
                         );
                     if (selectedModelDetail.type.isNotEmpty) {
-                      _typeController.text = selectedModelDetail.type;
+                      _typeController.text = normalizeVehicleType(
+                        selectedModelDetail.type,
+                      );
                     }
                   }
                 },
@@ -1759,6 +1758,31 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     return 'Recorded: $existing km. Weekly readings are validated against this.';
   }
 
+
+  Widget _buildTypeDropdown() {
+    return ValueListenableBuilder<TextEditingValue>(
+      valueListenable: _typeController,
+      builder: (context, typeValue, _) {
+        final val = typeValue.text.trim();
+        return DropdownButtonFormField<String>(
+          // ignore: deprecated_member_use
+          value: val.isEmpty ? null : val,
+          focusNode: _typeFocusNode,
+          decoration: InputDecoration(
+            labelText: 'Type',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8.r),
+            ),
+          ),
+          items: vehicleTypeOptions(val)
+              .map((type) => DropdownMenuItem(value: type, child: Text(type)))
+              .toList(),
+          onChanged: (v) => _typeController.text = v ?? '',
+          validator: (v) => v == null || v.isEmpty ? 'Please select Type' : null,
+        );
+      },
+    );
+  }
 
   Widget _buildFuelTypeDropdown() {
     return ValueListenableBuilder<String?>(

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../features/vehicle/domain/entities/vehicle_make_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
+import '../core/constants/vehicle_types.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 
 class VehicleMakesScreen extends StatefulWidget {
@@ -457,7 +458,7 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
   late final ValueNotifier<List<String>> _colors;
 
   final _modelController = TextEditingController();
-  final _modelTypeController = TextEditingController(); // Added
+  final ValueNotifier<String?> _modelType = ValueNotifier(null);
   final _yearController = TextEditingController();
   final _colorController = TextEditingController();
 
@@ -485,7 +486,7 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
     _nameController.dispose();
     _logoUrlController.dispose();
     _modelController.dispose();
-    _modelTypeController.dispose(); // Added
+    _modelType.dispose();
     _yearController.dispose();
     _colorController.dispose();
     _models.dispose();
@@ -496,7 +497,7 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
 
   void _addModel() {
     final name = _modelController.text.trim();
-    final type = _modelTypeController.text.trim();
+    final type = _modelType.value ?? '';
 
     if (name.isNotEmpty) {
       final exists = _models.value.any(
@@ -512,7 +513,7 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
         );
         _models.value = current;
         _modelController.clear();
-        _modelTypeController.clear();
+        _modelType.value = null;
       }
     }
   }
@@ -787,15 +788,30 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _modelTypeController,
-                      decoration: const InputDecoration(
-                        hintText: 'Type (e.g. SUV)',
-                        isDense: true,
-                        contentPadding: EdgeInsets.all(8),
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) => _addModel(),
+                    child: ValueListenableBuilder<String?>(
+                      valueListenable: _modelType,
+                      builder: (context, val, _) {
+                        return DropdownButtonFormField<String>(
+                          // ignore: deprecated_member_use
+                          value: val,
+                          isDense: true,
+                          decoration: const InputDecoration(
+                            hintText: 'Type (e.g. SUV)',
+                            isDense: true,
+                            contentPadding: EdgeInsets.all(8),
+                            border: OutlineInputBorder(),
+                          ),
+                          items: kVehicleTypes
+                              .map(
+                                (type) => DropdownMenuItem(
+                                  value: type,
+                                  child: Text(type),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (v) => _modelType.value = v,
+                        );
+                      },
                     ),
                   ),
                   IconButton(
