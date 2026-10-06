@@ -6,7 +6,8 @@ class MaintenanceTypeEntity extends Equatable {
   final int suvIntervalKm;
   final int sedanIntervalKm;
 
-  /// Trigger type: 'odometer' (default) or 'date'
+  /// Trigger type: 'odometer' (default), 'date', or 'none' (no alert, e.g.
+  /// Vehicle Puncture)
   final String triggerType;
 
   /// For 'date' trigger type: how many days before due date to alert (default 7)
@@ -22,7 +23,8 @@ class MaintenanceTypeEntity extends Equatable {
   });
 
   bool get isDateTrigger => triggerType == 'date';
-  bool get isOdometerTrigger => triggerType != 'date';
+  bool get isNoAlert => triggerType == 'none';
+  bool get isOdometerTrigger => !isDateTrigger && !isNoAlert;
 
   int get defaultIntervalKm => suvIntervalKm;
 

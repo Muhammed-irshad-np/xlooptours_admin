@@ -74,6 +74,8 @@ class GetVehicleMaintenanceAlertsUseCase {
 
       // For each maintenance type configured, check if service is overdue.
       for (final type in maintenanceTypes) {
+        if (type.isNoAlert) continue;
+
         final key = _normalizeServiceType(type.name);
         final entries = byType[key];
         if (entries == null || entries.isEmpty) continue;

@@ -41,6 +41,7 @@ class VehicleDetailScreen extends StatelessWidget {
     );
 
     final missingTypes = provider.maintenanceTypes.where((type) {
+      if (type.isNoAlert) return false;
       final wasPerformed =
           currentVehicle.maintenanceHistory?.any(
             (record) =>
