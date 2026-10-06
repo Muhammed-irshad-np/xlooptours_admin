@@ -333,6 +333,7 @@ class _MyAppState extends State<MyApp> {
             routerConfig: _router,
             debugShowCheckedModeBanner: false,
             title: 'Xloop Tours Admin',
+            builder: (context, child) => SelectionArea(child: child!),
             theme: ThemeData(
               colorScheme: ColorScheme.fromSeed(
                 seedColor: const Color(0xFF13b1f2),
