@@ -356,7 +356,7 @@ class _MyAppState extends State<MyApp> {
                   body: Center(child: CircularProgressIndicator()),
                 );
               }
-              return child!;
+              return SelectionArea(child: child!);
             },
             debugShowCheckedModeBanner: false,
             title: 'Xloop Tours Admin',
