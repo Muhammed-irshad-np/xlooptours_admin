@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../core/widgets/action_items_dialog.dart';
@@ -42,6 +43,10 @@ class _EmployeeTableState extends State<EmployeeTable> {
   static const List<int> _pageSizes = [10, 20, 50];
   static const double _actionsWidth = 96;
 
+  /// Below this width the Email column is dropped to make room for the
+  /// Iqama and visa columns.
+  static const double _emailMinWidth = 1250;
+
   int _page = 0;
   int _rowsPerPage = 20;
   bool _sortAscending = true;
@@ -78,6 +83,7 @@ class _EmployeeTableState extends State<EmployeeTable> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isWide = constraints.maxWidth >= 800;
+        final showEmail = constraints.maxWidth >= _emailMinWidth;
         return Container(
           decoration: BoxDecoration(
             color: Colors.white,
@@ -88,7 +94,7 @@ class _EmployeeTableState extends State<EmployeeTable> {
           child: Column(
             children: [
               if (isWide) ...[
-                _buildHeader(),
+                _buildHeader(showEmail),
                 Divider(height: 1, color: Colors.grey.withValues(alpha: 0.2)),
               ],
               Expanded(
@@ -99,7 +105,7 @@ class _EmployeeTableState extends State<EmployeeTable> {
                     color: Colors.grey.withValues(alpha: 0.15),
                   ),
                   itemBuilder: (context, index) => isWide
-                      ? _buildWideRow(rows[index])
+                      ? _buildWideRow(rows[index], showEmail)
                       : _buildCompactRow(rows[index]),
                 ),
               ),
@@ -116,13 +122,13 @@ class _EmployeeTableState extends State<EmployeeTable> {
   Widget _cell(int flex, Widget child) {
     return Expanded(
       flex: flex,
-      child: Padding(padding: const EdgeInsets.only(right: 16), child: child),
+      child: Padding(padding: const EdgeInsets.only(right: 12), child: child),
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(bool showEmail) {
     final style = TextStyle(
-      fontSize: 13.sp,
+      fontSize: 12.sp,
       fontWeight: FontWeight.w600,
       color: Colors.grey[700],
     );
@@ -131,7 +137,7 @@ class _EmployeeTableState extends State<EmployeeTable> {
       child: Row(
         children: [
           _cell(
-            3,
+            4,
             Align(
               alignment: Alignment.centerLeft,
               child: InkWell(
@@ -154,9 +160,12 @@ class _EmployeeTableState extends State<EmployeeTable> {
               ),
             ),
           ),
-          _cell(2, Text('Role', style: style)),
-          _cell(2, Text('Phone', style: style)),
-          _cell(3, Text('Email', style: style)),
+          _cell(3, Text('Role', style: style)),
+          _cell(3, Text('Phone', style: style)),
+          _cell(3, Text('Iqama No.', style: style)),
+          _cell(3, Text('Iqama Expiry', style: style)),
+          _cell(3, Text('Saudi Visa Expiry', style: style)),
+          if (showEmail) _cell(4, Text('Email', style: style)),
           _cell(2, Text('Status', style: style)),
           const SizedBox(width: _actionsWidth),
         ],
@@ -164,14 +173,14 @@ class _EmployeeTableState extends State<EmployeeTable> {
     );
   }
 
-  Widget _buildWideRow(EmployeeEntity employee) {
-    final cellStyle = TextStyle(fontSize: 13.sp, color: Colors.grey[800]);
+  Widget _buildWideRow(EmployeeEntity employee, bool showEmail) {
+    final cellStyle = TextStyle(fontSize: 12.sp, color: Colors.grey[800]);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
           _cell(
-            3,
+            4,
             Row(
               children: [
                 _buildAvatar(employee, 36),
@@ -201,9 +210,9 @@ class _EmployeeTableState extends State<EmployeeTable> {
               ],
             ),
           ),
-          _cell(2, _buildRoleCell(employee, cellStyle)),
+          _cell(3, _buildRoleCell(employee, cellStyle)),
           _cell(
-            2,
+            3,
             Text(
               _formatPhone(employee),
               style: cellStyle,
@@ -214,12 +223,24 @@ class _EmployeeTableState extends State<EmployeeTable> {
           _cell(
             3,
             Text(
-              employee.email.isEmpty ? '—' : employee.email,
+              employee.iqama?.number ?? '—',
               style: cellStyle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          _cell(3, _buildExpiry(employee.iqama?.expiryDate, cellStyle)),
+          _cell(3, _buildExpiry(employee.saudiVisa?.expiryDate, cellStyle)),
+          if (showEmail)
+            _cell(
+              4,
+              Text(
+                employee.email.isEmpty ? '—' : employee.email,
+                style: cellStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           _cell(2, _buildStatus(employee)),
           SizedBox(
             width: _actionsWidth,
@@ -243,6 +264,12 @@ class _EmployeeTableState extends State<EmployeeTable> {
       if (employee.isExternal) employee.employmentType,
       _formatPhone(employee),
     ].where((s) => s.isNotEmpty).join(' · ');
+    final iqama = employee.iqama;
+    final visa = employee.saudiVisa;
+    final documents = [
+      if (iqama != null) 'Iqama ${iqama.number} · exp ${_formatDate(iqama.expiryDate)}',
+      if (visa != null) 'Saudi visa exp ${_formatDate(visa.expiryDate)}',
+    ].join(' · ');
     return InkWell(
       onTap: () => widget.onOpen(employee),
       child: Padding(
@@ -266,6 +293,13 @@ class _EmployeeTableState extends State<EmployeeTable> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (documents.isNotEmpty)
+                    Text(
+                      documents,
+                      style: TextStyle(fontSize: 11.sp, color: Colors.grey[600]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   const SizedBox(height: 4),
                   _buildStatus(employee),
                 ],
@@ -365,6 +399,26 @@ class _EmployeeTableState extends State<EmployeeTable> {
     );
   }
 
+  /// Expiry date; red once expired, orange within 30 days.
+  Widget _buildExpiry(DateTime? date, TextStyle style) {
+    if (date == null) return Text('—', style: style);
+    final daysLeft = date.difference(DateTime.now()).inDays;
+    final color = date.isBefore(DateTime.now())
+        ? Colors.red[700]
+        : daysLeft <= 30
+        ? Colors.orange[800]
+        : style.color;
+    return Text(
+      _formatDate(date),
+      style: style.copyWith(
+        color: color,
+        fontWeight: color == style.color ? null : FontWeight.w600,
+      ),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
   Widget _buildStatus(EmployeeEntity employee) {
     final color = employee.isActive ? Colors.green[700]! : Colors.grey;
     return Row(
@@ -376,12 +430,16 @@ class _EmployeeTableState extends State<EmployeeTable> {
           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 6),
-        Text(
-          employee.isActive ? 'Active' : 'Inactive',
-          style: TextStyle(
-            fontSize: 12.sp,
-            color: color,
-            fontWeight: FontWeight.w600,
+        Flexible(
+          child: Text(
+            employee.isActive ? 'Active' : 'Inactive',
+            style: TextStyle(
+              fontSize: 12.sp,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],
@@ -550,6 +608,8 @@ class _EmployeeTableState extends State<EmployeeTable> {
     );
   }
 
+  String _formatDate(DateTime date) => DateFormat('MMM dd, yyyy').format(date);
+
   String _formatPhone(EmployeeEntity employee) {
     if (employee.phoneNumber.isEmpty) return '';
     return '${employee.countryCode ?? '+966'} ${employee.phoneNumber}';
@@ -584,7 +644,7 @@ class _NameLinkState extends State<_NameLink> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontSize: 14.sp,
+            fontSize: 13.sp,
             fontWeight: FontWeight.w600,
             color: color,
             decoration: _hovered
