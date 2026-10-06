@@ -17,7 +17,6 @@ import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'package:provider/provider.dart';
 import '../core/widgets/modern_app_bar.dart';
-import '../core/widgets/modern_tab_bar.dart';
 import 'tafweed_history_view_all_screen.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 
@@ -40,108 +39,64 @@ class EmployeeDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: const ModernAppBar(
-          title: 'Employee Details',
-          bottom: ModernTabBar(
-            tabs: [
-              Tab(text: 'Personal'),
-              Tab(text: 'Documents & IDs'),
-              Tab(text: 'Others'),
-            ],
-          ),
-        ),
-        body: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 800),
-            child: TabBarView(
+    return Scaffold(
+      appBar: const ModernAppBar(title: 'Employee Details'),
+      body: Align(
+        alignment: Alignment.topCenter,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.all(16.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Tab 1: Personal
-                SingleChildScrollView(
-                  padding: EdgeInsets.all(16.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildProfileHeader(),
-                      SizedBox(height: 24.h),
-                      _buildSectionHeader('Personal Information'),
-                      _buildPersonalInfoCard(),
+                _buildProfileHeader(),
+                SizedBox(height: 24.h),
+                _buildSectionHeader('Personal Information'),
+                _buildPersonalInfoCard(),
 
-                      // Fleet authorisation (tafweed) only applies to internal
-                      // staff; an external driver brings their own car.
-                      if (employee.isExternal) ...[
-                        if (employee.isDriver) _buildExternalVehicleCard(),
-                      ] else ...[
-                        _buildAuthorizedVehiclesCard(context),
-                        _buildTafweedHistorySection(context),
-                      ],
-                    ],
-                  ),
-                ),
+                // External staff do not have company documents on file.
+                if (!employee.isExternal) ...[
+                  SizedBox(height: 24.h),
+                  _buildSectionHeader('Documents & IDs'),
+                  _buildDocumentsSection(context),
+                ],
 
-                // Tab 2: Documents & IDs
-                SingleChildScrollView(
-                  padding: EdgeInsets.all(16.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildSectionHeader('Documents & IDs'),
-                      if (employee.isExternal)
-                        Padding(
-                          padding: EdgeInsets.symmetric(vertical: 40.h),
-                          child: Center(
-                            child: Text(
-                              'External staff do not have company documents '
-                              'on file.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 16.sp,
-                                color: Colors.grey,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ),
-                        )
-                      else
-                        _buildDocumentsSection(context),
-                    ],
-                  ),
-                ),
+                SizedBox(height: 24.h),
+                _buildSectionHeader('SIM / Contact Numbers'),
+                if (employee.contacts.isNotEmpty)
+                  ...employee.contacts.map(
+                    (contact) => _buildContactCard(contact),
+                  )
+                else
+                  _buildEmptyCard('No contacts added yet.'),
 
-                // Tab 3: Others (Contacts & Recharge)
-                SingleChildScrollView(
-                  padding: EdgeInsets.all(16.w),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (employee.contacts.isNotEmpty) ...[
-                        _buildSectionHeader('SIM / Contact Numbers'),
-                        ...employee.contacts.map(
-                          (contact) => _buildContactCard(contact),
-                        ),
-                      ] else ...[
-                        Padding(
-                          padding: EdgeInsets.symmetric(vertical: 40.h),
-                          child: Center(
-                            child: Text(
-                              'No contacts added yet.',
-                              style: TextStyle(
-                                fontSize: 16.sp,
-                                color: Colors.grey,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                // Fleet authorisation (tafweed) only applies to internal
+                // staff; an external driver brings their own car.
+                if (employee.isExternal) ...[
+                  if (employee.isDriver) _buildExternalVehicleCard(),
+                ] else ...[
+                  _buildAuthorizedVehiclesCard(context),
+                  _buildTafweedHistorySection(context),
+                ],
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyCard(String message) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+      child: Padding(
+        padding: EdgeInsets.all(20.w),
+        child: Text(
+          message,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
         ),
       ),
     );
@@ -322,38 +277,71 @@ class EmployeeDetailsScreen extends StatelessWidget {
   }
 
   Widget _buildPersonalInfoCard() {
+    final fields = <(String, String, IconData, Color)>[
+      (
+        'Phone',
+        employee.phoneNumber.isEmpty
+            ? ''
+            : '${employee.countryCode ?? '+966'} ${employee.phoneNumber}',
+        Icons.phone,
+        Colors.green,
+      ),
+      ('Nationality', employee.nationality, Icons.flag, Colors.indigo),
+      ('Gender', employee.gender, Icons.person, Colors.pink),
+      if (!employee.isExternal) ...[
+        ('ID Type', employee.idType, Icons.badge, Colors.teal),
+        ('ID Number', employee.idNumber, Icons.numbers, Colors.blueGrey),
+        (
+          'Join Date',
+          _formatDate(employee.joinDate),
+          Icons.calendar_today,
+          Colors.purple,
+        ),
+        (
+          'Birth Date',
+          _formatDate(employee.birthDate),
+          Icons.cake,
+          Colors.orange,
+        ),
+      ],
+    ].where((f) => f.$2.isNotEmpty).toList();
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
       child: Padding(
-        padding: EdgeInsets.all(20.w),
+        padding: EdgeInsets.fromLTRB(20.w, 20.w, 20.w, 4.w),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // Email can be long, so it keeps a full row.
             if (!employee.isExternal)
-              _buildDetailRow('Email', employee.email, Icons.email),
-            _buildDetailRow(
-              'Phone',
-              employee.phoneNumber.isEmpty
-                  ? ''
-                  : '${employee.countryCode ?? '+966'} ${employee.phoneNumber}',
-              Icons.phone,
+              _buildDetailRow(
+                'Email',
+                employee.email,
+                Icons.email,
+                color: Colors.red,
+              ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                // Two short fields per line, unless the screen is too narrow.
+                final columns = constraints.maxWidth >= 360 ? 2 : 1;
+                final spacing = 16.w;
+                final itemWidth =
+                    (constraints.maxWidth - spacing * (columns - 1)) / columns;
+                return Wrap(
+                  spacing: spacing,
+                  children: fields
+                      .map(
+                        (f) => SizedBox(
+                          width: itemWidth,
+                          child: _buildDetailRow(f.$1, f.$2, f.$3, color: f.$4),
+                        ),
+                      )
+                      .toList(),
+                );
+              },
             ),
-            _buildDetailRow('Nationality', employee.nationality, Icons.flag),
-            _buildDetailRow('Gender', employee.gender, Icons.person),
-            if (!employee.isExternal) ...[
-              _buildDetailRow('ID Type', employee.idType, Icons.badge),
-              _buildDetailRow('ID Number', employee.idNumber, Icons.numbers),
-              _buildDetailRow(
-                'Join Date',
-                _formatDate(employee.joinDate),
-                Icons.calendar_today,
-              ),
-              _buildDetailRow(
-                'Birth Date',
-                _formatDate(employee.birthDate),
-                Icons.cake,
-              ),
-            ],
           ],
         ),
       ),
@@ -389,16 +377,19 @@ class EmployeeDetailsScreen extends StatelessWidget {
                         'Vehicle',
                         vehicle.vehicleDescription,
                         Icons.directions_car,
+                        color: Colors.blue,
                       ),
                       _buildDetailRow(
                         'Vehicle Color',
                         vehicle.vehicleColor,
                         Icons.palette,
+                        color: Colors.deepPurple,
                       ),
                       _buildDetailRow(
                         'Car Plate No',
                         vehicle.plateNumber,
                         Icons.confirmation_number,
+                        color: Colors.brown,
                       ),
                     ],
                   ),
@@ -644,6 +635,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
                     'Recharge Expiry',
                     _formatDate(contact.rechargeExpiryDate),
                     isExpired ? Icons.warning : Icons.event,
+                    color: isExpired ? Colors.red : Colors.orange,
                   ),
                 ),
                 Expanded(
@@ -653,6 +645,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
                         ? contact.rechargeCost!.toStringAsFixed(2)
                         : 'N/A',
                     Icons.attach_money,
+                    color: Colors.green,
                   ),
                 ),
               ],
@@ -671,6 +664,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             context,
             title: 'Iqama',
             icon: Icons.badge,
+            color: Colors.teal,
             number: employee.iqama!.number,
             expiryDate: employee.iqama!.expiryDate,
             attachmentUrl: employee.iqama!.attachmentUrl,
@@ -681,6 +675,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             context,
             title: 'Bahrain Residence ID',
             icon: Icons.badge,
+            color: Colors.red,
             number: employee.bahrainResidence!.number,
             expiryDate: employee.bahrainResidence!.expiryDate,
             attachmentUrl: employee.bahrainResidence!.attachmentUrl,
@@ -691,6 +686,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             context,
             title: 'Passport',
             icon: Icons.book,
+            color: Colors.indigo,
             number: employee.passport!.number,
             expiryDate: employee.passport!.expiryDate,
             attachmentUrl: employee.passport!.attachmentUrl,
@@ -702,6 +698,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
             context,
             title: 'Driving License',
             icon: Icons.drive_eta,
+            color: Colors.blue,
             number: employee.drivingLicense!.number,
             expiryDate: employee.drivingLicense!.expiryDate,
             attachmentUrl: employee.drivingLicense!.attachmentUrl,
@@ -710,18 +707,39 @@ class EmployeeDetailsScreen extends StatelessWidget {
             notificationDays: null,
           ),
         if (employee.saudiVisa != null)
-          _buildVisaCard(context, 'Saudi Visa', employee.saudiVisa!),
+          _buildVisaCard(
+            context,
+            'Saudi Visa',
+            employee.saudiVisa!,
+            color: Colors.green,
+          ),
         if (employee.bahrainVisa != null)
-          _buildVisaCard(context, 'Bahrain Visa', employee.bahrainVisa!),
+          _buildVisaCard(
+            context,
+            'Bahrain Visa',
+            employee.bahrainVisa!,
+            color: Colors.redAccent,
+          ),
         if (employee.dubaiVisa != null)
-          _buildVisaCard(context, 'Dubai Visa', employee.dubaiVisa!),
+          _buildVisaCard(
+            context,
+            'Dubai Visa',
+            employee.dubaiVisa!,
+            color: Colors.amber.shade800,
+          ),
         if (employee.qatarVisa != null)
-          _buildVisaCard(context, 'Qatar Visa', employee.qatarVisa!),
+          _buildVisaCard(
+            context,
+            'Qatar Visa',
+            employee.qatarVisa!,
+            color: Colors.purple,
+          ),
         if (employee.healthInsurance != null)
           _buildDocumentCard(
             context,
             title: 'Health Insurance',
             icon: Icons.health_and_safety,
+            color: Colors.pink,
             number: 'N/A',
             expiryDate: employee.healthInsurance!.expiryDate,
             attachmentUrl: employee.healthInsurance!.attachmentUrl,
@@ -732,24 +750,14 @@ class EmployeeDetailsScreen extends StatelessWidget {
             context,
             title: 'Authorization',
             icon: Icons.security,
+            color: Colors.deepPurple,
             number: 'N/A',
             expiryDate: employee.authorization!.expiryDate,
             attachmentUrl: employee.authorization!.attachmentUrl,
             notificationDays: null,
           ),
         if (_hasNoDocuments())
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: 24.h),
-            child: Text(
-              'No documents uploaded for this employee.',
-              style: TextStyle(
-                color: Colors.grey,
-                fontStyle: FontStyle.italic,
-                fontSize: 16.sp,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
+          _buildEmptyCard('No documents uploaded for this employee.'),
       ],
     );
   }
@@ -767,11 +775,17 @@ class EmployeeDetailsScreen extends StatelessWidget {
         employee.authorization == null;
   }
 
-  Widget _buildVisaCard(BuildContext context, String title, VisaDocument visa) {
+  Widget _buildVisaCard(
+    BuildContext context,
+    String title,
+    VisaDocument visa, {
+    required Color color,
+  }) {
     return _buildDocumentCard(
       context,
       title: title,
       icon: Icons.airplane_ticket,
+      color: color,
       number: visa.number,
       expiryDate: visa.expiryDate,
       attachmentUrl: visa.attachmentUrl,
@@ -785,6 +799,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
     BuildContext context, {
     required String title,
     required IconData icon,
+    Color color = Colors.blue,
     required String number,
     required DateTime expiryDate,
     String? attachmentUrl,
@@ -808,7 +823,14 @@ class EmployeeDetailsScreen extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: Colors.blue[700], size: 28.sp),
+                Container(
+                  padding: EdgeInsets.all(8.w),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                  child: Icon(icon, color: color, size: 24.sp),
+                ),
                 SizedBox(width: 16.w),
                 Expanded(
                   child: Column(
@@ -869,8 +891,10 @@ class EmployeeDetailsScreen extends StatelessWidget {
               SizedBox(height: 12.h),
               Align(
                 alignment: Alignment.centerRight,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                child: Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 4.w,
                   children: [
                     IconButton(
                       icon: const Icon(Icons.share),
@@ -900,7 +924,6 @@ class EmployeeDetailsScreen extends StatelessWidget {
                         );
                       },
                     ),
-                    SizedBox(height: 4.h),
                     TextButton.icon(
                       onPressed: () => _launchUrl(attachmentUrl),
                       icon: const Icon(Icons.download),
@@ -923,7 +946,12 @@ class EmployeeDetailsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildDetailRow(String label, String value, IconData icon) {
+  Widget _buildDetailRow(
+    String label,
+    String value,
+    IconData icon, {
+    Color color = Colors.blue,
+  }) {
     if (value.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: EdgeInsets.only(bottom: 16.h),
@@ -933,10 +961,10 @@ class EmployeeDetailsScreen extends StatelessWidget {
           Container(
             padding: EdgeInsets.all(8.w),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8.r),
             ),
-            child: Icon(icon, size: 20.sp, color: Colors.blue[700]),
+            child: Icon(icon, size: 20.sp, color: color),
           ),
           SizedBox(width: 16.w),
           Expanded(
