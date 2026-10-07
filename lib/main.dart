@@ -37,6 +37,7 @@ import 'screens/invoice_form_screen.dart';
 import 'screens/pdf_preview_screen.dart';
 import 'features/invoice/domain/entities/invoice_entity.dart';
 import 'screens/admin_layout.dart';
+import 'core/widgets/app_selection_area.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'features/company/domain/entities/company_entity.dart';
 import 'screens/public/registration_screen.dart';
@@ -356,7 +357,7 @@ class _MyAppState extends State<MyApp> {
                   body: Center(child: CircularProgressIndicator()),
                 );
               }
-              return SelectionArea(child: child!);
+              return AppSelectionArea(child: child!);
             },
             debugShowCheckedModeBanner: false,
             title: 'Xloop Tours Admin',
