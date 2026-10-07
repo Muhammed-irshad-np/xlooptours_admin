@@ -72,6 +72,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   final ValueNotifier<DateTime?> _joinDate = ValueNotifier(null);
   final ValueNotifier<DateTime?> _birthDate = ValueNotifier(null);
   final ValueNotifier<bool> _isActive = ValueNotifier(true);
+  final ValueNotifier<bool> _isResigned = ValueNotifier(false);
+  final ValueNotifier<DateTime?> _resignationDate = ValueNotifier(null);
   final ValueNotifier<String?> _currentImageUrl = ValueNotifier(null);
   final ValueNotifier<XFile?> _pickedImage = ValueNotifier(null);
   final ImagePicker _picker = ImagePicker();
@@ -310,6 +312,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       _joinDate.value = e.joinDate;
       _birthDate.value = e.birthDate;
       _isActive.value = e.isActive;
+      _isResigned.value = e.isResigned;
+      _resignationDate.value = e.resignationDate;
       _currentImageUrl.value = e.imageUrl;
     }
 
@@ -408,6 +412,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _joinDate.dispose();
     _birthDate.dispose();
     _isActive.dispose();
+    _isResigned.dispose();
+    _resignationDate.dispose();
     _currentImageUrl.dispose();
     _pickedImage.dispose();
 
@@ -466,6 +472,27 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       } else {
         _birthDate.value = picked;
       }
+    }
+  }
+
+  Future<void> _selectResignationDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _resignationDate.value ?? DateTime.now(),
+      firstDate: DateTime(1950),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) {
+      _resignationDate.value = picked;
+    }
+  }
+
+  /// Resigning always makes the employee inactive.
+  void _setResigned(bool resigned) {
+    _isResigned.value = resigned;
+    if (resigned) {
+      _isActive.value = false;
+      _resignationDate.value ??= DateTime.now();
     }
   }
 
@@ -533,6 +560,10 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
   Future<void> _saveEmployee() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_isResigned.value && _resignationDate.value == null) {
+      AppSnackBar.showError(context, 'Please select the resignation date');
+      return;
+    }
     if (!await _confirmConversionToExternal()) return;
 
     // Show confirmation dialog with entered details
@@ -578,8 +609,15 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
           ),
           ConfirmDetailEntry(
             label: 'Status',
-            value: _isActive.value ? 'Active' : 'Inactive',
+            value: _isResigned.value
+                ? 'Resigned'
+                : (_isActive.value ? 'Active' : 'Inactive'),
           ),
+          if (_isResigned.value)
+            ConfirmDetailEntry(
+              label: 'Resignation Date',
+              value: formatDateForConfirmation(_resignationDate.value),
+            ),
         ],
       ),
       if (!_isExternal)
@@ -875,7 +913,9 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 plateNumber: _plateNumberController.text.trim(),
               )
             : null,
-        isActive: _isActive.value,
+        isActive: _isResigned.value ? false : _isActive.value,
+        isResigned: _isResigned.value,
+        resignationDate: _isResigned.value ? _resignationDate.value : null,
         imageUrl: imageUrl,
         iqama: iqama,
         bahrainResidence: bahrainResidence,
@@ -1097,16 +1137,49 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
                   SizedBox(height: 24.h),
                   Divider(),
-                  ValueListenableBuilder<bool>(
-                    valueListenable: _isActive,
-                    builder: (context, isActive, _) {
-                      return SwitchListTile(
-                        title: const Text('Active Employee'),
-                        subtitle: const Text(
-                          'Is this employee currently working?',
-                        ),
-                        value: isActive,
-                        onChanged: (val) => _isActive.value = val,
+                  AnimatedBuilder(
+                    animation: Listenable.merge([
+                      _isActive,
+                      _isResigned,
+                      _resignationDate,
+                    ]),
+                    builder: (context, _) {
+                      final isResigned = _isResigned.value;
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SwitchListTile(
+                            title: const Text('Active Employee'),
+                            subtitle: Text(
+                              isResigned
+                                  ? 'Resigned employees are always inactive'
+                                  : 'Is this employee currently working?',
+                            ),
+                            value: _isActive.value,
+                            onChanged: isResigned
+                                ? null
+                                : (val) => _isActive.value = val,
+                          ),
+                          SwitchListTile(
+                            title: const Text('Resigned'),
+                            subtitle: const Text(
+                              'Has this employee resigned?',
+                            ),
+                            value: isResigned,
+                            activeTrackColor: Colors.red,
+                            onChanged: _setResigned,
+                          ),
+                          if (isResigned)
+                            Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16.w),
+                              child: CustomDatePicker(
+                                label: 'Resignation Date',
+                                date: _resignationDate.value,
+                                onTap: () => _selectResignationDate(context),
+                                onClear: () => _resignationDate.value = null,
+                              ),
+                            ),
+                        ],
                       );
                     },
                   ),

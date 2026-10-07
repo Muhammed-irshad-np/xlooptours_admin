@@ -37,6 +37,11 @@ class EmployeeEntity extends Equatable {
   /// drive fleet vehicles tracked separately.
   final ExternalVehicleInfo? externalVehicle;
   final bool isActive;
+
+  /// Marked when the employee has resigned. A resigned employee is always
+  /// inactive; the full resignation workflow will build on these fields.
+  final bool isResigned;
+  final DateTime? resignationDate;
   final String? imageUrl;
   final String? assignedVehicleId;
   final IqamaDocument? iqama;
@@ -67,6 +72,8 @@ class EmployeeEntity extends Equatable {
     this.employmentType = EmploymentType.internal,
     this.externalVehicle,
     this.isActive = true,
+    this.isResigned = false,
+    this.resignationDate,
     this.imageUrl,
     this.assignedVehicleId,
     this.iqama,
@@ -126,6 +133,8 @@ class EmployeeEntity extends Equatable {
     String? employmentType,
     ExternalVehicleInfo? externalVehicle,
     bool? isActive,
+    bool? isResigned,
+    DateTime? resignationDate,
     String? imageUrl,
     String? assignedVehicleId,
     IqamaDocument? iqama,
@@ -150,6 +159,7 @@ class EmployeeEntity extends Equatable {
     bool clearQatarVisa = false,
     bool clearAuthorization = false,
     bool clearExternalVehicle = false,
+    bool clearResignationDate = false,
   }) {
     return EmployeeEntity(
       id: id ?? this.id,
@@ -169,6 +179,10 @@ class EmployeeEntity extends Equatable {
           ? null
           : (externalVehicle ?? this.externalVehicle),
       isActive: isActive ?? this.isActive,
+      isResigned: isResigned ?? this.isResigned,
+      resignationDate: clearResignationDate
+          ? null
+          : (resignationDate ?? this.resignationDate),
       imageUrl: imageUrl ?? this.imageUrl,
       assignedVehicleId: assignedVehicleId ?? this.assignedVehicleId,
       iqama: clearIqama ? null : (iqama ?? this.iqama),
@@ -202,6 +216,8 @@ class EmployeeEntity extends Equatable {
     employmentType,
     externalVehicle,
     isActive,
+    isResigned,
+    resignationDate,
     imageUrl,
     assignedVehicleId,
     iqama,

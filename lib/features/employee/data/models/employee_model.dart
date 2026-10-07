@@ -23,6 +23,8 @@ class EmployeeModel extends EmployeeEntity {
     super.employmentType,
     super.externalVehicle,
     super.isActive = true,
+    super.isResigned = false,
+    super.resignationDate,
     super.imageUrl,
     super.assignedVehicleId,
     super.iqama,
@@ -60,6 +62,8 @@ class EmployeeModel extends EmployeeEntity {
           ? ExternalVehicleInfoModel.fromEntity(externalVehicle!).toJson()
           : null,
       'isActive': isActive,
+      'isResigned': isResigned,
+      'resignationDate': resignationDate?.toIso8601String(),
       'imageUrl': imageUrl,
       'assignedVehicleId': assignedVehicleId,
       'iqama': iqama != null
@@ -172,6 +176,10 @@ class EmployeeModel extends EmployeeEntity {
             )
           : null,
       isActive: json['isActive'] as bool? ?? true,
+      isResigned: json['isResigned'] as bool? ?? false,
+      resignationDate: json['resignationDate'] != null
+          ? DateTime.tryParse(json['resignationDate'] as String)
+          : null,
       imageUrl: json['imageUrl'] as String?,
       assignedVehicleId: json['assignedVehicleId'] as String?,
       iqama: json['iqama'] != null
@@ -273,6 +281,8 @@ class EmployeeModel extends EmployeeEntity {
       employmentType: entity.employmentType,
       externalVehicle: entity.externalVehicle,
       isActive: entity.isActive,
+      isResigned: entity.isResigned,
+      resignationDate: entity.resignationDate,
       imageUrl: entity.imageUrl,
       assignedVehicleId: entity.assignedVehicleId,
       iqama: entity.iqama,
@@ -306,6 +316,8 @@ class EmployeeModel extends EmployeeEntity {
     String? employmentType,
     ExternalVehicleInfo? externalVehicle,
     bool? isActive,
+    bool? isResigned,
+    DateTime? resignationDate,
     String? imageUrl,
     String? assignedVehicleId,
     IqamaDocument? iqama,
@@ -331,6 +343,7 @@ class EmployeeModel extends EmployeeEntity {
     bool clearQatarVisa = false,
     bool clearAuthorization = false,
     bool clearExternalVehicle = false,
+    bool clearResignationDate = false,
   }) {
     return EmployeeModel(
       id: id ?? this.id,
@@ -350,6 +363,10 @@ class EmployeeModel extends EmployeeEntity {
           ? null
           : (externalVehicle ?? this.externalVehicle),
       isActive: isActive ?? this.isActive,
+      isResigned: isResigned ?? this.isResigned,
+      resignationDate: clearResignationDate
+          ? null
+          : (resignationDate ?? this.resignationDate),
       imageUrl: imageUrl ?? this.imageUrl,
       assignedVehicleId: assignedVehicleId ?? this.assignedVehicleId,
       iqama: clearIqama ? null : (iqama ?? this.iqama),

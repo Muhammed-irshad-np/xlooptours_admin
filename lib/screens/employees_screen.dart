@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
@@ -647,16 +648,23 @@ class _EmployeesScreenState extends State<EmployeesScreen>
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  employee.isActive ? 'Active' : 'Inactive',
+                  employee.isResigned
+                      ? 'Resigned${employee.resignationDate != null ? ' · ${DateFormat('MMM dd, yyyy').format(employee.resignationDate!)}' : ''}'
+                      : (employee.isActive ? 'Active' : 'Inactive'),
                   style: TextStyle(
-                    color: employee.isActive ? Colors.green : Colors.grey,
+                    color: employee.isResigned
+                        ? Colors.red
+                        : (employee.isActive ? Colors.green : Colors.grey),
                     fontWeight: FontWeight.bold,
                     fontSize: 12.sp,
                   ),
                 ),
+                // Resigned employees stay inactive; un-resign via Edit.
                 Switch(
                   value: employee.isActive,
-                  onChanged: (val) => _toggleStatus(employee, val),
+                  onChanged: employee.isResigned
+                      ? null
+                      : (val) => _toggleStatus(employee, val),
                   activeThumbColor: Colors.white,
                   activeTrackColor: Colors.green,
                 ),

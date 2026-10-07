@@ -27,6 +27,10 @@ class EmployeeDetailsScreen extends StatelessWidget {
     return DateFormat('MMM dd, yyyy').format(date);
   }
 
+  Color get _statusColor => employee.isResigned
+      ? Colors.red
+      : (employee.isActive ? Colors.green : Colors.grey);
+
   Future<void> _launchUrl(String? urlString) async {
     if (urlString == null || urlString.isEmpty) return;
     final Uri url = Uri.parse(urlString);
@@ -232,24 +236,18 @@ class EmployeeDetailsScreen extends StatelessWidget {
                           vertical: 4.h,
                         ),
                         decoration: BoxDecoration(
-                          color: employee.isActive
-                              ? Colors.green.withValues(alpha: 0.1)
-                              : Colors.grey.withValues(alpha: 0.1),
+                          color: _statusColor.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8.r),
-                          border: Border.all(
-                            color: employee.isActive
-                                ? Colors.green
-                                : Colors.grey,
-                          ),
+                          border: Border.all(color: _statusColor),
                         ),
                         child: Text(
-                          employee.isActive ? 'Active' : 'Inactive',
+                          employee.isResigned
+                              ? 'Resigned'
+                              : (employee.isActive ? 'Active' : 'Inactive'),
                           style: TextStyle(
                             fontSize: 12.sp,
                             fontWeight: FontWeight.bold,
-                            color: employee.isActive
-                                ? Colors.green
-                                : Colors.grey,
+                            color: _statusColor,
                           ),
                         ),
                       ),
@@ -329,6 +327,12 @@ class EmployeeDetailsScreen extends StatelessWidget {
                 Icons.cake,
               ),
             ],
+            if (employee.isResigned)
+              _buildDetailRow(
+                'Resignation Date',
+                _formatDate(employee.resignationDate),
+                Icons.logout,
+              ),
           ],
         ),
       ),
