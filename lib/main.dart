@@ -36,6 +36,7 @@ import 'screens/invoice_form_screen.dart';
 import 'screens/pdf_preview_screen.dart';
 import 'features/invoice/domain/entities/invoice_entity.dart';
 import 'screens/admin_layout.dart';
+import 'core/widgets/app_selection_area.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'features/company/domain/entities/company_entity.dart';
 import 'screens/public/registration_screen.dart';
@@ -333,7 +334,7 @@ class _MyAppState extends State<MyApp> {
             routerConfig: _router,
             debugShowCheckedModeBanner: false,
             title: 'Xloop Tours Admin',
-            builder: (context, child) => SelectionArea(child: child!),
+            builder: (context, child) => AppSelectionArea(child: child!),
             theme: ThemeData(
               colorScheme: ColorScheme.fromSeed(
                 seedColor: const Color(0xFF13b1f2),
