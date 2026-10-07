@@ -420,7 +420,12 @@ class _EmployeeTableState extends State<EmployeeTable> {
   }
 
   Widget _buildStatus(EmployeeEntity employee) {
-    final color = employee.isActive ? Colors.green[700]! : Colors.grey;
+    final color = employee.isResigned
+        ? Colors.red[700]!
+        : (employee.isActive ? Colors.green[700]! : Colors.grey);
+    final resignedOn = employee.resignationDate != null
+        ? ' · ${DateFormat('MMM dd, yyyy').format(employee.resignationDate!)}'
+        : '';
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -432,7 +437,9 @@ class _EmployeeTableState extends State<EmployeeTable> {
         const SizedBox(width: 6),
         Flexible(
           child: Text(
-            employee.isActive ? 'Active' : 'Inactive',
+            employee.isResigned
+                ? 'Resigned$resignedOn'
+                : (employee.isActive ? 'Active' : 'Inactive'),
             style: TextStyle(
               fontSize: 12.sp,
               color: color,
@@ -509,22 +516,24 @@ class _EmployeeTableState extends State<EmployeeTable> {
             ],
           ),
         ),
-        PopupMenuItem(
-          value: 'status',
-          child: Row(
-            children: [
-              Icon(
-                employee.isActive
-                    ? Icons.toggle_off_outlined
-                    : Icons.toggle_on_outlined,
-                size: 20,
-                color: employee.isActive ? Colors.grey : Colors.green,
-              ),
-              const SizedBox(width: 8),
-              Text(employee.isActive ? 'Mark Inactive' : 'Mark Active'),
-            ],
+        // Resigned employees stay inactive; un-resign via Edit.
+        if (!employee.isResigned)
+          PopupMenuItem(
+            value: 'status',
+            child: Row(
+              children: [
+                Icon(
+                  employee.isActive
+                      ? Icons.toggle_off_outlined
+                      : Icons.toggle_on_outlined,
+                  size: 20,
+                  color: employee.isActive ? Colors.grey : Colors.green,
+                ),
+                const SizedBox(width: 8),
+                Text(employee.isActive ? 'Mark Inactive' : 'Mark Active'),
+              ],
+            ),
           ),
-        ),
         if (widget.canDelete)
           const PopupMenuItem(
             value: 'delete',

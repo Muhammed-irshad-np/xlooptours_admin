@@ -98,6 +98,45 @@ void main() {
     });
   });
 
+  group('resignation', () {
+    test('round-trips through JSON', () {
+      final model = EmployeeModel.fromJson(
+        baseJson()
+          ..['isActive'] = false
+          ..['isResigned'] = true
+          ..['resignationDate'] = '2026-09-30T00:00:00.000',
+      );
+
+      final restored = EmployeeModel.fromJson(model.toJson());
+
+      expect(restored.isResigned, isTrue);
+      expect(restored.isActive, isFalse);
+      expect(restored.resignationDate, DateTime(2026, 9, 30));
+    });
+
+    test('older records default to not resigned', () {
+      final model = EmployeeModel.fromJson(baseJson());
+
+      expect(model.isResigned, isFalse);
+      expect(model.resignationDate, isNull);
+    });
+
+    test('copyWith can clear the resignation date', () {
+      final resigned = EmployeeModel.fromJson(baseJson()).copyWith(
+        isResigned: true,
+        resignationDate: DateTime(2026, 9, 30),
+      );
+
+      final reinstated = resigned.copyWith(
+        isResigned: false,
+        clearResignationDate: true,
+      );
+
+      expect(reinstated.isResigned, isFalse);
+      expect(reinstated.resignationDate, isNull);
+    });
+  });
+
   group('isDriver', () {
     test('matches any driver position label', () {
       for (final position in ['Driver', 'External Driver', 'Senior driver']) {
