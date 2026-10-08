@@ -9,6 +9,7 @@ import 'screens/login_screen.dart';
 import 'firebase_options.dart' as prod_options;
 import 'firebase_options_dev.dart' as dev_options;
 import 'injection_container.dart' as di;
+import 'core/utils/return_location.dart';
 import 'features/auth/presentation/providers/auth_provider.dart';
 import 'features/notifications/presentation/providers/notification_provider.dart';
 import 'features/company/presentation/providers/company_provider.dart';
@@ -178,12 +179,24 @@ class _MyAppState extends State<MyApp> {
           }
         }
 
+        // On a page refresh Firebase restores the session asynchronously, so
+        // the user is briefly null. Stay on the requested URL until the session
+        // resolves (MaterialApp.router shows a loader meanwhile) and re-run.
+        if (authProvider.isResolvingSession) {
+          return null;
+        }
+
         if (!isLoggedIn && !isLoggingIn) {
-          return '/login';
+          // Remember where the user was so login can send them back there.
+          if (isRoot) return '/login';
+          return Uri(
+            path: '/login',
+            queryParameters: {'from': state.uri.toString()},
+          ).toString();
         }
 
         if (isLoggedIn && (isLoggingIn || isRoot)) {
-          return '/home';
+          return safeReturnLocation(state.uri.queryParameters['from']);
         }
 
         return null;
@@ -201,7 +214,8 @@ class _MyAppState extends State<MyApp> {
         ),
         GoRoute(
           path: '/home',
-          builder: (context, state) => const AdminLayout(),
+          builder: (context, state) =>
+              AdminLayout(tab: state.uri.queryParameters['tab']),
         ),
         GoRoute(
           path: '/invoice',
@@ -332,6 +346,19 @@ class _MyAppState extends State<MyApp> {
         builder: (_, child) {
           return MaterialApp.router(
             routerConfig: _router,
+            builder: (context, child) {
+              // Don't build any page until the session is known, otherwise
+              // protected pages render (and load data) with no user.
+              final isResolving = context.select<AuthProvider, bool>(
+                (auth) => auth.isResolvingSession,
+              );
+              if (isResolving) {
+                return const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                );
+              }
+              return child!;
+            },
             debugShowCheckedModeBanner: false,
             title: 'Xloop Tours Admin',
             builder: (context, child) => AppSelectionArea(child: child!),

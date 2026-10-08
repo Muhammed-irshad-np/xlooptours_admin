@@ -30,6 +30,7 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
               createdBy: m.createdBy,
               employeeId: m.employeeId,
               employeeName: m.employeeName,
+              ownDisplayName: m.ownDisplayName,
               photoUrl: m.photoUrl,
               lastLoginAt: m.lastLoginAt,
               lastActiveAt: m.lastActiveAt,
@@ -55,6 +56,7 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
     required String roleId,
     String? employeeId,
     String? employeeName,
+    String? ownDisplayName,
   }) async {
     try {
       final m = await remoteDataSource.createUser(
@@ -64,6 +66,7 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
         roleId: roleId,
         employeeId: employeeId,
         employeeName: employeeName,
+        ownDisplayName: ownDisplayName,
       );
       return Right(
         ManagedUserEntity(
@@ -77,6 +80,7 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
           createdBy: m.createdBy,
           employeeId: m.employeeId,
           employeeName: m.employeeName,
+          ownDisplayName: m.ownDisplayName,
           photoUrl: m.photoUrl,
           lastLoginAt: m.lastLoginAt,
           lastActiveAt: m.lastActiveAt,
@@ -108,6 +112,7 @@ class UserManagementRepositoryImpl implements UserManagementRepository {
         createdBy: user.createdBy,
         employeeId: user.employeeId,
         employeeName: user.employeeName,
+        ownDisplayName: user.ownDisplayName,
         photoUrl: user.photoUrl,
       );
       await remoteDataSource.updateUser(model);

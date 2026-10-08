@@ -87,6 +87,7 @@ class UserManagementProvider extends ChangeNotifier {
     required String roleId,
     String? employeeId,
     String? employeeName,
+    String? ownDisplayName,
   }) async {
     _setLoading(true);
     _errorMessage = null;
@@ -98,6 +99,7 @@ class UserManagementProvider extends ChangeNotifier {
       roleId: roleId,
       employeeId: employeeId,
       employeeName: employeeName,
+      ownDisplayName: ownDisplayName,
     ));
 
     return result.fold(
@@ -161,6 +163,7 @@ class UserManagementProvider extends ChangeNotifier {
             createdBy: old.createdBy,
             employeeId: old.employeeId,
             employeeName: old.employeeName,
+            ownDisplayName: old.ownDisplayName,
             photoUrl: old.photoUrl,
             lastLoginAt: old.lastLoginAt,
             lastActiveAt: old.lastActiveAt,
@@ -226,6 +229,7 @@ class UserManagementProvider extends ChangeNotifier {
             createdBy: old.createdBy,
             employeeId: old.employeeId,
             employeeName: old.employeeName,
+            ownDisplayName: old.ownDisplayName,
             photoUrl: old.photoUrl,
             lastLoginAt: old.lastLoginAt,
             lastActiveAt: old.lastActiveAt,

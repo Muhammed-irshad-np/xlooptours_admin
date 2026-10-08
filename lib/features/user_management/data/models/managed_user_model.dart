@@ -14,6 +14,7 @@ class ManagedUserModel extends ManagedUserEntity {
     super.createdBy,
     super.employeeId,
     super.employeeName,
+    super.ownDisplayName,
     super.photoUrl,
     super.lastLoginAt,
     super.lastActiveAt,
@@ -52,6 +53,7 @@ class ManagedUserModel extends ManagedUserEntity {
       createdBy: data['createdBy'],
       employeeId: data['employeeId'] as String?,
       employeeName: data['employeeName'] as String?,
+      ownDisplayName: data['ownDisplayName'] as String?,
       photoUrl: photoUrl,
       lastLoginAt: _asDate(data['lastLoginAt']),
       lastActiveAt: _asDate(data['lastActiveAt']),
@@ -74,7 +76,30 @@ class ManagedUserModel extends ManagedUserEntity {
       createdBy: createdBy,
       employeeId: employeeId,
       employeeName: employeeName,
+      ownDisplayName: ownDisplayName,
       photoUrl: url,
+      lastLoginAt: lastLoginAt,
+      lastActiveAt: lastActiveAt,
+      lastLogoutAt: lastLogoutAt,
+      sessionActive: sessionActive,
+      loginCount: loginCount,
+    );
+  }
+
+  /// This account once its linked employee is gone: no link, and the
+  /// display name the admin typed (if one was kept).
+  ManagedUserModel copyWithoutEmployee() {
+    final ownName = ownDisplayName?.trim() ?? '';
+    return ManagedUserModel(
+      uid: uid,
+      email: email,
+      displayName: ownName.isNotEmpty ? ownName : displayName,
+      roleId: roleId,
+      roleName: roleName,
+      isActive: isActive,
+      createdAt: createdAt,
+      createdBy: createdBy,
+      ownDisplayName: ownDisplayName,
       lastLoginAt: lastLoginAt,
       lastActiveAt: lastActiveAt,
       lastLogoutAt: lastLogoutAt,
@@ -100,6 +125,7 @@ class ManagedUserModel extends ManagedUserEntity {
       'createdBy': createdBy,
       'employeeId': employeeId,
       'employeeName': employeeName,
+      'ownDisplayName': ownDisplayName,
     };
   }
 
@@ -113,6 +139,7 @@ class ManagedUserModel extends ManagedUserEntity {
       'isActive': isActive,
       'employeeId': employeeId,
       'employeeName': employeeName,
+      'ownDisplayName': ownDisplayName,
     };
     if (includeEmail) {
       map['email'] = email.toLowerCase();
