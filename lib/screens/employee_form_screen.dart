@@ -24,6 +24,7 @@ import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
 import '../core/constants/nationalities.dart';
 import '../widgets/searchable_dropdown.dart';
+import '../core/utils/form_validation_helper.dart';
 import '../core/widgets/confirm_save_dialog.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
@@ -532,7 +533,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   }
 
   Future<void> _saveEmployee() async {
-    if (!_formKey.currentState!.validate()) return;
+    if (!validateAndRevealFirstError(_formKey.currentState!)) return;
     if (!await _confirmConversionToExternal()) return;
 
     // Show confirmation dialog with entered details
