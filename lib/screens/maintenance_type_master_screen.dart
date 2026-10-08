@@ -129,9 +129,11 @@ class _MaintenanceTypeMasterScreenState
                     ),
                   ),
                   subtitle: Text(
-                    type.isDateTrigger
-                        ? 'Trigger: Date  |  Alert: ${type.notificationDays ?? 7} days before due date'
-                        : 'Trigger: Odometer  |  SUV: ${type.suvIntervalKm} KM  |  Sedan: ${type.sedanIntervalKm} KM',
+                    type.isNoAlert
+                        ? 'Trigger: No Alert'
+                        : type.isDateTrigger
+                            ? 'Trigger: Date  |  Alert: ${type.notificationDays ?? 7} days before due date'
+                            : 'Trigger: Odometer  |  SUV: ${type.suvIntervalKm} KM  |  Sedan: ${type.sedanIntervalKm} KM',
                     style: TextStyle(color: Colors.grey[600], fontSize: 14.sp),
                   ),
                   trailing: Row(
@@ -240,6 +242,7 @@ class _AddEditMaintenanceTypeDialogState
     if (!_formKey.currentState!.validate()) return;
 
     final isDate = _triggerType == 'date';
+    final isOdometer = _triggerType == 'odometer';
 
     // Show confirmation dialog with entered details
     final sections = <ConfirmDetailSection>[
@@ -253,14 +256,16 @@ class _AddEditMaintenanceTypeDialogState
           ),
           ConfirmDetailEntry(
             label: 'Trigger Type',
-            value: _triggerType == 'odometer' ? 'Odometer (KM)' : 'Date Based',
+            value: isOdometer
+                ? 'Odometer (KM)'
+                : (isDate ? 'Date Based' : 'No Alert'),
           ),
-          if (!isDate)
+          if (isOdometer)
             ConfirmDetailEntry(
               label: 'SUV Interval',
               value: '${_suvIntervalController.text.trim()} km',
             ),
-          if (!isDate)
+          if (isOdometer)
             ConfirmDetailEntry(
               label: 'Sedan Interval',
               value: '${_sedanIntervalController.text.trim()} km',
@@ -288,12 +293,12 @@ class _AddEditMaintenanceTypeDialogState
       id: widget.type?.id ?? const Uuid().v4(),
       name: _nameController.text.trim(),
       triggerType: _triggerType,
-      suvIntervalKm: isDate
-          ? 0
-          : (int.tryParse(_suvIntervalController.text.trim()) ?? 0),
-      sedanIntervalKm: isDate
-          ? 0
-          : (int.tryParse(_sedanIntervalController.text.trim()) ?? 0),
+      suvIntervalKm: isOdometer
+          ? (int.tryParse(_suvIntervalController.text.trim()) ?? 0)
+          : 0,
+      sedanIntervalKm: isOdometer
+          ? (int.tryParse(_sedanIntervalController.text.trim()) ?? 0)
+          : 0,
       notificationDays: isDate
           ? (int.tryParse(_notificationDaysController.text.trim()) ?? 7)
           : null,
@@ -306,6 +311,7 @@ class _AddEditMaintenanceTypeDialogState
   @override
   Widget build(BuildContext context) {
     final isDateTrigger = _triggerType == 'date';
+    final isOdometerTrigger = _triggerType == 'odometer';
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -376,11 +382,27 @@ class _AddEditMaintenanceTypeDialogState
                       },
                     ),
                   ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ChoiceChip(
+                      label: const Center(
+                        child: Text('No Alert'),
+                      ),
+                      selected: _triggerType == 'none',
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() {
+                            _triggerType = 'none';
+                          });
+                        }
+                      },
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
 
-              if (!isDateTrigger) ...[
+              if (isOdometerTrigger) ...[
                 // --- ODOMETER INPUTS ---
                 Row(
                   children: [
@@ -423,7 +445,7 @@ class _AddEditMaintenanceTypeDialogState
                     ),
                   ],
                 ),
-              ] else ...[
+              ] else if (isDateTrigger) ...[
                 // --- DATE TRIGGER INPUTS ---
                 TextFormField(
                   controller: _notificationDaysController,
@@ -461,6 +483,31 @@ class _AddEditMaintenanceTypeDialogState
                         child: Text(
                           'Alerts will be triggered automatically N days before the due date set on the maintenance record.',
                           style: TextStyle(fontSize: 13, color: Colors.blue),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                // --- NO ALERT ---
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.notifications_off_outlined,
+                          color: Colors.grey[700], size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'No KM or date alert will be raised. Use this for one-off maintenance such as a vehicle puncture.',
+                          style: TextStyle(fontSize: 13, color: Colors.grey[800]),
                         ),
                       ),
                     ],
