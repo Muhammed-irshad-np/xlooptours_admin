@@ -955,6 +955,16 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Text(
+                    'Fields marked with * are required.',
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      color: Colors.grey[700],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  SizedBox(height: 16.h),
+
                   // Basic Info Section
                   _buildSectionTitle('Basic Information'),
                   SizedBox(height: 16.h),
@@ -1022,7 +1032,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                       Expanded(
                         child: _buildTextField(
                           controller: _nameController,
-                          label: 'Full Name',
+                          label: 'Full Name *',
                           icon: Icons.person,
                           validator: (v) =>
                               v!.isEmpty ? 'Please enter full name' : null,
@@ -1162,7 +1172,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
           Expanded(
             child: _buildTextField(
               controller: _phoneController,
-              label: 'Mobile No',
+              label: 'Mobile No *',
               icon: Icons.phone,
               keyboardType: TextInputType.phone,
               validator: (v) =>
@@ -1258,7 +1268,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                 ),
                 _buildTextField(
                   controller: _plateNumberController,
-                  label: 'Car Plate No',
+                  label: 'Car Plate No *',
                   icon: Icons.confirmation_number,
                   validator: (v) => v!.trim().isEmpty
                       ? 'Please enter car plate number'
@@ -1329,7 +1339,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         return DropdownButtonFormField<String>(
           initialValue: _selectedVehicleMake.value,
           decoration: InputDecoration(
-            labelText: 'Make',
+            labelText: 'Make *',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8.r),
             ),
@@ -1361,7 +1371,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         return DropdownButtonFormField<String>(
           initialValue: _selectedVehicleModel.value,
           decoration: InputDecoration(
-            labelText: 'Model',
+            labelText: 'Model *',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8.r),
             ),
@@ -1418,7 +1428,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         return DropdownButtonFormField<String>(
           initialValue: _selectedVehicleColor.value,
           decoration: InputDecoration(
-            labelText: 'Color',
+            labelText: 'Color *',
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8.r),
             ),
@@ -1449,7 +1459,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                     Expanded(
                       child: _buildTextField(
                         controller: _phoneController,
-                        label: 'Primary Contact',
+                        label: 'Primary Contact *',
                         icon: Icons.phone,
                         keyboardType: TextInputType.phone,
                         validator: (v) =>
