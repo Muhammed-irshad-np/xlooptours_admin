@@ -480,32 +480,36 @@ class _AddMaintenanceRecordDialogState
         ));
       }
 
-      // Append to flat history list
-      final List<MaintenanceRecord> updatedHistory = List.from(
-        widget.vehicle.maintenanceHistory ?? [],
-      );
-      for (final e in recordsToAdd) {
-        updatedHistory.add(e.record);
-      }
-
-      // Also update the typed VehicleMaintenance fields so the alert checker
-      // (GetVehicleMaintenanceAlertsUseCase) can find the latest service record.
-      final existing = widget.vehicle.maintenance ?? const VehicleMaintenance();
-      VehicleMaintenance updatedMaintenance = existing;
-      for (final e in recordsToAdd) {
-        updatedMaintenance = _applyTypedRecord(
-          updatedMaintenance,
-          e.typeId,
-          e.record,
+      // Added to the stored copy, not widget.vehicle: a page loaded earlier
+      // would otherwise write back its old list and lose records added since.
+      final updatedVehicle = await provider.modifyVehicle(widget.vehicle.id, (
+        latest,
+      ) {
+        // Append to flat history list
+        final List<MaintenanceRecord> updatedHistory = List.from(
+          latest.maintenanceHistory ?? [],
         );
-      }
+        for (final e in recordsToAdd) {
+          updatedHistory.add(e.record);
+        }
 
-      final updatedVehicle = widget.vehicle.copyWith(
-        maintenanceHistory: updatedHistory,
-        maintenance: updatedMaintenance,
-      );
+        // Also update the typed VehicleMaintenance fields so the alert checker
+        // (GetVehicleMaintenanceAlertsUseCase) can find the latest service record.
+        VehicleMaintenance updatedMaintenance =
+            latest.maintenance ?? const VehicleMaintenance();
+        for (final e in recordsToAdd) {
+          updatedMaintenance = _applyTypedRecord(
+            updatedMaintenance,
+            e.typeId,
+            e.record,
+          );
+        }
 
-      await provider.updateVehicle(updatedVehicle);
+        return latest.copyWith(
+          maintenanceHistory: updatedHistory,
+          maintenance: updatedMaintenance,
+        );
+      });
 
       // Every service mileage typed here is an odometer observation. Logging
       // them gives the plausibility engine a second, independent source to

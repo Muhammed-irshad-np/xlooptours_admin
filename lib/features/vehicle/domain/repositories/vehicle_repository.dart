@@ -11,6 +11,15 @@ abstract class VehicleRepository {
   Future<List<VehicleEntity>> getAllVehicles();
   Future<void> insertVehicle(VehicleEntity vehicle);
   Future<void> updateVehicle(VehicleEntity vehicle);
+
+  /// Applies [change] to the vehicle as currently stored and saves only the
+  /// fields it changed, so edits other users made since this page loaded are
+  /// kept. Returns the vehicle as saved. Use this for maintenance changes;
+  /// [updateVehicle] does not write maintenance.
+  Future<VehicleEntity> modifyVehicle(
+    String vehicleId,
+    VehicleEntity Function(VehicleEntity latest) change,
+  );
   Future<void> deleteVehicle(String id);
   Future<String> uploadVehicleImage(XFile image, String vehicleId);
   Future<String> uploadDocumentAttachment(

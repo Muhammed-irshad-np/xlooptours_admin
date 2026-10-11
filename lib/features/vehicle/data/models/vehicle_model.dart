@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../domain/entities/vehicle_documents.dart';
 import '../../domain/entities/vehicle_entity.dart';
 
@@ -492,4 +494,18 @@ class VehicleModel extends VehicleEntity {
       maintenanceHistory: maintenanceHistory ?? this.maintenanceHistory,
     );
   }
+}
+
+/// The fields of [after] that differ from [before], ready for a Firestore
+/// `update`. Writing only these leaves everything else as stored.
+Map<String, dynamic> vehicleChangePatch(
+  VehicleEntity before,
+  VehicleEntity after,
+) {
+  final from = VehicleModel.fromEntity(before).toJson();
+  final to = VehicleModel.fromEntity(after).toJson();
+  return {
+    for (final key in to.keys)
+      if (jsonEncode(from[key]) != jsonEncode(to[key])) key: to[key],
+  };
 }

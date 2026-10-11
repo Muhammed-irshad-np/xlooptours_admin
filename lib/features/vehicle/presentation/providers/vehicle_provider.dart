@@ -13,6 +13,7 @@ import '../../domain/usecases/insert_vehicle_make_usecase.dart';
 import '../../domain/usecases/insert_vehicle_usecase.dart';
 import '../../domain/usecases/update_vehicle_make_usecase.dart';
 import '../../domain/usecases/update_vehicle_usecase.dart';
+import '../../domain/usecases/modify_vehicle_usecase.dart';
 import '../../domain/usecases/upload_vehicle_document_usecase.dart';
 import '../../domain/usecases/upload_vehicle_image_usecase.dart';
 import '../../domain/usecases/get_all_maintenance_types_usecase.dart';
@@ -55,6 +56,7 @@ class VehicleProvider extends ChangeNotifier {
   final GetVehicleSettingsUseCase getVehicleSettingsUseCase;
   final UpdateVehicleSettingsUseCase updateVehicleSettingsUseCase;
   final ExtendVehicleMaintenanceUseCase extendVehicleMaintenanceUseCase;
+  final ModifyVehicleUseCase modifyVehicleUseCase;
 
   List<VehicleEntity> _vehicles = [];
   List<VehicleMakeEntity> _vehicleMakes = [];
@@ -86,6 +88,7 @@ class VehicleProvider extends ChangeNotifier {
     required this.getVehicleSettingsUseCase,
     required this.updateVehicleSettingsUseCase,
     required this.extendVehicleMaintenanceUseCase,
+    required this.modifyVehicleUseCase,
   });
 
   List<VehicleEntity> get vehicles => _vehicles;
@@ -131,10 +134,7 @@ class VehicleProvider extends ChangeNotifier {
     _setLoading(true);
     try {
       await updateVehicleUseCase(vehicle);
-      final index = _vehicles.indexWhere((v) => v.id == vehicle.id);
-      if (index != -1) {
-        _vehicles[index] = vehicle;
-      }
+      _cacheSaved(vehicle);
       _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to update vehicle: $e';
@@ -151,10 +151,49 @@ class VehicleProvider extends ChangeNotifier {
   /// saved the vehicle by the time it calls this. Purely a cache refresh, so it
   /// performs no I/O of its own.
   void applyVehicleLocally(VehicleEntity vehicle) {
+    _cacheSaved(vehicle);
+    notifyListeners();
+  }
+
+  /// Applies [change] to the vehicle as currently stored and saves only what
+  /// it changed. Use this for maintenance: [updateVehicle] saves the page's
+  /// copy, which may predate records other users added.
+  Future<VehicleEntity> modifyVehicle(
+    String vehicleId,
+    VehicleEntity Function(VehicleEntity latest) change,
+  ) async {
+    _setLoading(true);
+    try {
+      final saved = await modifyVehicleUseCase(vehicleId, change);
+      _cacheLatest(saved);
+      _errorMessage = null;
+      return saved;
+    } catch (e) {
+      _errorMessage = 'Failed to update vehicle: $e';
+      debugPrint(_errorMessage);
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  /// Caches a vehicle saved through [updateVehicle]. That save does not write
+  /// maintenance, so the cached maintenance is kept rather than replaced by
+  /// whatever copy the caller held.
+  void _cacheSaved(VehicleEntity vehicle) {
     final index = _vehicles.indexWhere((v) => v.id == vehicle.id);
     if (index == -1) return;
-    _vehicles[index] = vehicle;
-    notifyListeners();
+    final cached = _vehicles[index];
+    _vehicles[index] = vehicle.copyWith(
+      maintenance: cached.maintenance,
+      maintenanceHistory: cached.maintenanceHistory,
+    );
+  }
+
+  /// Caches a vehicle read back from storage, in full.
+  void _cacheLatest(VehicleEntity vehicle) {
+    final index = _vehicles.indexWhere((v) => v.id == vehicle.id);
+    if (index != -1) _vehicles[index] = vehicle;
   }
 
   /// Direct odometer writes are no longer allowed from here.
@@ -200,55 +239,14 @@ class VehicleProvider extends ChangeNotifier {
   ) async {
     _setLoading(true);
     try {
-      final List<MaintenanceRecord> updatedHistory = List.from(
-        vehicle.maintenanceHistory ?? [],
+      // Removed from the stored copy, not from [vehicle]: a page loaded
+      // earlier would otherwise write back its old list and lose records
+      // added since.
+      final saved = await modifyVehicleUseCase(
+        vehicle.id,
+        (latest) => _withoutMaintenanceRecord(latest, record),
       );
-      
-      VehicleMaintenance? updatedMaintenance = vehicle.maintenance;
-      bool isAuditRecord = record.serviceType?.startsWith('Extension:') ?? false;
-
-      if (isAuditRecord) {
-        String category = record.serviceType!.replaceAll('Extension:', '').trim();
-        
-        // Find the most recent actual record for this category
-        int actualIndex = updatedHistory.lastIndexWhere((r) => 
-            r.serviceType != null &&
-            _isMatchingCategory(r.serviceType!, category) &&
-            !r.serviceType!.startsWith('Extension:')
-        );
-
-        if (actualIndex != -1) {
-          var actualRecord = updatedHistory[actualIndex];
-          if (actualRecord.isExtended == true && actualRecord.extendedMileage != null) {
-            // Revert the extension: subtract the extended mileage from nextServiceMileage
-            var revertedRecord = actualRecord.copyWith(
-               nextServiceMileage: (actualRecord.nextServiceMileage ?? 0) - actualRecord.extendedMileage!,
-               clearExtension: true,
-            );
-            updatedHistory[actualIndex] = revertedRecord;
-            
-            // Also update the typed maintenance field
-            updatedMaintenance = _applyExtensionToTypedField(
-              updatedMaintenance ?? const VehicleMaintenance(),
-              category,
-              revertedRecord,
-            );
-          }
-        }
-      }
-
-      updatedHistory.remove(record);
-
-      final updatedVehicle = vehicle.copyWith(
-        maintenanceHistory: updatedHistory,
-        maintenance: updatedMaintenance,
-      );
-
-      await updateVehicleUseCase(updatedVehicle);
-      final index = _vehicles.indexWhere((v) => v.id == vehicle.id);
-      if (index != -1) {
-        _vehicles[index] = updatedVehicle;
-      }
+      _cacheLatest(saved);
       _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to delete maintenance record: $e';
@@ -257,6 +255,62 @@ class VehicleProvider extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  VehicleEntity _withoutMaintenanceRecord(
+    VehicleEntity vehicle,
+    MaintenanceRecord record,
+  ) {
+    if (!(vehicle.maintenanceHistory ?? const []).contains(record)) {
+      throw StateError(
+        'This maintenance record was changed or removed by someone else. '
+        'Refresh the page and try again.',
+      );
+    }
+
+    final List<MaintenanceRecord> updatedHistory = List.from(
+      vehicle.maintenanceHistory ?? [],
+    );
+    
+    VehicleMaintenance? updatedMaintenance = vehicle.maintenance;
+    bool isAuditRecord = record.serviceType?.startsWith('Extension:') ?? false;
+
+    if (isAuditRecord) {
+      String category = record.serviceType!.replaceAll('Extension:', '').trim();
+      
+      // Find the most recent actual record for this category
+      int actualIndex = updatedHistory.lastIndexWhere((r) => 
+          r.serviceType != null &&
+          _isMatchingCategory(r.serviceType!, category) &&
+          !r.serviceType!.startsWith('Extension:')
+      );
+
+      if (actualIndex != -1) {
+        var actualRecord = updatedHistory[actualIndex];
+        if (actualRecord.isExtended == true && actualRecord.extendedMileage != null) {
+          // Revert the extension: subtract the extended mileage from nextServiceMileage
+          var revertedRecord = actualRecord.copyWith(
+             nextServiceMileage: (actualRecord.nextServiceMileage ?? 0) - actualRecord.extendedMileage!,
+             clearExtension: true,
+          );
+          updatedHistory[actualIndex] = revertedRecord;
+          
+          // Also update the typed maintenance field
+          updatedMaintenance = _applyExtensionToTypedField(
+            updatedMaintenance ?? const VehicleMaintenance(),
+            category,
+            revertedRecord,
+          );
+        }
+      }
+    }
+
+    updatedHistory.remove(record);
+
+    return vehicle.copyWith(
+      maintenanceHistory: updatedHistory,
+      maintenance: updatedMaintenance,
+    );
   }
 
   Future<void> deleteVehicleDocument(
@@ -279,10 +333,7 @@ class VehicleProvider extends ChangeNotifier {
       }
 
       await updateVehicleUseCase(updatedVehicle);
-      final index = _vehicles.indexWhere((v) => v.id == vehicle.id);
-      if (index != -1) {
-        _vehicles[index] = updatedVehicle;
-      }
+      _cacheSaved(updatedVehicle);
       _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to delete document: $e';
@@ -308,10 +359,7 @@ class VehicleProvider extends ChangeNotifier {
       );
 
       await updateVehicleUseCase(updatedVehicle);
-      final index = _vehicles.indexWhere((v) => v.id == vehicle.id);
-      if (index != -1) {
-        _vehicles[index] = updatedVehicle;
-      }
+      _cacheSaved(updatedVehicle);
       _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to delete Tafweed record: $e';
