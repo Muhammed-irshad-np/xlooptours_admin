@@ -1373,115 +1373,103 @@ class UpdateDialogHelper {
                             performedBy: username,
                           );
 
-                          final currentMaintenance =
-                              vehicle.maintenance ?? const VehicleMaintenance();
-                          VehicleMaintenance updatedMaintenance =
-                              currentMaintenance;
+                          // Sets this category's typed field, so the alert checker finds the
+                          // new service. Applied to the stored copy when saving.
+                          VehicleMaintenance withTypedRecord(
+                            VehicleMaintenance currentMaintenance,
+                          ) {
+                            VehicleMaintenance updatedMaintenance =
+                                currentMaintenance;
 
-                          switch (category) {
-                            case 'Engine Oil':
-                            case 'Engine Oil Change':
-                            case 'Engine Oil & Filter':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                engineOil: newRecord,
-                              );
-                              break;
-                            case 'Gear Oil':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                gearOil: newRecord,
-                              );
-                              break;
-                            case 'Housing Oil':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                housingOil: newRecord,
-                              );
-                              break;
-                            case 'Tyre Change':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                tyreChange: newRecord,
-                              );
-                              break;
-                            case 'Battery Change':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                batteryChange: newRecord,
-                              );
-                              break;
-                            case 'Brake Pads':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                brakePads: newRecord,
-                              );
-                              break;
-                            case 'Air Filter':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                airFilter: newRecord,
-                              );
-                              break;
-                            case 'AC Service':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                acService: newRecord,
-                              );
-                              break;
-                            case 'Wheel Alignment':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                wheelAlignment: newRecord,
-                              );
-                              break;
-                            case 'Spark Plugs':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                sparkPlugs: newRecord,
-                              );
-                              break;
-                            case 'Coolant Flush':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                coolantFlush: newRecord,
-                              );
-                              break;
-                            case 'Wiper Blades':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                wiperBlades: newRecord,
-                              );
-                              break;
-                            case 'Timing Belt':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                timingBelt: newRecord,
-                              );
-                              break;
-                            case 'Transmission Fluid':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                transmissionFluid: newRecord,
-                              );
-                              break;
-                            case 'Brake Fluid':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                brakeFluid: newRecord,
-                              );
-                              break;
-                            case 'Fuel Filter':
-                              updatedMaintenance = currentMaintenance.copyWith(
-                                fuelFilter: newRecord,
-                              );
-                              break;
+                            switch (category) {
+                              case 'Engine Oil':
+                              case 'Engine Oil Change':
+                              case 'Engine Oil & Filter':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  engineOil: newRecord,
+                                );
+                                break;
+                              case 'Gear Oil':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  gearOil: newRecord,
+                                );
+                                break;
+                              case 'Housing Oil':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  housingOil: newRecord,
+                                );
+                                break;
+                              case 'Tyre Change':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  tyreChange: newRecord,
+                                );
+                                break;
+                              case 'Battery Change':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  batteryChange: newRecord,
+                                );
+                                break;
+                              case 'Brake Pads':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  brakePads: newRecord,
+                                );
+                                break;
+                              case 'Air Filter':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  airFilter: newRecord,
+                                );
+                                break;
+                              case 'AC Service':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  acService: newRecord,
+                                );
+                                break;
+                              case 'Wheel Alignment':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  wheelAlignment: newRecord,
+                                );
+                                break;
+                              case 'Spark Plugs':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  sparkPlugs: newRecord,
+                                );
+                                break;
+                              case 'Coolant Flush':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  coolantFlush: newRecord,
+                                );
+                                break;
+                              case 'Wiper Blades':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  wiperBlades: newRecord,
+                                );
+                                break;
+                              case 'Timing Belt':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  timingBelt: newRecord,
+                                );
+                                break;
+                              case 'Transmission Fluid':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  transmissionFluid: newRecord,
+                                );
+                                break;
+                              case 'Brake Fluid':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  brakeFluid: newRecord,
+                                );
+                                break;
+                              case 'Fuel Filter':
+                                updatedMaintenance = currentMaintenance.copyWith(
+                                  fuelFilter: newRecord,
+                                );
+                                break;
+                            }
+                            return updatedMaintenance;
                           }
 
-                          int updatedOdometer = vehicle.currentOdometer ?? 0;
-                          if (newMileage > updatedOdometer) {
-                            updatedOdometer = newMileage;
-                          }
-
-                          final updatedHistory = List<MaintenanceRecord>.from(
-                            vehicle.maintenanceHistory ?? [],
-                          );
-                          updatedHistory.add(newRecord);
-
-                          final updatedVehicle = vehicle.copyWith(
-                            maintenance: updatedMaintenance,
-                            currentOdometer: updatedOdometer,
-                            lastOdometerUpdateDate:
-                                newMileage > (vehicle.currentOdometer ?? 0)
-                                ? DateTime.now()
-                                : vehicle.lastOdometerUpdateDate,
-                            maintenanceHistory: updatedHistory,
-                          );
+                          // What was stored just before this save, for the rollback below.
+                          VehicleEntity? before;
 
                           try {
                             // Prepared before the vehicle is written, so the only
@@ -1505,7 +1493,34 @@ class UpdateDialogHelper {
                               submitterUserId: authUser?.id,
                             );
 
-                            await vehicleProvider.updateVehicle(updatedVehicle);
+                            // Added to the stored copy, not `vehicle`: a page
+                            // loaded earlier would otherwise write back its old
+                            // list and lose records added since.
+                            await vehicleProvider.modifyVehicle(vehicle.id, (
+                              latest,
+                            ) {
+                              before = latest;
+                              int updatedOdometer = latest.currentOdometer ?? 0;
+                              if (newMileage > updatedOdometer) {
+                                updatedOdometer = newMileage;
+                              }
+
+                              return latest.copyWith(
+                                maintenance: withTypedRecord(
+                                  latest.maintenance ??
+                                      const VehicleMaintenance(),
+                                ),
+                                currentOdometer: updatedOdometer,
+                                lastOdometerUpdateDate:
+                                    newMileage > (latest.currentOdometer ?? 0)
+                                    ? DateTime.now()
+                                    : latest.lastOdometerUpdateDate,
+                                maintenanceHistory: [
+                                  ...?latest.maintenanceHistory,
+                                  newRecord,
+                                ],
+                              );
+                            });
 
                             if (expense != null) {
                               try {
@@ -1513,8 +1528,26 @@ class UpdateDialogHelper {
                               } catch (_) {
                                 // Keep the two in step: if the cost cannot be
                                 // recorded, the service record goes back to what it
-                                // was rather than silently diverging.
-                                await vehicleProvider.updateVehicle(vehicle);
+                                // was rather than silently diverging. Only this
+                                // record is undone; others' changes are kept.
+                                final stored = before!;
+                                await vehicleProvider.modifyVehicle(
+                                  vehicle.id,
+                                  (latest) => latest.copyWith(
+                                    maintenanceHistory: [
+                                      for (final r
+                                          in latest.maintenanceHistory ??
+                                              const <MaintenanceRecord>[])
+                                        if (r != newRecord) r,
+                                    ],
+                                    maintenance:
+                                        stored.maintenance ??
+                                        const VehicleMaintenance(),
+                                    currentOdometer: stored.currentOdometer,
+                                    lastOdometerUpdateDate:
+                                        stored.lastOdometerUpdateDate,
+                                  ),
+                                );
                                 rethrow;
                               }
                             }

@@ -17,6 +17,31 @@ class ExtendVehicleMaintenanceUseCase {
     String? performedBy,
     int? baseOdometer,
   }) async {
+    // Applied to the stored copy, not [vehicle]: a page loaded earlier would
+    // otherwise write back its old list and lose records added since.
+    await repository.modifyVehicle(
+      vehicle.id,
+      (latest) => _extend(
+        latest,
+        category: category,
+        extensionKm: extensionKm,
+        extensionDate: extensionDate,
+        reason: reason,
+        performedBy: performedBy,
+        baseOdometer: baseOdometer,
+      ),
+    );
+  }
+
+  VehicleEntity _extend(
+    VehicleEntity vehicle, {
+    required String category,
+    required int extensionKm,
+    DateTime? extensionDate,
+    required String reason,
+    String? performedBy,
+    int? baseOdometer,
+  }) {
     final currentOdometer = vehicle.currentOdometer ?? 0;
     final List<MaintenanceRecord> updatedHistory = List.from(
       vehicle.maintenanceHistory ?? [],
@@ -107,13 +132,10 @@ class ExtendVehicleMaintenanceUseCase {
       updatedRecord,
     );
 
-    // 4. Save to repository
-    final updatedVehicle = vehicle.copyWith(
+    return vehicle.copyWith(
       maintenanceHistory: updatedHistory,
       maintenance: updatedMaintenance,
     );
-
-    await repository.updateVehicle(updatedVehicle);
   }
 
   bool _isMatchingCategory(String serviceType, String category) {
