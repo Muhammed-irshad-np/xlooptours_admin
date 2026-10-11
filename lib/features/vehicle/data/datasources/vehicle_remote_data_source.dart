@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:xloop_invoice/features/vehicle/data/models/vehicle_settings_model.dart';
 
+import '../../domain/entities/vehicle_entity.dart';
 import '../models/vehicle_model.dart';
 import '../models/vehicle_make_model.dart';
 import '../models/maintenance_type_model.dart';
@@ -15,6 +16,13 @@ abstract class VehicleRemoteDataSource {
   Future<List<VehicleModel>> getAllVehicles();
   Future<void> insertVehicle(VehicleModel vehicle);
   Future<void> updateVehicle(VehicleModel vehicle);
+
+  /// Applies [change] to the vehicle as currently stored and saves only the
+  /// fields it changed. Returns the vehicle as saved.
+  Future<VehicleModel> modifyVehicle(
+    String vehicleId,
+    VehicleEntity Function(VehicleEntity latest) change,
+  );
   Future<void> deleteVehicle(String id);
   Future<String> uploadVehicleImage(XFile image, String vehicleId);
 
@@ -78,7 +86,54 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
     // to null in Firestore (e.g., when deleting a document attachment or clearing a field).
     // The VehicleModel.toJson() provides a full representation of the entity.
 
+    // Maintenance is never written from here. The vehicle passed in is
+    // whatever copy the page loaded, so writing its maintenance would wipe
+    // records other users added since. Maintenance goes through
+    // [modifyVehicle], which works on the stored copy.
+    vehicleData.remove('maintenanceHistory');
+    vehicleData.remove('maintenance');
+
     await firestore.collection('vehicles').doc(vehicle.id).update(vehicleData);
+  }
+
+  @override
+  Future<VehicleModel> modifyVehicle(
+    String vehicleId,
+    VehicleEntity Function(VehicleEntity latest) change,
+  ) async {
+    final ref = firestore.collection('vehicles').doc(vehicleId);
+    // Errors thrown inside runTransaction reach Flutter web as a generic
+    // "Dart exception thrown", so [change]'s own errors are carried out and
+    // rethrown here to keep their message.
+    Object? changeError;
+    StackTrace? changeStack;
+
+    final saved = await firestore.runTransaction((txn) async {
+      final snap = await txn.get(ref);
+      if (!snap.exists || snap.data() == null) {
+        changeError = StateError('This vehicle no longer exists.');
+        return null;
+      }
+
+      final latest = VehicleModel.fromJson(snap.data()!);
+      final VehicleEntity changed;
+      try {
+        changed = change(latest);
+      } catch (e, st) {
+        changeError = e;
+        changeStack = st;
+        return null;
+      }
+
+      final patch = vehicleChangePatch(latest, changed);
+      if (patch.isNotEmpty) txn.update(ref, patch);
+      return VehicleModel.fromJson(VehicleModel.fromEntity(changed).toJson());
+    });
+
+    if (changeError != null) {
+      Error.throwWithStackTrace(changeError!, changeStack ?? StackTrace.current);
+    }
+    return saved!;
   }
 
   @override

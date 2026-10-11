@@ -63,6 +63,11 @@ class _FakeVehicleRepository implements VehicleRepository {
   @override
   Future<List<VehicleEntity>> getAllVehicles() => throw UnimplementedError();
   @override
+  Future<VehicleEntity> modifyVehicle(
+    String id,
+    VehicleEntity Function(VehicleEntity latest) change,
+  ) => throw UnimplementedError();
+  @override
   Future<void> insertVehicle(VehicleEntity v) => throw UnimplementedError();
   @override
   Future<void> deleteVehicle(String id) => throw UnimplementedError();

@@ -224,27 +224,38 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
         nextServiceMileage: nextMileage,
       );
 
-      final List<MaintenanceRecord> updatedHistory = (widget.vehicle.maintenanceHistory ?? []).map((r) {
-        if (r == widget.record) {
-          return updatedRecord;
-        }
-        return r;
-      }).toList();
-
-      final existingMaintenance = widget.vehicle.maintenance ?? const VehicleMaintenance();
-      final updatedMaintenance = _updateMatchingTypedRecord(existingMaintenance, widget.record, updatedRecord);
-
       // The odometer is no longer written here. This dialog used to take
       // max(entered, current), which silently swallowed a too-low entry and
       // bypassed every plausibility check. The service mileage now goes into
       // the odometer log like any other reading, and the vehicle's derived
       // odometer is refreshed from there.
-      final updatedVehicle = widget.vehicle.copyWith(
-        maintenanceHistory: updatedHistory,
-        maintenance: updatedMaintenance,
-      );
+      //
+      // Applied to the stored copy, not widget.vehicle: a page loaded earlier
+      // would otherwise write back its old list and lose records added since.
+      final updatedVehicle = await provider.modifyVehicle(widget.vehicle.id, (latest) {
+        final history = latest.maintenanceHistory ?? const <MaintenanceRecord>[];
+        if (!history.contains(widget.record)) {
+          throw StateError(
+            'This maintenance record was changed or removed by someone else. '
+            'Refresh the page and try again.',
+          );
+        }
 
-      await provider.updateVehicle(updatedVehicle);
+        final List<MaintenanceRecord> updatedHistory = history.map((r) {
+          if (r == widget.record) {
+            return updatedRecord;
+          }
+          return r;
+        }).toList();
+
+        final existingMaintenance = latest.maintenance ?? const VehicleMaintenance();
+        final updatedMaintenance = _updateMatchingTypedRecord(existingMaintenance, widget.record, updatedRecord);
+
+        return latest.copyWith(
+          maintenanceHistory: updatedHistory,
+          maintenance: updatedMaintenance,
+        );
+      });
 
       await odometerProvider.recordSilently(
         vehicle: updatedVehicle,
