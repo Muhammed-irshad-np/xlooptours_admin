@@ -474,7 +474,16 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     try {
       final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
       if (image != null) {
-        _pickedImage.value = image;
+        // On web the picked file is only a blob URL that is read again at
+        // save time, which fails with "Could not load Blob from its URL" if
+        // the browser has dropped it by then. Hold the bytes instead.
+        _pickedImage.value = kIsWeb
+            ? XFile.fromData(
+                await image.readAsBytes(),
+                name: image.name,
+                mimeType: image.mimeType,
+              )
+            : image;
       }
     } catch (e) {
       debugPrint('Error picking image: $e');
