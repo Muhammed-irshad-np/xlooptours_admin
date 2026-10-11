@@ -357,11 +357,10 @@ class _MyAppState extends State<MyApp> {
                   body: Center(child: CircularProgressIndicator()),
                 );
               }
-              return child!;
+              return AppSelectionArea(child: child!);
             },
             debugShowCheckedModeBanner: false,
             title: 'Xloop Tours Admin',
-            builder: (context, child) => AppSelectionArea(child: child!),
             theme: ThemeData(
               colorScheme: ColorScheme.fromSeed(
                 seedColor: const Color(0xFF13b1f2),
