@@ -14,6 +14,7 @@ import '../features/vehicle/domain/entities/shop_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../features/vehicle/presentation/providers/odometer_provider.dart';
 import '../features/vehicle/domain/entities/odometer_reading_entity.dart';
+import '../features/vehicle/domain/entities/odometer_policy.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
@@ -566,18 +567,31 @@ class _AddMaintenanceRecordDialogState
     return last == null ? null : 'Last recorded: $last km';
   }
 
-  /// Catches the one error that is unambiguous at this point: a service
-  /// mileage below what the vehicle has already covered. Subtler slips are
-  /// caught by the plausibility engine when the reading reaches the odometer
-  /// log, where the full history is available.
+  /// Shown, without blocking the save, when the service mileage is below the
+  /// last recorded reading — usually a bill that arrived late.
+  String? _serviceOdometerWarning(String text) {
+    final parsed = int.tryParse(text);
+    final last = widget.vehicle.currentOdometer;
+    if (parsed == null || last == null || parsed >= last) return null;
+    return '${last - parsed} km below last recorded ($last km). '
+        'Only save if this is an older bill.';
+  }
+
+  /// A service mileage a little below the last reading is allowed (a late
+  /// bill) and only warned about. Further below than
+  /// [OdometerPolicy.maxServiceKmBelowLast] is treated as a typo and blocked.
+  /// Subtler slips are caught by the plausibility engine when the reading
+  /// reaches the odometer log, where the full history is available.
   String? _validateServiceOdometer(String? v) {
     if (v == null || v.isEmpty) return 'Required';
     final parsed = int.tryParse(v);
     if (parsed == null) return 'Invalid';
 
     final last = widget.vehicle.currentOdometer;
-    if (last != null && parsed < last) {
-      return 'Below last recorded ($last km)';
+    if (last != null &&
+        last - parsed > OdometerPolicy.maxServiceKmBelowLast) {
+      return 'More than ${OdometerPolicy.maxServiceKmBelowLast} km below '
+          'last recorded ($last km)';
     }
     return null;
   }
@@ -859,7 +873,18 @@ class _AddMaintenanceRecordDialogState
                                   decoration: InputDecoration(
                                     labelText: 'Current Odometer *',
                                     suffixText: 'km',
-                                    helperText: _odometerHelperText,
+                                    helperText: _serviceOdometerWarning(
+                                          entry.serviceKmController.text,
+                                        ) ??
+                                        _odometerHelperText,
+                                    helperMaxLines: 2,
+                                    helperStyle:
+                                        _serviceOdometerWarning(
+                                              entry.serviceKmController.text,
+                                            ) !=
+                                            null
+                                        ? const TextStyle(color: Colors.orange)
+                                        : null,
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(8.r),
                                     ),
@@ -868,6 +893,7 @@ class _AddMaintenanceRecordDialogState
                                   inputFormatters: [
                                     FilteringTextInputFormatter.digitsOnly,
                                   ],
+                                  onChanged: (_) => setState(() {}),
                                   validator: _validateServiceOdometer,
                                 ),
                               ),

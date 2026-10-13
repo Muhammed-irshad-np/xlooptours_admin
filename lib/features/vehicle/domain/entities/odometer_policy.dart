@@ -100,6 +100,11 @@ class OdometerPolicy extends Equatable {
 
   static const OdometerPolicy defaults = OdometerPolicy();
 
+  /// How far below the last recorded reading a maintenance entry may go.
+  /// Bills often arrive after newer readings were logged, so a lower service
+  /// mileage is allowed (with a warning) up to this gap, and blocked beyond it.
+  static const int maxServiceKmBelowLast = 5000;
+
   /// Largest delta that is physically possible across [days].
   ///
   /// Clamped to at least one day so a same-day second reading still gets the
