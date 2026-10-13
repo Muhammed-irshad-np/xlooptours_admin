@@ -520,6 +520,11 @@ class _AddMaintenanceRecordDialogState
       var vehicleForOdometer = updatedVehicle;
       for (final e in recordsToAdd) {
         if (e.record.mileage <= 0) continue;
+        // A mileage below the vehicle's current odometer is a late bill: it
+        // belongs on the maintenance record only, not in the odometer log.
+        if (e.record.mileage < (vehicleForOdometer.currentOdometer ?? 0)) {
+          continue;
+        }
         final result = await odometerProvider.recordSilently(
           vehicle: vehicleForOdometer,
           value: e.record.mileage,
