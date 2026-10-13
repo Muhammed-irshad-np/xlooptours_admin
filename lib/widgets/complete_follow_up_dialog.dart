@@ -77,8 +77,7 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
     final parsed = int.tryParse(_odometerController.text);
     final last = _lastKnownOdometer;
     if (parsed == null || last == null || parsed >= last) return null;
-    return '${last - parsed} km below the last recorded reading ($last km). '
-        'Only save if this is an older bill.';
+    return '${last - parsed} km below last ($last km)';
   }
 
   /// A reading a little below the last one is allowed (a late bill) and only
@@ -94,8 +93,8 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
     final last = _lastKnownOdometer;
     if (last != null &&
         last - parsed > OdometerPolicy.maxServiceKmBelowLast) {
-      return 'More than ${OdometerPolicy.maxServiceKmBelowLast} km below the '
-          'last recorded reading ($last km)';
+      return 'Over ${OdometerPolicy.maxServiceKmBelowLast} km below last '
+          '($last km)';
     }
     return null;
   }
@@ -378,7 +377,8 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
                   suffixText: 'km',
                   hintText: 'Read it off the cluster',
                   helperText: _odometerWarning ?? _odometerHelperText,
-                  helperMaxLines: 2,
+                  helperMaxLines: 3,
+                  errorMaxLines: 3,
                   helperStyle: _odometerWarning != null
                       ? const TextStyle(color: Colors.orange)
                       : null,
@@ -388,6 +388,9 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
                 ),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                // Shows the red "too far below" error while typing, not only
+                // after Save is pressed.
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 onChanged: (_) => setState(() {}),
                 validator: _validateOdometer,
               ),

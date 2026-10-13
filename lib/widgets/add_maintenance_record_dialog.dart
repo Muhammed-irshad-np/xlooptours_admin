@@ -578,8 +578,7 @@ class _AddMaintenanceRecordDialogState
     final parsed = int.tryParse(text);
     final last = widget.vehicle.currentOdometer;
     if (parsed == null || last == null || parsed >= last) return null;
-    return '${last - parsed} km below last recorded ($last km). '
-        'Only save if this is an older bill.';
+    return '${last - parsed} km below last ($last km)';
   }
 
   /// A service mileage a little below the last reading is allowed (a late
@@ -595,8 +594,8 @@ class _AddMaintenanceRecordDialogState
     final last = widget.vehicle.currentOdometer;
     if (last != null &&
         last - parsed > OdometerPolicy.maxServiceKmBelowLast) {
-      return 'More than ${OdometerPolicy.maxServiceKmBelowLast} km below '
-          'last recorded ($last km)';
+      return 'Over ${OdometerPolicy.maxServiceKmBelowLast} km below last '
+          '($last km)';
     }
     return null;
   }
@@ -882,7 +881,8 @@ class _AddMaintenanceRecordDialogState
                                           entry.serviceKmController.text,
                                         ) ??
                                         _odometerHelperText,
-                                    helperMaxLines: 2,
+                                    helperMaxLines: 3,
+                                    errorMaxLines: 3,
                                     helperStyle:
                                         _serviceOdometerWarning(
                                               entry.serviceKmController.text,
@@ -898,6 +898,10 @@ class _AddMaintenanceRecordDialogState
                                   inputFormatters: [
                                     FilteringTextInputFormatter.digitsOnly,
                                   ],
+                                  // Shows the red "too far below" error while
+                                  // typing, not only after Save is pressed.
+                                  autovalidateMode:
+                                      AutovalidateMode.onUserInteraction,
                                   onChanged: (_) => setState(() {}),
                                   validator: _validateServiceOdometer,
                                 ),
