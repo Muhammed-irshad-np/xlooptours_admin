@@ -272,15 +272,19 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
         );
       });
 
-      await odometerProvider.recordSilently(
-        vehicle: updatedVehicle,
-        value: completion.mileage,
-        source: OdometerSource.followUp,
-        readingAt: _selectedDate,
-        enteredByUid: user?.id,
-        enteredByName: username,
-        note: 'Captured while completing ${widget.record.serviceType}.',
-      );
+      // A reading below the vehicle's current odometer is a late bill: it
+      // belongs on the maintenance record only, not in the odometer log.
+      if (completion.mileage >= (updatedVehicle.currentOdometer ?? 0)) {
+        await odometerProvider.recordSilently(
+          vehicle: updatedVehicle,
+          value: completion.mileage,
+          source: OdometerSource.followUp,
+          readingAt: _selectedDate,
+          enteredByUid: user?.id,
+          enteredByName: username,
+          note: 'Captured while completing ${widget.record.serviceType}.',
+        );
+      }
 
       if (mounted) {
         await ActivityLogger.log(
