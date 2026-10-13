@@ -13,6 +13,7 @@ import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../features/vehicle/presentation/providers/odometer_provider.dart';
 import '../features/vehicle/domain/entities/odometer_reading_entity.dart';
+import '../features/vehicle/domain/entities/odometer_policy.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
@@ -70,17 +71,30 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
     return parts.isEmpty ? null : parts.join(' · ');
   }
 
-  /// Blocks the two errors this dialog can catch on its own. Anything subtler
-  /// is caught downstream by the plausibility engine when the reading is
-  /// written to the odometer log.
+  /// Shown, without blocking the save, when the reading is below the last
+  /// recorded one — usually a bill that arrived late.
+  String? get _odometerWarning {
+    final parsed = int.tryParse(_odometerController.text);
+    final last = _lastKnownOdometer;
+    if (parsed == null || last == null || parsed >= last) return null;
+    return '${last - parsed} km below last ($last km)';
+  }
+
+  /// A reading a little below the last one is allowed (a late bill) and only
+  /// warned about. Further below than [OdometerPolicy.maxServiceKmBelowLast]
+  /// is treated as a typo and blocked. Anything subtler is caught downstream
+  /// by the plausibility engine when the reading is written to the odometer
+  /// log.
   String? _validateOdometer(String? v) {
     if (v == null || v.isEmpty) return 'Required';
     final parsed = int.tryParse(v);
     if (parsed == null) return 'Invalid odometer';
 
     final last = _lastKnownOdometer;
-    if (last != null && parsed < last) {
-      return 'Lower than the last recorded reading ($last km)';
+    if (last != null &&
+        last - parsed > OdometerPolicy.maxServiceKmBelowLast) {
+      return 'Over ${OdometerPolicy.maxServiceKmBelowLast} km below last '
+          '($last km)';
     }
     return null;
   }
@@ -257,15 +271,19 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
         );
       });
 
-      await odometerProvider.recordSilently(
-        vehicle: updatedVehicle,
-        value: completion.mileage,
-        source: OdometerSource.followUp,
-        readingAt: _selectedDate,
-        enteredByUid: user?.id,
-        enteredByName: username,
-        note: 'Captured while completing ${widget.record.serviceType}.',
-      );
+      // A reading below the vehicle's current odometer is a late bill: it
+      // belongs on the maintenance record only, not in the odometer log.
+      if (completion.mileage >= (updatedVehicle.currentOdometer ?? 0)) {
+        await odometerProvider.recordSilently(
+          vehicle: updatedVehicle,
+          value: completion.mileage,
+          source: OdometerSource.followUp,
+          readingAt: _selectedDate,
+          enteredByUid: user?.id,
+          enteredByName: username,
+          note: 'Captured while completing ${widget.record.serviceType}.',
+        );
+      }
 
       if (mounted) {
         await ActivityLogger.log(
@@ -358,14 +376,22 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
                   labelText: 'Odometer Reading',
                   suffixText: 'km',
                   hintText: 'Read it off the cluster',
-                  helperText: _odometerHelperText,
-                  helperMaxLines: 2,
+                  helperText: _odometerWarning ?? _odometerHelperText,
+                  helperMaxLines: 3,
+                  errorMaxLines: 3,
+                  helperStyle: _odometerWarning != null
+                      ? const TextStyle(color: Colors.orange)
+                      : null,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.r),
                   ),
                 ),
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                // Shows the red "too far below" error while typing, not only
+                // after Save is pressed.
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                onChanged: (_) => setState(() {}),
                 validator: _validateOdometer,
               ),
               SizedBox(height: 16.h),
