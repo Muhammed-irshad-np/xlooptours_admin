@@ -97,7 +97,11 @@ class _AddMaintenanceRecordDialogState
     ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<VehicleProvider>().fetchAllShops();
+        final provider = context.read<VehicleProvider>();
+        provider.fetchAllShops();
+        // Normally already loaded at startup; without them the dropdown
+        // offers only the built-in Car Wash and Other.
+        provider.ensureMaintenanceTypesLoaded();
       }
     });
   }

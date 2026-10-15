@@ -35,6 +35,7 @@ import '../core/rbac/rbac_manager.dart';
 import '../features/auth/domain/entities/user_entity.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
+import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../features/xloop_vault/presentation/pages/vault_screen.dart';
 import 'companies_screen.dart';
 import '../features/user_management/presentation/pages/user_management_screen.dart';
@@ -782,6 +783,18 @@ class _AdminLayoutState extends State<AdminLayout> {
   int _indexOfTab(List<_NavItem> items, String? tab) {
     final index = items.indexWhere((item) => item.slug == tab);
     return index < 0 ? 0 : index;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Loaded here rather than only by the dashboard, so the maintenance
+    // dropdowns and alerts have them after a page refresh on any tab.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<VehicleProvider>().ensureMaintenanceTypesLoaded();
+      }
+    });
   }
 
   @override
