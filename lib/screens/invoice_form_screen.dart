@@ -14,6 +14,7 @@ import '../widgets/line_item_row_widget.dart';
 import '../widgets/responsive_layout.dart';
 import '../widgets/custom_date_picker.dart';
 import '../core/widgets/confirm_save_dialog.dart';
+import '../core/widgets/unsaved_changes_guard.dart';
 
 class InvoiceFormScreen extends StatefulWidget {
   final InvoiceEntity? invoiceToEdit;
@@ -26,6 +27,7 @@ class InvoiceFormScreen extends StatefulWidget {
 
 class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _unsavedChangesKey = GlobalKey<UnsavedChangesGuardState>();
   final _contractRefController = TextEditingController();
   final _taxRateController = TextEditingController(
     text: '5',
@@ -412,6 +414,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
       // Clear draft after successful generation
       await _storageService.clearInvoiceDraft();
       _resetForm();
+      _unsavedChangesKey.currentState?.markClean();
 
       // Navigate to PDF preview
       if (mounted) {
@@ -424,8 +427,31 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
     }
   }
 
+  /// Everything the user can edit, for the unsaved-changes warning on back.
+  List<Object?> _editableFields() => [
+    _selectedDate,
+    _contractRefController,
+    _taxRateController,
+    _discountController,
+    _useCustomPaymentTerms,
+    _selectedPaymentTermsOption,
+    _paymentTermsController,
+    _selectedCompany.value?.id,
+    _lineItems,
+  ];
+
   @override
   Widget build(BuildContext context) {
+    // A new invoice is auto-saved as a draft, so only edits can be lost.
+    return UnsavedChangesGuard(
+      key: _unsavedChangesKey,
+      enabled: widget.invoiceToEdit != null,
+      fields: _editableFields,
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     final dateFormat = DateFormat('dd-MM-yyyy');
     final currencyFormat = NumberFormat.currency(
       symbol: 'SR ',

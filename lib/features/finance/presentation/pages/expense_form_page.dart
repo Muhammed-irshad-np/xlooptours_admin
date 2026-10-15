@@ -20,6 +20,7 @@ import '../../../../features/employee/presentation/providers/employee_provider.d
 import '../../../../features/employee/domain/entities/employee_entity.dart';
 import '../../../../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../../../../features/vehicle/domain/entities/vehicle_entity.dart';
+import '../../../../core/widgets/unsaved_changes_guard.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
 
@@ -236,8 +237,37 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     super.dispose();
   }
 
+  /// Everything the user can edit, for the unsaved-changes warning on back.
+  /// Category and type are compared loosely because the dropdowns rewrite them
+  /// to the master list's spelling once it loads.
+  List<Object?> _editableFields() => [
+    _amountController,
+    _descriptionController,
+    _paymentDetailsController,
+    _notesController,
+    _mileageController,
+    _selectedDate,
+    _selectedCategory?.trim().toLowerCase(),
+    _selectedType?.trim().toLowerCase(),
+    _selectedAccountId,
+    _paymentMethod,
+    _selectedCurrency,
+    _submittedByEmployeeId,
+    _submittedBy,
+    _beneficiaryEmployeeId,
+    _selectedVehicleId,
+    _receiptUrls,
+  ];
+
   @override
   Widget build(BuildContext context) {
+    return UnsavedChangesGuard(
+      fields: _editableFields,
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       backgroundColor: FinDT.bgPage,
       appBar: _buildAppBar(),
@@ -353,7 +383,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       elevation: 0,
       surfaceTintColor: Colors.transparent,
       leading: IconButton(
-        onPressed: () => Navigator.pop(context),
+        onPressed: () => Navigator.maybePop(context),
         icon: Icon(
           Icons.arrow_back_rounded,
           color: FinDT.textPrimary,
