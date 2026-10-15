@@ -10,6 +10,10 @@ import '../../domain/usecases/upload_employee_image_usecase.dart';
 import '../../domain/usecases/get_employee_settings_usecase.dart';
 import '../../domain/usecases/update_employee_settings_usecase.dart';
 import '../../domain/entities/employee_settings_entity.dart';
+import '../../domain/entities/employee_role_entity.dart';
+import '../../domain/usecases/get_employee_roles_usecase.dart';
+import '../../domain/usecases/save_employee_role_usecase.dart';
+import '../../domain/usecases/delete_employee_role_usecase.dart';
 
 class EmployeeProvider with ChangeNotifier {
   final GetAllEmployeesUseCase getAllEmployeesUseCase;
@@ -20,6 +24,9 @@ class EmployeeProvider with ChangeNotifier {
   final UploadDocumentAttachmentUseCase uploadDocumentAttachmentUseCase;
   final GetEmployeeSettingsUseCase getEmployeeSettingsUseCase;
   final UpdateEmployeeSettingsUseCase updateEmployeeSettingsUseCase;
+  final GetEmployeeRolesUseCase getEmployeeRolesUseCase;
+  final SaveEmployeeRoleUseCase saveEmployeeRoleUseCase;
+  final DeleteEmployeeRoleUseCase deleteEmployeeRoleUseCase;
 
   EmployeeProvider({
     required this.getAllEmployeesUseCase,
@@ -30,15 +37,20 @@ class EmployeeProvider with ChangeNotifier {
     required this.uploadDocumentAttachmentUseCase,
     required this.getEmployeeSettingsUseCase,
     required this.updateEmployeeSettingsUseCase,
+    required this.getEmployeeRolesUseCase,
+    required this.saveEmployeeRoleUseCase,
+    required this.deleteEmployeeRoleUseCase,
   });
 
   List<EmployeeEntity> _employees = [];
   EmployeeSettingsEntity? _settings;
+  List<EmployeeRoleEntity> _roles = [];
   bool _isLoading = false;
   String? _error;
 
   List<EmployeeEntity> get employees => _employees;
   EmployeeSettingsEntity? get settings => _settings;
+  List<EmployeeRoleEntity> get roles => _roles;
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -175,5 +187,55 @@ class EmployeeProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  // ======================
+  // Role Master Methods
+  // ======================
+
+  /// Built-in roles first, in their fixed order, then the custom ones.
+  Future<void> fetchEmployeeRoles() async {
+    try {
+      final custom = await getEmployeeRolesUseCase();
+      _roles = [
+        ...EmployeeRoleEntity.defaults,
+        ...custom.where((r) => !r.isBuiltIn),
+      ];
+    } catch (e) {
+      debugPrint('Error fetching employee roles: $e');
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
+  }
+
+  Future<void> saveEmployeeRole(EmployeeRoleEntity role) async {
+    final index = _roles.indexWhere((r) => r.id == role.id);
+    final previousName = index == -1 ? null : _roles[index].name;
+    await saveEmployeeRoleUseCase(role, previousName: previousName);
+
+    if (index == -1) {
+      _roles.add(role);
+    } else {
+      _roles[index] = role;
+    }
+    final custom = _roles.where((r) => !r.isBuiltIn).toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    _roles = [...EmployeeRoleEntity.defaults, ...custom];
+    if (previousName != null && previousName != role.name) {
+      _employees = _employees
+          .map(
+            (e) =>
+                e.position == previousName ? e.copyWith(position: role.name) : e,
+          )
+          .toList();
+    }
+    notifyListeners();
+  }
+
+  Future<void> deleteEmployeeRole(String id) async {
+    await deleteEmployeeRoleUseCase(id);
+    _roles.removeWhere((r) => r.id == id);
+    notifyListeners();
   }
 }
