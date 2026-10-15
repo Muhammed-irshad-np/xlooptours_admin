@@ -139,7 +139,7 @@ class _DashboardScreenState extends State<DashboardScreen>
         employeeProvider.fetchAllEmployees(),
         employeeProvider.fetchEmployeeSettings(),
         vehicleProvider.fetchAllVehicles(),
-        vehicleProvider.fetchAllMaintenanceTypes(),
+        vehicleProvider.ensureMaintenanceTypesLoaded(),
         vehicleProvider.fetchVehicleSettings(),
         vaultProvider.loadVaultData(),
         if (isAdmin) context.read<FeedbackProvider>().fetchLatestFeedbacks(),

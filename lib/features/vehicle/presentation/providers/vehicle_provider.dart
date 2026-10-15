@@ -61,6 +61,8 @@ class VehicleProvider extends ChangeNotifier {
   List<VehicleEntity> _vehicles = [];
   List<VehicleMakeEntity> _vehicleMakes = [];
   List<MaintenanceTypeEntity> _maintenanceTypes = [];
+  bool _maintenanceTypesLoaded = false;
+  Future<void>? _maintenanceTypesFetch;
   List<ShopEntity> _shops = [];
   VehicleSettingsEntity? _settings;
   bool _isLoading = false;
@@ -485,10 +487,21 @@ class VehicleProvider extends ChangeNotifier {
   // Maintenance Type Methods
   // ======================
 
+  /// Loads the maintenance types once per session; later calls join a load
+  /// already in flight or return straight away. Edits made on the master
+  /// screen refresh the list through [fetchAllMaintenanceTypes].
+  Future<void> ensureMaintenanceTypesLoaded() {
+    if (_maintenanceTypesLoaded) return Future.value();
+    return _maintenanceTypesFetch ??= fetchAllMaintenanceTypes().whenComplete(
+      () => _maintenanceTypesFetch = null,
+    );
+  }
+
   Future<void> fetchAllMaintenanceTypes() async {
     _setLoading(true);
     try {
       _maintenanceTypes = await getAllMaintenanceTypesUseCase();
+      _maintenanceTypesLoaded = true;
       _errorMessage = null;
     } catch (e) {
       _errorMessage = 'Failed to fetch maintenance types: \$e';
