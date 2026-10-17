@@ -167,38 +167,32 @@ class ExpenseCategoriesPage extends StatelessWidget {
             id: 'rent',
             name: 'Office Rent',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'electricity',
             name: 'Electricity Bill',
             defaultDuration: 'MONTHLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'tax',
             name: 'Corporate Tax',
             defaultDuration: 'QUARTERLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'wifi',
             name: 'Office Wi-Fi',
             defaultDuration: 'MONTHLY',
-            submittedByRole: 'ADMIN',
           ),
           // Company document costs, logged straight from the vault alerts.
           ExpenseTypeEntity(
             id: 'cr_renewal',
             name: 'Commercial Registration (CR) Renewal',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'vat_certificate',
             name: 'VAT Certificate Renewal',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
         ],
       ),
@@ -211,44 +205,37 @@ class ExpenseCategoriesPage extends StatelessWidget {
             id: 'fuel',
             name: 'Fuel',
             defaultDuration: 'DAILY',
-            submittedByRole: 'DRIVER',
           ),
           ExpenseTypeEntity(
             id: 'car_wash',
             name: 'Car Wash',
             defaultDuration: 'DAILY',
-            submittedByRole: 'DRIVER',
           ),
           ExpenseTypeEntity(
             id: 'maintenance',
             name: 'Maintenance & Repairs',
             defaultDuration: 'MONTHLY',
-            submittedByRole: 'COORDINATOR',
           ),
           ExpenseTypeEntity(
             id: 'insurance',
             name: 'Vehicle Insurance',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           // Vehicle document costs, logged straight from the expiry alerts.
           ExpenseTypeEntity(
             id: 'istimara_renewal',
             name: 'Istimara Renewal',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'fahas_mvpi',
             name: 'Fahas / MVPI',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'vehicle_authorization',
             name: 'Vehicle Authorization (Tafweed)',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
         ],
       ),
@@ -261,19 +248,16 @@ class ExpenseCategoriesPage extends StatelessWidget {
             id: 'salary',
             name: 'Basic Salary',
             defaultDuration: 'MONTHLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'allowance',
             name: 'Housing & Transport Allowance',
             defaultDuration: 'MONTHLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'bonus',
             name: 'Performance Bonus',
             defaultDuration: 'MONTHLY',
-            submittedByRole: 'ADMIN',
           ),
           // Company-borne document costs. These are attributed to the
           // employee they were spent on, not paid by them.
@@ -281,63 +265,53 @@ class ExpenseCategoriesPage extends StatelessWidget {
             id: 'iqama_renewal',
             name: 'Iqama Renewal',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'passport_renewal',
             name: 'Passport Renewal',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'visa_renewal',
             name: 'Visa Renewal',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'residence_renewal',
             name: 'Residence Permit Renewal',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'driving_license_renewal',
             name: 'Driving License Renewal',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'health_insurance',
             name: 'Health Insurance',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'authorization_renewal',
             name: 'Tafweed (Authorization) Renewal',
             defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'phone_recharge',
             name: 'Phone Recharge',
             defaultDuration: 'MONTHLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'medical_exam',
             name: 'Medical Examination',
             defaultDuration: 'ONE_TIME',
             priority: 'IF_REQUIRED',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'exit_reentry',
             name: 'Exit Re-entry Visa',
             defaultDuration: 'ONE_TIME',
             priority: 'IF_REQUIRED',
-            submittedByRole: 'ADMIN',
           ),
         ],
       ),
@@ -512,7 +486,7 @@ class _CategoryExpansionCard extends StatelessWidget {
                     style: GoogleFonts.inter(fontSize: 13.sp, fontWeight: FontWeight.w600),
                   ),
                   subtitle: Text(
-                    'Frequency: ${type.defaultDuration} | Submitted by: ${type.submittedByRole}',
+                    'Frequency: ${type.defaultDuration}',
                     style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.textSecondary),
                   ),
                   trailing: Row(
@@ -572,7 +546,6 @@ class _CategoryExpansionCard extends StatelessWidget {
     final formKey = GlobalKey<FormState>();
     final nameCtrl = TextEditingController(text: type?.name);
     String duration = type?.defaultDuration ?? 'MONTHLY';
-    String role = type?.submittedByRole ?? 'ADMIN';
     bool isSaving = false;
 
     showDialog(
@@ -619,19 +592,6 @@ class _CategoryExpansionCard extends StatelessWidget {
                           .toList(),
                       onChanged: isSaving ? null : (v) => setDialogState(() => duration = v ?? 'MONTHLY'),
                     ),
-                    SizedBox(height: 14.h),
-                    DropdownButtonFormField<String>(
-                      initialValue: role,
-                      decoration: finDialogInputDecoration(
-                        label: 'Who Submits This?',
-                        prefixIcon: Icons.badge_outlined,
-                      ),
-                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                      items: ['ADMIN', 'COORDINATOR', 'DRIVER']
-                          .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                          .toList(),
-                      onChanged: isSaving ? null : (v) => setDialogState(() => role = v ?? 'ADMIN'),
-                    ),
                   ],
                 ),
               ),
@@ -649,7 +609,6 @@ class _CategoryExpansionCard extends StatelessWidget {
                   id: isEditing ? type.id : const Uuid().v4(),
                   name: nameCtrl.text.trim(),
                   defaultDuration: duration,
-                  submittedByRole: role,
                 );
 
                 final updatedTypes = List<ExpenseTypeEntity>.from(category.expenseTypes);

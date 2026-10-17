@@ -9,7 +9,6 @@ class ExpenseTypeModel extends ExpenseTypeEntity {
     super.isRecurring = false,
     super.defaultAmount,
     super.priority = 'MANDATORY',
-    required super.submittedByRole,
     super.isActive = true,
   });
 
@@ -21,7 +20,6 @@ class ExpenseTypeModel extends ExpenseTypeEntity {
       'isRecurring': isRecurring,
       'defaultAmount': defaultAmount,
       'priority': priority,
-      'submittedByRole': submittedByRole,
       'isActive': isActive,
     };
   }
@@ -34,7 +32,6 @@ class ExpenseTypeModel extends ExpenseTypeEntity {
       isRecurring: json['isRecurring'] as bool? ?? false,
       defaultAmount: (json['defaultAmount'] as num?)?.toDouble(),
       priority: json['priority'] as String? ?? 'MANDATORY',
-      submittedByRole: json['submittedByRole'] as String? ?? 'ADMIN',
       isActive: json['isActive'] as bool? ?? true,
     );
   }
@@ -47,7 +44,6 @@ class ExpenseTypeModel extends ExpenseTypeEntity {
       isRecurring: entity.isRecurring,
       defaultAmount: entity.defaultAmount,
       priority: entity.priority,
-      submittedByRole: entity.submittedByRole,
       isActive: entity.isActive,
     );
   }

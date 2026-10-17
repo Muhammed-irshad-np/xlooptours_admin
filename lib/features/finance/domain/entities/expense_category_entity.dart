@@ -20,9 +20,6 @@ class ExpenseTypeEntity extends Equatable {
   /// Priority level for this expense type.
   final String priority; // MANDATORY, IF_REQUIRED
 
-  /// Which role is expected to submit this expense.
-  final String submittedByRole; // ADMIN, COORDINATOR, DRIVER
-
   final bool isActive;
 
   const ExpenseTypeEntity({
@@ -32,7 +29,6 @@ class ExpenseTypeEntity extends Equatable {
     this.isRecurring = false,
     this.defaultAmount,
     this.priority = 'MANDATORY',
-    required this.submittedByRole,
     this.isActive = true,
   });
 
@@ -43,7 +39,6 @@ class ExpenseTypeEntity extends Equatable {
     bool? isRecurring,
     double? defaultAmount,
     String? priority,
-    String? submittedByRole,
     bool? isActive,
     bool clearDefaultAmount = false,
   }) {
@@ -56,7 +51,6 @@ class ExpenseTypeEntity extends Equatable {
           ? null
           : (defaultAmount ?? this.defaultAmount),
       priority: priority ?? this.priority,
-      submittedByRole: submittedByRole ?? this.submittedByRole,
       isActive: isActive ?? this.isActive,
     );
   }
@@ -69,7 +63,6 @@ class ExpenseTypeEntity extends Equatable {
         isRecurring,
         defaultAmount,
         priority,
-        submittedByRole,
         isActive,
       ];
 }
