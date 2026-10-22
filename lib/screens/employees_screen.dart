@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -6,8 +8,10 @@ import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/domain/entities/employee_role_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
+import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../features/xloop_vault/presentation/providers/vault_provider.dart';
 
 import '../widgets/employee_table.dart';
 import '../widgets/responsive_layout.dart';
@@ -90,11 +94,45 @@ class _EmployeesScreenState extends State<EmployeesScreen>
       _isLoading.value = false;
 
       _filterEmployees();
+      unawaited(_refreshAlerts());
     } catch (e) {
       if (mounted) {
         _isLoading.value = false;
         AppSnackBar.showError(context, 'Error loading employees: $e');
       }
+    }
+  }
+
+  /// The warning icon in the table reads computed alerts from
+  /// [NotificationProvider], which the dashboard normally builds. On a
+  /// browser refresh straight onto this screen nothing has built them yet,
+  /// so load whatever is missing and rebuild them here.
+  Future<void> _refreshAlerts() async {
+    final employeeProvider = context.read<EmployeeProvider>();
+    final vehicleProvider = context.read<VehicleProvider>();
+    final vaultProvider = context.read<VaultProvider>();
+    final notificationProvider = context.read<NotificationProvider>();
+    try {
+      await Future.wait<void>([
+        if (employeeProvider.settings == null)
+          employeeProvider.fetchEmployeeSettings(),
+        if (vehicleProvider.vehicles.isEmpty) vehicleProvider.fetchAllVehicles(),
+        vehicleProvider.ensureMaintenanceTypesLoaded(),
+        if (vehicleProvider.settings == null)
+          vehicleProvider.fetchVehicleSettings(),
+        if (vaultProvider.vaultData == null) vaultProvider.loadVaultData(),
+      ]);
+      if (!mounted) return;
+      await notificationProvider.refreshAlerts(
+        vehicles: vehicleProvider.vehicles,
+        maintenanceTypes: vehicleProvider.maintenanceTypes,
+        employees: employeeProvider.employees,
+        employeeSettings: employeeProvider.settings,
+        vehicleSettings: vehicleProvider.settings,
+        vaultData: vaultProvider.vaultData,
+      );
+    } catch (e) {
+      debugPrint('Error refreshing employee alerts: $e');
     }
   }
 
