@@ -8,12 +8,6 @@ class ExpenseTypeEntity extends Equatable {
   final String id;
   final String name;
 
-  /// How often this expense typically occurs.
-  final String defaultDuration; // DAILY, WEEKLY, MONTHLY, QUARTERLY, YEARLY, ONE_TIME, etc.
-
-  /// Whether this expense recurs automatically.
-  final bool isRecurring;
-
   /// Default/expected amount for this type (0 means variable).
   final double? defaultAmount;
 
@@ -25,8 +19,6 @@ class ExpenseTypeEntity extends Equatable {
   const ExpenseTypeEntity({
     required this.id,
     required this.name,
-    required this.defaultDuration,
-    this.isRecurring = false,
     this.defaultAmount,
     this.priority = 'MANDATORY',
     this.isActive = true,
@@ -35,8 +27,6 @@ class ExpenseTypeEntity extends Equatable {
   ExpenseTypeEntity copyWith({
     String? id,
     String? name,
-    String? defaultDuration,
-    bool? isRecurring,
     double? defaultAmount,
     String? priority,
     bool? isActive,
@@ -45,8 +35,6 @@ class ExpenseTypeEntity extends Equatable {
     return ExpenseTypeEntity(
       id: id ?? this.id,
       name: name ?? this.name,
-      defaultDuration: defaultDuration ?? this.defaultDuration,
-      isRecurring: isRecurring ?? this.isRecurring,
       defaultAmount: clearDefaultAmount
           ? null
           : (defaultAmount ?? this.defaultAmount),
@@ -59,8 +47,6 @@ class ExpenseTypeEntity extends Equatable {
   List<Object?> get props => [
         id,
         name,
-        defaultDuration,
-        isRecurring,
         defaultAmount,
         priority,
         isActive,
