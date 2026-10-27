@@ -38,6 +38,7 @@ class _PayrollRow {
 
   double get basic => payment?.basicSalary ?? structure?.basicSalary ?? 0;
   double get allowances => payment?.allowances ?? structure?.allowances ?? 0;
+  double get extraAllowance => payment?.extraAllowance ?? 0;
   double get deductions => payment?.deductions ?? 0;
   double get advanceRecovery => payment?.advanceRecovery ?? 0;
 
@@ -49,6 +50,7 @@ class _PayrollRow {
       SalaryPaymentEntity.computeNet(
         basicSalary: basic,
         allowances: allowances,
+        extraAllowance: extraAllowance,
       );
   String get currency => payment?.currency ?? structure?.currency ?? 'SAR';
 }
@@ -713,8 +715,11 @@ class _SalariesPageState extends State<SalariesPage> {
             flex: 2,
             child: _amountCell(
               'Allowances',
-              fmt.format(row.allowances),
+              fmt.format(row.allowances + row.extraAllowance),
               row.currency,
+              note: row.extraAllowance > 0
+                  ? 'incl. ${fmt.format(row.extraAllowance)} extra'
+                  : null,
             ),
           ),
           Expanded(
@@ -1245,6 +1250,11 @@ class _SalariesPageState extends State<SalariesPage> {
     );
     final deductionNoteCtrl =
         TextEditingController(text: row.payment?.deductionNote ?? '');
+    final extraCtrl = TextEditingController(
+      text: row.extraAllowance > 0 ? row.extraAllowance.toStringAsFixed(2) : '',
+    );
+    final extraNoteCtrl =
+        TextEditingController(text: row.payment?.extraAllowanceNote ?? '');
     final recoveryCtrl = TextEditingController();
 
     String accountId = row.payment?.fundAccountId ??
@@ -1273,10 +1283,11 @@ class _SalariesPageState extends State<SalariesPage> {
               account.stcPayBalance > 0;
           final effectiveMethod = usesBuckets ? paymentMethod : 'bank';
 
+          final extra = double.tryParse(extraCtrl.text.trim()) ?? 0;
           final deduction = double.tryParse(deductionCtrl.text.trim()) ?? 0;
           final requestedRecovery =
               double.tryParse(recoveryCtrl.text.trim()) ?? 0;
-          final gross = row.basic + row.allowances;
+          final gross = row.basic + row.allowances + extra;
           // Never recover more than is owed, nor more than what is left after
           // manual deductions.
           final maxRecovery = [
@@ -1289,6 +1300,7 @@ class _SalariesPageState extends State<SalariesPage> {
           final net = SalaryPaymentEntity.computeNet(
             basicSalary: row.basic,
             allowances: row.allowances,
+            extraAllowance: extra,
             deductions: deduction,
             advanceRecovery: recovery,
           );
@@ -1380,6 +1392,53 @@ class _SalariesPageState extends State<SalariesPage> {
                       ],
                       SizedBox(height: 14.h),
                       TextFormField(
+                        controller: extraCtrl,
+                        enabled: !isPaying,
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+                        ],
+                        onChanged: (_) => setInner(() {}),
+                        decoration: finDialogInputDecoration(
+                          label: 'Extra Allowance (this month)',
+                          hint: 'Bonus, overtime, Eid allowance…',
+                          prefixIcon: Icons.add_circle_outline,
+                          suffixText: row.currency,
+                        ),
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          color: FinDT.textPrimary,
+                        ),
+                        validator: (v) {
+                          if (v == null || v.trim().isEmpty) return null;
+                          final n = double.tryParse(v);
+                          if (n == null || n < 0) return 'Enter a valid amount';
+                          return null;
+                        },
+                      ),
+                      if (extra > 0) ...[
+                        SizedBox(height: 14.h),
+                        TextFormField(
+                          controller: extraNoteCtrl,
+                          enabled: !isPaying,
+                          decoration: finDialogInputDecoration(
+                            label: 'Extra Allowance Reason *',
+                            hint: 'e.g. Overtime – September',
+                            prefixIcon: Icons.description_outlined,
+                          ),
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: FinDT.textPrimary,
+                          ),
+                          validator: (v) => extra > 0 &&
+                                  (v == null || v.trim().isEmpty)
+                              ? 'Give a reason for the extra allowance'
+                              : null,
+                        ),
+                      ],
+                      SizedBox(height: 14.h),
+                      TextFormField(
                         controller: deductionCtrl,
                         keyboardType:
                             const TextInputType.numberWithOptions(decimal: true),
@@ -1445,6 +1504,7 @@ class _SalariesPageState extends State<SalariesPage> {
                       SizedBox(height: 16.h),
                       _buildPaySummary(
                         row: row,
+                        extra: extra,
                         deduction: deduction,
                         recovery: recovery,
                         net: net,
@@ -1504,6 +1564,11 @@ class _SalariesPageState extends State<SalariesPage> {
                       position: row.position,
                       basicSalary: row.basic,
                       allowances: row.allowances,
+                      extraAllowance: extra,
+                      extraAllowanceNote:
+                          extra <= 0 || extraNoteCtrl.text.trim().isEmpty
+                              ? null
+                              : extraNoteCtrl.text.trim(),
                       deductions: deduction,
                       deductionNote: deductionNoteCtrl.text.trim().isEmpty
                           ? null
@@ -1798,6 +1863,7 @@ class _SalariesPageState extends State<SalariesPage> {
 
   Widget _buildPaySummary({
     required _PayrollRow row,
+    required double extra,
     required double deduction,
     required double recovery,
     required double net,
@@ -1845,6 +1911,12 @@ class _SalariesPageState extends State<SalariesPage> {
         children: [
           line('Basic', '${fmt.format(row.basic)} ${row.currency}'),
           line('Allowances', '${fmt.format(row.allowances)} ${row.currency}'),
+          if (extra > 0)
+            line(
+              'Extra allowance',
+              '+ ${fmt.format(extra)} ${row.currency}',
+              color: FinDT.success,
+            ),
           line(
             'Deductions',
             '− ${fmt.format(deduction)} ${row.currency}',

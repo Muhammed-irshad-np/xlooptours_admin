@@ -128,6 +128,11 @@ class SalaryPaymentEntity extends Equatable {
   final double basicSalary;
   final double allowances;
 
+  /// One-off allowance for this month only (bonus, overtime, Eid, etc.).
+  /// Never copied back to the [SalaryStructureEntity].
+  final double extraAllowance;
+  final String? extraAllowanceNote;
+
   /// Manual deductions: absences, fines, etc. (major units). Advance recovery
   /// is tracked separately in [advanceRecovery].
   final double deductions;
@@ -142,7 +147,8 @@ class SalaryPaymentEntity extends Equatable {
   /// Kept so voiding the salary can put the amounts back on those advances.
   final Map<String, double> advanceRecoveries;
 
-  /// basic + allowances − deductions − advance recovery, never below zero.
+  /// basic + allowances + extra allowance − deductions − advance recovery,
+  /// never below zero.
   final double netAmount;
   final int? netAmountMinor;
   final String currency;
@@ -184,6 +190,8 @@ class SalaryPaymentEntity extends Equatable {
     this.position = '',
     required this.basicSalary,
     this.allowances = 0,
+    this.extraAllowance = 0,
+    this.extraAllowanceNote,
     this.deductions = 0,
     this.deductionNote,
     this.advanceRecovery = 0,
@@ -209,7 +217,7 @@ class SalaryPaymentEntity extends Equatable {
     this.createdBy,
   });
 
-  double get grossSalary => basicSalary + allowances;
+  double get grossSalary => basicSalary + allowances + extraAllowance;
 
   /// Everything withheld from gross pay this month.
   double get totalWithheld => deductions + advanceRecovery;
@@ -230,10 +238,15 @@ class SalaryPaymentEntity extends Equatable {
   static double computeNet({
     required double basicSalary,
     double allowances = 0,
+    double extraAllowance = 0,
     double deductions = 0,
     double advanceRecovery = 0,
   }) {
-    final net = basicSalary + allowances - deductions - advanceRecovery;
+    final net = basicSalary +
+        allowances +
+        extraAllowance -
+        deductions -
+        advanceRecovery;
     return net < 0 ? 0 : net;
   }
 
@@ -269,6 +282,8 @@ class SalaryPaymentEntity extends Equatable {
   SalaryPaymentEntity copyWith({
     double? basicSalary,
     double? allowances,
+    double? extraAllowance,
+    String? extraAllowanceNote,
     double? deductions,
     String? deductionNote,
     double? advanceRecovery,
@@ -298,6 +313,8 @@ class SalaryPaymentEntity extends Equatable {
       position: position,
       basicSalary: basicSalary ?? this.basicSalary,
       allowances: allowances ?? this.allowances,
+      extraAllowance: extraAllowance ?? this.extraAllowance,
+      extraAllowanceNote: extraAllowanceNote ?? this.extraAllowanceNote,
       deductions: deductions ?? this.deductions,
       deductionNote: deductionNote ?? this.deductionNote,
       advanceRecovery: advanceRecovery ?? this.advanceRecovery,

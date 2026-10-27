@@ -2156,10 +2156,15 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       totalRecovery += amount;
     }
 
+    if (payment.extraAllowance < 0) {
+      throw StateError('Extra allowance cannot be negative');
+    }
+
     // Net is always recomputed here — never trusted from the UI.
     final net = SalaryPaymentEntity.computeNet(
       basicSalary: payment.basicSalary,
       allowances: payment.allowances,
+      extraAllowance: payment.extraAllowance,
       deductions: payment.deductions,
       advanceRecovery: totalRecovery,
     );
@@ -2439,6 +2444,12 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       'Basic ${payment.basicSalary.toStringAsFixed(2)}',
       'Allowances ${payment.allowances.toStringAsFixed(2)}',
     ];
+    if (payment.extraAllowance > 0) {
+      parts.add(
+        'Extra allowance ${payment.extraAllowance.toStringAsFixed(2)}'
+        '${payment.extraAllowanceNote != null ? ' (${payment.extraAllowanceNote})' : ''}',
+      );
+    }
     if (payment.deductions > 0) {
       parts.add(
         'Deductions -${payment.deductions.toStringAsFixed(2)}'

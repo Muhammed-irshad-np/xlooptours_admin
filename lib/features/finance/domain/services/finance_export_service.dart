@@ -101,7 +101,8 @@ class FinanceExportService {
   static String salariesToCsv(List<SalaryPaymentEntity> payments) {
     final buf = StringBuffer();
     buf.writeln(
-      'id,period,employeeName,position,basicSalary,allowances,deductions,'
+      'id,period,employeeName,position,basicSalary,allowances,extraAllowance,'
+      'extraAllowanceNote,deductions,'
       'advanceRecovery,netAmount,currency,status,fundAccountName,paymentMethod,'
       'expenseId,paidAt,paidBy,notes',
     );
@@ -113,6 +114,8 @@ class FinanceExportService {
         _csvEscape(p.position),
         p.basicSalary.toStringAsFixed(2),
         p.allowances.toStringAsFixed(2),
+        p.extraAllowance.toStringAsFixed(2),
+        _csvEscape(p.extraAllowanceNote),
         p.deductions.toStringAsFixed(2),
         p.advanceRecovery.toStringAsFixed(2),
         p.netAmount.toStringAsFixed(2),

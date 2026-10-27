@@ -92,6 +92,31 @@ void main() {
       );
     });
 
+    test('a one-off extra allowance adds to net pay and gross', () {
+      expect(
+        SalaryPaymentEntity.computeNet(
+          basicSalary: 3000,
+          allowances: 500,
+          extraAllowance: 750,
+          deductions: 200,
+        ),
+        4050,
+      );
+      final payment = SalaryPaymentEntity(
+        id: '2026-09_emp1',
+        period: '2026-09',
+        employeeId: 'emp1',
+        employeeName: 'Employee',
+        basicSalary: 3000,
+        allowances: 500,
+        extraAllowance: 750,
+        extraAllowanceNote: 'Overtime',
+        netAmount: 4250,
+        createdAt: DateTime(2026, 9, 1),
+      );
+      expect(payment.grossSalary, 4250);
+    });
+
     test('period key and document id are deterministic', () {
       expect(SalaryPaymentEntity.periodOf(DateTime(2026, 9, 15)), '2026-09');
       expect(SalaryPaymentEntity.buildId('2026-09', 'emp1'), '2026-09_emp1');
