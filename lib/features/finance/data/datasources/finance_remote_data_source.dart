@@ -1738,6 +1738,22 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   Future<CashAdvanceModel> issueCashAdvance({
     required CashAdvanceModel advance,
   }) async {
+    // Petty cash rules, same as an expense or salary: cash only leaves the
+    // drawer inside an open session, so it shows up in that day's count.
+    final account = await _getFundAccountOrThrow(advance.fundAccountId);
+    final session =
+        await _requireOpenSessionIfPetty(account, 'issue an advance from');
+    if (session != null &&
+        DayLockEntity.dayKeyFrom(advance.issuedAt)
+                .compareTo(DayLockEntity.dayKeyFrom(session.date)) <
+            0) {
+      throw StateError(
+        'A petty cash advance cannot be dated before the open session '
+        '(${DayLockEntity.dayKeyFrom(session.date)}). Earlier days have '
+        'already been counted.',
+      );
+    }
+
     // Prefer total-balance deduction so non-split wallets work.
     final tx = await postFundMovement(
       PostFundRequest(
@@ -1815,6 +1831,11 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     final outstanding = advance.outstanding;
     if (total > outstanding + 1e-9) {
       throw StateError('Settle amount exceeds outstanding $outstanding');
+    }
+    // Returned cash goes back into the drawer, so it needs a session too.
+    if (returnToFund && settleAmountMajor > 0) {
+      final account = await _getFundAccountOrThrow(advance.fundAccountId);
+      await _requireOpenSessionIfPetty(account, 'return advance cash to');
     }
 
     // What the employee spent becomes approved, tracking-only expenses: the
@@ -2215,16 +2236,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     // Same gates an expense payment goes through: the day must not be locked
     // by a verified session, and a petty cash wallet must have a session open.
     await _throwIfDayLocked(fundAccountId, now);
-    if (account.isPettyCash) {
-      final openSession = await getOpenSession(account.id);
-      if (openSession == null) {
-        throw StateError(
-          'Cannot pay salary from Petty Cash account "${account.name}" because '
-          'no petty cash session is currently open. Open today\'s session in '
-          'the Petty Cash tab first.',
-        );
-      }
-    }
+    await _requireOpenSessionIfPetty(account, 'pay salary from');
 
     // ── Advance recovery ───────────────────────────────────────
     // Validate every advance before any money moves, so a bad entry cannot
@@ -2760,6 +2772,33 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         .replaceFirst('StateError: ', '')
         .replaceFirst('Exception: ', '')
         .replaceFirst('Bad state: ', '');
+  }
+
+  Future<FundAccountModel> _getFundAccountOrThrow(String accountId) async {
+    final snap = await _accounts.doc(accountId).get();
+    if (!snap.exists || snap.data() == null) {
+      throw StateError('Fund account not found');
+    }
+    return FundAccountModel.fromJson(snap.data()!);
+  }
+
+  /// Petty cash wallets only move cash while a session is open, so every
+  /// drawer movement lands in a day's count. Returns that session, or null
+  /// for any other account type. [action] reads like "pay salary from".
+  Future<PettyCashSessionModel?> _requireOpenSessionIfPetty(
+    FundAccountEntity account,
+    String action,
+  ) async {
+    if (!account.isPettyCash) return null;
+    final session = await getOpenSession(account.id);
+    if (session == null) {
+      throw StateError(
+        'Cannot $action Petty Cash account "${account.name}" because no '
+        'petty cash session is currently open. Open today\'s session in the '
+        'Petty Cash tab first.',
+      );
+    }
+    return session;
   }
 
   Future<void> _throwIfDayLocked(String fundAccountId, DateTime day) async {

@@ -1602,6 +1602,40 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                             ? 'Purpose required'
                             : null,
                       ),
+                      if (selectedAccount.isPettyCash) ...[
+                        SizedBox(height: 12.h),
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(10.w),
+                          decoration: BoxDecoration(
+                            color: FinDT.brand.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Icon(
+                                Icons.info_outline,
+                                size: 15.sp,
+                                color: FinDT.brand,
+                              ),
+                              SizedBox(width: 8.w),
+                              Expanded(
+                                child: Text(
+                                  'Petty cash rules apply: a session must be '
+                                  'open for this account, and the issue date '
+                                  'cannot be before that session\'s date.',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.sp,
+                                    color: FinDT.textSecondary,
+                                    height: 1.4,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
