@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../employee/domain/entities/employee_entity.dart';
 import '../../../employee/presentation/providers/employee_provider.dart';
+import '../../../../widgets/searchable_dropdown.dart';
 import '../../domain/entities/cash_advance_entity.dart';
 import '../../domain/services/finance_export_service.dart';
 import '../providers/cash_advance_provider.dart';
@@ -1068,8 +1069,10 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                         validator: (v) => v == null ? 'Required' : null,
                       ),
                       SizedBox(height: 14.h),
-                      DropdownButtonFormField<EmployeeEntity>(
-                        initialValue: employee,
+                      SearchableDropdown<EmployeeEntity>(
+                        value: employee,
+                        labelText: 'Employee Recipient',
+                        searchHint: 'Search employee by name…',
                         decoration: finDialogInputDecoration(
                           label: 'Employee Recipient *',
                           hint: 'Select staff member',
@@ -1079,15 +1082,10 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                           fontSize: 12.sp,
                           color: FinDT.textPrimary,
                         ),
-                        items: employees
-                            .map(
-                              (e) => DropdownMenuItem(
-                                value: e,
-                                child: Text(e.fullName),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: isIssuing ? null : (v) => setInnerState(() => employee = v),
+                        items: employees,
+                        itemToString: (e) => e.fullName,
+                        enabled: !isIssuing,
+                        onChanged: (v) => setInnerState(() => employee = v),
                         validator: (v) => v == null ? 'Required' : null,
                       ),
                       SizedBox(height: 14.h),
