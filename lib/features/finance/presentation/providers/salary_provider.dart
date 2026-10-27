@@ -4,8 +4,8 @@ import '../../domain/usecases/salary_usecases.dart';
 
 /// Payroll state: who is on the payroll and what each month has been paid.
 ///
-/// The provider always holds one selected month ([period]) and the salary rows
-/// belonging to it.
+/// The provider always holds one selected month ([period]) and the rows
+/// belonging to it — staff salaries and external drivers' trip settlements.
 class SalaryProvider with ChangeNotifier {
   final GetSalaryStructuresUseCase getSalaryStructuresUseCase;
   final SaveSalaryStructureUseCase saveSalaryStructureUseCase;
@@ -39,8 +39,16 @@ class SalaryProvider with ChangeNotifier {
   List<SalaryStructureEntity> get activeStructures =>
       _structures.where((s) => s.isActive).toList();
 
-  /// Salary rows of the selected [period].
+  /// Every row of the selected [period], salaries and trip settlements alike.
   List<SalaryPaymentEntity> get payments => _payments;
+
+  /// Staff salary rows of the selected [period].
+  List<SalaryPaymentEntity> get salaryPayments =>
+      _payments.where((p) => !p.isTripSettlement).toList();
+
+  /// External drivers' trip settlements of the selected [period].
+  List<SalaryPaymentEntity> get tripPayments =>
+      _payments.where((p) => p.isTripSettlement).toList();
   String get period => _period;
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -50,17 +58,27 @@ class SalaryProvider with ChangeNotifier {
     return DateTime(int.parse(parts[0]), int.parse(parts[1]));
   }
 
-  List<SalaryPaymentEntity> get pendingPayments =>
-      _payments.where((p) => p.status == SalaryPaymentStatus.pending).toList();
-  List<SalaryPaymentEntity> get paidPayments =>
-      _payments.where((p) => p.status == SalaryPaymentStatus.paid).toList();
+  List<SalaryPaymentEntity> get pendingPayments => salaryPayments
+      .where((p) => p.status == SalaryPaymentStatus.pending)
+      .toList();
+  List<SalaryPaymentEntity> get paidPayments => salaryPayments
+      .where((p) => p.status == SalaryPaymentStatus.paid)
+      .toList();
 
-  /// Net total of everything still to be paid this month.
+  /// Net salary total still to be paid this month.
   double get totalPending =>
       pendingPayments.fold(0.0, (sum, p) => sum + p.netAmount);
 
-  /// Net total already posted to fund accounts this month.
+  /// Net salary total already posted to fund accounts this month.
   double get totalPaid => paidPayments.fold(0.0, (sum, p) => sum + p.netAmount);
+
+  List<SalaryPaymentEntity> get paidTripPayments => tripPayments
+      .where((p) => p.status == SalaryPaymentStatus.paid)
+      .toList();
+
+  /// Net trip settlements already posted to fund accounts this month.
+  double get totalTripPaid =>
+      paidTripPayments.fold(0.0, (sum, p) => sum + p.netAmount);
 
   /// Monthly payroll cost of everyone on the payroll (before deductions).
   double get monthlyPayrollCost =>
@@ -73,9 +91,18 @@ class SalaryProvider with ChangeNotifier {
     return null;
   }
 
+  /// This month's salary row for [employeeId], if generated.
   SalaryPaymentEntity? paymentFor(String employeeId) {
     for (final p in _payments) {
-      if (p.employeeId == employeeId) return p;
+      if (!p.isTripSettlement && p.employeeId == employeeId) return p;
+    }
+    return null;
+  }
+
+  /// This month's trip settlement for the external driver [employeeId].
+  SalaryPaymentEntity? tripPaymentFor(String employeeId) {
+    for (final p in _payments) {
+      if (p.isTripSettlement && p.employeeId == employeeId) return p;
     }
     return null;
   }

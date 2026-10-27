@@ -1,4 +1,5 @@
 import '../entities/cash_advance_entity.dart';
+import '../entities/expense_entity.dart';
 import '../repositories/finance_repository.dart';
 
 class GetCashAdvancesUseCase {
@@ -24,6 +25,7 @@ class SettleCashAdvanceUseCase {
     required String actorName,
     required String actorUserId,
     required bool returnToFund,
+    List<ExpenseEntity> spentExpenses = const [],
   }) =>
       repository.settleCashAdvance(
         advanceId: advanceId,
@@ -31,6 +33,7 @@ class SettleCashAdvanceUseCase {
         actorName: actorName,
         actorUserId: actorUserId,
         returnToFund: returnToFund,
+        spentExpenses: spentExpenses,
       );
 }
 

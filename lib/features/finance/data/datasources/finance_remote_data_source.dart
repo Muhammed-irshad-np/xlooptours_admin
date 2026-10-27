@@ -30,6 +30,15 @@ import '../models/fund_account_type_model.dart';
 const String salaryExpenseCategory = 'EMPLOYEES';
 const String salaryExpenseType = 'Salary';
 
+/// Type stamped on the `expenses` mirror of an external driver's monthly trip
+/// closing. Same EMPLOYEES category as payroll, but kept apart in reports.
+const String driverTripExpenseType = 'Driver Trip Payment';
+
+/// Category and type stamped on the expense recorded when the unrecovered
+/// remainder of a cash advance is written off.
+const String advanceWriteOffExpenseCategory = 'EMPLOYEES';
+const String advanceWriteOffExpenseType = 'Advance Write-off';
+
 abstract class FinanceRemoteDataSource {
   // Expenses
   Future<List<ExpenseModel>> getAllExpenses();
@@ -140,6 +149,7 @@ abstract class FinanceRemoteDataSource {
     required String actorName,
     required String actorUserId,
     required bool returnToFund,
+    List<ExpenseEntity> spentExpenses = const [],
   });
 
   /// Closes outstanding advance as a loss. No cash returns to the fund
@@ -1667,6 +1677,9 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     // 4. Include any expenses on that calendar day not matched to a transaction
     for (final exp in allExpenses) {
       if (matchedExpenseIds.contains(exp.id)) continue;
+      // The drawer outflow is the advance withdrawal already listed above;
+      // what was spent from it, or written off, is not a second outflow.
+      if (exp.cashAdvanceId != null) continue;
       final expDate = exp.paidAt ?? exp.date;
       if (!expDate.isBefore(start) && expDate.isBefore(end)) {
         if (exp.status == ExpenseStatus.paid || exp.status == ExpenseStatus.approved) {
@@ -1729,6 +1742,22 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   Future<CashAdvanceModel> issueCashAdvance({
     required CashAdvanceModel advance,
   }) async {
+    // Petty cash rules, same as an expense or salary: cash only leaves the
+    // drawer inside an open session, so it shows up in that day's count.
+    final account = await _getFundAccountOrThrow(advance.fundAccountId);
+    final session =
+        await _requireOpenSessionIfPetty(account, 'issue an advance from');
+    if (session != null &&
+        DayLockEntity.dayKeyFrom(advance.issuedAt)
+                .compareTo(DayLockEntity.dayKeyFrom(session.date)) <
+            0) {
+      throw StateError(
+        'A petty cash advance cannot be dated before the open session '
+        '(${DayLockEntity.dayKeyFrom(session.date)}). Earlier days have '
+        'already been counted.',
+      );
+    }
+
     // Prefer total-balance deduction so non-split wallets work.
     final tx = await postFundMovement(
       PostFundRequest(
@@ -1743,6 +1772,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         bucket: FundBucket.total,
         credit: false,
         auditNote: 'cash_advance:${advance.id}',
+        date: advance.issuedAt,
       ),
     );
     final withLedger = CashAdvanceModel(
@@ -1783,8 +1813,15 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     required String actorName,
     required String actorUserId,
     required bool returnToFund,
+    List<ExpenseEntity> spentExpenses = const [],
   }) async {
-    if (settleAmountMajor <= 0) {
+    if (settleAmountMajor < 0 || spentExpenses.any((e) => e.amount <= 0)) {
+      throw ArgumentError('Settle amounts must be positive');
+    }
+    final spentTotal =
+        spentExpenses.fold<double>(0, (acc, e) => acc + e.amount);
+    final total = settleAmountMajor + spentTotal;
+    if (total <= 0) {
       throw ArgumentError('Settle amount must be positive');
     }
     final snap = await _advances.doc(advanceId).get();
@@ -1796,11 +1833,44 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       throw StateError('Advance is not open');
     }
     final outstanding = advance.outstanding;
-    if (settleAmountMajor > outstanding + 1e-9) {
+    if (total > outstanding + 1e-9) {
       throw StateError('Settle amount exceeds outstanding $outstanding');
     }
+    // Returned cash goes back into the drawer, so it needs a session too.
+    if (returnToFund && settleAmountMajor > 0) {
+      final account = await _getFundAccountOrThrow(advance.fundAccountId);
+      await _requireOpenSessionIfPetty(account, 'return advance cash to');
+    }
 
-    if (returnToFund) {
+    // What the employee spent becomes approved, tracking-only expenses: the
+    // advance already took this money out of the fund, so approving them
+    // must not take it out again. Approved rows cannot be edited, deleted or
+    // voided, which keeps them in step with the advance they settle.
+    final now = DateTime.now();
+    final spent = <ExpenseModel>[];
+    for (final e in spentExpenses) {
+      spent.add(
+        ExpenseModel.fromEntity(
+          e.copyWith(
+            id: e.id.isEmpty ? _uuid.v4() : e.id,
+            referenceNumber: await generateReferenceNumber(),
+            createdAt: now,
+            amountMinor: e.resolvedAmountMinor,
+            currency: advance.currency,
+            fundAccountId: advance.fundAccountId,
+            fundAccountName: advance.fundAccountName,
+            isNonWallet: true,
+            status: ExpenseStatus.approved,
+            approvedBy: actorName,
+            approvedByUserId: actorUserId,
+            approvedAt: now,
+            cashAdvanceId: advance.id,
+          ),
+        ),
+      );
+    }
+
+    if (returnToFund && settleAmountMajor > 0) {
       await postFundMovement(
         PostFundRequest(
           fundAccountId: advance.fundAccountId,
@@ -1818,8 +1888,17 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       );
     }
 
-    final newSettled = advance.settledAmount + settleAmountMajor;
+    final newSettled = advance.settledAmount + total;
     final fully = newSettled + 1e-9 >= advance.amount;
+    final note = [
+      if (advance.notes != null && advance.notes!.isNotEmpty) advance.notes,
+      if (spent.isNotEmpty)
+        'SETTLED ${total.toStringAsFixed(2)} ${advance.currency} by '
+            '$actorName: '
+            '${settleAmountMajor > 0 ? '${settleAmountMajor.toStringAsFixed(2)} returned, ' : ''}'
+            '${spentTotal.toStringAsFixed(2)} spent '
+            '(${spent.map((e) => e.referenceNumber).join(', ')})',
+    ].join('\n');
     final updated = CashAdvanceModel(
       id: advance.id,
       fundAccountId: advance.fundAccountId,
@@ -1838,11 +1917,27 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       issuedByUserId: advance.issuedByUserId,
       issuedAt: advance.issuedAt,
       issueLedgerEntryId: advance.issueLedgerEntryId,
-      settledAt: fully ? DateTime.now() : advance.settledAt,
-      notes: advance.notes,
+      settledAt: fully ? now : advance.settledAt,
+      notes: note.isEmpty ? null : note,
       createdAt: advance.createdAt,
     );
-    await _advances.doc(advanceId).update(_stripNulls(updated.toJson()));
+    final batch = firestore.batch();
+    for (final e in spent) {
+      batch.set(_expenses.doc(e.id), _stripNulls(e.toJson()));
+    }
+    batch.update(_advances.doc(advanceId), _stripNulls(updated.toJson()));
+    await batch.commit();
+    if (spent.isNotEmpty) {
+      await _writeAudit(
+        action: 'advance.settle',
+        entityType: 'cash_advance',
+        entityId: advanceId,
+        actorUserId: actorUserId,
+        actorName: actorName,
+        detail: 'returned=$settleAmountMajor spent=$spentTotal '
+            'expenses=${spent.map((e) => e.referenceNumber).join(',')}',
+      );
+    }
     return updated;
   }
 
@@ -1896,7 +1991,42 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       notes: note,
       createdAt: advance.createdAt,
     );
-    await _advances.doc(advanceId).update(_stripNulls(updated.toJson()));
+
+    // The loss is a real cost, so it lands in the expense list and reports.
+    // Tracking-only: the money left the fund when the advance was issued.
+    final now = DateTime.now();
+    final expense = ExpenseModel(
+      id: _uuid.v4(),
+      referenceNumber: await generateReferenceNumber(),
+      date: now,
+      createdAt: now,
+      submittedBy: actorName,
+      submittedByRole: 'ADMIN',
+      submittedByUserId: actorUserId,
+      expenseCategory: advanceWriteOffExpenseCategory,
+      expenseType: advanceWriteOffExpenseType,
+      description: 'Advance to ${advance.employeeName} written off: '
+          '${advance.purpose}',
+      amount: outstanding,
+      amountMinor: (outstanding * 100).round(),
+      currency: advance.currency,
+      fundAccountId: advance.fundAccountId,
+      fundAccountName: advance.fundAccountName,
+      isNonWallet: true,
+      status: ExpenseStatus.approved,
+      employeeId: advance.employeeId,
+      employeeName: advance.employeeName,
+      approvedBy: actorName,
+      approvedByUserId: actorUserId,
+      approvedAt: now,
+      notes: trimmed,
+      cashAdvanceId: advance.id,
+    );
+
+    final batch = firestore.batch();
+    batch.set(_expenses.doc(expense.id), _stripNulls(expense.toJson()));
+    batch.update(_advances.doc(advanceId), _stripNulls(updated.toJson()));
+    await batch.commit();
     await _writeAudit(
       action: 'advance.write_off',
       entityType: 'cash_advance',
@@ -1983,7 +2113,10 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     final structures =
         (await getSalaryStructures()).where((s) => s.isActive).toList();
     final existing = await getSalaryPayments(period: period);
-    final existingEmployeeIds = existing.map((p) => p.employeeId).toSet();
+    final existingEmployeeIds = existing
+        .where((p) => p.kind == SalaryPaymentKind.salary)
+        .map((p) => p.employeeId)
+        .toSet();
 
     final now = DateTime.now();
     final created = <SalaryPaymentModel>[];
@@ -2110,16 +2243,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     // Same gates an expense payment goes through: the day must not be locked
     // by a verified session, and a petty cash wallet must have a session open.
     await _throwIfDayLocked(fundAccountId, now);
-    if (account.isPettyCash) {
-      final openSession = await getOpenSession(account.id);
-      if (openSession == null) {
-        throw StateError(
-          'Cannot pay salary from Petty Cash account "${account.name}" because '
-          'no petty cash session is currently open. Open today\'s session in '
-          'the Petty Cash tab first.',
-        );
-      }
-    }
+    await _requireOpenSessionIfPetty(account, 'pay salary from');
 
     // ── Advance recovery ───────────────────────────────────────
     // Validate every advance before any money moves, so a bad entry cannot
@@ -2156,10 +2280,15 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       totalRecovery += amount;
     }
 
+    if (payment.extraAllowance < 0) {
+      throw StateError('Extra allowance cannot be negative');
+    }
+
     // Net is always recomputed here — never trusted from the UI.
     final net = SalaryPaymentEntity.computeNet(
       basicSalary: payment.basicSalary,
       allowances: payment.allowances,
+      extraAllowance: payment.extraAllowance,
       deductions: payment.deductions,
       advanceRecovery: totalRecovery,
     );
@@ -2235,7 +2364,9 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         submittedByRole: 'ADMIN',
         submittedByUserId: actorUserId,
         expenseCategory: salaryExpenseCategory,
-        expenseType: salaryExpenseType,
+        expenseType: payment.isTripSettlement
+            ? driverTripExpenseType
+            : salaryExpenseType,
         description: _salaryLabel(payment),
         paymentMethod: paymentMethod,
         amount: net,
@@ -2302,7 +2433,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       actorUserId: actorUserId,
       actorName: actorName,
       detail:
-          '${payment.employeeName} net=$net ${payment.currency} '
+          '${payment.kind.name} ${payment.employeeName} net=$net ${payment.currency} '
           'advanceRecovery=$totalRecovery from ${account.name} ($paymentMethod)',
     );
     return updated;
@@ -2418,27 +2549,41 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
-  /// "Salary Sep 2026 — Ahmed Ali", falling back to the raw period.
+  /// "Salary Sep 2026 — Ahmed Ali" (or "Trip Payment …" for an external
+  /// driver), falling back to the raw period.
   String _salaryLabel(SalaryPaymentEntity payment) {
+    final prefix = payment.kind.displayName;
     final parts = payment.period.split('-');
     if (parts.length == 2) {
       final month = int.tryParse(parts[1]);
       if (month != null && month >= 1 && month <= 12) {
-        return 'Salary ${_monthNames[month - 1]} ${parts[0]} — '
+        return '$prefix ${_monthNames[month - 1]} ${parts[0]} — '
             '${payment.employeeName}';
       }
     }
-    return 'Salary ${payment.period} — ${payment.employeeName}';
+    return '$prefix ${payment.period} — ${payment.employeeName}';
   }
 
   String _salaryBreakdownNote(
     SalaryPaymentEntity payment,
     double advanceRecovery,
   ) {
-    final parts = <String>[
-      'Basic ${payment.basicSalary.toStringAsFixed(2)}',
-      'Allowances ${payment.allowances.toStringAsFixed(2)}',
-    ];
+    final parts = payment.isTripSettlement
+        ? <String>[
+            'Trip earnings ${payment.basicSalary.toStringAsFixed(2)}'
+                '${payment.tripCount != null ? ' (${payment.tripCount} trips)' : ''}',
+          ]
+        : <String>[
+            'Basic ${payment.basicSalary.toStringAsFixed(2)}',
+            'Allowances ${payment.allowances.toStringAsFixed(2)}',
+          ];
+    if (payment.extraAllowance > 0) {
+      parts.add(
+        '${payment.isTripSettlement ? 'Extra' : 'Extra allowance'} '
+        '${payment.extraAllowance.toStringAsFixed(2)}'
+        '${payment.extraAllowanceNote != null ? ' (${payment.extraAllowanceNote})' : ''}',
+      );
+    }
     if (payment.deductions > 0) {
       parts.add(
         'Deductions -${payment.deductions.toStringAsFixed(2)}'
@@ -2644,6 +2789,33 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         .replaceFirst('StateError: ', '')
         .replaceFirst('Exception: ', '')
         .replaceFirst('Bad state: ', '');
+  }
+
+  Future<FundAccountModel> _getFundAccountOrThrow(String accountId) async {
+    final snap = await _accounts.doc(accountId).get();
+    if (!snap.exists || snap.data() == null) {
+      throw StateError('Fund account not found');
+    }
+    return FundAccountModel.fromJson(snap.data()!);
+  }
+
+  /// Petty cash wallets only move cash while a session is open, so every
+  /// drawer movement lands in a day's count. Returns that session, or null
+  /// for any other account type. [action] reads like "pay salary from".
+  Future<PettyCashSessionModel?> _requireOpenSessionIfPetty(
+    FundAccountEntity account,
+    String action,
+  ) async {
+    if (!account.isPettyCash) return null;
+    final session = await getOpenSession(account.id);
+    if (session == null) {
+      throw StateError(
+        'Cannot $action Petty Cash account "${account.name}" because no '
+        'petty cash session is currently open. Open today\'s session in the '
+        'Petty Cash tab first.',
+      );
+    }
+    return session;
   }
 
   Future<void> _throwIfDayLocked(String fundAccountId, DateTime day) async {

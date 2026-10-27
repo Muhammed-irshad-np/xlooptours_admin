@@ -11,6 +11,11 @@ class SearchableDropdown<T> extends FormField<T> {
   final ValueChanged<T?> onChanged;
   final Widget Function(BuildContext, T)? itemWidgetBuilder;
 
+  /// Replaces the default outlined look, so the field can match the
+  /// surrounding form. [labelText] still titles the search dialog.
+  final InputDecoration? decoration;
+  final TextStyle? style;
+
   SearchableDropdown({
     super.key,
     required this.items,
@@ -20,7 +25,10 @@ class SearchableDropdown<T> extends FormField<T> {
     required this.itemToString,
     required this.onChanged,
     this.itemWidgetBuilder,
+    this.decoration,
+    this.style,
     super.validator,
+    super.enabled,
   }) : super(
           initialValue: value,
           builder: (FormFieldState<T> state) {
@@ -29,7 +37,9 @@ class SearchableDropdown<T> extends FormField<T> {
             final displayValue = state.value != null ? itemToString(state.value as T) : '';
 
             return GestureDetector(
-              onTap: () {
+              onTap: !state.widget.enabled
+                  ? null
+                  : () {
                 showDialog(
                   context: context,
                   builder: (context) {
@@ -50,25 +60,30 @@ class SearchableDropdown<T> extends FormField<T> {
                 });
               },
               child: InputDecorator(
-                decoration: InputDecoration(
-                  labelText: labelText,
+                decoration: (decoration ??
+                        InputDecoration(
+                          labelText: labelText,
+                          border: const OutlineInputBorder(),
+                          contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                        ))
+                    .copyWith(
                   errorText: hasError ? state.errorText : null,
-                  border: const OutlineInputBorder(),
-                  suffixIcon: Icon(
-                    Icons.arrow_drop_down,
-                    color: const Color(0xFF64748B),
-                    size: 24.sp,
-                  ),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                  suffixIcon: decoration?.suffixIcon ??
+                      Icon(
+                        Icons.arrow_drop_down,
+                        color: const Color(0xFF64748B),
+                        size: 24.sp,
+                      ),
                 ),
                 isEmpty: state.value == null,
                 child: Text(
                   displayValue,
-                  style: GoogleFonts.inter(
-                    fontSize: 14.sp,
-                    color: state.value == null ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
-                    fontWeight: state.value == null ? FontWeight.w400 : FontWeight.w500,
-                  ),
+                  style: style ??
+                      GoogleFonts.inter(
+                        fontSize: 14.sp,
+                        color: state.value == null ? const Color(0xFF94A3B8) : const Color(0xFF0F172A),
+                        fontWeight: state.value == null ? FontWeight.w400 : FontWeight.w500,
+                      ),
                 ),
               ),
             );

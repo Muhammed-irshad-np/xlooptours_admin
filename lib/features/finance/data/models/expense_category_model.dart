@@ -5,11 +5,8 @@ class ExpenseTypeModel extends ExpenseTypeEntity {
   const ExpenseTypeModel({
     required super.id,
     required super.name,
-    required super.defaultDuration,
-    super.isRecurring = false,
     super.defaultAmount,
     super.priority = 'MANDATORY',
-    required super.submittedByRole,
     super.isActive = true,
   });
 
@@ -17,11 +14,8 @@ class ExpenseTypeModel extends ExpenseTypeEntity {
     return {
       'id': id,
       'name': name,
-      'defaultDuration': defaultDuration,
-      'isRecurring': isRecurring,
       'defaultAmount': defaultAmount,
       'priority': priority,
-      'submittedByRole': submittedByRole,
       'isActive': isActive,
     };
   }
@@ -30,11 +24,8 @@ class ExpenseTypeModel extends ExpenseTypeEntity {
     return ExpenseTypeModel(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
-      defaultDuration: json['defaultDuration'] as String? ?? 'MONTHLY',
-      isRecurring: json['isRecurring'] as bool? ?? false,
       defaultAmount: (json['defaultAmount'] as num?)?.toDouble(),
       priority: json['priority'] as String? ?? 'MANDATORY',
-      submittedByRole: json['submittedByRole'] as String? ?? 'ADMIN',
       isActive: json['isActive'] as bool? ?? true,
     );
   }
@@ -43,11 +34,8 @@ class ExpenseTypeModel extends ExpenseTypeEntity {
     return ExpenseTypeModel(
       id: entity.id,
       name: entity.name,
-      defaultDuration: entity.defaultDuration,
-      isRecurring: entity.isRecurring,
       defaultAmount: entity.defaultAmount,
       priority: entity.priority,
-      submittedByRole: entity.submittedByRole,
       isActive: entity.isActive,
     );
   }

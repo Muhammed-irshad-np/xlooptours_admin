@@ -351,39 +351,27 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
           ExpenseTypeEntity(
             id: 'rent',
             name: 'Office Rent',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'electricity',
             name: 'Electricity Bill',
-            defaultDuration: 'MONTHLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'tax',
             name: 'Corporate Tax',
-            defaultDuration: 'QUARTERLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'wifi',
             name: 'Office Wi-Fi',
-            defaultDuration: 'MONTHLY',
-            submittedByRole: 'ADMIN',
           ),
           // Company document costs, logged straight from the vault alerts.
           ExpenseTypeEntity(
             id: 'cr_renewal',
             name: 'Commercial Registration (CR) Renewal',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'vat_certificate',
             name: 'VAT Certificate Renewal',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
         ],
       ),
@@ -395,45 +383,31 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
           ExpenseTypeEntity(
             id: 'fuel',
             name: 'Fuel',
-            defaultDuration: 'DAILY',
-            submittedByRole: 'DRIVER',
           ),
           ExpenseTypeEntity(
             id: 'car_wash',
             name: 'Car Wash',
-            defaultDuration: 'DAILY',
-            submittedByRole: 'DRIVER',
           ),
           ExpenseTypeEntity(
             id: 'maintenance',
             name: 'Maintenance & Repairs',
-            defaultDuration: 'MONTHLY',
-            submittedByRole: 'COORDINATOR',
           ),
           ExpenseTypeEntity(
             id: 'insurance',
             name: 'Vehicle Insurance',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           // Vehicle document costs, logged straight from the expiry alerts.
           ExpenseTypeEntity(
             id: 'istimara_renewal',
             name: 'Istimara Renewal',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'fahas_mvpi',
             name: 'Fahas / MVPI',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'vehicle_authorization',
             name: 'Vehicle Authorization (Tafweed)',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
         ],
       ),
@@ -445,84 +419,64 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
           ExpenseTypeEntity(
             id: 'salary',
             name: 'Basic Salary',
-            defaultDuration: 'MONTHLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'allowance',
             name: 'Housing & Transport Allowance',
-            defaultDuration: 'MONTHLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'bonus',
             name: 'Performance Bonus',
-            defaultDuration: 'MONTHLY',
-            submittedByRole: 'ADMIN',
           ),
           // Company-borne document costs. These are attributed to the
           // employee they were spent on, not paid by them.
           ExpenseTypeEntity(
             id: 'iqama_renewal',
             name: 'Iqama Renewal',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'passport_renewal',
             name: 'Passport Renewal',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'visa_renewal',
             name: 'Visa Renewal',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'residence_renewal',
             name: 'Residence Permit Renewal',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'driving_license_renewal',
             name: 'Driving License Renewal',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'health_insurance',
             name: 'Health Insurance',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'authorization_renewal',
             name: 'Tafweed (Authorization) Renewal',
-            defaultDuration: 'YEARLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'phone_recharge',
             name: 'Phone Recharge',
-            defaultDuration: 'MONTHLY',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'medical_exam',
             name: 'Medical Examination',
-            defaultDuration: 'ONE_TIME',
             priority: 'IF_REQUIRED',
-            submittedByRole: 'ADMIN',
           ),
           ExpenseTypeEntity(
             id: 'exit_reentry',
             name: 'Exit Re-entry Visa',
-            defaultDuration: 'ONE_TIME',
             priority: 'IF_REQUIRED',
-            submittedByRole: 'ADMIN',
+          ),
+          // Recorded automatically when a cash advance is written off.
+          ExpenseTypeEntity(
+            id: 'advance_write_off',
+            name: 'Advance Write-off',
+            priority: 'IF_REQUIRED',
           ),
         ],
       ),
@@ -1152,7 +1106,7 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
                   IconButton(
                     icon: Icon(Icons.add_circle_outline_rounded, size: 18.sp, color: FinDT.brand),
                     tooltip: 'Add Subcategory Type',
-                    onPressed: () => _showAddTypeDialog(context),
+                    onPressed: () => _showTypeDialog(context),
                   ),
                   IconButton(
                     icon: Icon(Icons.delete_outline_rounded, size: 18.sp, color: FinDT.danger),
@@ -1213,36 +1167,31 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
             ),
           ),
           SizedBox(width: 8.w),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.h),
-            decoration: BoxDecoration(
-              color: FinDT.brand.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4.r),
-            ),
-            child: Text(
-              type.defaultDuration,
-              style: GoogleFonts.inter(
-                fontSize: 9.sp,
-                fontWeight: FontWeight.w700,
-                color: FinDT.brand,
-              ),
+          Tooltip(
+            message: 'Edit Type',
+            child: InkWell(
+              onTap: () => _showTypeDialog(context, type: type),
+              child: Icon(Icons.edit_outlined, size: 14.sp, color: FinDT.textSecondary),
             ),
           ),
           SizedBox(width: 6.w),
-          InkWell(
-            onTap: () => _confirmDeleteType(context, type),
-            child: Icon(Icons.close, size: 14.sp, color: FinDT.textSecondary),
+          Tooltip(
+            message: 'Delete Type',
+            child: InkWell(
+              onTap: () => _confirmDeleteType(context, type),
+              child: Icon(Icons.close, size: 14.sp, color: FinDT.textSecondary),
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _showAddTypeDialog(BuildContext context) {
+  /// Adds a new expense type, or edits [type] in place when given.
+  void _showTypeDialog(BuildContext context, {ExpenseTypeEntity? type}) {
+    final isEditing = type != null;
     final formKey = GlobalKey<FormState>();
-    final nameCtrl = TextEditingController();
-    String duration = 'MONTHLY';
-    String role = 'ADMIN';
+    final nameCtrl = TextEditingController(text: type?.name);
     bool isAdding = false;
 
     showDialog(
@@ -1253,7 +1202,10 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
           backgroundColor: Colors.white,
           surfaceTintColor: Colors.transparent,
           shape: finDialogShape,
-          title: finDialogTitle('New Expense Type', icon: Icons.playlist_add_rounded),
+          title: finDialogTitle(
+            isEditing ? 'Edit Expense Type' : 'New Expense Type',
+            icon: isEditing ? Icons.edit_outlined : Icons.playlist_add_rounded,
+          ),
           content: SizedBox(
             width: 380.w,
             child: Form(
@@ -1272,32 +1224,6 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
                     style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
                     validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
                   ),
-                  SizedBox(height: 14.h),
-                  DropdownButtonFormField<String>(
-                    initialValue: duration,
-                    decoration: finDialogInputDecoration(
-                      label: 'Default Duration',
-                      prefixIcon: Icons.schedule_rounded,
-                    ),
-                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                    items: ['DAILY', 'WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY', 'ONE_TIME']
-                        .map((d) => DropdownMenuItem(value: d, child: Text(d)))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => duration = v ?? 'MONTHLY'),
-                  ),
-                  SizedBox(height: 14.h),
-                  DropdownButtonFormField<String>(
-                    initialValue: role,
-                    decoration: finDialogInputDecoration(
-                      label: 'Allowed Role',
-                      prefixIcon: Icons.person_outline_rounded,
-                    ),
-                    style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                    items: ['ADMIN', 'COORDINATOR', 'DRIVER', 'ANY']
-                        .map((r) => DropdownMenuItem(value: r, child: Text(r)))
-                        .toList(),
-                    onChanged: (v) => setDialogState(() => role = v ?? 'ADMIN'),
-                  ),
                 ],
               ),
             ),
@@ -1310,15 +1236,23 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
             finDialogActionButton(
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
-                final newType = ExpenseTypeEntity(
-                  id: const Uuid().v4(),
-                  name: nameCtrl.text.trim(),
-                  defaultDuration: duration,
-                  submittedByRole: role,
-                );
-                final updatedCat = widget.category.copyWith(
-                  expenseTypes: [...widget.category.expenseTypes, newType],
-                );
+                final name = nameCtrl.text.trim();
+                // Keep the id and the fields this dialog doesn't show
+                // (priority, default amount) when editing.
+                final updatedTypes = isEditing
+                    ? widget.category.expenseTypes
+                        .map((t) => t.id == type.id
+                            ? t.copyWith(name: name)
+                            : t)
+                        .toList()
+                    : [
+                        ...widget.category.expenseTypes,
+                        ExpenseTypeEntity(
+                          id: const Uuid().v4(),
+                          name: name,
+                        ),
+                      ];
+                final updatedCat = widget.category.copyWith(expenseTypes: updatedTypes);
                 setDialogState(() => isAdding = true);
                 try {
                   await widget.provider.updateCategory(updatedCat);
@@ -1332,7 +1266,7 @@ class _CategoryExpansionCardState extends State<_CategoryExpansionCard> {
                   }
                 }
               },
-              label: 'Add Type',
+              label: isEditing ? 'Save Changes' : 'Add Type',
               backgroundColor: FinDT.brand,
               isLoading: isAdding,
             ),

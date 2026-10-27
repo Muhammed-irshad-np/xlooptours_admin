@@ -51,15 +51,11 @@ void main() {
       ExpenseTypeEntity(
         id: 't-1',
         name: 'Fuel',
-        defaultDuration: 'DAILY',
-        submittedByRole: 'DRIVER',
         isActive: true,
       ),
       ExpenseTypeEntity(
         id: 't-2',
         name: 'Car Wash',
-        defaultDuration: 'WEEKLY',
-        submittedByRole: 'DRIVER',
         isActive: true,
       ),
     ],
@@ -73,8 +69,6 @@ void main() {
       ExpenseTypeEntity(
         id: 't-3',
         name: 'Stationery',
-        defaultDuration: 'MONTHLY',
-        submittedByRole: 'ADMIN',
         isActive: true,
       ),
     ],
