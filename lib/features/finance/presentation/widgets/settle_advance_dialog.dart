@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/utils/receipt_picker.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../employee/presentation/providers/employee_provider.dart';
 import '../../domain/entities/cash_advance_entity.dart';
@@ -477,7 +478,7 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
   }
 
   Future<void> _pickReceipt(_SpentLine line) async {
-    final file = await ImagePicker().pickImage(source: ImageSource.gallery);
+    final file = await pickReceiptFile();
     if (file != null) setState(() => line.receipt = file);
   }
 

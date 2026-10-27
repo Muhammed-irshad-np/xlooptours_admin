@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
+import 'package:xloop_invoice/core/utils/receipt_picker.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,7 +10,6 @@ import 'package:uuid/uuid.dart';
 import '../../../vehicle/domain/entities/odometer_reading_entity.dart';
 import '../../../vehicle/presentation/providers/odometer_provider.dart';
 import '../../../vehicle/presentation/providers/vehicle_provider.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../auth/domain/entities/user_entity.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/finance_provider.dart';
@@ -2166,8 +2166,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   }
 
   Future<void> _pickAndUploadReceipt(FinanceProvider finProv) async {
-    final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery);
+    final file = await pickReceiptFile();
     if (file == null) return;
 
     final expenseId = _isEditing

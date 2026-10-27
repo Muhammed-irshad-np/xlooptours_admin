@@ -1,4 +1,3 @@
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -10,6 +9,7 @@ import '../../features/finance/domain/entities/expense_entity.dart';
 import '../../features/finance/domain/entities/finance_policy_entity.dart';
 import '../../features/finance/domain/entities/fund_account_entity.dart';
 import '../../widgets/custom_date_picker.dart';
+import '../utils/receipt_picker.dart';
 
 /// What a cost is tracked against — an employee, a vehicle, or both.
 ///
@@ -199,7 +199,8 @@ class InlineExpenseSection extends StatelessWidget {
   });
 
   String _fileName(XFile f) {
-    final base = p.basename(f.path);
+    // Web files have no real path, only a name.
+    final base = f.name.isNotEmpty ? f.name : p.basename(f.path);
     return base.length > 30 ? '...${base.substring(base.length - 27)}' : base;
   }
 
@@ -410,12 +411,9 @@ class InlineExpenseSection extends StatelessWidget {
             onPressed: isSaving
                 ? null
                 : () async {
-                    final result = await FilePicker.platform.pickFiles(
-                      type: FileType.any,
-                      allowMultiple: false,
-                    );
-                    if (result != null && result.files.isNotEmpty) {
-                      c.receipt = XFile(result.files.first.path ?? '');
+                    final file = await pickReceiptFile();
+                    if (file != null) {
+                      c.receipt = file;
                       onChanged();
                     }
                   },

@@ -6,6 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/utils/receipt_picker.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../employee/domain/entities/employee_entity.dart';
 import '../../../employee/presentation/providers/employee_provider.dart';
@@ -3264,6 +3266,11 @@ class _PettyCashPageState extends State<PettyCashPage> {
   }
 
   void _previewReceipt(BuildContext context, String url) {
+    // PDFs can't render in an image viewer; open them in the browser instead.
+    if (isPdfReceiptUrl(url)) {
+      launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      return;
+    }
     showDialog(
       context: context,
       builder: (ctx) => Dialog(
