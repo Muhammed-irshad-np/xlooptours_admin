@@ -74,16 +74,10 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
         return false;
       }
 
-      // Search query
+      // Search matches only the employee who took the advance
       final q = _searchCtrl.text.trim().toLowerCase();
-      if (q.isNotEmpty) {
-        final empMatch = a.employeeName.toLowerCase().contains(q);
-        final purpMatch = a.purpose.toLowerCase().contains(q);
-        final accMatch = (a.fundAccountName ?? '').toLowerCase().contains(q);
-        final issuerMatch = a.issuedBy.toLowerCase().contains(q);
-        if (!empMatch && !purpMatch && !accMatch && !issuerMatch) {
-          return false;
-        }
+      if (q.isNotEmpty && !a.employeeName.toLowerCase().contains(q)) {
+        return false;
       }
 
       return true;
@@ -296,7 +290,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                             color: FinDT.textPrimary,
                           ),
                           decoration: InputDecoration(
-                            hintText: 'Search by employee, purpose, or fund account...',
+                            hintText: 'Search by employee...',
                             hintStyle: GoogleFonts.inter(
                               fontSize: 12.sp,
                               color: FinDT.textMuted,
