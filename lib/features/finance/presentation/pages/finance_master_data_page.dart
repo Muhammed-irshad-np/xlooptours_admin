@@ -472,6 +472,12 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
             name: 'Exit Re-entry Visa',
             priority: 'IF_REQUIRED',
           ),
+          // Recorded automatically when a cash advance is written off.
+          ExpenseTypeEntity(
+            id: 'advance_write_off',
+            name: 'Advance Write-off',
+            priority: 'IF_REQUIRED',
+          ),
         ],
       ),
     ];

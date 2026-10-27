@@ -13,7 +13,9 @@ import '../../domain/entities/cash_advance_entity.dart';
 import '../../domain/services/finance_export_service.dart';
 import '../providers/cash_advance_provider.dart';
 import '../providers/fund_account_provider.dart';
+import '../providers/finance_provider.dart';
 import '../widgets/finance_dialog_helpers.dart';
+import '../widgets/settle_advance_dialog.dart';
 import 'finance_dashboard_page.dart';
 
 /// Issue, monitor, and settle staff cash advances / operational floats.
@@ -979,6 +981,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
     final purposeCtrl = TextEditingController();
     String? accountId;
     EmployeeEntity? employee;
+    var issueDate = DateUtils.dateOnly(DateTime.now());
     final accounts = context.read<FundAccountProvider>().activeAccounts;
     final employees = context.read<EmployeeProvider>().employees;
 
@@ -1083,6 +1086,45 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                         validator: (v) => v == null ? 'Required' : null,
                       ),
                       SizedBox(height: 14.h),
+                      InkWell(
+                        onTap: isIssuing
+                            ? null
+                            : () async {
+                                final picked = await showDatePicker(
+                                  context: ctx,
+                                  initialDate: issueDate,
+                                  firstDate: DateTime(2024),
+                                  lastDate: DateTime.now(),
+                                  builder: (context, child) => Theme(
+                                    data: Theme.of(context).copyWith(
+                                      colorScheme: ColorScheme.light(
+                                        primary: FinDT.brand,
+                                      ),
+                                    ),
+                                    child: child!,
+                                  ),
+                                );
+                                if (picked != null) {
+                                  setInnerState(() => issueDate = picked);
+                                }
+                              },
+                        borderRadius: BorderRadius.circular(10.r),
+                        child: InputDecorator(
+                          decoration: finDialogInputDecoration(
+                            label: 'Issue Date *',
+                            hint: 'Select date',
+                            prefixIcon: Icons.calendar_today_rounded,
+                          ),
+                          child: Text(
+                            DateFormat('dd MMM yyyy').format(issueDate),
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              color: FinDT.textPrimary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 14.h),
                       TextFormField(
                         controller: amountCtrl,
                         keyboardType: const TextInputType.numberWithOptions(
@@ -1146,6 +1188,19 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                   final user = context.read<AuthProvider>().user;
                   final acc = accounts.firstWhere((a) => a.id == accountId);
                   final amount = double.parse(amountCtrl.text);
+                  // Keep the current time of day so same-day advances still
+                  // sort in the order they were entered.
+                  final now = DateTime.now();
+                  final issuedAt = DateUtils.isSameDay(issueDate, now)
+                      ? now
+                      : DateTime(
+                          issueDate.year,
+                          issueDate.month,
+                          issueDate.day,
+                          now.hour,
+                          now.minute,
+                          now.second,
+                        );
 
                   final advance = CashAdvanceEntity(
                     id: const Uuid().v4(),
@@ -1159,8 +1214,8 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                     purpose: purposeCtrl.text.trim(),
                     issuedBy: user?.actorLabel ?? 'Admin',
                     issuedByUserId: user?.id,
-                    issuedAt: DateTime.now(),
-                    createdAt: DateTime.now(),
+                    issuedAt: issuedAt,
+                    createdAt: now,
                   );
 
                   final advProv = context.read<CashAdvanceProvider>();
@@ -1217,7 +1272,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
       message:
           'Mark remaining ${advance.outstanding.toStringAsFixed(2)} ${advance.currency} for ${advance.employeeName} as an unrecoverable operational loss.',
       highlightNote:
-          'Cash does NOT return to the fund account. This action permanently closes the outstanding advance.',
+          'Cash does NOT return to the fund account. The amount is recorded as an "Advance Write-off" expense and the advance is permanently closed.',
       confirmLabel: 'Write Off as Loss',
       confirmColor: FinDT.danger,
       icon: Icons.warning_amber_rounded,
@@ -1255,6 +1310,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
             actorUserId: user?.id ?? '',
           );
       if (context.mounted) {
+        context.read<FinanceProvider>().fetchAllExpenses();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Advance marked as written off'),
@@ -1277,207 +1333,6 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
   Future<void> _showSettleDialog(
     BuildContext context,
     CashAdvanceEntity advance,
-  ) async {
-    final formKey = GlobalKey<FormState>();
-    final ctrl = TextEditingController(
-      text: advance.outstanding.toStringAsFixed(2),
-    );
-    var returnToFund = true;
-    bool isSettling = false;
-
-    showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setLocal) => AlertDialog(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          shape: finDialogShape,
-          title: finDialogTitle(
-            'Settle Cash Advance',
-            icon: Icons.receipt_long_rounded,
-          ),
-          content: SizedBox(
-            width: 420.w,
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(12.w),
-                    decoration: BoxDecoration(
-                      color: FinDT.bgPage,
-                      borderRadius: BorderRadius.circular(10.r),
-                      border: Border.all(color: FinDT.border),
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Recipient Staff:',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.sp,
-                                color: FinDT.textSecondary,
-                              ),
-                            ),
-                            Text(
-                              advance.employeeName,
-                              style: GoogleFonts.inter(
-                                fontSize: 12.sp,
-                                fontWeight: FontWeight.w700,
-                                color: FinDT.textPrimary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 6.h),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Outstanding Float:',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.sp,
-                                color: FinDT.textSecondary,
-                              ),
-                            ),
-                            Text(
-                              '${advance.outstanding.toStringAsFixed(2)} ${advance.currency}',
-                              style: GoogleFonts.inter(
-                                fontSize: 12.sp,
-                                fontWeight: FontWeight.w700,
-                                color: FinDT.brand,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 14.h),
-                  TextFormField(
-                    controller: ctrl,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d*\.?\d*'),
-                      ),
-                    ],
-                    decoration: finDialogInputDecoration(
-                      label: 'Settlement Amount *',
-                      prefixIcon: Icons.payments_outlined,
-                      suffixText: advance.currency,
-                    ),
-                    style: GoogleFonts.inter(
-                      fontSize: 12.sp,
-                      color: FinDT.textPrimary,
-                    ),
-                    validator: (v) {
-                      final val = double.tryParse(v ?? '');
-                      if (val == null || val <= 0) {
-                        return 'Enter a valid positive amount';
-                      }
-                      if (val > advance.outstanding + 1e-6) {
-                        return 'Cannot exceed outstanding balance (${advance.outstanding.toStringAsFixed(2)})';
-                      }
-                      return null;
-                    },
-                  ),
-                  SizedBox(height: 12.h),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: FinDT.bgPage,
-                      borderRadius: BorderRadius.circular(10.r),
-                      border: Border.all(color: FinDT.border),
-                    ),
-                    child: CheckboxListTile(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 10.w),
-                      title: Text(
-                        'Return cash to source fund account',
-                        style: GoogleFonts.inter(
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.w500,
-                          color: FinDT.textPrimary,
-                        ),
-                      ),
-                      subtitle: Text(
-                        'Deposits amount back to ${advance.fundAccountName ?? advance.fundAccountId}',
-                        style: GoogleFonts.inter(
-                          fontSize: 10.sp,
-                          color: FinDT.textSecondary,
-                        ),
-                      ),
-                      activeColor: FinDT.brand,
-                      value: returnToFund,
-                      onChanged: isSettling
-                          ? null
-                          : (v) => setLocal(() => returnToFund = v ?? true),
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            finDialogCancelButton(
-              ctx,
-              onPressed: isSettling ? () {} : null,
-            ),
-            finDialogActionButton(
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-                final amount = double.tryParse(ctrl.text) ?? 0;
-                final user = context.read<AuthProvider>().user;
-                final advProv = context.read<CashAdvanceProvider>();
-                final fundProv = context.read<FundAccountProvider>();
-
-                setLocal(() => isSettling = true);
-                try {
-                  await advProv.settle(
-                    advanceId: advance.id,
-                    amount: amount,
-                    actorName: user?.actorLabel ?? 'Admin',
-                    actorUserId: user?.id ?? '',
-                    returnToFund: returnToFund,
-                  );
-                  await fundProv.fetchAllAccounts();
-                  if (ctx.mounted) finSafePop(ctx, true);
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Successfully settled ${amount.toStringAsFixed(2)} ${advance.currency} for ${advance.employeeName}',
-                        ),
-                        backgroundColor: FinDT.success,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (ctx.mounted) {
-                    setLocal(() => isSettling = false);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Failed to settle advance: $e'),
-                        backgroundColor: FinDT.danger,
-                      ),
-                    );
-                  }
-                }
-              },
-              label: 'Confirm Settlement',
-              backgroundColor: FinDT.brand,
-              isLoading: isSettling,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  ) =>
+      showSettleAdvanceDialog(context, advance);
 }

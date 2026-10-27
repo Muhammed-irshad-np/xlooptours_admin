@@ -30,6 +30,11 @@ import '../models/fund_account_type_model.dart';
 const String salaryExpenseCategory = 'EMPLOYEES';
 const String salaryExpenseType = 'Salary';
 
+/// Category and type stamped on the expense recorded when the unrecovered
+/// remainder of a cash advance is written off.
+const String advanceWriteOffExpenseCategory = 'EMPLOYEES';
+const String advanceWriteOffExpenseType = 'Advance Write-off';
+
 abstract class FinanceRemoteDataSource {
   // Expenses
   Future<List<ExpenseModel>> getAllExpenses();
@@ -140,6 +145,7 @@ abstract class FinanceRemoteDataSource {
     required String actorName,
     required String actorUserId,
     required bool returnToFund,
+    List<ExpenseEntity> spentExpenses = const [],
   });
 
   /// Closes outstanding advance as a loss. No cash returns to the fund
@@ -1667,6 +1673,9 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     // 4. Include any expenses on that calendar day not matched to a transaction
     for (final exp in allExpenses) {
       if (matchedExpenseIds.contains(exp.id)) continue;
+      // The drawer outflow is the advance withdrawal already listed above;
+      // what was spent from it, or written off, is not a second outflow.
+      if (exp.cashAdvanceId != null) continue;
       final expDate = exp.paidAt ?? exp.date;
       if (!expDate.isBefore(start) && expDate.isBefore(end)) {
         if (exp.status == ExpenseStatus.paid || exp.status == ExpenseStatus.approved) {
@@ -1743,6 +1752,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         bucket: FundBucket.total,
         credit: false,
         auditNote: 'cash_advance:${advance.id}',
+        date: advance.issuedAt,
       ),
     );
     final withLedger = CashAdvanceModel(
@@ -1783,8 +1793,15 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     required String actorName,
     required String actorUserId,
     required bool returnToFund,
+    List<ExpenseEntity> spentExpenses = const [],
   }) async {
-    if (settleAmountMajor <= 0) {
+    if (settleAmountMajor < 0 || spentExpenses.any((e) => e.amount <= 0)) {
+      throw ArgumentError('Settle amounts must be positive');
+    }
+    final spentTotal =
+        spentExpenses.fold<double>(0, (acc, e) => acc + e.amount);
+    final total = settleAmountMajor + spentTotal;
+    if (total <= 0) {
       throw ArgumentError('Settle amount must be positive');
     }
     final snap = await _advances.doc(advanceId).get();
@@ -1796,11 +1813,39 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       throw StateError('Advance is not open');
     }
     final outstanding = advance.outstanding;
-    if (settleAmountMajor > outstanding + 1e-9) {
+    if (total > outstanding + 1e-9) {
       throw StateError('Settle amount exceeds outstanding $outstanding');
     }
 
-    if (returnToFund) {
+    // What the employee spent becomes approved, tracking-only expenses: the
+    // advance already took this money out of the fund, so approving them
+    // must not take it out again. Approved rows cannot be edited, deleted or
+    // voided, which keeps them in step with the advance they settle.
+    final now = DateTime.now();
+    final spent = <ExpenseModel>[];
+    for (final e in spentExpenses) {
+      spent.add(
+        ExpenseModel.fromEntity(
+          e.copyWith(
+            id: e.id.isEmpty ? _uuid.v4() : e.id,
+            referenceNumber: await generateReferenceNumber(),
+            createdAt: now,
+            amountMinor: e.resolvedAmountMinor,
+            currency: advance.currency,
+            fundAccountId: advance.fundAccountId,
+            fundAccountName: advance.fundAccountName,
+            isNonWallet: true,
+            status: ExpenseStatus.approved,
+            approvedBy: actorName,
+            approvedByUserId: actorUserId,
+            approvedAt: now,
+            cashAdvanceId: advance.id,
+          ),
+        ),
+      );
+    }
+
+    if (returnToFund && settleAmountMajor > 0) {
       await postFundMovement(
         PostFundRequest(
           fundAccountId: advance.fundAccountId,
@@ -1818,8 +1863,17 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       );
     }
 
-    final newSettled = advance.settledAmount + settleAmountMajor;
+    final newSettled = advance.settledAmount + total;
     final fully = newSettled + 1e-9 >= advance.amount;
+    final note = [
+      if (advance.notes != null && advance.notes!.isNotEmpty) advance.notes,
+      if (spent.isNotEmpty)
+        'SETTLED ${total.toStringAsFixed(2)} ${advance.currency} by '
+            '$actorName: '
+            '${settleAmountMajor > 0 ? '${settleAmountMajor.toStringAsFixed(2)} returned, ' : ''}'
+            '${spentTotal.toStringAsFixed(2)} spent '
+            '(${spent.map((e) => e.referenceNumber).join(', ')})',
+    ].join('\n');
     final updated = CashAdvanceModel(
       id: advance.id,
       fundAccountId: advance.fundAccountId,
@@ -1838,11 +1892,27 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       issuedByUserId: advance.issuedByUserId,
       issuedAt: advance.issuedAt,
       issueLedgerEntryId: advance.issueLedgerEntryId,
-      settledAt: fully ? DateTime.now() : advance.settledAt,
-      notes: advance.notes,
+      settledAt: fully ? now : advance.settledAt,
+      notes: note.isEmpty ? null : note,
       createdAt: advance.createdAt,
     );
-    await _advances.doc(advanceId).update(_stripNulls(updated.toJson()));
+    final batch = firestore.batch();
+    for (final e in spent) {
+      batch.set(_expenses.doc(e.id), _stripNulls(e.toJson()));
+    }
+    batch.update(_advances.doc(advanceId), _stripNulls(updated.toJson()));
+    await batch.commit();
+    if (spent.isNotEmpty) {
+      await _writeAudit(
+        action: 'advance.settle',
+        entityType: 'cash_advance',
+        entityId: advanceId,
+        actorUserId: actorUserId,
+        actorName: actorName,
+        detail: 'returned=$settleAmountMajor spent=$spentTotal '
+            'expenses=${spent.map((e) => e.referenceNumber).join(',')}',
+      );
+    }
     return updated;
   }
 
@@ -1896,7 +1966,42 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       notes: note,
       createdAt: advance.createdAt,
     );
-    await _advances.doc(advanceId).update(_stripNulls(updated.toJson()));
+
+    // The loss is a real cost, so it lands in the expense list and reports.
+    // Tracking-only: the money left the fund when the advance was issued.
+    final now = DateTime.now();
+    final expense = ExpenseModel(
+      id: _uuid.v4(),
+      referenceNumber: await generateReferenceNumber(),
+      date: now,
+      createdAt: now,
+      submittedBy: actorName,
+      submittedByRole: 'ADMIN',
+      submittedByUserId: actorUserId,
+      expenseCategory: advanceWriteOffExpenseCategory,
+      expenseType: advanceWriteOffExpenseType,
+      description: 'Advance to ${advance.employeeName} written off: '
+          '${advance.purpose}',
+      amount: outstanding,
+      amountMinor: (outstanding * 100).round(),
+      currency: advance.currency,
+      fundAccountId: advance.fundAccountId,
+      fundAccountName: advance.fundAccountName,
+      isNonWallet: true,
+      status: ExpenseStatus.approved,
+      employeeId: advance.employeeId,
+      employeeName: advance.employeeName,
+      approvedBy: actorName,
+      approvedByUserId: actorUserId,
+      approvedAt: now,
+      notes: trimmed,
+      cashAdvanceId: advance.id,
+    );
+
+    final batch = firestore.batch();
+    batch.set(_expenses.doc(expense.id), _stripNulls(expense.toJson()));
+    batch.update(_advances.doc(advanceId), _stripNulls(updated.toJson()));
+    await batch.commit();
     await _writeAudit(
       action: 'advance.write_off',
       entityType: 'cash_advance',

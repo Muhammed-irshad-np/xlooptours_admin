@@ -115,12 +115,16 @@ abstract class FinanceRepository {
 
   Future<List<CashAdvanceEntity>> getCashAdvances({String? fundAccountId});
   Future<CashAdvanceEntity> issueCashAdvance(CashAdvanceEntity advance);
+  /// Closes [settleAmountMajor] of the advance as cash handed back (or
+  /// otherwise recovered), plus each of [spentExpenses] as a tracking-only
+  /// expense of what the employee spent it on.
   Future<CashAdvanceEntity> settleCashAdvance({
     required String advanceId,
     required double settleAmountMajor,
     required String actorName,
     required String actorUserId,
     required bool returnToFund,
+    List<ExpenseEntity> spentExpenses = const [],
   });
 
   Future<CashAdvanceEntity> writeOffCashAdvance({

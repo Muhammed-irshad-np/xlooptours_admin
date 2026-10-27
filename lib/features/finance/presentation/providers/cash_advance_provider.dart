@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../domain/entities/cash_advance_entity.dart';
+import '../../domain/entities/expense_entity.dart';
 import '../../domain/usecases/cash_advance_usecases.dart';
 
 class CashAdvanceProvider with ChangeNotifier {
@@ -60,6 +61,7 @@ class CashAdvanceProvider with ChangeNotifier {
     required String actorName,
     required String actorUserId,
     bool returnToFund = true,
+    List<ExpenseEntity> spentExpenses = const [],
   }) async {
     _error = null;
     try {
@@ -69,6 +71,7 @@ class CashAdvanceProvider with ChangeNotifier {
         actorName: actorName,
         actorUserId: actorUserId,
         returnToFund: returnToFund,
+        spentExpenses: spentExpenses,
       );
       final i = _advances.indexWhere((a) => a.id == advanceId);
       if (i != -1) _advances[i] = updated;

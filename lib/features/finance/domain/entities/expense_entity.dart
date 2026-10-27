@@ -131,6 +131,11 @@ class ExpenseEntity extends Equatable {
   /// stay identifiable (and linked back) in the expense list and reports.
   final String? salaryPaymentId;
 
+  /// Set when this expense records what an employee spent from a cash
+  /// advance, or the unrecovered remainder written off. The advance already
+  /// took the money out of the fund, so these rows are tracking-only.
+  final String? cashAdvanceId;
+
   const ExpenseEntity({
     required this.id,
     required this.referenceNumber,
@@ -180,6 +185,7 @@ class ExpenseEntity extends Equatable {
     this.reverseLedgerEntryId,
     this.notes,
     this.salaryPaymentId,
+    this.cashAdvanceId,
   });
 
   int get resolvedAmountMinor =>
@@ -277,6 +283,7 @@ class ExpenseEntity extends Equatable {
     String? reverseLedgerEntryId,
     String? notes,
     String? salaryPaymentId,
+    String? cashAdvanceId,
     bool clearDescription = false,
     bool clearPaymentDetails = false,
     bool clearEmployeeId = false,
@@ -356,6 +363,7 @@ class ExpenseEntity extends Equatable {
       reverseLedgerEntryId: reverseLedgerEntryId ?? this.reverseLedgerEntryId,
       notes: clearNotes ? null : (notes ?? this.notes),
       salaryPaymentId: salaryPaymentId ?? this.salaryPaymentId,
+      cashAdvanceId: cashAdvanceId ?? this.cashAdvanceId,
     );
   }
 
@@ -409,5 +417,6 @@ class ExpenseEntity extends Equatable {
         reverseLedgerEntryId,
         notes,
         salaryPaymentId,
+        cashAdvanceId,
       ];
 }
