@@ -220,6 +220,29 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       _selectedVehicleName = e.vehicleName;
       _receiptUrls = List.from(e.receiptUrls);
     }
+    if (!_isEditing &&
+        (_submittedByEmployeeId ?? '').isEmpty &&
+        _submittedBy.isEmpty) {
+      _setSubmitterToLoggedInUser();
+    }
+  }
+
+  /// New expenses start as submitted by whoever is logged in.
+  void _setSubmitterToLoggedInUser() {
+    final user = context.read<AuthProvider>().user;
+    if (user == null) return;
+    final employeeId = user.employeeId;
+    final employeeName = user.employeeName?.trim() ?? '';
+    _submittedByEmployeeId =
+        (employeeId != null && employeeId.isNotEmpty) ? employeeId : null;
+    _submittedBy = employeeName.isNotEmpty ? employeeName : user.actorLabel;
+    _submittedByRole = user.role.name.toUpperCase();
+  }
+
+  void _setSubmitter(EmployeeEntity emp) {
+    _submittedByEmployeeId = emp.id;
+    _submittedBy = emp.fullName;
+    _submittedByRole = emp.position;
   }
 
   void _onAmountChanged() {
@@ -576,7 +599,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       label: 'Submitted By *',
       child: FormField<String>(
         initialValue: _submittedByEmployeeId,
-        validator: (v) => (_submittedByEmployeeId == null || _submittedByEmployeeId!.isEmpty)
+        // A login without a linked employee record still names the submitter.
+        validator: (v) => ((_submittedByEmployeeId ?? '').isEmpty && _submittedBy.isEmpty)
             ? 'Required'
             : null,
         builder: (state) {
@@ -588,14 +612,15 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               InkWell(
-                onTap: () => _showEmployeeSearchDialog(context, empProv, (selected) {
-                  setState(() {
-                    _submittedByEmployeeId = selected.id;
-                    _submittedBy = selected.fullName;
-                    _submittedByRole = selected.position;
-                  });
-                  state.didChange(selected.id);
-                }),
+                onTap: () => _showEmployeeSearchDialog(
+                  context,
+                  empProv,
+                  (selected) {
+                    setState(() => _setSubmitter(selected));
+                    state.didChange(selected.id);
+                  },
+                  internalOnly: true,
+                ),
                 borderRadius: BorderRadius.circular(10.r),
                 child: Container(
                   padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
@@ -837,8 +862,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   void _showEmployeeSearchDialog(
     BuildContext context,
     EmployeeProvider empProv,
-    ValueChanged<EmployeeEntity> onSelect,
-  ) {
+    ValueChanged<EmployeeEntity> onSelect, {
+    // Only Xloop's own staff can submit; external (contracted) staff can
+    // still be the employee an expense is for.
+    bool internalOnly = false,
+  }) {
     showDialog(
       context: context,
       builder: (ctx) {
@@ -846,6 +874,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         return StatefulBuilder(
           builder: (ctx, setStateDialog) {
             final filtered = empProv.employees.where((e) {
+              if (internalOnly && e.isExternal) return false;
               final q = searchQuery.toLowerCase();
               return e.fullName.toLowerCase().contains(q) ||
                   e.position.toLowerCase().contains(q);
