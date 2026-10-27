@@ -30,6 +30,10 @@ import '../models/fund_account_type_model.dart';
 const String salaryExpenseCategory = 'EMPLOYEES';
 const String salaryExpenseType = 'Salary';
 
+/// Type stamped on the `expenses` mirror of an external driver's monthly trip
+/// closing. Same EMPLOYEES category as payroll, but kept apart in reports.
+const String driverTripExpenseType = 'Driver Trip Payment';
+
 /// Category and type stamped on the expense recorded when the unrecovered
 /// remainder of a cash advance is written off.
 const String advanceWriteOffExpenseCategory = 'EMPLOYEES';
@@ -2109,7 +2113,10 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     final structures =
         (await getSalaryStructures()).where((s) => s.isActive).toList();
     final existing = await getSalaryPayments(period: period);
-    final existingEmployeeIds = existing.map((p) => p.employeeId).toSet();
+    final existingEmployeeIds = existing
+        .where((p) => p.kind == SalaryPaymentKind.salary)
+        .map((p) => p.employeeId)
+        .toSet();
 
     final now = DateTime.now();
     final created = <SalaryPaymentModel>[];
@@ -2357,7 +2364,9 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         submittedByRole: 'ADMIN',
         submittedByUserId: actorUserId,
         expenseCategory: salaryExpenseCategory,
-        expenseType: salaryExpenseType,
+        expenseType: payment.isTripSettlement
+            ? driverTripExpenseType
+            : salaryExpenseType,
         description: _salaryLabel(payment),
         paymentMethod: paymentMethod,
         amount: net,
@@ -2424,7 +2433,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       actorUserId: actorUserId,
       actorName: actorName,
       detail:
-          '${payment.employeeName} net=$net ${payment.currency} '
+          '${payment.kind.name} ${payment.employeeName} net=$net ${payment.currency} '
           'advanceRecovery=$totalRecovery from ${account.name} ($paymentMethod)',
     );
     return updated;
@@ -2540,30 +2549,38 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
-  /// "Salary Sep 2026 — Ahmed Ali", falling back to the raw period.
+  /// "Salary Sep 2026 — Ahmed Ali" (or "Trip Payment …" for an external
+  /// driver), falling back to the raw period.
   String _salaryLabel(SalaryPaymentEntity payment) {
+    final prefix = payment.kind.displayName;
     final parts = payment.period.split('-');
     if (parts.length == 2) {
       final month = int.tryParse(parts[1]);
       if (month != null && month >= 1 && month <= 12) {
-        return 'Salary ${_monthNames[month - 1]} ${parts[0]} — '
+        return '$prefix ${_monthNames[month - 1]} ${parts[0]} — '
             '${payment.employeeName}';
       }
     }
-    return 'Salary ${payment.period} — ${payment.employeeName}';
+    return '$prefix ${payment.period} — ${payment.employeeName}';
   }
 
   String _salaryBreakdownNote(
     SalaryPaymentEntity payment,
     double advanceRecovery,
   ) {
-    final parts = <String>[
-      'Basic ${payment.basicSalary.toStringAsFixed(2)}',
-      'Allowances ${payment.allowances.toStringAsFixed(2)}',
-    ];
+    final parts = payment.isTripSettlement
+        ? <String>[
+            'Trip earnings ${payment.basicSalary.toStringAsFixed(2)}'
+                '${payment.tripCount != null ? ' (${payment.tripCount} trips)' : ''}',
+          ]
+        : <String>[
+            'Basic ${payment.basicSalary.toStringAsFixed(2)}',
+            'Allowances ${payment.allowances.toStringAsFixed(2)}',
+          ];
     if (payment.extraAllowance > 0) {
       parts.add(
-        'Extra allowance ${payment.extraAllowance.toStringAsFixed(2)}'
+        '${payment.isTripSettlement ? 'Extra' : 'Extra allowance'} '
+        '${payment.extraAllowance.toStringAsFixed(2)}'
         '${payment.extraAllowanceNote != null ? ' (${payment.extraAllowanceNote})' : ''}',
       );
     }

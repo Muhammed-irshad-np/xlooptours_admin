@@ -114,18 +114,44 @@ enum SalaryPaymentStatus {
   bool get canVoid => this == SalaryPaymentStatus.paid;
 }
 
-/// One employee's salary for one month.
+/// What a [SalaryPaymentEntity] pays for.
+enum SalaryPaymentKind {
+  /// Monthly salary of internal staff, generated from a [SalaryStructureEntity].
+  salary,
+
+  /// Monthly trip closing of an external driver. Not a salary: there is no
+  /// fixed structure, the month's trip earnings are entered at closing.
+  tripSettlement;
+
+  String get displayName {
+    switch (this) {
+      case SalaryPaymentKind.salary:
+        return 'Salary';
+      case SalaryPaymentKind.tripSettlement:
+        return 'Trip Payment';
+    }
+  }
+}
+
+/// One employee's salary (or external driver's trip closing) for one month.
 class SalaryPaymentEntity extends Equatable {
   final String id;
 
   /// Payroll month in `yyyy-MM` form (e.g. `2026-09`).
   final String period;
 
+  final SalaryPaymentKind kind;
+
   final String employeeId;
   final String employeeName;
   final String position;
 
+  /// Basic pay for a salary; the month's trip earnings for a trip settlement.
   final double basicSalary;
+
+  /// Number of trips the driver did this month. Reference only — the amount
+  /// in [basicSalary] is entered directly, not derived from it.
+  final int? tripCount;
   final double allowances;
 
   /// One-off allowance for this month only (bonus, overtime, Eid, etc.).
@@ -185,10 +211,12 @@ class SalaryPaymentEntity extends Equatable {
   const SalaryPaymentEntity({
     required this.id,
     required this.period,
+    this.kind = SalaryPaymentKind.salary,
     required this.employeeId,
     required this.employeeName,
     this.position = '',
     required this.basicSalary,
+    this.tripCount,
     this.allowances = 0,
     this.extraAllowance = 0,
     this.extraAllowanceNote,
@@ -219,6 +247,8 @@ class SalaryPaymentEntity extends Equatable {
 
   double get grossSalary => basicSalary + allowances + extraAllowance;
 
+  bool get isTripSettlement => kind == SalaryPaymentKind.tripSettlement;
+
   /// Everything withheld from gross pay this month.
   double get totalWithheld => deductions + advanceRecovery;
 
@@ -228,6 +258,11 @@ class SalaryPaymentEntity extends Equatable {
   /// create a duplicate salary for the same employee.
   static String buildId(String period, String employeeId) =>
       '${period}_$employeeId';
+
+  /// Deterministic id for an external driver's trip closing; prefixed so it
+  /// can never collide with a salary row of the same month.
+  static String buildTripId(String period, String employeeId) =>
+      'trip_${period}_$employeeId';
 
   /// `yyyy-MM` key for [date].
   static String periodOf(DateTime date) =>
@@ -281,6 +316,7 @@ class SalaryPaymentEntity extends Equatable {
 
   SalaryPaymentEntity copyWith({
     double? basicSalary,
+    int? tripCount,
     double? allowances,
     double? extraAllowance,
     String? extraAllowanceNote,
@@ -308,10 +344,12 @@ class SalaryPaymentEntity extends Equatable {
     return SalaryPaymentEntity(
       id: id,
       period: period,
+      kind: kind,
       employeeId: employeeId,
       employeeName: employeeName,
       position: position,
       basicSalary: basicSalary ?? this.basicSalary,
+      tripCount: tripCount ?? this.tripCount,
       allowances: allowances ?? this.allowances,
       extraAllowance: extraAllowance ?? this.extraAllowance,
       extraAllowanceNote: extraAllowanceNote ?? this.extraAllowanceNote,
@@ -345,7 +383,9 @@ class SalaryPaymentEntity extends Equatable {
   List<Object?> get props => [
         id,
         period,
+        kind,
         employeeId,
+        tripCount,
         netAmount,
         advanceRecovery,
         status,

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:xloop_invoice/features/finance/data/models/salary_models.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/cash_advance_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/salary_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/usecases/salary_usecases.dart';
@@ -120,6 +121,61 @@ void main() {
     test('period key and document id are deterministic', () {
       expect(SalaryPaymentEntity.periodOf(DateTime(2026, 9, 15)), '2026-09');
       expect(SalaryPaymentEntity.buildId('2026-09', 'emp1'), '2026-09_emp1');
+    });
+  });
+
+  group('External driver trip settlements', () {
+    SalaryPaymentModel trip() => SalaryPaymentModel(
+          id: SalaryPaymentEntity.buildTripId('2026-09', 'drv1'),
+          period: '2026-09',
+          kind: SalaryPaymentKind.tripSettlement,
+          employeeId: 'drv1',
+          employeeName: 'Driver',
+          basicSalary: 4200,
+          tripCount: 37,
+          netAmount: 4200,
+          createdAt: DateTime(2026, 10, 1),
+        );
+
+    test('trip id never collides with a salary id of the same month', () {
+      expect(
+        SalaryPaymentEntity.buildTripId('2026-09', 'drv1'),
+        'trip_2026-09_drv1',
+      );
+      expect(
+        SalaryPaymentEntity.buildTripId('2026-09', 'drv1'),
+        isNot(SalaryPaymentEntity.buildId('2026-09', 'drv1')),
+      );
+    });
+
+    test('trip earnings and advance recovery give the net like a salary', () {
+      final t = trip();
+      expect(t.isTripSettlement, isTrue);
+      expect(
+        SalaryPaymentEntity.computeNet(
+          basicSalary: t.basicSalary,
+          extraAllowance: 150,
+          advanceRecovery: 1000,
+        ),
+        3350,
+      );
+    });
+
+    test('kind and trip count survive a JSON round trip', () {
+      final back = SalaryPaymentModel.fromJson(trip().toJson());
+      expect(back.kind, SalaryPaymentKind.tripSettlement);
+      expect(back.tripCount, 37);
+      expect(back.basicSalary, 4200);
+    });
+
+    test('rows saved before trip settlements existed read as salaries', () {
+      final json = trip().toJson()
+        ..remove('kind')
+        ..remove('tripCount');
+      final back = SalaryPaymentModel.fromJson(json);
+      expect(back.kind, SalaryPaymentKind.salary);
+      expect(back.isTripSettlement, isFalse);
+      expect(back.tripCount, isNull);
     });
   });
 

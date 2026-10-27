@@ -19,12 +19,16 @@ import '../providers/salary_provider.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
 
-/// One line of the monthly payroll: an employee on the payroll, together with
-/// this month's salary row when it already exists.
+/// Which list the page shows: staff payroll or external drivers' trip closing.
+enum _SalaryTab { payroll, trips }
+
+/// One line of the monthly payroll: an employee on the payroll (or an external
+/// driver), together with this month's payment row when it already exists.
 class _PayrollRow {
   final String employeeId;
   final String employeeName;
   final String position;
+  final SalaryPaymentKind kind;
   final SalaryStructureEntity? structure;
   final SalaryPaymentEntity? payment;
 
@@ -32,11 +36,16 @@ class _PayrollRow {
     required this.employeeId,
     required this.employeeName,
     required this.position,
+    this.kind = SalaryPaymentKind.salary,
     this.structure,
     this.payment,
   });
 
+  bool get isTrip => kind == SalaryPaymentKind.tripSettlement;
+
+  /// Basic salary, or the month's trip earnings for an external driver.
   double get basic => payment?.basicSalary ?? structure?.basicSalary ?? 0;
+  int? get tripCount => payment?.tripCount;
   double get allowances => payment?.allowances ?? structure?.allowances ?? 0;
   double get extraAllowance => payment?.extraAllowance ?? 0;
   double get deductions => payment?.deductions ?? 0;
@@ -56,7 +65,8 @@ class _PayrollRow {
 }
 
 /// Monthly staff payroll: set a salary per employee, then pay each one out of
-/// a fund account for the selected month.
+/// a fund account for the selected month. A second tab closes the month for
+/// external drivers, who are paid for their trips rather than a salary.
 class SalariesPage extends StatefulWidget {
   const SalariesPage({super.key});
 
@@ -67,6 +77,9 @@ class SalariesPage extends StatefulWidget {
 class _SalariesPageState extends State<SalariesPage> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _statusFilter = 'ALL';
+  _SalaryTab _tab = _SalaryTab.payroll;
+
+  bool get _isTrips => _tab == _SalaryTab.trips;
 
   @override
   void initState() {
@@ -105,7 +118,54 @@ class _SalariesPageState extends State<SalariesPage> {
       ..sort((a, b) => a.fullName.compareTo(b.fullName));
   }
 
-  List<_PayrollRow> _buildRows(SalaryProvider provider) {
+  /// Drivers whose month is closed on the trips tab: active external drivers.
+  List<EmployeeEntity> _externalDrivers() {
+    return context
+        .read<EmployeeProvider>()
+        .employees
+        .where((e) => e.isActive && e.isExternalDriver)
+        .toList();
+  }
+
+  List<_PayrollRow> _buildRows(SalaryProvider provider) =>
+      _isTrips ? _buildTripRows(provider) : _buildPayrollRows(provider);
+
+  List<_PayrollRow> _buildTripRows(SalaryProvider provider) {
+    final rows = <_PayrollRow>[];
+    final seen = <String>{};
+
+    for (final e in _externalDrivers()) {
+      seen.add(e.id);
+      rows.add(
+        _PayrollRow(
+          employeeId: e.id,
+          employeeName: e.fullName,
+          position: e.position,
+          kind: SalaryPaymentKind.tripSettlement,
+          payment: provider.tripPaymentFor(e.id),
+        ),
+      );
+    }
+
+    // A driver deactivated after being paid still belongs to the month.
+    for (final p in provider.tripPayments) {
+      if (seen.contains(p.employeeId)) continue;
+      rows.add(
+        _PayrollRow(
+          employeeId: p.employeeId,
+          employeeName: p.employeeName,
+          position: p.position,
+          kind: SalaryPaymentKind.tripSettlement,
+          payment: p,
+        ),
+      );
+    }
+
+    rows.sort((a, b) => a.employeeName.compareTo(b.employeeName));
+    return rows;
+  }
+
+  List<_PayrollRow> _buildPayrollRows(SalaryProvider provider) {
     final rows = <_PayrollRow>[];
     final seen = <String>{};
 
@@ -125,7 +185,7 @@ class _SalariesPageState extends State<SalariesPage> {
 
     // Salary rows whose employee was since taken off the payroll still belong
     // to the month's history.
-    for (final p in provider.payments) {
+    for (final p in provider.salaryPayments) {
       if (seen.contains(p.employeeId)) continue;
       rows.add(
         _PayrollRow(
@@ -169,6 +229,10 @@ class _SalariesPageState extends State<SalariesPage> {
   Widget build(BuildContext context) {
     final fmt = NumberFormat('#,##0.00');
 
+    // Employees are watched too: the trips tab lists drivers straight from
+    // the employee records, which may finish loading after the payroll.
+    context.watch<EmployeeProvider>();
+
     return Consumer<SalaryProvider>(
       builder: (context, provider, _) {
         final rows = _buildRows(provider);
@@ -177,6 +241,8 @@ class _SalariesPageState extends State<SalariesPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _buildTabSwitcher(provider),
+            SizedBox(height: 12.h),
             _buildToolbar(context, provider, rows),
             SizedBox(height: 16.h),
             _buildKpiRow(provider, rows, fmt),
@@ -209,6 +275,61 @@ class _SalariesPageState extends State<SalariesPage> {
 
   // ─── Toolbar ────────────────────────────────────────────────
 
+  Widget _buildTabSwitcher(SalaryProvider provider) {
+    Widget tab(_SalaryTab value, String label, IconData icon, int count) {
+      final isSelected = _tab == value;
+      return InkWell(
+        onTap: () => setState(() => _tab = value),
+        borderRadius: BorderRadius.circular(10.r),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 9.h),
+          decoration: BoxDecoration(
+            color: isSelected ? FinDT.brand : Colors.white,
+            borderRadius: BorderRadius.circular(10.r),
+            border: Border.all(color: isSelected ? FinDT.brand : FinDT.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 15.sp,
+                color: isSelected ? Colors.white : FinDT.textSecondary,
+              ),
+              SizedBox(width: 8.w),
+              Text(
+                '$label ($count)',
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? Colors.white : FinDT.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        tab(
+          _SalaryTab.payroll,
+          'Staff Payroll',
+          Icons.badge_outlined,
+          provider.activeStructures.length,
+        ),
+        SizedBox(width: 8.w),
+        tab(
+          _SalaryTab.trips,
+          'External Driver Trips',
+          Icons.local_taxi_outlined,
+          _externalDrivers().length,
+        ),
+      ],
+    );
+  }
+
   Widget _buildToolbar(
     BuildContext context,
     SalaryProvider provider,
@@ -238,7 +359,11 @@ class _SalariesPageState extends State<SalariesPage> {
               color: FinDT.brand.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10.r),
             ),
-            child: Icon(Icons.badge_outlined, size: 20.sp, color: FinDT.brand),
+            child: Icon(
+              _isTrips ? Icons.local_taxi_outlined : Icons.badge_outlined,
+              size: 20.sp,
+              color: FinDT.brand,
+            ),
           ),
           SizedBox(width: 12.w),
           Expanded(
@@ -246,7 +371,9 @@ class _SalariesPageState extends State<SalariesPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Payroll & Salaries',
+                  _isTrips
+                      ? 'External Driver Trip Closing'
+                      : 'Payroll & Salaries',
                   style: GoogleFonts.inter(
                     fontSize: 15.sp,
                     fontWeight: FontWeight.w700,
@@ -255,7 +382,9 @@ class _SalariesPageState extends State<SalariesPage> {
                 ),
                 SizedBox(height: 2.h),
                 Text(
-                  'Set a monthly salary per employee, then pay each one from a fund account',
+                  _isTrips
+                      ? 'Enter each driver\'s trip earnings for the month, recover advances, then pay'
+                      : 'Set a monthly salary per employee, then pay each one from a fund account',
                   style: GoogleFonts.inter(
                     fontSize: 11.sp,
                     color: FinDT.textSecondary,
@@ -307,13 +436,19 @@ class _SalariesPageState extends State<SalariesPage> {
           ),
           SizedBox(width: 10.w),
           OutlinedButton.icon(
-            onPressed: provider.payments.isEmpty
+            onPressed:
+                (_isTrips ? provider.tripPayments : provider.salaryPayments)
+                    .isEmpty
                 ? null
                 : () async {
                     await FinanceExportService.shareCsv(
-                      fileName: 'salaries_${provider.period}.csv',
+                      fileName: _isTrips
+                          ? 'driver_trips_${provider.period}.csv'
+                          : 'salaries_${provider.period}.csv',
                       csvContent: FinanceExportService.salariesToCsv(
-                        provider.payments,
+                        _isTrips
+                            ? provider.tripPayments
+                            : provider.salaryPayments,
                       ),
                     );
                   },
@@ -334,26 +469,28 @@ class _SalariesPageState extends State<SalariesPage> {
               ),
             ),
           ),
-          SizedBox(width: 8.w),
-          OutlinedButton.icon(
-            onPressed: () => _showStructureDialog(context),
-            icon: Icon(Icons.person_add_alt_1_outlined, size: 15.sp),
-            label: Text(
-              'Add to Payroll',
-              style: GoogleFonts.inter(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w600,
+          if (!_isTrips) ...[
+            SizedBox(width: 8.w),
+            OutlinedButton.icon(
+              onPressed: () => _showStructureDialog(context),
+              icon: Icon(Icons.person_add_alt_1_outlined, size: 15.sp),
+              label: Text(
+                'Add to Payroll',
+                style: GoogleFonts.inter(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: FinDT.textPrimary,
+                side: const BorderSide(color: FinDT.border),
+                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10.r),
+                ),
               ),
             ),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: FinDT.textPrimary,
-              side: const BorderSide(color: FinDT.border),
-              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10.r),
-              ),
-            ),
-          ),
+          ],
         ],
       ),
     );
@@ -364,6 +501,8 @@ class _SalariesPageState extends State<SalariesPage> {
     List<_PayrollRow> rows,
     NumberFormat fmt,
   ) {
+    if (_isTrips) return _buildTripKpiRow(provider, rows, fmt);
+
     // "Pending" is computed live from the payroll list, not from generated
     // rows — an employee who hasn't been paid yet this month counts as
     // pending whether or not a salary_payments row exists for them.
@@ -405,6 +544,62 @@ class _SalariesPageState extends State<SalariesPage> {
               subtitle: '${unpaidRows.length} awaiting payment',
               icon: Icons.schedule_outlined,
               color: FinDT.warning,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTripKpiRow(
+    SalaryProvider provider,
+    List<_PayrollRow> rows,
+    NumberFormat fmt,
+  ) {
+    final notClosed = rows
+        .where((r) => r.payment?.status != SalaryPaymentStatus.paid)
+        .length;
+    final driverIds = rows.map((r) => r.employeeId).toSet();
+    final driverAdvances = context
+        .watch<CashAdvanceProvider>()
+        .advances
+        .where((a) => a.isOpen && driverIds.contains(a.employeeId))
+        .toList();
+    final outstanding = SalaryPaymentEntity.totalOutstanding(driverAdvances);
+    final currency = rows.isEmpty ? 'SAR' : rows.first.currency;
+
+    return SizedBox(
+      height: 96.h,
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildKpiCard(
+              title: 'Not Closed Yet',
+              value: '$notClosed',
+              subtitle: 'of ${rows.length} external drivers',
+              icon: Icons.schedule_outlined,
+              color: FinDT.warning,
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: _buildKpiCard(
+              title: 'Paid This Month',
+              value: fmt.format(provider.totalTripPaid),
+              subtitle: '${provider.paidTripPayments.length} drivers paid',
+              icon: Icons.check_circle_outline,
+              color: FinDT.success,
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: _buildKpiCard(
+              title: 'Open Advances',
+              value: fmt.format(outstanding),
+              subtitle:
+                  '$currency across ${driverAdvances.map((a) => a.employeeId).toSet().length} drivers',
+              icon: Icons.account_balance_outlined,
+              color: FinDT.brand,
             ),
           ),
         ],
@@ -620,10 +815,18 @@ class _SalariesPageState extends State<SalariesPage> {
       ),
       child: Column(
         children: [
-          Icon(Icons.badge_outlined, size: 40.sp, color: FinDT.textMuted),
+          Icon(
+            _isTrips ? Icons.local_taxi_outlined : Icons.badge_outlined,
+            size: 40.sp,
+            color: FinDT.textMuted,
+          ),
           SizedBox(height: 12.h),
           Text(
-            payrollEmpty ? 'No one on the payroll yet' : 'Nothing matches this filter',
+            !payrollEmpty
+                ? 'Nothing matches this filter'
+                : _isTrips
+                    ? 'No external drivers'
+                    : 'No one on the payroll yet',
             style: GoogleFonts.inter(
               fontSize: 14.sp,
               fontWeight: FontWeight.w700,
@@ -632,9 +835,11 @@ class _SalariesPageState extends State<SalariesPage> {
           ),
           SizedBox(height: 6.h),
           Text(
-            payrollEmpty
-                ? 'Use "Add to Payroll" to set an employee\'s monthly salary, then generate the month.'
-                : 'Try another status or clear the search.',
+            !payrollEmpty
+                ? 'Try another status or clear the search.'
+                : _isTrips
+                ? 'Drivers set as External in Employees appear here for their monthly trip closing.'
+                : 'Use "Add to Payroll" to set an employee\'s monthly salary, then generate the month.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
           ),
@@ -707,21 +912,41 @@ class _SalariesPageState extends State<SalariesPage> {
               ],
             ),
           ),
-          Expanded(
-            flex: 2,
-            child: _amountCell('Basic', fmt.format(row.basic), row.currency),
-          ),
-          Expanded(
-            flex: 2,
-            child: _amountCell(
-              'Allowances',
-              fmt.format(row.allowances + row.extraAllowance),
-              row.currency,
-              note: row.extraAllowance > 0
-                  ? 'incl. ${fmt.format(row.extraAllowance)} extra'
-                  : null,
+          if (row.isTrip) ...[
+            Expanded(
+              flex: 2,
+              child: _amountCell(
+                'Trip earnings',
+                payment == null ? '—' : fmt.format(row.basic),
+                payment == null ? '' : row.currency,
+                note: row.tripCount != null ? '${row.tripCount} trips' : null,
+              ),
             ),
-          ),
+            Expanded(
+              flex: 2,
+              child: _amountCell(
+                'Extra',
+                fmt.format(row.extraAllowance),
+                row.currency,
+              ),
+            ),
+          ] else ...[
+            Expanded(
+              flex: 2,
+              child: _amountCell('Basic', fmt.format(row.basic), row.currency),
+            ),
+            Expanded(
+              flex: 2,
+              child: _amountCell(
+                'Allowances',
+                fmt.format(row.allowances + row.extraAllowance),
+                row.currency,
+                note: row.extraAllowance > 0
+                    ? 'incl. ${fmt.format(row.extraAllowance)} extra'
+                    : null,
+              ),
+            ),
+          ],
           Expanded(
             flex: 2,
             child: _amountCell(
@@ -738,8 +963,8 @@ class _SalariesPageState extends State<SalariesPage> {
             flex: 2,
             child: _amountCell(
               'Net pay',
-              fmt.format(row.net),
-              row.currency,
+              row.isTrip && payment == null ? '—' : fmt.format(row.net),
+              row.isTrip && payment == null ? '' : row.currency,
               emphasize: true,
             ),
           ),
@@ -831,7 +1056,7 @@ class _SalariesPageState extends State<SalariesPage> {
         if (canPay)
           finDialogActionButton(
             onPressed: () => _showPayDialog(context, provider, row),
-            label: 'Pay',
+            label: row.isTrip ? 'Close & Pay' : 'Pay',
             icon: Icons.payments_outlined,
           ),
         PopupMenuButton<String>(
@@ -895,20 +1120,28 @@ class _SalariesPageState extends State<SalariesPage> {
     if (!_guardPermission(context)) return;
     final confirmed = await showFinConfirmationDialog(
       context: context,
-      title: 'Remove Salary Row',
+      title: row.isTrip ? 'Remove Trip Closing' : 'Remove Salary Row',
       icon: Icons.delete_outline_rounded,
       iconColor: FinDT.danger,
       confirmColor: FinDT.danger,
-      message:
-          'Remove ${row.employeeName}\'s pending salary for this month? '
-          'You can regenerate it later.',
+      message: row.isTrip
+          ? 'Remove ${row.employeeName}\'s unpaid trip closing for this month? '
+                'You can close the month again later.'
+          : 'Remove ${row.employeeName}\'s pending salary for this month? '
+                'You can regenerate it later.',
       confirmLabel: 'Remove',
     );
     if (confirmed != true || !context.mounted) return;
 
     try {
       await provider.deletePayment(row.payment!.id);
-      if (context.mounted) _snack(context, 'Salary row removed.', FinDT.success);
+      if (context.mounted) {
+        _snack(
+          context,
+          row.isTrip ? 'Trip closing removed.' : 'Salary row removed.',
+          FinDT.success,
+        );
+      }
     } catch (e) {
       if (context.mounted) _snack(context, 'Failed: $e', FinDT.danger);
     }
@@ -1213,8 +1446,9 @@ class _SalariesPageState extends State<SalariesPage> {
     );
   }
 
-  /// Pay one salary: pick the account and bucket, optionally deduct and
-  /// recover outstanding advances, then post the money.
+  /// Pay one salary (or close an external driver's month): pick the account
+  /// and bucket, optionally deduct and recover outstanding advances, then post
+  /// the money.
   Future<void> _showPayDialog(
     BuildContext context,
     SalaryProvider provider,
@@ -1228,7 +1462,7 @@ class _SalariesPageState extends State<SalariesPage> {
     if (accounts.isEmpty) {
       _snack(
         context,
-        'No active fund account in ${row.currency} to pay this salary from.',
+        'No active fund account in ${row.currency} to pay this from.',
         FinDT.danger,
       );
       return;
@@ -1256,6 +1490,15 @@ class _SalariesPageState extends State<SalariesPage> {
     final extraNoteCtrl =
         TextEditingController(text: row.payment?.extraAllowanceNote ?? '');
     final recoveryCtrl = TextEditingController();
+    // Trip closing only: the month's trip earnings are typed in at closing.
+    final tripAmountCtrl = TextEditingController(
+      text: row.isTrip && row.payment != null
+          ? row.basic.toStringAsFixed(2)
+          : '',
+    );
+    final tripCountCtrl = TextEditingController(
+      text: row.tripCount?.toString() ?? '',
+    );
 
     String accountId = row.payment?.fundAccountId ??
         row.structure?.defaultFundAccountId ??
@@ -1287,7 +1530,10 @@ class _SalariesPageState extends State<SalariesPage> {
           final deduction = double.tryParse(deductionCtrl.text.trim()) ?? 0;
           final requestedRecovery =
               double.tryParse(recoveryCtrl.text.trim()) ?? 0;
-          final gross = row.basic + row.allowances + extra;
+          final basic = row.isTrip
+              ? double.tryParse(tripAmountCtrl.text.trim()) ?? 0
+              : row.basic;
+          final gross = basic + row.allowances + extra;
           // Never recover more than is owed, nor more than what is left after
           // manual deductions.
           final maxRecovery = [
@@ -1298,7 +1544,7 @@ class _SalariesPageState extends State<SalariesPage> {
               ? 0.0
               : (requestedRecovery > maxRecovery ? maxRecovery : requestedRecovery);
           final net = SalaryPaymentEntity.computeNet(
-            basicSalary: row.basic,
+            basicSalary: basic,
             allowances: row.allowances,
             extraAllowance: extra,
             deductions: deduction,
@@ -1325,7 +1571,9 @@ class _SalariesPageState extends State<SalariesPage> {
             surfaceTintColor: Colors.transparent,
             shape: finDialogShape,
             title: finDialogTitle(
-              'Pay Salary — ${row.employeeName}',
+              row.isTrip
+                  ? 'Close Trips — ${row.employeeName}'
+                  : 'Pay Salary — ${row.employeeName}',
               icon: Icons.payments_outlined,
             ),
             content: SizedBox(
@@ -1339,7 +1587,7 @@ class _SalariesPageState extends State<SalariesPage> {
                     children: [
                       SizedBox(height: 8.h),
                       Text(
-                        'Payroll month: $monthLabel',
+                        '${row.isTrip ? 'Trip month' : 'Payroll month'}: $monthLabel',
                         style: GoogleFonts.inter(
                           fontSize: 11.sp,
                           color: FinDT.textSecondary,
@@ -1390,6 +1638,76 @@ class _SalariesPageState extends State<SalariesPage> {
                           ),
                         ],
                       ],
+                      if (row.isTrip) ...[
+                        SizedBox(height: 14.h),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: TextFormField(
+                                controller: tripAmountCtrl,
+                                enabled: !isPaying,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(
+                                    RegExp(r'^\d*\.?\d*'),
+                                  ),
+                                ],
+                                onChanged: (_) => setInner(() {}),
+                                decoration: finDialogInputDecoration(
+                                  label: 'Trip Earnings *',
+                                  hint: 'Total for the month',
+                                  prefixIcon: Icons.local_taxi_outlined,
+                                  suffixText: row.currency,
+                                ),
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.sp,
+                                  color: FinDT.textPrimary,
+                                ),
+                                validator: (v) {
+                                  final n = double.tryParse(v ?? '');
+                                  if (n == null || n <= 0) {
+                                    return 'Enter the month\'s trip earnings';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            SizedBox(width: 10.w),
+                            Expanded(
+                              flex: 2,
+                              child: TextFormField(
+                                controller: tripCountCtrl,
+                                enabled: !isPaying,
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                ],
+                                decoration: finDialogInputDecoration(
+                                  label: 'No. of Trips',
+                                  hint: 'Optional',
+                                  prefixIcon: Icons.tag,
+                                ),
+                                style: GoogleFonts.inter(
+                                  fontSize: 12.sp,
+                                  color: FinDT.textPrimary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8.h),
+                        _buildInfoStrip(
+                          'No receipt needed — this closing record is the '
+                          'proof of payment.',
+                          Icons.receipt_long_outlined,
+                          FinDT.textSecondary,
+                        ),
+                      ],
                       SizedBox(height: 14.h),
                       TextFormField(
                         controller: extraCtrl,
@@ -1401,8 +1719,12 @@ class _SalariesPageState extends State<SalariesPage> {
                         ],
                         onChanged: (_) => setInner(() {}),
                         decoration: finDialogInputDecoration(
-                          label: 'Extra Allowance (this month)',
-                          hint: 'Bonus, overtime, Eid allowance…',
+                          label: row.isTrip
+                              ? 'Extra Amount (this month)'
+                              : 'Extra Allowance (this month)',
+                          hint: row.isTrip
+                              ? 'Waiting time, parking, tolls…'
+                              : 'Bonus, overtime, Eid allowance…',
                           prefixIcon: Icons.add_circle_outline,
                           suffixText: row.currency,
                         ),
@@ -1423,7 +1745,9 @@ class _SalariesPageState extends State<SalariesPage> {
                           controller: extraNoteCtrl,
                           enabled: !isPaying,
                           decoration: finDialogInputDecoration(
-                            label: 'Extra Allowance Reason *',
+                            label: row.isTrip
+                                ? 'Extra Amount Reason *'
+                                : 'Extra Allowance Reason *',
                             hint: 'e.g. Overtime – September',
                             prefixIcon: Icons.description_outlined,
                           ),
@@ -1433,7 +1757,7 @@ class _SalariesPageState extends State<SalariesPage> {
                           ),
                           validator: (v) => extra > 0 &&
                                   (v == null || v.trim().isEmpty)
-                              ? 'Give a reason for the extra allowance'
+                              ? 'Give a reason for the extra amount'
                               : null,
                         ),
                       ],
@@ -1493,6 +1817,9 @@ class _SalariesPageState extends State<SalariesPage> {
                           currency: row.currency,
                           fmt: fmt,
                           enabled: !isPaying,
+                          recoverLabel: row.isTrip
+                              ? 'Recover From This Trip Payment'
+                              : 'Recover From This Salary',
                           onChanged: () => setInner(() {}),
                           onRecoverAll: () => setInner(() {
                             recoveryCtrl.text = maxRecovery <= 0
@@ -1504,6 +1831,7 @@ class _SalariesPageState extends State<SalariesPage> {
                       SizedBox(height: 16.h),
                       _buildPaySummary(
                         row: row,
+                        basic: basic,
                         extra: extra,
                         deduction: deduction,
                         recovery: recovery,
@@ -1528,7 +1856,7 @@ class _SalariesPageState extends State<SalariesPage> {
                 onPressed: () async {
                   if (!formKey.currentState!.validate()) return;
                   if (net <= 0 && recovery <= 0) {
-                    _snack(context, 'Net salary must be above zero.', FinDT.danger);
+                    _snack(context, 'Net pay must be above zero.', FinDT.danger);
                     return;
                   }
                   if (net > bucketBalance + 1e-9) {
@@ -1551,18 +1879,27 @@ class _SalariesPageState extends State<SalariesPage> {
                     // Upsert the salary row first so the amounts being paid are
                     // exactly what the dialog shows.
                     final paymentId = row.payment?.id ??
-                        SalaryPaymentEntity.buildId(
-                          provider.period,
-                          row.employeeId,
-                        );
+                        (row.isTrip
+                            ? SalaryPaymentEntity.buildTripId(
+                                provider.period,
+                                row.employeeId,
+                              )
+                            : SalaryPaymentEntity.buildId(
+                                provider.period,
+                                row.employeeId,
+                              ));
                     final base = row.payment;
                     final toSave = SalaryPaymentEntity(
                       id: paymentId,
                       period: provider.period,
+                      kind: row.kind,
                       employeeId: row.employeeId,
                       employeeName: row.employeeName,
                       position: row.position,
-                      basicSalary: row.basic,
+                      basicSalary: basic,
+                      tripCount: row.isTrip
+                          ? int.tryParse(tripCountCtrl.text.trim())
+                          : null,
                       allowances: row.allowances,
                       extraAllowance: extra,
                       extraAllowanceNote:
@@ -1618,7 +1955,7 @@ class _SalariesPageState extends State<SalariesPage> {
                   } catch (e) {
                     if (ctx.mounted) {
                       setInner(() => isPaying = false);
-                      _snack(context, 'Failed to pay salary: $e', FinDT.danger);
+                      _snack(context, 'Failed to pay: $e', FinDT.danger);
                     }
                   }
                 },
@@ -1732,6 +2069,7 @@ class _SalariesPageState extends State<SalariesPage> {
     required String currency,
     required NumberFormat fmt,
     required bool enabled,
+    required String recoverLabel,
     required VoidCallback onChanged,
     required VoidCallback onRecoverAll,
   }) {
@@ -1810,7 +2148,7 @@ class _SalariesPageState extends State<SalariesPage> {
             ],
             onChanged: (_) => onChanged(),
             decoration: finDialogInputDecoration(
-              label: 'Recover From This Salary',
+              label: recoverLabel,
               hint: 'Leave blank to skip. Oldest advance settles first.',
               prefixIcon: Icons.undo_rounded,
               suffixText: currency,
@@ -1863,6 +2201,7 @@ class _SalariesPageState extends State<SalariesPage> {
 
   Widget _buildPaySummary({
     required _PayrollRow row,
+    required double basic,
     required double extra,
     required double deduction,
     required double recovery,
@@ -1909,11 +2248,15 @@ class _SalariesPageState extends State<SalariesPage> {
       ),
       child: Column(
         children: [
-          line('Basic', '${fmt.format(row.basic)} ${row.currency}'),
-          line('Allowances', '${fmt.format(row.allowances)} ${row.currency}'),
+          if (row.isTrip)
+            line('Trip earnings', '${fmt.format(basic)} ${row.currency}')
+          else ...[
+            line('Basic', '${fmt.format(basic)} ${row.currency}'),
+            line('Allowances', '${fmt.format(row.allowances)} ${row.currency}'),
+          ],
           if (extra > 0)
             line(
-              'Extra allowance',
+              row.isTrip ? 'Extra' : 'Extra allowance',
               '+ ${fmt.format(extra)} ${row.currency}',
               color: FinDT.success,
             ),
@@ -1973,7 +2316,9 @@ class _SalariesPageState extends State<SalariesPage> {
           surfaceTintColor: Colors.transparent,
           shape: finDialogShape,
           title: finDialogTitle(
-            'Void Salary Payment',
+            payment.isTripSettlement
+                ? 'Void Trip Payment'
+                : 'Void Salary Payment',
             icon: Icons.undo_rounded,
             iconColor: FinDT.danger,
           ),
@@ -2035,7 +2380,11 @@ class _SalariesPageState extends State<SalariesPage> {
                   await fundProv.fetchAllAccounts();
                   if (ctx.mounted) finSafePop(ctx);
                   if (context.mounted) {
-                    _snack(context, 'Salary payment voided.', FinDT.success);
+                    _snack(
+                      context,
+                      '${payment.kind.displayName} voided.',
+                      FinDT.success,
+                    );
                   }
                 } catch (e) {
                   if (ctx.mounted) {
