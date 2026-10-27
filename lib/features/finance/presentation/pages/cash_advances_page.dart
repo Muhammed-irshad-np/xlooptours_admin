@@ -30,6 +30,28 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _selectedStatusFilter = 'ALL';
   String? _selectedFundAccountFilter;
+  DateTimeRange? _issuedRange;
+  // Set from "Pending by Employee"; matches by id so similar names don't mix.
+  String? _employeeFilterId;
+  String? _employeeFilterName;
+
+  bool get _hasActiveFilters =>
+      _selectedStatusFilter != 'ALL' ||
+      _selectedFundAccountFilter != null ||
+      _issuedRange != null ||
+      _employeeFilterId != null ||
+      _searchCtrl.text.trim().isNotEmpty;
+
+  void _clearFilters() {
+    _searchCtrl.clear();
+    setState(() {
+      _selectedStatusFilter = 'ALL';
+      _selectedFundAccountFilter = null;
+      _issuedRange = null;
+      _employeeFilterId = null;
+      _employeeFilterName = null;
+    });
+  }
 
   @override
   void initState() {
@@ -74,6 +96,19 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
           _selectedFundAccountFilter!.isNotEmpty &&
           a.fundAccountId != _selectedFundAccountFilter) {
         return false;
+      }
+
+      if (_employeeFilterId != null && a.employeeId != _employeeFilterId) {
+        return false;
+      }
+
+      // Issue date range, both ends inclusive
+      if (_issuedRange != null) {
+        final day = DateUtils.dateOnly(a.issuedAt);
+        if (day.isBefore(_issuedRange!.start) ||
+            day.isAfter(_issuedRange!.end)) {
+          return false;
+        }
       }
 
       // Search matches only the employee who took the advance
@@ -398,6 +433,34 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                           );
                         },
                       ),
+                      SizedBox(width: 12.w),
+                      _buildDateRangeButton(context),
+                      SizedBox(width: 12.w),
+                      OutlinedButton.icon(
+                        onPressed: () =>
+                            _showPendingByEmployee(context, allAdvances, fmt),
+                        icon: Icon(Icons.groups_outlined, size: 15.sp),
+                        label: Text(
+                          'Pending by Employee',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: FinDT.warning,
+                          side: BorderSide(
+                            color: FinDT.warning.withValues(alpha: 0.4),
+                          ),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 14.w,
+                            vertical: 12.h,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10.r),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                   SizedBox(height: 12.h),
@@ -460,7 +523,13 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                 ],
               ),
             ),
-            SizedBox(height: 16.h),
+            SizedBox(height: 12.h),
+
+            // ── Totals for whatever the filters currently show ──────
+            if (!provider.isLoading && allAdvances.isNotEmpty) ...[
+              _buildFilteredSummary(filteredAdvances, fmt),
+              SizedBox(height: 12.h),
+            ],
 
             // ── Advances List ───────────────────────────────────────
             if (provider.isLoading)
@@ -532,6 +601,367 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
         );
       },
     );
+  }
+
+  /// Sums [pick] per currency, e.g. "1,200.00 SAR · 50.00 BHD".
+  String _sumByCurrency(
+    Iterable<CashAdvanceEntity> advances,
+    double Function(CashAdvanceEntity) pick,
+    NumberFormat fmt,
+  ) {
+    final totals = <String, double>{};
+    for (final a in advances) {
+      totals[a.currency] = (totals[a.currency] ?? 0) + pick(a);
+    }
+    if (totals.isEmpty) return '${fmt.format(0)} SAR';
+    return totals.entries
+        .map((e) => '${fmt.format(e.value)} ${e.key}')
+        .join(' · ');
+  }
+
+  Widget _buildDateRangeButton(BuildContext context) {
+    final range = _issuedRange;
+    final label = range == null
+        ? 'Issue Date'
+        : '${DateFormat('d MMM').format(range.start)} – '
+            '${DateFormat('d MMM y').format(range.end)}';
+    final color = range == null ? FinDT.textSecondary : FinDT.brand;
+
+    return InkWell(
+      onTap: () async {
+        final now = DateTime.now();
+        final picked = await showDateRangePicker(
+          context: context,
+          firstDate: DateTime(2024),
+          lastDate: DateTime(now.year, now.month, now.day),
+          initialDateRange: range,
+          builder: (context, child) => Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: ColorScheme.light(primary: FinDT.brand),
+            ),
+            child: child!,
+          ),
+        );
+        if (picked != null) setState(() => _issuedRange = picked);
+      },
+      borderRadius: BorderRadius.circular(10.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 11.h),
+        decoration: BoxDecoration(
+          color: range == null ? FinDT.bgPage : FinDT.brandLight,
+          borderRadius: BorderRadius.circular(10.r),
+          border: Border.all(
+            color: range == null
+                ? FinDT.border
+                : FinDT.brand.withValues(alpha: 0.4),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.date_range_rounded, size: 16.sp, color: color),
+            SizedBox(width: 6.w),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 12.sp,
+                fontWeight: range == null ? FontWeight.w500 : FontWeight.w600,
+                color: color,
+              ),
+            ),
+            if (range != null) ...[
+              SizedBox(width: 6.w),
+              InkWell(
+                onTap: () => setState(() => _issuedRange = null),
+                child: Icon(Icons.close, size: 14.sp, color: color),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Issued / settled / pending totals for the advances the filters show.
+  Widget _buildFilteredSummary(
+    List<CashAdvanceEntity> advances,
+    NumberFormat fmt,
+  ) {
+    final pending = advances.where((a) => a.isOpen);
+
+    Widget figure(String label, String value, {Color? color, bool bold = false}) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(fontSize: 10.sp, color: FinDT.textMuted),
+          ),
+          SizedBox(height: 2.h),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: bold ? 14.sp : 12.sp,
+              fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+              color: color ?? FinDT.textPrimary,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+      decoration: BoxDecoration(
+        color: FinDT.warning.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: FinDT.warning.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _hasActiveFilters
+                      ? 'Showing ${advances.length} filtered advance(s)'
+                      : 'Showing all ${advances.length} advance(s)',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w700,
+                    color: FinDT.textPrimary,
+                  ),
+                ),
+                if (_employeeFilterName != null) ...[
+                  SizedBox(height: 6.h),
+                  InputChip(
+                    label: Text(
+                      _employeeFilterName!,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        fontWeight: FontWeight.w600,
+                        color: FinDT.brand,
+                      ),
+                    ),
+                    avatar: Icon(
+                      Icons.person_outline,
+                      size: 14.sp,
+                      color: FinDT.brand,
+                    ),
+                    backgroundColor: FinDT.brandLight,
+                    side: BorderSide(
+                      color: FinDT.brand.withValues(alpha: 0.3),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    onDeleted: () => setState(() {
+                      _employeeFilterId = null;
+                      _employeeFilterName = null;
+                    }),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: figure(
+              'Issued',
+              _sumByCurrency(advances, (a) => a.amount, fmt),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: figure(
+              'Settled',
+              _sumByCurrency(advances, (a) => a.settledAmount, fmt),
+              color: FinDT.success,
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: figure(
+              'Pending (${pending.length} open)',
+              _sumByCurrency(pending, (a) => a.outstanding, fmt),
+              color: FinDT.warning,
+              bold: true,
+            ),
+          ),
+          if (_hasActiveFilters)
+            TextButton.icon(
+              onPressed: _clearFilters,
+              icon: Icon(Icons.filter_alt_off_outlined, size: 15.sp),
+              label: Text(
+                'Clear filters',
+                style: GoogleFonts.inter(
+                  fontSize: 11.sp,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              style: TextButton.styleFrom(foregroundColor: FinDT.danger),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Outstanding balance per employee across all open advances, largest
+  /// first. Picking a row filters the list down to that employee.
+  Future<void> _showPendingByEmployee(
+    BuildContext context,
+    List<CashAdvanceEntity> advances,
+    NumberFormat fmt,
+  ) async {
+    final groups = <String, _EmployeePending>{};
+    for (final a in advances) {
+      if (!a.isOpen || a.outstanding <= 0) continue;
+      final g = groups.putIfAbsent(
+        '${a.employeeId}|${a.currency}',
+        () => _EmployeePending(a.employeeId, a.employeeName, a.currency),
+      );
+      g.outstanding += a.outstanding;
+      g.count++;
+      if (g.oldest == null || a.issuedAt.isBefore(g.oldest!)) {
+        g.oldest = a.issuedAt;
+      }
+    }
+    final rows = groups.values.toList()
+      ..sort((a, b) => b.outstanding.compareTo(a.outstanding));
+    final grandTotal = <String, double>{};
+    for (final r in rows) {
+      grandTotal[r.currency] = (grandTotal[r.currency] ?? 0) + r.outstanding;
+    }
+
+    final picked = await showDialog<_EmployeePending>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        shape: finDialogShape,
+        title: finDialogTitle(
+          'Pending Advances by Employee',
+          icon: Icons.groups_outlined,
+          iconColor: FinDT.warning,
+        ),
+        content: SizedBox(
+          width: 480.w,
+          child: rows.isEmpty
+              ? Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24.h),
+                  child: Text(
+                    'No employee has an outstanding advance.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      color: FinDT.textSecondary,
+                    ),
+                  ),
+                )
+              : Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(12.w),
+                      decoration: BoxDecoration(
+                        color: FinDT.warning.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10.r),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Total pending · ${rows.length} employee(s)',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.sp,
+                              fontWeight: FontWeight.w600,
+                              color: FinDT.textSecondary,
+                            ),
+                          ),
+                          Text(
+                            grandTotal.entries
+                                .map((e) => '${fmt.format(e.value)} ${e.key}')
+                                .join(' · '),
+                            style: GoogleFonts.inter(
+                              fontSize: 14.sp,
+                              fontWeight: FontWeight.w800,
+                              color: FinDT.warning,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 10.h),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: 380.h),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        itemCount: rows.length,
+                        separatorBuilder: (_, __) =>
+                            Divider(height: 1, color: FinDT.border),
+                        itemBuilder: (_, i) {
+                          final r = rows[i];
+                          final days =
+                              DateTime.now().difference(r.oldest!).inDays;
+                          return ListTile(
+                            dense: true,
+                            onTap: () => Navigator.of(ctx).pop(r),
+                            title: Text(
+                              r.employeeName,
+                              style: GoogleFonts.inter(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w700,
+                                color: FinDT.textPrimary,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${r.count} open advance(s) · oldest '
+                              '${DateFormat('d MMM y').format(r.oldest!)} '
+                              '($days day${days == 1 ? '' : 's'})',
+                              style: GoogleFonts.inter(
+                                fontSize: 10.sp,
+                                color: FinDT.textMuted,
+                              ),
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${fmt.format(r.outstanding)} ${r.currency}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: FinDT.warning,
+                                  ),
+                                ),
+                                SizedBox(width: 4.w),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 18.sp,
+                                  color: FinDT.textMuted,
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+        actions: [finDialogCancelButton(ctx, label: 'Close')],
+      ),
+    );
+
+    if (picked == null || !mounted) return;
+    _searchCtrl.clear();
+    setState(() {
+      _employeeFilterId = picked.employeeId;
+      _employeeFilterName = picked.employeeName;
+      _selectedStatusFilter = 'ACTIVE';
+    });
   }
 
   Widget _buildKpiCard({
@@ -1335,4 +1765,16 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
     CashAdvanceEntity advance,
   ) =>
       showSettleAdvanceDialog(context, advance);
+}
+
+/// One employee's open advances in one currency, for "Pending by Employee".
+class _EmployeePending {
+  final String employeeId;
+  final String employeeName;
+  final String currency;
+  double outstanding = 0;
+  int count = 0;
+  DateTime? oldest;
+
+  _EmployeePending(this.employeeId, this.employeeName, this.currency);
 }
