@@ -10,12 +10,14 @@ import '../../../vehicle/domain/entities/odometer_reading_entity.dart';
 import '../../../vehicle/presentation/providers/odometer_provider.dart';
 import '../../../vehicle/presentation/providers/vehicle_provider.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../auth/domain/entities/user_entity.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/expense_category_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
+import '../../domain/services/finance_permission_service.dart';
 import '../../../../features/employee/presentation/providers/employee_provider.dart';
 import '../../../../features/employee/domain/entities/employee_entity.dart';
 import '../../../../features/vehicle/presentation/providers/vehicle_provider.dart';
@@ -243,6 +245,50 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     _submittedByEmployeeId = emp.id;
     _submittedBy = emp.fullName;
     _submittedByRole = emp.position;
+  }
+
+  bool _submitterIsLoggedInUser(UserEntity user) {
+    final linkedId = user.employeeId ?? '';
+    if (linkedId.isNotEmpty) return _submittedByEmployeeId == linkedId;
+    return (_submittedByEmployeeId ?? '').isEmpty &&
+        _submittedBy == user.actorLabel;
+  }
+
+  /// The submitter's current name, preferring their employee record so a
+  /// stale name saved on the login does not hide their accounts.
+  String get _submitterName {
+    final id = _submittedByEmployeeId ?? '';
+    if (id.isNotEmpty) {
+      for (final e in context.read<EmployeeProvider>().employees) {
+        if (e.id == id) return e.fullName;
+      }
+    }
+    return _submittedBy;
+  }
+
+  /// Expenses are recorded only against fund accounts assigned to the
+  /// submitter. Admins and finance managers entering their own expenses see
+  /// every account, unassigned ones included. Accounts store the custodian's
+  /// name, so the match is by name.
+  bool _canUseAccount(FundAccountEntity account) {
+    final user = context.read<AuthProvider>().user;
+    if (user != null && _submitterIsLoggedInUser(user)) {
+      final policy = context.read<FinanceProvider>().policy;
+      if (FinancePermissionService.canManageAccounts(
+        user: user,
+        policy: policy,
+      )) {
+        return true;
+      }
+      // Legacy accounts that recorded the custodian's login id.
+      if ((account.assignedToId ?? '').isNotEmpty &&
+          account.assignedToId == user.id) {
+        return true;
+      }
+    }
+    final assignee = account.assignedTo?.trim().toLowerCase() ?? '';
+    return assignee.isNotEmpty &&
+        assignee == _submitterName.trim().toLowerCase();
   }
 
   void _onAmountChanged() {
@@ -616,7 +662,16 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                   context,
                   empProv,
                   (selected) {
-                    setState(() => _setSubmitter(selected));
+                    setState(() {
+                      _setSubmitter(selected);
+                      // Drop an account the new submitter isn't assigned to.
+                      final acc = context
+                          .read<FundAccountProvider>()
+                          .getAccountById(_selectedAccountId ?? '');
+                      if (!_isEditing && acc != null && !_canUseAccount(acc)) {
+                        _selectedAccountId = null;
+                      }
+                    });
                     state.didChange(selected.id);
                   },
                   internalOnly: true,
@@ -1124,8 +1179,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     final isPettyCash = selectedAcc?.isPettyCash ?? false;
     final currencyFormat = NumberFormat('#,##0.00', 'en_US');
 
-    // Gather active accounts and ensure selected account is included even if inactive/archived
-    final accountList = List<FundAccountEntity>.from(accProv.activeAccounts);
+    // Gather the submitter's active accounts and ensure selected account is
+    // included even if inactive/archived or assigned to someone else
+    final accountList =
+        accProv.activeAccounts.where(_canUseAccount).toList();
     if (_selectedAccountId != null && _selectedAccountId!.isNotEmpty) {
       final existsInActive = accountList.any((a) => a.id == _selectedAccountId);
       if (!existsInActive && selectedAcc != null) {
@@ -1271,7 +1328,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
             },
             onChanged: (v) => setState(() => _selectedAccountId = v),
             validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
-            decoration: _inputDecoration(hint: 'Select account'),
+            decoration: _inputDecoration(
+              hint: uniqueAccounts.isEmpty
+                  ? 'No fund account assigned to ${_submitterName.isNotEmpty ? _submitterName : "the submitter"}'
+                  : 'Select account',
+            ),
             style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
           ),
         ),
