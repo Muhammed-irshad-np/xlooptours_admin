@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../../../core/usecases/usecase.dart';
+import '../../../../core/utils/page_reload.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/auth_getters.dart';
@@ -65,8 +66,21 @@ class AuthProvider extends ChangeNotifier {
     // Immediate touch, then every 2 minutes while logged in
     unawaited(_authRepository.touchLastActive());
     _presenceTimer = Timer.periodic(const Duration(minutes: 2), (_) {
+      if (_authRepository.isSessionExpired) {
+        unawaited(_expireSession());
+        return;
+      }
       unawaited(_authRepository.touchLastActive());
     });
+  }
+
+  /// Daily cutoff passed while the app was open: log out and reload so the
+  /// next login also runs the latest deployed build (web).
+  Future<void> _expireSession() async {
+    await logout();
+    _errorMessage = 'Your session has expired. Please log in again.';
+    notifyListeners();
+    reloadPage();
   }
 
   void _stopPresenceHeartbeat() {

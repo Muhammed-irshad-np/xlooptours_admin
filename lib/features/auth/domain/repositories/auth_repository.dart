@@ -16,4 +16,7 @@ abstract class AuthRepository {
 
   /// Heartbeat for online presence in User Management.
   Future<void> touchLastActive();
+
+  /// True when the current login predates the daily session cutoff.
+  bool get isSessionExpired;
 }

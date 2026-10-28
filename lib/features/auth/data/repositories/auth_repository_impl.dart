@@ -48,4 +48,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> touchLastActive() {
     return remoteDataSource.touchLastActive();
   }
+
+  @override
+  bool get isSessionExpired => remoteDataSource.isSessionExpired;
 }
