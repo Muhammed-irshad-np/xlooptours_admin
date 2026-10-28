@@ -30,6 +30,15 @@ class ExpenseListPage extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── One tab per fund account ────────────────────
+            if (accountProvider.accounts.isNotEmpty) ...[
+              _AccountTabs(
+                provider: provider,
+                accountProvider: accountProvider,
+              ),
+              SizedBox(height: 16.h),
+            ],
+
             // ── Ledger vs Projected Balance ─────────────────
             if (accountProvider.accounts.isNotEmpty) ...[
               ProjectedBalanceStrip(
@@ -40,7 +49,7 @@ class ExpenseListPage extends StatelessWidget {
             ],
 
             // ── Filters Bar ─────────────────────────────────
-            _FiltersBar(provider: provider, accountProvider: accountProvider),
+            _FiltersBar(provider: provider),
             SizedBox(height: 16.h),
 
             // ── Expense Table ───────────────────────────────
@@ -56,38 +65,142 @@ class ExpenseListPage extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ACCOUNT TABS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Picks the fund account the page is scoped to, replacing the old account
+/// dropdown. Each tab carries that account's pending commitments, the same
+/// figure the Wallet Position strip shows, so it's visible without opening
+/// the account first.
+class _AccountTabs extends StatelessWidget {
+  final FinanceProvider provider;
+  final FundAccountProvider accountProvider;
+  const _AccountTabs({required this.provider, required this.accountProvider});
+
+  static final _money = NumberFormat('#,##0.00', 'en_US');
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedId = provider.accountFilter;
+    final accounts = [...accountProvider.activeAccounts];
+    // Keep a tab for the selected account even if it was since deactivated.
+    if (selectedId != null && !accounts.any((a) => a.id == selectedId)) {
+      accounts.insertAll(
+        0,
+        accountProvider.accounts.where((a) => a.id == selectedId),
+      );
+    }
+
+    final totalPendingCount = accountProvider.activeAccounts.fold<int>(
+      0,
+      (sum, a) => sum + provider.outstandingCountFor(a.id),
+    );
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _buildTab(
+            label: 'All Accounts',
+            icon: Icons.dashboard_outlined,
+            pendingCount: totalPendingCount,
+            pendingText: null,
+            isSelected: selectedId == null,
+            onTap: () => provider.setAccountFilter(null),
+          ),
+          for (final account in accounts) ...[
+            SizedBox(width: 10.w),
+            _buildTab(
+              label: account.name,
+              icon: Icons.account_balance_wallet_outlined,
+              pendingCount: provider.outstandingCountFor(account.id),
+              pendingText:
+                  '${_money.format(provider.outstandingOutflowMinorFor(account.id) / 100.0)} ${account.currency}',
+              isSelected: selectedId == account.id,
+              onTap: () => provider.setAccountFilter(account.id),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTab({
+    required String label,
+    required IconData icon,
+    required int pendingCount,
+    required String? pendingText,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    final fgColor = isSelected ? Colors.white : FinDT.textPrimary;
+    final subColor = isSelected
+        ? Colors.white.withValues(alpha: 0.85)
+        : (pendingCount > 0 ? FinDT.warning : FinDT.textMuted);
+    final subtitle = pendingCount == 0
+        ? 'No pending'
+        : '$pendingCount pending${pendingText == null ? '' : ' · $pendingText'}';
+
+    return Material(
+      color: isSelected ? FinDT.brand : Colors.white,
+      borderRadius: BorderRadius.circular(12.r),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12.r),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12.r),
+            border: Border.all(color: isSelected ? FinDT.brand : FinDT.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16.sp, color: fgColor),
+              SizedBox(width: 8.w),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                      color: fgColor,
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 10.sp,
+                      fontWeight: pendingCount > 0
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      color: subColor,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // FILTERS BAR
 // ═══════════════════════════════════════════════════════════════════════════════
 
 class _FiltersBar extends StatelessWidget {
   final FinanceProvider provider;
-  final FundAccountProvider accountProvider;
-  const _FiltersBar({required this.provider, required this.accountProvider});
+  const _FiltersBar({required this.provider});
 
   @override
   Widget build(BuildContext context) {
-    final accounts = accountProvider.activeAccounts;
-    // Keep dropdown value valid even if the selected account is inactive.
-    final selectedAccountId = provider.accountFilter;
-    final accountItems = accounts
-        .map((a) => DropdownMenuItem(value: a.id, child: Text(a.name)))
-        .toList();
-    if (selectedAccountId != null &&
-        !accounts.any((a) => a.id == selectedAccountId)) {
-      final inactive = accountProvider.accounts
-          .where((a) => a.id == selectedAccountId)
-          .toList();
-      if (inactive.isNotEmpty) {
-        accountItems.insert(
-          0,
-          DropdownMenuItem(
-            value: inactive.first.id,
-            child: Text(inactive.first.name),
-          ),
-        );
-      }
-    }
-
     return Container(
       padding: EdgeInsets.all(16.w),
       decoration: BoxDecoration(
@@ -159,22 +272,13 @@ class _FiltersBar extends StatelessWidget {
             ),
             SizedBox(width: 12.w),
 
-            // Fund account filter
-            _FilterDropdown<String>(
-              hint: 'Account',
-              value: selectedAccountId,
-              items: accountItems,
-              onChanged: (id) => provider.setAccountFilter(id),
-            ),
-            SizedBox(width: 12.w),
-
             // Date range
             _DateRangeButton(provider: provider),
 
+            // The account is picked from the tabs, so it isn't a filter here.
             if (provider.statusFilter != null ||
                 provider.categoryFilter != null ||
                 provider.typeFilter != null ||
-                provider.accountFilter != null ||
                 provider.employeeFilter != null ||
                 provider.searchQuery != null ||
                 provider.dateFrom != null) ...[
@@ -374,7 +478,10 @@ class _ClearFilterButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return IconButton(
       onPressed: () {
+        // Clearing filters keeps the user on the account tab they're viewing.
+        final accountId = provider.accountFilter;
         provider.clearFilters();
+        provider.setAccountFilter(accountId);
         provider.fetchAllExpenses();
       },
       icon: Icon(
