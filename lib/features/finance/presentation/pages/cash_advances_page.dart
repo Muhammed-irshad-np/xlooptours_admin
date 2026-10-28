@@ -1411,6 +1411,8 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
     final purposeCtrl = TextEditingController();
     String? accountId;
     EmployeeEntity? employee;
+    // Narrows the recipient list to internal or external staff; null = all.
+    String? employmentType;
     var issueDate = DateUtils.dateOnly(DateTime.now());
     final accounts = context.read<FundAccountProvider>().activeAccounts;
     final employees = context.read<EmployeeProvider>().employees;
@@ -1453,6 +1455,48 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
             (a) => a.id == accountId,
             orElse: () => accounts.first,
           );
+          final filteredEmployees = employmentType == null
+              ? employees
+              : employees
+                  .where((e) => e.employmentType == employmentType)
+                  .toList();
+
+          Widget employmentTypeChip(String? type, String label) {
+            final isSelected = employmentType == type;
+            final count = type == null
+                ? employees.length
+                : employees.where((e) => e.employmentType == type).length;
+            return ChoiceChip(
+              label: Text('$label ($count)'),
+              selected: isSelected,
+              onSelected: isIssuing
+                  ? null
+                  : (_) => setInnerState(() {
+                      employmentType = type;
+                      // Drop a recipient the new filter hides.
+                      if (employee != null &&
+                          type != null &&
+                          employee!.employmentType != type) {
+                        employee = null;
+                      }
+                    }),
+              labelStyle: GoogleFonts.inter(
+                fontSize: 11.sp,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? Colors.white : FinDT.textSecondary,
+              ),
+              selectedColor: FinDT.brand,
+              backgroundColor: Colors.white,
+              side: BorderSide(
+                color: isSelected ? FinDT.brand : FinDT.border,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20.r),
+              ),
+              showCheckmark: false,
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+            );
+          }
 
           return AlertDialog(
             backgroundColor: Colors.white,
@@ -1496,7 +1540,29 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                         validator: (v) => v == null ? 'Required' : null,
                       ),
                       SizedBox(height: 14.h),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Wrap(
+                          spacing: 8.w,
+                          runSpacing: 6.h,
+                          children: [
+                            employmentTypeChip(null, 'All'),
+                            employmentTypeChip(
+                              EmploymentType.internal,
+                              'Internal',
+                            ),
+                            employmentTypeChip(
+                              EmploymentType.external,
+                              'External',
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 10.h),
                       SearchableDropdown<EmployeeEntity>(
+                        // The field keeps its own selection, so rebuild it
+                        // when the filter changes to pick up a cleared value.
+                        key: ValueKey(employmentType),
                         value: employee,
                         labelText: 'Employee Recipient',
                         searchHint: 'Search employee by name…',
@@ -1509,7 +1575,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                           fontSize: 12.sp,
                           color: FinDT.textPrimary,
                         ),
-                        items: employees,
+                        items: filteredEmployees,
                         itemToString: (e) => e.fullName,
                         enabled: !isIssuing,
                         onChanged: (v) => setInnerState(() => employee = v),
