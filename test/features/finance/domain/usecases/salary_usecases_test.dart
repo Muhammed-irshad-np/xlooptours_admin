@@ -118,6 +118,49 @@ void main() {
       expect(payment.grossSalary, 4250);
     });
 
+    test('each leave day costs a 30th of basic plus allowances', () {
+      expect(
+        SalaryPaymentEntity.leaveDeductionFor(
+          basicSalary: 3000,
+          allowances: 600,
+          leaveDays: 2,
+        ),
+        240,
+      );
+      expect(
+        SalaryPaymentEntity.leaveDeductionFor(
+          basicSalary: 3000,
+          allowances: 600,
+          leaveDays: 0,
+        ),
+        0,
+      );
+    });
+
+    test('leave deduction is rounded to halalas', () {
+      // 3500 / 30 = 116.666…
+      expect(
+        SalaryPaymentEntity.leaveDeductionFor(
+          basicSalary: 3000,
+          allowances: 500,
+          leaveDays: 1,
+        ),
+        116.67,
+      );
+    });
+
+    test('leave reduces net pay alongside other deductions', () {
+      expect(
+        SalaryPaymentEntity.computeNet(
+          basicSalary: 3000,
+          allowances: 600,
+          leaveDeduction: 240,
+          deductions: 100,
+        ),
+        3260,
+      );
+    });
+
     test('period key and document id are deterministic', () {
       expect(SalaryPaymentEntity.periodOf(DateTime(2026, 9, 15)), '2026-09');
       expect(SalaryPaymentEntity.buildId('2026-09', 'emp1'), '2026-09_emp1');
