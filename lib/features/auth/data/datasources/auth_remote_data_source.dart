@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/error/exceptions.dart';
 import '../../../../core/rbac/permission.dart';
 import '../../../../core/rbac/rbac_manager.dart';
+import '../../../../core/utils/session_expiry.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -12,6 +13,8 @@ abstract class AuthRemoteDataSource {
   Future<void> signOut();
   /// Updates lastActiveAt for online presence (safe to call periodically).
   Future<void> touchLastActive();
+  /// True when the signed-in user's login predates the daily cutoff.
+  bool get isSessionExpired;
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -95,6 +98,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final user = auth.currentUser;
     if (user == null) return;
     await _recordSessionActivity(user, heartbeatOnly: true);
+  }
+
+  @override
+  bool get isSessionExpired {
+    final user = auth.currentUser;
+    if (user == null) return false;
+    return loginPredatesCutoff(user.metadata.lastSignInTime);
   }
 
   Future<List<String>> _permissionsForRole(String roleId) async {
@@ -291,6 +301,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<UserModel> _buildAuthorizedUserModel(User user) async {
     // Invalidate Google-only / non-password sessions immediately
     _ensurePasswordLoginAllowed(user);
+    // Restored sessions from before the daily cutoff must log in again
+    if (loginPredatesCutoff(user.metadata.lastSignInTime)) {
+      throw AuthenticationException(
+        'Your session has expired. Please log in again.',
+      );
+    }
     final resolved = await _resolveAuthorizedUser(user);
     // Track login / presence for User Management (admin visibility)
     await _recordSessionActivity(user);
