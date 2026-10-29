@@ -48,12 +48,14 @@ class _PayrollRow {
   int? get tripCount => payment?.tripCount;
   double get allowances => payment?.allowances ?? structure?.allowances ?? 0;
   double get extraAllowance => payment?.extraAllowance ?? 0;
+  int get leaveDays => payment?.leaveDays ?? 0;
+  double get leaveDeduction => payment?.leaveDeduction ?? 0;
   double get deductions => payment?.deductions ?? 0;
   double get advanceRecovery => payment?.advanceRecovery ?? 0;
 
-  /// Everything held back from gross pay: manual deductions plus any amount
-  /// recovered against outstanding advances.
-  double get withheld => deductions + advanceRecovery;
+  /// Everything held back from gross pay: unpaid leave, manual deductions and
+  /// any amount recovered against outstanding advances.
+  double get withheld => leaveDeduction + deductions + advanceRecovery;
   double get net =>
       payment?.netAmount ??
       SalaryPaymentEntity.computeNet(
@@ -1490,6 +1492,10 @@ class _SalariesPageState extends State<SalariesPage> {
     final extraNoteCtrl =
         TextEditingController(text: row.payment?.extraAllowanceNote ?? '');
     final recoveryCtrl = TextEditingController();
+    // Salary only: unpaid leave days, each costing a day's pay.
+    final leaveDaysCtrl = TextEditingController(
+      text: row.leaveDays > 0 ? row.leaveDays.toString() : '',
+    );
     // Trip closing only: the month's trip earnings are typed in at closing.
     final tripAmountCtrl = TextEditingController(
       text: row.isTrip && row.payment != null
@@ -1534,11 +1540,23 @@ class _SalariesPageState extends State<SalariesPage> {
               ? double.tryParse(tripAmountCtrl.text.trim()) ?? 0
               : row.basic;
           final gross = basic + row.allowances + extra;
+          final leaveDays = row.isTrip
+              ? 0
+              : int.tryParse(leaveDaysCtrl.text.trim()) ?? 0;
+          final dailyRate = SalaryPaymentEntity.dailyRate(
+            basicSalary: basic,
+            allowances: row.allowances,
+          );
+          final leaveDeduction = SalaryPaymentEntity.leaveDeductionFor(
+            basicSalary: basic,
+            allowances: row.allowances,
+            leaveDays: leaveDays,
+          );
           // Never recover more than is owed, nor more than what is left after
-          // manual deductions.
+          // leave and manual deductions.
           final maxRecovery = [
             totalOutstanding,
-            gross - deduction,
+            gross - leaveDeduction - deduction,
           ].reduce((a, b) => a < b ? a : b);
           final recovery = requestedRecovery <= 0
               ? 0.0
@@ -1547,6 +1565,7 @@ class _SalariesPageState extends State<SalariesPage> {
             basicSalary: basic,
             allowances: row.allowances,
             extraAllowance: extra,
+            leaveDeduction: leaveDeduction,
             deductions: deduction,
             advanceRecovery: recovery,
           );
@@ -1761,6 +1780,50 @@ class _SalariesPageState extends State<SalariesPage> {
                               : null,
                         ),
                       ],
+                      if (!row.isTrip) ...[
+                        SizedBox(height: 14.h),
+                        TextFormField(
+                          controller: leaveDaysCtrl,
+                          enabled: !isPaying,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          onChanged: (_) => setInner(() {}),
+                          decoration: finDialogInputDecoration(
+                            label: 'Leave Days (unpaid)',
+                            hint: 'Days of unpaid leave this month',
+                            prefixIcon: Icons.event_busy_outlined,
+                            suffixText: leaveDays > 0
+                                ? '− ${fmt.format(leaveDeduction)} ${row.currency}'
+                                : 'days',
+                          ),
+                          style: GoogleFonts.inter(
+                            fontSize: 12.sp,
+                            color: FinDT.textPrimary,
+                          ),
+                          validator: (v) {
+                            if (v == null || v.trim().isEmpty) return null;
+                            final n = int.tryParse(v);
+                            if (n == null || n < 0) return 'Enter a valid number';
+                            if (n > SalaryPaymentEntity.payrollDaysPerMonth) {
+                              return 'At most '
+                                  '${SalaryPaymentEntity.payrollDaysPerMonth} days';
+                            }
+                            return null;
+                          },
+                        ),
+                        SizedBox(height: 6.h),
+                        Text(
+                          'One day = ${fmt.format(dailyRate)} ${row.currency} '
+                          '(basic + allowances ÷ '
+                          '${SalaryPaymentEntity.payrollDaysPerMonth})',
+                          style: GoogleFonts.inter(
+                            fontSize: 10.sp,
+                            color: FinDT.textMuted,
+                          ),
+                        ),
+                      ],
                       SizedBox(height: 14.h),
                       TextFormField(
                         controller: deductionCtrl,
@@ -1772,7 +1835,7 @@ class _SalariesPageState extends State<SalariesPage> {
                         onChanged: (_) => setInner(() {}),
                         decoration: finDialogInputDecoration(
                           label: 'Deductions',
-                          hint: 'Absences, fines, other withholdings',
+                          hint: 'Fines, other withholdings',
                           prefixIcon: Icons.remove_circle_outline,
                           suffixText: row.currency,
                         ),
@@ -1784,7 +1847,9 @@ class _SalariesPageState extends State<SalariesPage> {
                           if (v == null || v.trim().isEmpty) return null;
                           final n = double.tryParse(v);
                           if (n == null || n < 0) return 'Enter a valid amount';
-                          if (n > gross) return 'Deductions exceed gross pay';
+                          if (n > gross - leaveDeduction) {
+                            return 'Deductions exceed gross pay';
+                          }
                           return null;
                         },
                       ),
@@ -1794,7 +1859,7 @@ class _SalariesPageState extends State<SalariesPage> {
                           controller: deductionNoteCtrl,
                           decoration: finDialogInputDecoration(
                             label: 'Deduction Reason *',
-                            hint: 'e.g. 2 days unpaid leave',
+                            hint: 'e.g. Traffic fine',
                             prefixIcon: Icons.description_outlined,
                           ),
                           style: GoogleFonts.inter(
@@ -1833,6 +1898,8 @@ class _SalariesPageState extends State<SalariesPage> {
                         row: row,
                         basic: basic,
                         extra: extra,
+                        leaveDays: leaveDays,
+                        leaveDeduction: leaveDeduction,
                         deduction: deduction,
                         recovery: recovery,
                         net: net,
@@ -1906,6 +1973,8 @@ class _SalariesPageState extends State<SalariesPage> {
                           extra <= 0 || extraNoteCtrl.text.trim().isEmpty
                               ? null
                               : extraNoteCtrl.text.trim(),
+                      leaveDays: leaveDays,
+                      leaveDeduction: leaveDeduction,
                       deductions: deduction,
                       deductionNote: deductionNoteCtrl.text.trim().isEmpty
                           ? null
@@ -2203,6 +2272,8 @@ class _SalariesPageState extends State<SalariesPage> {
     required _PayrollRow row,
     required double basic,
     required double extra,
+    required int leaveDays,
+    required double leaveDeduction,
     required double deduction,
     required double recovery,
     required double net,
@@ -2259,6 +2330,12 @@ class _SalariesPageState extends State<SalariesPage> {
               row.isTrip ? 'Extra' : 'Extra allowance',
               '+ ${fmt.format(extra)} ${row.currency}',
               color: FinDT.success,
+            ),
+          if (leaveDays > 0)
+            line(
+              'Leave ($leaveDays ${leaveDays == 1 ? 'day' : 'days'})',
+              '− ${fmt.format(leaveDeduction)} ${row.currency}',
+              color: FinDT.danger,
             ),
           line(
             'Deductions',

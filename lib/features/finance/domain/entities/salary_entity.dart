@@ -159,8 +159,15 @@ class SalaryPaymentEntity extends Equatable {
   final double extraAllowance;
   final String? extraAllowanceNote;
 
-  /// Manual deductions: absences, fines, etc. (major units). Advance recovery
-  /// is tracked separately in [advanceRecovery].
+  /// Unpaid leave days taken this month. Each one costs a day's pay — see
+  /// [leaveDeductionFor].
+  final int leaveDays;
+
+  /// Pay withheld for [leaveDays] (major units).
+  final double leaveDeduction;
+
+  /// Manual deductions: fines, other withholdings (major units). Unpaid leave
+  /// is tracked in [leaveDeduction] and advance recovery in [advanceRecovery].
   final double deductions;
   final String? deductionNote;
 
@@ -173,8 +180,8 @@ class SalaryPaymentEntity extends Equatable {
   /// Kept so voiding the salary can put the amounts back on those advances.
   final Map<String, double> advanceRecoveries;
 
-  /// basic + allowances + extra allowance − deductions − advance recovery,
-  /// never below zero.
+  /// basic + allowances + extra allowance − leave deduction − deductions
+  /// − advance recovery, never below zero.
   final double netAmount;
   final int? netAmountMinor;
   final String currency;
@@ -220,6 +227,8 @@ class SalaryPaymentEntity extends Equatable {
     this.allowances = 0,
     this.extraAllowance = 0,
     this.extraAllowanceNote,
+    this.leaveDays = 0,
+    this.leaveDeduction = 0,
     this.deductions = 0,
     this.deductionNote,
     this.advanceRecovery = 0,
@@ -250,7 +259,7 @@ class SalaryPaymentEntity extends Equatable {
   bool get isTripSettlement => kind == SalaryPaymentKind.tripSettlement;
 
   /// Everything withheld from gross pay this month.
-  double get totalWithheld => deductions + advanceRecovery;
+  double get totalWithheld => leaveDeduction + deductions + advanceRecovery;
 
   int get resolvedNetMinor => netAmountMinor ?? (netAmount * 100).round();
 
@@ -269,17 +278,44 @@ class SalaryPaymentEntity extends Equatable {
       '${date.year.toString().padLeft(4, '0')}-'
       '${date.month.toString().padLeft(2, '0')}';
 
+  /// Days in a payroll month when working out a day's pay. Fixed at 30 so a
+  /// leave day costs the same in February as in March.
+  static const int payrollDaysPerMonth = 30;
+
+  /// One day's pay: the fixed monthly pay (basic + allowances) spread over
+  /// [payrollDaysPerMonth].
+  static double dailyRate({
+    required double basicSalary,
+    double allowances = 0,
+  }) =>
+      (basicSalary + allowances) / payrollDaysPerMonth;
+
+  /// Pay withheld for [leaveDays] unpaid leave days, rounded to halalas.
+  static double leaveDeductionFor({
+    required double basicSalary,
+    double allowances = 0,
+    required int leaveDays,
+  }) {
+    if (leaveDays <= 0) return 0;
+    final amount =
+        dailyRate(basicSalary: basicSalary, allowances: allowances) *
+            leaveDays;
+    return (amount * 100).round() / 100.0;
+  }
+
   /// Net pay derived from components, floored at zero.
   static double computeNet({
     required double basicSalary,
     double allowances = 0,
     double extraAllowance = 0,
+    double leaveDeduction = 0,
     double deductions = 0,
     double advanceRecovery = 0,
   }) {
     final net = basicSalary +
         allowances +
         extraAllowance -
+        leaveDeduction -
         deductions -
         advanceRecovery;
     return net < 0 ? 0 : net;
@@ -320,6 +356,8 @@ class SalaryPaymentEntity extends Equatable {
     double? allowances,
     double? extraAllowance,
     String? extraAllowanceNote,
+    int? leaveDays,
+    double? leaveDeduction,
     double? deductions,
     String? deductionNote,
     double? advanceRecovery,
@@ -353,6 +391,8 @@ class SalaryPaymentEntity extends Equatable {
       allowances: allowances ?? this.allowances,
       extraAllowance: extraAllowance ?? this.extraAllowance,
       extraAllowanceNote: extraAllowanceNote ?? this.extraAllowanceNote,
+      leaveDays: leaveDays ?? this.leaveDays,
+      leaveDeduction: leaveDeduction ?? this.leaveDeduction,
       deductions: deductions ?? this.deductions,
       deductionNote: deductionNote ?? this.deductionNote,
       advanceRecovery: advanceRecovery ?? this.advanceRecovery,
@@ -386,6 +426,7 @@ class SalaryPaymentEntity extends Equatable {
         kind,
         employeeId,
         tripCount,
+        leaveDays,
         netAmount,
         advanceRecovery,
         status,

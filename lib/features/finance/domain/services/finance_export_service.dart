@@ -103,7 +103,7 @@ class FinanceExportService {
     buf.writeln(
       'id,period,kind,employeeName,position,basicSalary,tripCount,allowances,'
       'extraAllowance,'
-      'extraAllowanceNote,deductions,'
+      'extraAllowanceNote,leaveDays,leaveDeduction,deductions,'
       'advanceRecovery,netAmount,currency,status,fundAccountName,paymentMethod,'
       'expenseId,paidAt,paidBy,notes',
     );
@@ -119,6 +119,8 @@ class FinanceExportService {
         p.allowances.toStringAsFixed(2),
         p.extraAllowance.toStringAsFixed(2),
         _csvEscape(p.extraAllowanceNote),
+        p.leaveDays.toString(),
+        p.leaveDeduction.toStringAsFixed(2),
         p.deductions.toStringAsFixed(2),
         p.advanceRecovery.toStringAsFixed(2),
         p.netAmount.toStringAsFixed(2),

@@ -2283,21 +2283,47 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     if (payment.extraAllowance < 0) {
       throw StateError('Extra allowance cannot be negative');
     }
+    if (payment.leaveDays < 0 ||
+        payment.leaveDays > SalaryPaymentEntity.payrollDaysPerMonth) {
+      throw StateError(
+        'Leave days must be between 0 and '
+        '${SalaryPaymentEntity.payrollDaysPerMonth}',
+      );
+    }
 
-    // Net is always recomputed here — never trusted from the UI.
+    // Net (and the leave deduction feeding it) is always recomputed here —
+    // never trusted from the UI. Trip settlements have no leave.
+    final leaveDeduction = payment.isTripSettlement
+        ? 0.0
+        : SalaryPaymentEntity.leaveDeductionFor(
+            basicSalary: payment.basicSalary,
+            allowances: payment.allowances,
+            leaveDays: payment.leaveDays,
+          );
     final net = SalaryPaymentEntity.computeNet(
       basicSalary: payment.basicSalary,
       allowances: payment.allowances,
       extraAllowance: payment.extraAllowance,
+      leaveDeduction: leaveDeduction,
       deductions: payment.deductions,
       advanceRecovery: totalRecovery,
     );
     if (net <= 0 && totalRecovery <= 0) {
       throw StateError('Net salary must be greater than zero');
     }
-    if (payment.grossSalary - payment.deductions - totalRecovery < -1e-9) {
-      throw StateError('Deductions and advance recovery exceed gross pay');
+    if (payment.grossSalary -
+            leaveDeduction -
+            payment.deductions -
+            totalRecovery <
+        -1e-9) {
+      throw StateError(
+        'Leave, deductions and advance recovery exceed gross pay',
+      );
     }
+    final payable = payment.copyWith(
+      leaveDays: payment.isTripSettlement ? 0 : payment.leaveDays,
+      leaveDeduction: leaveDeduction,
+    );
 
     final netMinor = (net * 100).round();
     FundTransactionModel? tx;
@@ -2386,7 +2412,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         paidAt: now,
         balanceAfter: tx.balanceAfter,
         balanceAfterMinor: (tx.balanceAfter * 100).round(),
-        notes: _salaryBreakdownNote(payment, totalRecovery),
+        notes: _salaryBreakdownNote(payable, totalRecovery),
         salaryPaymentId: payment.id,
       );
       await _expenses.doc(expenseId).set(_stripNulls(expense.toJson()));
@@ -2406,7 +2432,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     }
 
     final updated = SalaryPaymentModel.fromEntity(
-      payment.copyWith(
+      payable.copyWith(
         status: SalaryPaymentStatus.paid,
         advanceRecovery: totalRecovery,
         advanceRecoveries: recoveries,
@@ -2582,6 +2608,13 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         '${payment.isTripSettlement ? 'Extra' : 'Extra allowance'} '
         '${payment.extraAllowance.toStringAsFixed(2)}'
         '${payment.extraAllowanceNote != null ? ' (${payment.extraAllowanceNote})' : ''}',
+      );
+    }
+    if (payment.leaveDeduction > 0) {
+      parts.add(
+        'Leave ${payment.leaveDays} '
+        '${payment.leaveDays == 1 ? 'day' : 'days'} '
+        '-${payment.leaveDeduction.toStringAsFixed(2)}',
       );
     }
     if (payment.deductions > 0) {
