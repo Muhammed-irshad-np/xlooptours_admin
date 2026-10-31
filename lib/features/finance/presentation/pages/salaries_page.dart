@@ -92,6 +92,9 @@ class _SalariesPageState extends State<SalariesPage> {
       context.read<FundAccountProvider>().fetchAllAccounts();
       // Needed to offer advance recovery when paying a salary.
       context.read<CashAdvanceProvider>().load();
+      // Holds which accounts salaries and trip payments may use.
+      final finProv = context.read<FinanceProvider>();
+      if (!finProv.isPolicyLoaded) finProv.fetchFinancePolicy();
     });
   }
 
@@ -99,6 +102,18 @@ class _SalariesPageState extends State<SalariesPage> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  /// Active accounts the Master Data payroll settings allow for [kind]. An
+  /// empty setting allows every active account.
+  List<FundAccountEntity> _payrollAccounts(SalaryPaymentKind kind) {
+    final policy = context.read<FinanceProvider>().policy;
+    final allowed = kind == SalaryPaymentKind.tripSettlement
+        ? policy.tripPaymentAccountIds
+        : policy.salaryAccountIds;
+    final active = context.read<FundAccountProvider>().activeAccounts;
+    if (allowed.isEmpty) return active;
+    return active.where((a) => allowed.contains(a.id)).toList();
   }
 
   bool get _canManage {
@@ -1242,11 +1257,12 @@ class _SalariesPageState extends State<SalariesPage> {
     if (!_guardPermission(context)) return;
 
     final provider = context.read<SalaryProvider>();
-    final accounts = context.read<FundAccountProvider>().activeAccounts;
+    final accounts = _payrollAccounts(SalaryPaymentKind.salary);
     if (accounts.isEmpty) {
       _snack(
         context,
-        'Create an active fund account first — salaries are paid from one.',
+        'No salary account available — create an active fund account or '
+        'pick salary accounts in Master Data.',
         FinDT.danger,
       );
       return;
@@ -1512,13 +1528,15 @@ class _SalariesPageState extends State<SalariesPage> {
   ) async {
     if (!_guardPermission(context)) return;
 
-    final allAccounts = context.read<FundAccountProvider>().activeAccounts;
+    final allAccounts = _payrollAccounts(row.kind);
     final accounts =
         allAccounts.where((a) => a.currency == row.currency).toList();
     if (accounts.isEmpty) {
       _snack(
         context,
-        'No active fund account in ${row.currency} to pay this from.',
+        'No ${row.isTrip ? 'trip payment' : 'salary'} account in '
+        '${row.currency} to pay this from — check Payroll Accounts in '
+        'Master Data.',
         FinDT.danger,
       );
       return;

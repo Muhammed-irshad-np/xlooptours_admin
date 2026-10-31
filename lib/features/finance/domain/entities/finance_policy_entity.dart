@@ -85,6 +85,15 @@ class FinancePolicyEntity extends Equatable {
   /// Who can set up salaries and pay staff salaries.
   final WorkflowPermissionConfig salaryManagement;
 
+  // ─── Payroll Accounts ───────────────────────────────────────
+
+  /// Fund accounts staff salaries may be paid from. Empty = any active account.
+  final List<String> salaryAccountIds;
+
+  /// Fund accounts external drivers' trip payments may be paid from.
+  /// Empty = any active account.
+  final List<String> tripPaymentAccountIds;
+
   const FinancePolicyEntity({
     // Legacy approval limits
     this.approvalLimits = const {
@@ -147,6 +156,8 @@ class FinancePolicyEntity extends Equatable {
     this.salaryManagement = const WorkflowPermissionConfig(
       allowedRoles: ['finance', 'admin', 'super_admin'],
     ),
+    this.salaryAccountIds = const [],
+    this.tripPaymentAccountIds = const [],
   });
 
   // ─── Query Helpers ──────────────────────────────────────────
@@ -196,6 +207,8 @@ class FinancePolicyEntity extends Equatable {
     WorkflowPermissionConfig? masterDataManagement,
     WorkflowPermissionConfig? cashAdvanceManagement,
     WorkflowPermissionConfig? salaryManagement,
+    List<String>? salaryAccountIds,
+    List<String>? tripPaymentAccountIds,
   }) {
     return FinancePolicyEntity(
       approvalLimits: approvalLimits ?? this.approvalLimits,
@@ -221,6 +234,9 @@ class FinancePolicyEntity extends Equatable {
       cashAdvanceManagement:
           cashAdvanceManagement ?? this.cashAdvanceManagement,
       salaryManagement: salaryManagement ?? this.salaryManagement,
+      salaryAccountIds: salaryAccountIds ?? this.salaryAccountIds,
+      tripPaymentAccountIds:
+          tripPaymentAccountIds ?? this.tripPaymentAccountIds,
     );
   }
 
@@ -244,6 +260,8 @@ class FinancePolicyEntity extends Equatable {
         'masterDataManagement': masterDataManagement.toJson(),
         'cashAdvanceManagement': cashAdvanceManagement.toJson(),
         'salaryManagement': salaryManagement.toJson(),
+        'salaryAccountIds': salaryAccountIds,
+        'tripPaymentAccountIds': tripPaymentAccountIds,
       };
 
   factory FinancePolicyEntity.fromJson(Map<String, dynamic>? json) {
@@ -328,6 +346,14 @@ class FinancePolicyEntity extends Equatable {
           ? WorkflowPermissionConfig.fromJson(
               json['salaryManagement'] as Map<String, dynamic>?)
           : const FinancePolicyEntity().salaryManagement,
+      salaryAccountIds: (json['salaryAccountIds'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      tripPaymentAccountIds: (json['tripPaymentAccountIds'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
     );
   }
 
@@ -352,5 +378,7 @@ class FinancePolicyEntity extends Equatable {
         masterDataManagement,
         cashAdvanceManagement,
         salaryManagement,
+        salaryAccountIds,
+        tripPaymentAccountIds,
       ];
 }
