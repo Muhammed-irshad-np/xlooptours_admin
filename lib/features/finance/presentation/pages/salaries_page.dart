@@ -92,6 +92,9 @@ class _SalariesPageState extends State<SalariesPage> {
       context.read<FundAccountProvider>().fetchAllAccounts();
       // Needed to offer advance recovery when paying a salary.
       context.read<CashAdvanceProvider>().load();
+      // Holds which accounts salaries and trip payments may use.
+      final finProv = context.read<FinanceProvider>();
+      if (!finProv.isPolicyLoaded) finProv.fetchFinancePolicy();
     });
   }
 
@@ -99,6 +102,18 @@ class _SalariesPageState extends State<SalariesPage> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  /// Active accounts the Master Data payroll settings allow for [kind]. An
+  /// empty setting allows every active account.
+  List<FundAccountEntity> _payrollAccounts(SalaryPaymentKind kind) {
+    final policy = context.read<FinanceProvider>().policy;
+    final allowed = kind == SalaryPaymentKind.tripSettlement
+        ? policy.tripPaymentAccountIds
+        : policy.salaryAccountIds;
+    final active = context.read<FundAccountProvider>().activeAccounts;
+    if (allowed.isEmpty) return active;
+    return active.where((a) => allowed.contains(a.id)).toList();
   }
 
   bool get _canManage {
@@ -498,6 +513,34 @@ class _SalariesPageState extends State<SalariesPage> {
     );
   }
 
+  /// Pending pay once each unpaid employee's open advances are recovered from
+  /// it. An advance can only be recovered up to what that employee is owed, so
+  /// one person's large advance never reduces another's pending pay.
+  ({double gross, double afterAdvances, double advances}) _pendingTotals(
+    List<_PayrollRow> unpaidRows,
+  ) {
+    final advances = context
+        .watch<CashAdvanceProvider>()
+        .advances
+        .where((a) => a.isOpen)
+        .toList();
+    var gross = 0.0;
+    var after = 0.0;
+    var recovered = 0.0;
+    for (final r in unpaidRows) {
+      final owed = SalaryPaymentEntity.totalOutstanding(
+        advances.where((a) => a.employeeId == r.employeeId).toList(),
+      );
+      // A row already carrying a recovery has had it taken off its net.
+      final recoverable = r.advanceRecovery > 0 ? 0.0 : owed;
+      final take = recoverable < r.net ? recoverable : r.net;
+      gross += r.net;
+      after += r.net - take;
+      recovered += take;
+    }
+    return (gross: gross, afterAdvances: after, advances: recovered);
+  }
+
   Widget _buildKpiRow(
     SalaryProvider provider,
     List<_PayrollRow> rows,
@@ -511,7 +554,8 @@ class _SalariesPageState extends State<SalariesPage> {
     final unpaidRows = rows
         .where((r) => r.payment?.status != SalaryPaymentStatus.paid)
         .toList();
-    final totalPending = unpaidRows.fold(0.0, (sum, r) => sum + r.net);
+    final pending = _pendingTotals(unpaidRows);
+    final totalPending = pending.gross;
     final currency = rows.isEmpty ? 'SAR' : rows.first.currency;
 
     return SizedBox(
@@ -548,6 +592,16 @@ class _SalariesPageState extends State<SalariesPage> {
               color: FinDT.warning,
             ),
           ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: _buildKpiCard(
+              title: 'Pending After Advances',
+              value: fmt.format(pending.afterAdvances),
+              subtitle: '${fmt.format(pending.advances)} advances deducted',
+              icon: Icons.account_balance_wallet_outlined,
+              color: FinDT.brand,
+            ),
+          ),
         ],
       ),
     );
@@ -558,9 +612,11 @@ class _SalariesPageState extends State<SalariesPage> {
     List<_PayrollRow> rows,
     NumberFormat fmt,
   ) {
-    final notClosed = rows
+    final unclosedRows = rows
         .where((r) => r.payment?.status != SalaryPaymentStatus.paid)
-        .length;
+        .toList();
+    final notClosed = unclosedRows.length;
+    final pending = _pendingTotals(unclosedRows);
     final driverIds = rows.map((r) => r.employeeId).toSet();
     final driverAdvances = context
         .watch<CashAdvanceProvider>()
@@ -596,10 +652,19 @@ class _SalariesPageState extends State<SalariesPage> {
           SizedBox(width: 12.w),
           Expanded(
             child: _buildKpiCard(
-              title: 'Open Advances',
-              value: fmt.format(outstanding),
-              subtitle:
-                  '$currency across ${driverAdvances.map((a) => a.employeeId).toSet().length} drivers',
+              title: 'Total Pending',
+              value: fmt.format(pending.gross),
+              subtitle: '$notClosed awaiting closing',
+              icon: Icons.hourglass_empty_outlined,
+              color: FinDT.warning,
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: _buildKpiCard(
+              title: 'Pending After Advances',
+              value: fmt.format(pending.afterAdvances),
+              subtitle: '${fmt.format(outstanding)} $currency open advances',
               icon: Icons.account_balance_outlined,
               color: FinDT.brand,
             ),
@@ -956,9 +1021,13 @@ class _SalariesPageState extends State<SalariesPage> {
               fmt.format(row.withheld),
               row.currency,
               color: row.withheld > 0 ? FinDT.danger : null,
-              note: row.advanceRecovery > 0
-                  ? 'incl. ${fmt.format(row.advanceRecovery)} advance'
-                  : null,
+              note: [
+                if (row.advanceRecovery > 0)
+                  'incl. ${fmt.format(row.advanceRecovery)} advance',
+                if (row.deductions > 0 &&
+                    (row.payment?.deductionNote ?? '').isNotEmpty)
+                  'Deduction: ${row.payment!.deductionNote}',
+              ].join('\n'),
             ),
           ),
           Expanded(
@@ -1035,7 +1104,7 @@ class _SalariesPageState extends State<SalariesPage> {
             color: color ?? FinDT.textPrimary,
           ),
         ),
-        if (note != null)
+        if (note != null && note.isNotEmpty)
           Text(
             note,
             style: GoogleFonts.inter(fontSize: 9.sp, color: FinDT.warning),
@@ -1188,11 +1257,12 @@ class _SalariesPageState extends State<SalariesPage> {
     if (!_guardPermission(context)) return;
 
     final provider = context.read<SalaryProvider>();
-    final accounts = context.read<FundAccountProvider>().activeAccounts;
+    final accounts = _payrollAccounts(SalaryPaymentKind.salary);
     if (accounts.isEmpty) {
       _snack(
         context,
-        'Create an active fund account first — salaries are paid from one.',
+        'No salary account available — create an active fund account or '
+        'pick salary accounts in Master Data.',
         FinDT.danger,
       );
       return;
@@ -1458,13 +1528,15 @@ class _SalariesPageState extends State<SalariesPage> {
   ) async {
     if (!_guardPermission(context)) return;
 
-    final allAccounts = context.read<FundAccountProvider>().activeAccounts;
+    final allAccounts = _payrollAccounts(row.kind);
     final accounts =
         allAccounts.where((a) => a.currency == row.currency).toList();
     if (accounts.isEmpty) {
       _snack(
         context,
-        'No active fund account in ${row.currency} to pay this from.',
+        'No ${row.isTrip ? 'trip payment' : 'salary'} account in '
+        '${row.currency} to pay this from — check Payroll Accounts in '
+        'Master Data.',
         FinDT.danger,
       );
       return;
@@ -1976,7 +2048,8 @@ class _SalariesPageState extends State<SalariesPage> {
                       leaveDays: leaveDays,
                       leaveDeduction: leaveDeduction,
                       deductions: deduction,
-                      deductionNote: deductionNoteCtrl.text.trim().isEmpty
+                      deductionNote: deduction <= 0 ||
+                              deductionNoteCtrl.text.trim().isEmpty
                           ? null
                           : deductionNoteCtrl.text.trim(),
                       netAmount: net,

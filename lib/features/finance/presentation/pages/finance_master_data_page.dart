@@ -10,6 +10,7 @@ import '../../domain/entities/expense_category_entity.dart';
 import '../../domain/entities/fund_account_type_entity.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import '../widgets/finance_workflow_policy_view.dart';
+import '../widgets/payroll_accounts_view.dart';
 import 'finance_dashboard_page.dart';
 
 /// Master Data Hub for the Finance module.
@@ -18,6 +19,7 @@ import 'finance_dashboard_page.dart';
 /// 1. Expense Categories & Types
 /// 2. Virtual Account Types
 /// 3. Finance Approval Policies & Thresholds
+/// 4. Payroll Accounts (which accounts salaries and trip payments use)
 class FinanceMasterDataPage extends StatefulWidget {
   final int initialSubTab;
 
@@ -114,6 +116,11 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
         icon: Icons.shield_outlined,
         badge: 'Governance',
       ),
+      _MasterSubTabInfo(
+        title: 'Payroll Accounts',
+        icon: Icons.payments_outlined,
+        badge: 'Salaries',
+      ),
     ];
 
     return Container(
@@ -204,6 +211,8 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
         return _buildAccountTypesMasterView(accProv);
       case 2:
         return const FinanceWorkflowPolicyView();
+      case 3:
+        return const PayrollAccountsView();
       default:
         return const SizedBox.shrink();
     }
