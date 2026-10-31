@@ -498,6 +498,34 @@ class _SalariesPageState extends State<SalariesPage> {
     );
   }
 
+  /// Pending pay once each unpaid employee's open advances are recovered from
+  /// it. An advance can only be recovered up to what that employee is owed, so
+  /// one person's large advance never reduces another's pending pay.
+  ({double gross, double afterAdvances, double advances}) _pendingTotals(
+    List<_PayrollRow> unpaidRows,
+  ) {
+    final advances = context
+        .watch<CashAdvanceProvider>()
+        .advances
+        .where((a) => a.isOpen)
+        .toList();
+    var gross = 0.0;
+    var after = 0.0;
+    var recovered = 0.0;
+    for (final r in unpaidRows) {
+      final owed = SalaryPaymentEntity.totalOutstanding(
+        advances.where((a) => a.employeeId == r.employeeId).toList(),
+      );
+      // A row already carrying a recovery has had it taken off its net.
+      final recoverable = r.advanceRecovery > 0 ? 0.0 : owed;
+      final take = recoverable < r.net ? recoverable : r.net;
+      gross += r.net;
+      after += r.net - take;
+      recovered += take;
+    }
+    return (gross: gross, afterAdvances: after, advances: recovered);
+  }
+
   Widget _buildKpiRow(
     SalaryProvider provider,
     List<_PayrollRow> rows,
@@ -511,7 +539,8 @@ class _SalariesPageState extends State<SalariesPage> {
     final unpaidRows = rows
         .where((r) => r.payment?.status != SalaryPaymentStatus.paid)
         .toList();
-    final totalPending = unpaidRows.fold(0.0, (sum, r) => sum + r.net);
+    final pending = _pendingTotals(unpaidRows);
+    final totalPending = pending.gross;
     final currency = rows.isEmpty ? 'SAR' : rows.first.currency;
 
     return SizedBox(
@@ -548,6 +577,16 @@ class _SalariesPageState extends State<SalariesPage> {
               color: FinDT.warning,
             ),
           ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: _buildKpiCard(
+              title: 'Pending After Advances',
+              value: fmt.format(pending.afterAdvances),
+              subtitle: '${fmt.format(pending.advances)} advances deducted',
+              icon: Icons.account_balance_wallet_outlined,
+              color: FinDT.brand,
+            ),
+          ),
         ],
       ),
     );
@@ -558,9 +597,11 @@ class _SalariesPageState extends State<SalariesPage> {
     List<_PayrollRow> rows,
     NumberFormat fmt,
   ) {
-    final notClosed = rows
+    final unclosedRows = rows
         .where((r) => r.payment?.status != SalaryPaymentStatus.paid)
-        .length;
+        .toList();
+    final notClosed = unclosedRows.length;
+    final pending = _pendingTotals(unclosedRows);
     final driverIds = rows.map((r) => r.employeeId).toSet();
     final driverAdvances = context
         .watch<CashAdvanceProvider>()
@@ -596,10 +637,19 @@ class _SalariesPageState extends State<SalariesPage> {
           SizedBox(width: 12.w),
           Expanded(
             child: _buildKpiCard(
-              title: 'Open Advances',
-              value: fmt.format(outstanding),
-              subtitle:
-                  '$currency across ${driverAdvances.map((a) => a.employeeId).toSet().length} drivers',
+              title: 'Total Pending',
+              value: fmt.format(pending.gross),
+              subtitle: '$notClosed awaiting closing',
+              icon: Icons.hourglass_empty_outlined,
+              color: FinDT.warning,
+            ),
+          ),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: _buildKpiCard(
+              title: 'Pending After Advances',
+              value: fmt.format(pending.afterAdvances),
+              subtitle: '${fmt.format(outstanding)} $currency open advances',
               icon: Icons.account_balance_outlined,
               color: FinDT.brand,
             ),
