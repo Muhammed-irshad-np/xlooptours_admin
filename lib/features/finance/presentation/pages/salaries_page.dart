@@ -1006,9 +1006,13 @@ class _SalariesPageState extends State<SalariesPage> {
               fmt.format(row.withheld),
               row.currency,
               color: row.withheld > 0 ? FinDT.danger : null,
-              note: row.advanceRecovery > 0
-                  ? 'incl. ${fmt.format(row.advanceRecovery)} advance'
-                  : null,
+              note: [
+                if (row.advanceRecovery > 0)
+                  'incl. ${fmt.format(row.advanceRecovery)} advance',
+                if (row.deductions > 0 &&
+                    (row.payment?.deductionNote ?? '').isNotEmpty)
+                  'Deduction: ${row.payment!.deductionNote}',
+              ].join('\n'),
             ),
           ),
           Expanded(
@@ -1085,7 +1089,7 @@ class _SalariesPageState extends State<SalariesPage> {
             color: color ?? FinDT.textPrimary,
           ),
         ),
-        if (note != null)
+        if (note != null && note.isNotEmpty)
           Text(
             note,
             style: GoogleFonts.inter(fontSize: 9.sp, color: FinDT.warning),
@@ -2026,7 +2030,8 @@ class _SalariesPageState extends State<SalariesPage> {
                       leaveDays: leaveDays,
                       leaveDeduction: leaveDeduction,
                       deductions: deduction,
-                      deductionNote: deductionNoteCtrl.text.trim().isEmpty
+                      deductionNote: deduction <= 0 ||
+                              deductionNoteCtrl.text.trim().isEmpty
                           ? null
                           : deductionNoteCtrl.text.trim(),
                       netAmount: net,
