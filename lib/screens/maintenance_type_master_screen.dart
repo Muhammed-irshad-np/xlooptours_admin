@@ -24,6 +24,66 @@ class _MaintenanceTypeMasterScreenState
   final ValueNotifier<List<MaintenanceTypeEntity>> _types = ValueNotifier([]);
   final ValueNotifier<bool> _isLoading = ValueNotifier(true);
 
+  /// Trigger filter: 'all', 'odometer', 'date' or 'none' (no alert)
+  final ValueNotifier<String> _triggerFilter = ValueNotifier('all');
+
+  static const Map<String, String> _filterLabels = {
+    'all': 'All',
+    'odometer': 'Odometer',
+    'date': 'Date',
+    'none': 'No Alert',
+  };
+
+  bool _matchesFilter(MaintenanceTypeEntity type) {
+    switch (_triggerFilter.value) {
+      case 'odometer':
+        return type.isOdometerTrigger;
+      case 'date':
+        return type.isDateTrigger;
+      case 'none':
+        return type.isNoAlert;
+      default:
+        return true;
+    }
+  }
+
+  Widget _buildFilterRow(bool noMatches) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: _filterLabels.entries
+                .map(
+                  (e) => Padding(
+                    padding: EdgeInsets.only(right: 8.w),
+                    child: ChoiceChip(
+                      label: Text(e.value),
+                      selected: _triggerFilter.value == e.key,
+                      onSelected: (selected) {
+                        if (selected) _triggerFilter.value = e.key;
+                      },
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ),
+        if (noMatches)
+          Padding(
+            padding: EdgeInsets.only(top: 48.h),
+            child: Center(
+              child: Text(
+                'No maintenance types match this filter',
+                style: TextStyle(color: Colors.grey, fontSize: 16.sp),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -83,6 +143,7 @@ class _MaintenanceTypeMasterScreenState
   void dispose() {
     _types.dispose();
     _isLoading.dispose();
+    _triggerFilter.dispose();
     super.dispose();
   }
 
@@ -92,7 +153,7 @@ class _MaintenanceTypeMasterScreenState
     return Scaffold(
       appBar: const ModernAppBar(title: 'Maintenance Types'),
       body: AnimatedBuilder(
-        animation: Listenable.merge([_isLoading, _types]),
+        animation: Listenable.merge([_isLoading, _types, _triggerFilter]),
         builder: (context, _) {
           if (_isLoading.value) {
             return const Center(child: CircularProgressIndicator());
@@ -113,12 +174,15 @@ class _MaintenanceTypeMasterScreenState
               ),
             );
           }
+          final filtered = _types.value.where(_matchesFilter).toList();
+          // Index 0 is the trigger filter row; the types follow it
           return ListView.separated(
             padding: EdgeInsets.all(16.w),
-            itemCount: _types.value.length,
+            itemCount: filtered.length + 1,
             separatorBuilder: (context, index) => SizedBox(height: 12.h),
             itemBuilder: (context, index) {
-              final type = _types.value[index];
+              if (index == 0) return _buildFilterRow(filtered.isEmpty);
+              final type = filtered[index - 1];
               return Card(
                 child: ListTile(
                   title: Text(
