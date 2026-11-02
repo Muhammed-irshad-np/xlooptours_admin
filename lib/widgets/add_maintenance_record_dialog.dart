@@ -19,6 +19,7 @@ import '../features/auth/presentation/providers/auth_provider.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
 import '../core/utils/capitalize_first_letter_formatter.dart';
+import 'searchable_dropdown.dart';
 
 /// Special sentinel IDs for built-in extras that are not part of the
 /// Firestore-managed maintenance-type master list.
@@ -715,64 +716,24 @@ class _AddMaintenanceRecordDialogState
                             // ---------- Maintenance Type dropdown ----------
                             Expanded(
                               flex: 2,
-                              child: DropdownButtonFormField<String>(
-                                initialValue: entry.maintenanceTypeId,
-                                decoration: InputDecoration(
-                                  labelText: 'Maintenance Type *',
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(8.r),
-                                  ),
-                                ),
-                                isExpanded: true,
+                              child: SearchableDropdown<String>(
+                                value: entry.maintenanceTypeId,
+                                labelText: 'Maintenance Type *',
+                                searchHint: 'Search maintenance type…',
                                 items: [
-                                  // ── Master types from Firestore ──
-                                  ...types.map((t) {
-                                    return DropdownMenuItem(
-                                      value: t.id,
-                                      child: Text(t.name),
-                                    );
-                                  }),
-                                  // ── Visual separator ──
-                                  if (types.isNotEmpty)
-                                    DropdownMenuItem<String>(
-                                      enabled: false,
-                                      value: null,
-                                      child: Divider(
-                                        height: 1,
-                                        color: Colors.grey[300],
-                                      ),
-                                    ),
-                                  // ── Car Wash (built-in) ──
-                                  DropdownMenuItem(
-                                    value: _kCarWashId,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.local_car_wash_outlined,
-                                          size: 18.sp,
-                                          color: Colors.blue,
-                                        ),
-                                        SizedBox(width: 8.w),
-                                        const Text('Car Wash'),
-                                      ],
-                                    ),
-                                  ),
-                                  // ── Other (custom) ──
-                                  DropdownMenuItem(
-                                    value: _kOtherId,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.edit_note_outlined,
-                                          size: 18.sp,
-                                          color: Colors.deepPurple,
-                                        ),
-                                        SizedBox(width: 8.w),
-                                        const Text('Other (Custom)'),
-                                      ],
-                                    ),
-                                  ),
+                                  // Master types from Firestore, then the built-in extras
+                                  ...types.map((t) => t.id),
+                                  _kCarWashId,
+                                  _kOtherId,
                                 ],
+                                itemToString: (id) {
+                                  if (id == _kCarWashId) return 'Car Wash';
+                                  if (id == _kOtherId) return 'Other (Custom)';
+                                  for (final t in types) {
+                                    if (t.id == id) return t.name;
+                                  }
+                                  return '';
+                                },
                                 onChanged: (value) {
                                   setState(() {
                                     entry.maintenanceTypeId = value;
