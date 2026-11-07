@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/utils/network_timeout.dart';
 import '../../domain/entities/employee_entity.dart';
 import '../models/employee_model.dart';
 import '../models/employee_role_model.dart';
@@ -81,7 +82,7 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
       txn.set(_codeCounter, {'value': next}, SetOptions(merge: true));
       txn.set(employeeRef, employee.copyWith(employeeCode: code).toJson());
       return code;
-    });
+    }).withNetworkTimeout();
   }
 
   /// Version of the numbering order, kept on the counter doc as `scheme`.
@@ -167,13 +168,18 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     await firestore
         .collection('employees')
         .doc(employee.id)
-        .update(employee.toJson());
+        .update(employee.toJson())
+        .withNetworkTimeout();
   }
 
   @override
   Future<void> deleteEmployee(String id) async {
     await _unlinkLoginAccounts(id);
-    await firestore.collection('employees').doc(id).delete();
+    await firestore
+        .collection('employees')
+        .doc(id)
+        .delete()
+        .withNetworkTimeout();
   }
 
   /// A login account outlives its employee: drop the link and restore the
@@ -182,7 +188,8 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     final linked = await firestore
         .collection('users')
         .where('employeeId', isEqualTo: employeeId)
-        .get();
+        .get()
+        .withNetworkTimeout();
     if (linked.docs.isEmpty) return;
     final batch = firestore.batch();
     for (final doc in linked.docs) {
@@ -193,7 +200,7 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
         if (ownName.isNotEmpty) 'displayName': ownName,
       });
     }
-    await batch.commit();
+    await batch.commit().withNetworkTimeout();
   }
 
   String _getMimeType(String ext) {
@@ -224,15 +231,15 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     final metadata = SettableMetadata(contentType: 'image/jpeg');
 
     if (kIsWeb) {
-      await storageRef.putData(
+      await awaitUpload(storageRef.putData(
         await image.readAsBytes(),
         metadata,
-      );
+      ));
     } else {
-      await storageRef.putFile(File(image.path), metadata);
+      await awaitUpload(storageRef.putFile(File(image.path), metadata));
     }
 
-    return await storageRef.getDownloadURL();
+    return await storageRef.getDownloadURL().withNetworkTimeout();
   }
 
   @override
@@ -251,15 +258,15 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     final metadata = SettableMetadata(contentType: _getMimeType(ext));
 
     if (kIsWeb) {
-      await storageRef.putData(
+      await awaitUpload(storageRef.putData(
         await file.readAsBytes(),
         metadata,
-      );
+      ));
     } else {
-      await storageRef.putFile(File(file.path), metadata);
+      await awaitUpload(storageRef.putFile(File(file.path), metadata));
     }
 
-    return await storageRef.getDownloadURL();
+    return await storageRef.getDownloadURL().withNetworkTimeout();
   }
 
   @override
@@ -276,7 +283,8 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     await firestore
         .collection('Settings')
         .doc('employee_settings')
-        .set(settings.toJson(), SetOptions(merge: true));
+        .set(settings.toJson(), SetOptions(merge: true))
+        .withNetworkTimeout();
   }
 
   @override
@@ -311,7 +319,7 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
         batch.update(doc.reference, {'position': role.name});
       }
     }
-    await batch.commit();
+    await batch.commit().withNetworkTimeout();
   }
 
   @override

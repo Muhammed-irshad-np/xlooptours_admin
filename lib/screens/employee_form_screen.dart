@@ -160,6 +160,10 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   final ValueNotifier<String?> _licenseAttachmentUrl = ValueNotifier(null);
 
   final ValueNotifier<bool> _isSaving = ValueNotifier(false);
+
+  // Generated once so a retry after a network timeout overwrites the same
+  // document instead of creating a duplicate when the queued write syncs.
+  late final String _employeeId = widget.employee?.id ?? const Uuid().v4();
   late final ValueNotifier<String> _primaryCountryCode;
 
   // Role names from Employee Masters → Employee Roles.
@@ -676,7 +680,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _isSaving.value = true;
 
     try {
-      final id = widget.employee?.id ?? const Uuid().v4();
+      final id = _employeeId;
       final provider = context.read<EmployeeProvider>();
 
       // Upload profile image if changed
