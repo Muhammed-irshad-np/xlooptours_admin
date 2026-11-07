@@ -1,9 +1,11 @@
 import 'package:image_picker/image_picker.dart';
+import '../../domain/entities/document_renewal_entity.dart';
 import '../../domain/entities/employee_entity.dart';
 import '../../domain/entities/employee_role_entity.dart';
 import '../../domain/entities/employee_settings_entity.dart';
 import '../../domain/repositories/employee_repository.dart';
 import '../datasources/employee_remote_data_source.dart';
+import '../models/document_renewal_model.dart';
 import '../models/employee_model.dart';
 import '../models/employee_role_model.dart';
 import '../models/employee_settings_model.dart';
@@ -25,9 +27,24 @@ class EmployeeRepositoryImpl implements EmployeeRepository {
   }
 
   @override
-  Future<void> updateEmployee(EmployeeEntity employee) async {
+  Future<void> updateEmployee(
+    EmployeeEntity employee, {
+    List<DocumentRenewalEntity> renewals = const [],
+    List<String> voidRenewalIds = const [],
+  }) async {
     final employeeModel = EmployeeModel.fromEntity(employee);
-    await remoteDataSource.updateEmployee(employeeModel);
+    await remoteDataSource.updateEmployee(
+      employeeModel,
+      renewals: renewals.map(DocumentRenewalModel.fromEntity).toList(),
+      voidRenewalIds: voidRenewalIds,
+    );
+  }
+
+  @override
+  Future<List<DocumentRenewalEntity>> getDocumentRenewals(
+    String employeeId,
+  ) async {
+    return await remoteDataSource.getDocumentRenewals(employeeId);
   }
 
   @override

@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import '../features/employee/domain/entities/employee_documents.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/domain/entities/external_vehicle_info.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/vehicle/domain/entities/vehicle_make_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
@@ -920,7 +921,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
             );
           }
         } else {
-          await provider.updateEmployee(newEmployee);
+          await provider.updateEmployee(
+            newEmployee,
+            renewedBy: context.read<AuthProvider>().user?.actorLabel,
+            renewalSource: 'Employee form',
+          );
           if (mounted) {
             final changeSummary = ChangeDiffHelper.describeEmployeeChanges(
               widget.employee!,

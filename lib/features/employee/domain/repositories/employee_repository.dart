@@ -1,4 +1,5 @@
 import 'package:image_picker/image_picker.dart';
+import '../entities/document_renewal_entity.dart';
 import '../entities/employee_entity.dart';
 import '../entities/employee_role_entity.dart';
 import '../entities/employee_settings_entity.dart';
@@ -6,7 +7,12 @@ import '../entities/employee_settings_entity.dart';
 abstract class EmployeeRepository {
   Future<List<EmployeeEntity>> getAllEmployees();
   Future<void> insertEmployee(EmployeeEntity employee);
-  Future<void> updateEmployee(EmployeeEntity employee);
+  Future<void> updateEmployee(
+    EmployeeEntity employee, {
+    List<DocumentRenewalEntity> renewals = const [],
+    List<String> voidRenewalIds = const [],
+  });
+  Future<List<DocumentRenewalEntity>> getDocumentRenewals(String employeeId);
   Future<void> deleteEmployee(String id);
   Future<String> uploadEmployeeImage(XFile image, String employeeId);
   Future<String> uploadDocumentAttachment(

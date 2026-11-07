@@ -16,6 +16,7 @@ import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_pr
 import 'package:provider/provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import 'tafweed_history_view_all_screen.dart';
+import '../widgets/document_renewal_history_section.dart';
 
 class EmployeeDetailsScreen extends StatelessWidget {
   final EmployeeEntity employee;
@@ -57,6 +58,7 @@ class EmployeeDetailsScreen extends StatelessWidget {
                   SizedBox(height: 24.h),
                   _buildSectionHeader('Documents & IDs'),
                   _buildDocumentsSection(context),
+                  DocumentRenewalHistorySection(employee: employee),
                 ],
 
                 SizedBox(height: 24.h),
