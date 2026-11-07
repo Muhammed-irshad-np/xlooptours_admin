@@ -1752,7 +1752,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
   String? get _currentOdometerHelper {
     final existing = widget.vehicle?.currentOdometer;
     if (existing == null) return 'Sets the starting point for all future checks';
-    return 'Recorded: $existing km. Weekly readings are validated against this.';
+    return 'Recorded: $existing km. Mon & Thu readings are validated against this.';
   }
 
 
