@@ -16,6 +16,10 @@ class SearchableDropdown<T> extends FormField<T> {
   final InputDecoration? decoration;
   final TextStyle? style;
 
+  /// Shown at the start of the field, e.g. a search icon so users can tell
+  /// the list is searchable before opening it.
+  final Widget? prefixIcon;
+
   SearchableDropdown({
     super.key,
     required this.items,
@@ -27,6 +31,7 @@ class SearchableDropdown<T> extends FormField<T> {
     this.itemWidgetBuilder,
     this.decoration,
     this.style,
+    this.prefixIcon,
     super.validator,
     super.enabled,
   }) : super(
@@ -68,6 +73,7 @@ class SearchableDropdown<T> extends FormField<T> {
                         ))
                     .copyWith(
                   errorText: hasError ? state.errorText : null,
+                  prefixIcon: decoration?.prefixIcon ?? prefixIcon,
                   suffixIcon: decoration?.suffixIcon ??
                       Icon(
                         Icons.arrow_drop_down,

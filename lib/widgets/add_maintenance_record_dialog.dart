@@ -729,6 +729,7 @@ class _AddMaintenanceRecordDialogState
                                 value: entry.maintenanceTypeId,
                                 labelText: 'Maintenance Type *',
                                 searchHint: 'Search maintenance type…',
+                                prefixIcon: Icon(Icons.search, size: 18.sp),
                                 items: [
                                   // Master types from Firestore, then the built-in extras
                                   ...types.map((t) => t.id),
