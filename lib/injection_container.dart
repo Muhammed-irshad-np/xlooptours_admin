@@ -27,6 +27,7 @@ import 'features/employee/domain/usecases/update_employee_settings_usecase.dart'
 import 'features/employee/domain/usecases/get_employee_roles_usecase.dart';
 import 'features/employee/domain/usecases/save_employee_role_usecase.dart';
 import 'features/employee/domain/usecases/delete_employee_role_usecase.dart';
+import 'features/employee/domain/usecases/get_document_renewals_usecase.dart';
 
 import 'features/employee/data/datasources/employee_remote_data_source.dart';
 import 'features/employee/data/repositories/employee_repository_impl.dart';
@@ -342,6 +343,7 @@ Future<void> init() async {
       getEmployeeRolesUseCase: sl(),
       saveEmployeeRoleUseCase: sl(),
       deleteEmployeeRoleUseCase: sl(),
+      getDocumentRenewalsUseCase: sl(),
     ),
   );
 
@@ -359,6 +361,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetEmployeeRolesUseCase(sl()));
   sl.registerLazySingleton(() => SaveEmployeeRoleUseCase(sl()));
   sl.registerLazySingleton(() => DeleteEmployeeRoleUseCase(sl()));
+  sl.registerLazySingleton(() => GetDocumentRenewalsUseCase(sl()));
 
   // Repositories
   sl.registerLazySingleton<EmployeeRepository>(

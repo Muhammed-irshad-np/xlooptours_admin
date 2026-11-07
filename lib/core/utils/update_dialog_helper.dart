@@ -916,9 +916,12 @@ class UpdateDialogHelper {
                               submitterUserId: authUser?.id,
                             );
 
-                            await employeeProvider.updateEmployee(
-                              updatedEmployee,
-                            );
+                            final renewals = await employeeProvider
+                                .updateEmployee(
+                                  updatedEmployee,
+                                  renewedBy: authUser?.actorLabel,
+                                  renewalSource: 'Expiry alert',
+                                );
 
                             if (expense != null) {
                               try {
@@ -927,7 +930,10 @@ class UpdateDialogHelper {
                                 // Keep the two in step: if the cost cannot be
                                 // recorded, the document goes back to what it
                                 // was rather than silently diverging.
-                                await employeeProvider.updateEmployee(employee);
+                                await employeeProvider.revertEmployeeUpdate(
+                                  employee,
+                                  renewals,
+                                );
                                 rethrow;
                               }
                             }

@@ -1,9 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
+import '../../domain/entities/document_renewal_entity.dart';
 import '../../domain/entities/employee_entity.dart';
 import '../../domain/usecases/ensure_employee_codes_usecase.dart';
 import '../../domain/usecases/delete_employee_usecase.dart';
 import '../../domain/usecases/get_all_employees_usecase.dart';
+import '../../domain/usecases/get_document_renewals_usecase.dart';
 import '../../domain/usecases/insert_employee_usecase.dart';
 import '../../domain/usecases/update_employee_usecase.dart';
 import '../../domain/usecases/upload_document_attachment_usecase.dart';
@@ -29,6 +32,7 @@ class EmployeeProvider with ChangeNotifier {
   final GetEmployeeRolesUseCase getEmployeeRolesUseCase;
   final SaveEmployeeRoleUseCase saveEmployeeRoleUseCase;
   final DeleteEmployeeRoleUseCase deleteEmployeeRoleUseCase;
+  final GetDocumentRenewalsUseCase getDocumentRenewalsUseCase;
 
   EmployeeProvider({
     required this.getAllEmployeesUseCase,
@@ -43,11 +47,15 @@ class EmployeeProvider with ChangeNotifier {
     required this.getEmployeeRolesUseCase,
     required this.saveEmployeeRoleUseCase,
     required this.deleteEmployeeRoleUseCase,
+    required this.getDocumentRenewalsUseCase,
   });
 
   List<EmployeeEntity> _employees = [];
   EmployeeSettingsEntity? _settings;
   List<EmployeeRoleEntity> _roles = [];
+
+  /// Renewal history per employee id, loaded on demand by the details screen.
+  final Map<String, List<DocumentRenewalEntity>> _renewals = {};
   bool _isLoading = false;
   String? _error;
 
@@ -58,6 +66,10 @@ class EmployeeProvider with ChangeNotifier {
   List<EmployeeEntity> get employees => _employees;
   EmployeeSettingsEntity? get settings => _settings;
   List<EmployeeRoleEntity> get roles => _roles;
+
+  /// Null until [fetchDocumentRenewals] has run for [employeeId].
+  List<DocumentRenewalEntity>? renewalsFor(String employeeId) =>
+      _renewals[employeeId];
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -120,24 +132,77 @@ class EmployeeProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateEmployee(EmployeeEntity employee) async {
+  /// Saves [employee] and records a renewal for every document whose expiry
+  /// moved compared with the copy on file. Returns the renewals recorded, so a
+  /// caller that has to roll the save back can pass them to
+  /// [revertEmployeeUpdate].
+  Future<List<DocumentRenewalEntity>> updateEmployee(
+    EmployeeEntity employee, {
+    String? renewedBy,
+    String? renewalSource,
+  }) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      await updateEmployeeUseCase(employee);
       final index = _employees.indexWhere((e) => e.id == employee.id);
+      final renewals = index == -1
+          ? <DocumentRenewalEntity>[]
+          : DocumentRenewalEntity.detect(
+              _employees[index],
+              employee,
+              renewedAt: DateTime.now(),
+              newId: () => const Uuid().v4(),
+              renewedBy: renewedBy,
+              source: renewalSource,
+            );
+
+      await updateEmployeeUseCase(employee, renewals: renewals);
       if (index != -1) {
         _employees[index] = employee;
         _employees.sort((a, b) => a.fullName.compareTo(b.fullName));
       }
+      final cached = _renewals[employee.id];
+      if (cached != null && renewals.isNotEmpty) {
+        _renewals[employee.id] = [...renewals, ...cached];
+      }
+      return renewals;
     } catch (e) {
       _error = e.toString();
       debugPrint('Error updating employee: $e');
       rethrow;
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Puts [original] back and voids the [renewals] the undone save recorded,
+  /// without recording the reversal itself as a renewal.
+  Future<void> revertEmployeeUpdate(
+    EmployeeEntity original,
+    List<DocumentRenewalEntity> renewals,
+  ) async {
+    final ids = renewals.map((r) => r.id).toList();
+    await updateEmployeeUseCase(original, voidRenewalIds: ids);
+    final index = _employees.indexWhere((e) => e.id == original.id);
+    if (index != -1) _employees[index] = original;
+    final cached = _renewals[original.id];
+    if (cached != null) {
+      _renewals[original.id] =
+          cached.where((r) => !ids.contains(r.id)).toList();
+    }
+    notifyListeners();
+  }
+
+  Future<void> fetchDocumentRenewals(String employeeId) async {
+    try {
+      _renewals[employeeId] = await getDocumentRenewalsUseCase(employeeId);
+    } catch (e) {
+      debugPrint('Error fetching document renewals: $e');
+      rethrow;
+    } finally {
       notifyListeners();
     }
   }

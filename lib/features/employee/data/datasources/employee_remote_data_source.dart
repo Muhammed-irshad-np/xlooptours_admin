@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/utils/network_timeout.dart';
 import '../../domain/entities/employee_entity.dart';
+import '../models/document_renewal_model.dart';
 import '../models/employee_model.dart';
 import '../models/employee_role_model.dart';
 import '../models/employee_settings_model.dart';
@@ -22,7 +23,17 @@ abstract class EmployeeRemoteDataSource {
   /// when the numbering order changes. Safe to run repeatedly and from
   /// several devices at once. Returns how many employees were (re)coded.
   Future<int> ensureEmployeeCodes();
-  Future<void> updateEmployee(EmployeeModel employee);
+
+  /// Updates the employee and, in the same batch, appends [renewals] to
+  /// `employees/{id}/document_renewals` and voids [voidRenewalIds].
+  Future<void> updateEmployee(
+    EmployeeModel employee, {
+    List<DocumentRenewalModel> renewals = const [],
+    List<String> voidRenewalIds = const [],
+  });
+
+  /// Newest first; voided renewals are left out.
+  Future<List<DocumentRenewalModel>> getDocumentRenewals(String employeeId);
   Future<void> deleteEmployee(String id);
   Future<String> uploadEmployeeImage(XFile image, String employeeId);
 
@@ -164,12 +175,47 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
   }
 
   @override
-  Future<void> updateEmployee(EmployeeModel employee) async {
-    await firestore
+  Future<void> updateEmployee(
+    EmployeeModel employee, {
+    List<DocumentRenewalModel> renewals = const [],
+    List<String> voidRenewalIds = const [],
+  }) async {
+    final employeeRef = firestore.collection('employees').doc(employee.id);
+    if (renewals.isEmpty && voidRenewalIds.isEmpty) {
+      await employeeRef.update(employee.toJson()).withNetworkTimeout();
+      return;
+    }
+
+    // One batch, so the history can never disagree with the document.
+    final renewalsRef = employeeRef.collection('document_renewals');
+    final batch = firestore.batch();
+    batch.update(employeeRef, employee.toJson());
+    for (final renewal in renewals) {
+      batch.set(renewalsRef.doc(renewal.id), renewal.toJson());
+    }
+    for (final id in voidRenewalIds) {
+      batch.update(renewalsRef.doc(id), {'voided': true});
+    }
+    await batch.commit().withNetworkTimeout();
+  }
+
+  @override
+  Future<List<DocumentRenewalModel>> getDocumentRenewals(
+    String employeeId,
+  ) async {
+    final snapshot = await firestore
         .collection('employees')
-        .doc(employee.id)
-        .update(employee.toJson())
+        .doc(employeeId)
+        .collection('document_renewals')
+        .get()
         .withNetworkTimeout();
+
+    final renewals = snapshot.docs
+        .map((doc) => DocumentRenewalModel.fromJson(doc.data()))
+        .where((r) => !r.voided)
+        .toList()
+      ..sort((a, b) => b.renewedAt.compareTo(a.renewedAt));
+    return renewals;
   }
 
   @override
@@ -253,7 +299,9 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
         .ref()
         .child('employee_documents')
         .child(employeeId)
-        .child('$docType.$ext');
+        // Timestamped so a renewal does not overwrite the old scan, which the
+        // renewal history still links to.
+        .child('${docType}_${DateTime.now().millisecondsSinceEpoch}.$ext');
 
     final metadata = SettableMetadata(contentType: _getMimeType(ext));
 
