@@ -124,82 +124,118 @@ class _EmployeeRoleMasterScreenState extends State<EmployeeRoleMasterScreen> {
           if (isLoading) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (roles.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.badge, size: 64.sp, color: Colors.grey),
-                  SizedBox(height: 16.h),
-                  Text(
-                    'No roles found',
-                    style: TextStyle(color: Colors.grey, fontSize: 16.sp),
-                  ),
-                ],
-              ),
-            );
-          }
-          return ListView.separated(
-            padding: EdgeInsets.all(16.w),
-            itemCount: roles.length,
-            separatorBuilder: (context, index) => SizedBox(height: 12.h),
-            itemBuilder: (context, index) {
-              final role = roles[index];
-              final holders = provider.employees
-                  .where((e) => e.position == role.name)
-                  .length;
-              return Card(
-                child: ListTile(
-                  title: Text(
-                    role.name,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16.sp,
+          return Column(
+            children: [
+              // Add Role sits at the top so it stays reachable however long
+              // the list gets, and nothing floats over the last role's
+              // Edit/Delete buttons.
+              Padding(
+                padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 4.h),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${roles.length} role${roles.length == 1 ? '' : 's'}',
+                        style: TextStyle(
+                          color: Colors.grey[700],
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
-                  ),
-                  subtitle: Text(
-                    'Group: ${role.category}  |  '
-                    '$holders employee${holders == 1 ? '' : 's'}',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 14.sp),
-                  ),
-                  trailing: role.isBuiltIn
-                      ? Tooltip(
-                          message: 'Built-in role',
-                          child: Icon(Icons.lock, color: Colors.grey[400]),
-                        )
-                      : Row(
+                    ElevatedButton.icon(
+                      onPressed: () => _showAddEditDialog(),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Role'),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: roles.isEmpty
+                    ? Center(
+                        child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            IconButton(
-                              icon: const Icon(
-                                Icons.edit,
-                                color: Colors.orange,
+                            Icon(Icons.badge, size: 64.sp, color: Colors.grey),
+                            SizedBox(height: 16.h),
+                            Text(
+                              'No roles found',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 16.sp,
                               ),
-                              onPressed: () => _showAddEditDialog(role: role),
-                              tooltip: 'Edit',
                             ),
-                            if (isSuperAdmin)
-                              IconButton(
-                                icon: const Icon(
-                                  Icons.delete,
-                                  color: Colors.red,
-                                ),
-                                onPressed: () => _deleteRole(role, holders),
-                                tooltip: 'Delete',
-                              ),
                           ],
                         ),
-                ),
-              );
-            },
+                      )
+                    : ListView.separated(
+                        padding: EdgeInsets.all(16.w),
+                        itemCount: roles.length,
+                        separatorBuilder: (context, index) =>
+                            SizedBox(height: 12.h),
+                        itemBuilder: (context, index) {
+                          final role = roles[index];
+                          final holders = provider.employees
+                              .where((e) => e.position == role.name)
+                              .length;
+                          return Card(
+                            child: ListTile(
+                              title: Text(
+                                role.name,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16.sp,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Group: ${role.category}  |  '
+                                '$holders employee${holders == 1 ? '' : 's'}',
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 14.sp,
+                                ),
+                              ),
+                              trailing: role.isBuiltIn
+                                  ? Tooltip(
+                                      message: 'Built-in role',
+                                      child: Icon(
+                                        Icons.lock,
+                                        color: Colors.grey[400],
+                                      ),
+                                    )
+                                  : Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(
+                                            Icons.edit,
+                                            color: Colors.orange,
+                                          ),
+                                          onPressed: () =>
+                                              _showAddEditDialog(role: role),
+                                          tooltip: 'Edit',
+                                        ),
+                                        if (isSuperAdmin)
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.delete,
+                                              color: Colors.red,
+                                            ),
+                                            onPressed: () =>
+                                                _deleteRole(role, holders),
+                                            tooltip: 'Delete',
+                                          ),
+                                      ],
+                                    ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           );
         },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'addBtnEmployeeRole',
-        onPressed: () => _showAddEditDialog(),
-        label: const Text('Add Role'),
-        icon: const Icon(Icons.add),
       ),
     );
   }
