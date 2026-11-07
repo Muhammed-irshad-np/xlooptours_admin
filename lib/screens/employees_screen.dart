@@ -225,14 +225,21 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     );
 
     if (confirmed == true && mounted) {
-      await context.read<EmployeeProvider>().deleteEmployee(employee.id);
-      if (mounted) {
-        await ActivityLogger.log(
-          context,
-          title: 'Employee Deleted',
-          message: 'Employee ${employee.fullName} has been deleted.',
-          relatedId: employee.id,
-        );
+      try {
+        await context.read<EmployeeProvider>().deleteEmployee(employee.id);
+        if (mounted) {
+          AppSnackBar.showSuccess(context, 'Employee deleted successfully');
+          await ActivityLogger.log(
+            context,
+            title: 'Employee Deleted',
+            message: 'Employee ${employee.fullName} has been deleted.',
+            relatedId: employee.id,
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          AppSnackBar.showError(context, 'Error deleting employee: $e');
+        }
       }
       _loadEmployees();
     }
@@ -241,14 +248,24 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   Future<void> _toggleStatus(EmployeeEntity employee, bool isActive) async {
     final updatedEmployee = employee.copyWith(isActive: isActive);
     if (mounted) {
-      await context.read<EmployeeProvider>().updateEmployee(updatedEmployee);
-      if (mounted) {
-        await ActivityLogger.log(
-          context,
-          title: 'Employee Status Updated',
-          message: 'Employee ${employee.fullName} is now ${isActive ? 'ACTIVE' : 'INACTIVE'}.',
-          relatedId: employee.id,
-        );
+      try {
+        await context.read<EmployeeProvider>().updateEmployee(updatedEmployee);
+        if (mounted) {
+          AppSnackBar.showSuccess(
+            context,
+            'Employee ${isActive ? 'activated' : 'deactivated'} successfully',
+          );
+          await ActivityLogger.log(
+            context,
+            title: 'Employee Status Updated',
+            message: 'Employee ${employee.fullName} is now ${isActive ? 'ACTIVE' : 'INACTIVE'}.',
+            relatedId: employee.id,
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          AppSnackBar.showError(context, 'Error updating employee status: $e');
+        }
       }
       _loadEmployees();
     }
