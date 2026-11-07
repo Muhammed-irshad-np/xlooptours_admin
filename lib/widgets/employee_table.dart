@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
@@ -8,7 +9,6 @@ import 'package:provider/provider.dart';
 import '../core/widgets/action_items_dialog.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
-import 'web_safe_image.dart';
 
 /// Paginated employee list: a table on wide screens, compact rows on phones.
 /// Tapping an employee's name opens their details.
@@ -372,12 +372,16 @@ class _EmployeeTableState extends State<EmployeeTable> {
       ),
       child: ClipOval(
         child: hasImage
-            ? WebSafeImage(
+            // A Flutter-drawn image, not an HTML <img> platform view: the
+            // platform view went blank whenever the page rebuilt (search,
+            // filters, dialogs, paging), leaving an empty circle.
+            ? CachedNetworkImage(
                 imageUrl: employee.imageUrl!,
                 fit: BoxFit.cover,
                 width: size,
                 height: size,
-                errorWidget: _buildInitial(employee, size),
+                placeholder: (_, _) => _buildInitial(employee, size),
+                errorWidget: (_, _, _) => _buildInitial(employee, size),
               )
             : _buildInitial(employee, size),
       ),
