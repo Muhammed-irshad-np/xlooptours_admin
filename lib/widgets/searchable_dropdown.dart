@@ -11,6 +11,10 @@ class SearchableDropdown<T> extends FormField<T> {
   final ValueChanged<T?> onChanged;
   final Widget Function(BuildContext, T)? itemWidgetBuilder;
 
+  /// Shown at the start of the field, e.g. a search icon so users can tell
+  /// the list is searchable before opening it.
+  final Widget? prefixIcon;
+
   SearchableDropdown({
     super.key,
     required this.items,
@@ -20,6 +24,7 @@ class SearchableDropdown<T> extends FormField<T> {
     required this.itemToString,
     required this.onChanged,
     this.itemWidgetBuilder,
+    this.prefixIcon,
     super.validator,
   }) : super(
           initialValue: value,
@@ -54,6 +59,7 @@ class SearchableDropdown<T> extends FormField<T> {
                   labelText: labelText,
                   errorText: hasError ? state.errorText : null,
                   border: const OutlineInputBorder(),
+                  prefixIcon: prefixIcon,
                   suffixIcon: Icon(
                     Icons.arrow_drop_down,
                     color: const Color(0xFF64748B),
