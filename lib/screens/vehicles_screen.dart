@@ -29,6 +29,8 @@ class VehiclesScreen extends StatefulWidget {
 
 class _VehiclesScreenState extends State<VehiclesScreen> {
   bool _showInactive = false;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
   final ValueNotifier<Map<String, EmployeeEntity>> _driversMap = ValueNotifier(
     {},
   );
@@ -36,6 +38,7 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
   @override
   void dispose() {
     _driversMap.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -76,6 +79,67 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
     } catch (e) {
       debugPrint('Error loading vehicles: \$e');
     }
+  }
+
+  static String _normalizePlate(String s) =>
+      s.toLowerCase().replaceAll(RegExp(r'[\s\-]'), '');
+
+  /// Matches the search text against the vehicle name (make + model),
+  /// number plate, or the name of any driver holding a current Tafweed.
+  bool _matchesSearch(
+    VehicleEntity vehicle,
+    Map<String, EmployeeEntity> driversMap,
+  ) {
+    final query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return true;
+
+    final name = '${vehicle.make} ${vehicle.model}'.toLowerCase();
+    if (name.contains(query)) return true;
+
+    final plateQuery = _normalizePlate(query);
+    if (plateQuery.isNotEmpty &&
+        _normalizePlate(vehicle.plateNumber).contains(plateQuery)) {
+      return true;
+    }
+
+    for (final tafweed in vehicle.tafweeds ?? const []) {
+      final driverName = driversMap[tafweed.driverId]?.fullName;
+      if (driverName != null && driverName.toLowerCase().contains(query)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Widget _buildSearchBar() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 16.w, 16.w, 0),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Search by vehicle name, plate or Tafweed driver...',
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: _searchQuery.isEmpty
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.clear),
+                  tooltip: 'Clear search',
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+        ),
+        onChanged: (val) => setState(() => _searchQuery = val),
+      ),
+    );
   }
 
   Future<void> _navigateToAddEdit({VehicleEntity? vehicle}) async {
@@ -226,51 +290,69 @@ class _VehiclesScreenState extends State<VehiclesScreen> {
             // Tab 1: Fleet List (Existing UI)
             isLoading
                 ? const Center(child: CircularProgressIndicator())
-                : filteredVehicles.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.directions_car_outlined,
-                          size: 80.sp,
-                          color: Colors.grey,
-                        ),
-                        SizedBox(height: 16.h),
-                        Text(
-                          vehicles.isEmpty
-                              ? 'No vehicles found'
-                              : 'No vehicles match the filter',
-                          style: TextStyle(color: Colors.grey, fontSize: 18.sp),
-                        ),
-                        SizedBox(height: 16.h),
-                        if (vehicles.isEmpty)
-                          ElevatedButton(
-                            onPressed: () => _navigateToAddEdit(),
-                            child: const Text('Add Vehicle'),
-                          ),
-                      ],
-                    ),
-                  )
-                : ValueListenableBuilder<Map<String, EmployeeEntity>>(
-                    valueListenable: _driversMap,
-                    builder: (context, driversMap, _) {
-                      return ListView.separated(
-                        padding: EdgeInsets.all(16.w),
-                        itemCount: filteredVehicles.length,
-                        separatorBuilder: (context, index) =>
-                            SizedBox(height: 16.h),
-                        itemBuilder: (context, index) {
-                          final vehicle = filteredVehicles[index];
-                          final driver = vehicle.currentDriverId != null
-                              ? driversMap[vehicle.currentDriverId]
-                              : null;
+                : Column(
+                    children: [
+                      if (vehicles.isNotEmpty) _buildSearchBar(),
+                      Expanded(
+                        child: ValueListenableBuilder<Map<String, EmployeeEntity>>(
+                          valueListenable: _driversMap,
+                          builder: (context, driversMap, _) {
+                            final searchedVehicles = filteredVehicles
+                                .where((v) => _matchesSearch(v, driversMap))
+                                .toList();
 
-                          return _buildVehicleCard(vehicle, driver);
-                        },
-                      );
-                    },
+                            if (searchedVehicles.isEmpty) {
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.directions_car_outlined,
+                                      size: 80.sp,
+                                      color: Colors.grey,
+                                    ),
+                                    SizedBox(height: 16.h),
+                                    Text(
+                                      vehicles.isEmpty
+                                          ? 'No vehicles found'
+                                          : _searchQuery.trim().isNotEmpty
+                                          ? 'No vehicles match your search'
+                                          : 'No vehicles match the filter',
+                                      style: TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 18.sp,
+                                      ),
+                                    ),
+                                    SizedBox(height: 16.h),
+                                    if (vehicles.isEmpty)
+                                      ElevatedButton(
+                                        onPressed: () => _navigateToAddEdit(),
+                                        child: const Text('Add Vehicle'),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            return ListView.separated(
+                              padding: EdgeInsets.all(16.w),
+                              itemCount: searchedVehicles.length,
+                              separatorBuilder: (context, index) =>
+                                  SizedBox(height: 16.h),
+                              itemBuilder: (context, index) {
+                                final vehicle = searchedVehicles[index];
+                                final driver = vehicle.currentDriverId != null
+                                    ? driversMap[vehicle.currentDriverId]
+                                    : null;
+
+                                return _buildVehicleCard(vehicle, driver);
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
 
             // Tab 2: All Maintenance History
