@@ -541,6 +541,8 @@ class VehicleDetailScreen extends StatelessWidget {
 
   Widget _buildHistoryItem(BuildContext context, MaintenanceRecord record) {
     final dateStr = DateFormat('yyyy-MM-dd').format(record.date);
+    final isExtended = record.isExtended == true ||
+        (record.serviceType?.startsWith('Extension:') ?? false);
 
     // Attempt to find a suitable icon based on service type
     IconData icon = Icons.build_circle_outlined;
@@ -596,6 +598,8 @@ class VehicleDetailScreen extends StatelessWidget {
           style: GoogleFonts.inter(
             fontWeight: FontWeight.bold,
             fontSize: 15.sp,
+            // Extended maintenance titles are purple to set them apart from regular ones.
+            color: isExtended ? Colors.purple.shade700 : null,
           ),
         ),
         subtitle: Column(
