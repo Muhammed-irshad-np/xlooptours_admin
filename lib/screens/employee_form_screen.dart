@@ -476,10 +476,17 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   }
 
   Future<void> _selectResignationDate(BuildContext context) async {
+    final now = DateTime.now();
+    // Resignation dates can go back at most 5 years. A record saved before
+    // this limit may hold an older date, so let the picker open on it.
+    final fiveYearsAgo = DateTime(now.year - 5, now.month, now.day);
+    final current = _resignationDate.value;
+    final firstDate =
+        current != null && current.isBefore(fiveYearsAgo) ? current : fiveYearsAgo;
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _resignationDate.value ?? DateTime.now(),
-      firstDate: DateTime(1950),
+      initialDate: current ?? now,
+      firstDate: firstDate,
       lastDate: DateTime(2100),
     );
     if (picked != null) {
