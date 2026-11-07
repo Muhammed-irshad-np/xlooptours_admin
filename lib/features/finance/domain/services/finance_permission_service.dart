@@ -210,6 +210,29 @@ class FinancePermissionService {
     return configs.any((c) => c.isAuthorized(roleId, user.id));
   }
 
+  // ─── Account Visibility ──────────────────────────────────────
+
+  /// Can [user] see [account] on the Fund Accounts and Petty Cash tabs?
+  ///
+  /// Admin / Super Admin see every account; everyone else only the accounts
+  /// assigned to them. Accounts store the custodian's employee name, so pass
+  /// the current name of the user's linked employee as [employeeName] when it
+  /// is known, so a stale name saved on the login does not hide their accounts.
+  static bool canSeeAccount({
+    required UserEntity? user,
+    required FundAccountEntity account,
+    String? employeeName,
+  }) {
+    if (user == null) return false;
+    if (user.isAdmin) return true;
+    if (_isAssignedToAccount(user, account)) return true;
+
+    final assignee = account.assignedTo?.trim().toLowerCase() ?? '';
+    if (assignee.isEmpty) return false;
+    return [employeeName, user.employeeName, user.actorLabel]
+        .any((name) => name != null && name.trim().toLowerCase() == assignee);
+  }
+
   // ─── Helpers ─────────────────────────────────────────────────
 
   /// Check if [user] is the assigned coordinator for [account].
