@@ -735,7 +735,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           children: [
             Expanded(
               child: _SectionLabel(
-                label: 'Weekly Odometer Updates',
+                label: 'Odometer Updates (Mon & Thu)',
                 icon: Icons.speed_rounded,
                 iconColor: _DT.warning,
               ),
@@ -1805,7 +1805,7 @@ class _OdometerCardState extends State<_OdometerCard> {
                                 Text(
                                   v.lastOdometerUpdateDate == null
                                       ? 'Never Updated'
-                                      : 'Missed: $missedCount ${missedCount == 1 ? "week" : "weeks"}',
+                                      : 'Missed: $missedCount ${missedCount == 1 ? "check" : "checks"}',
                                   style: GoogleFonts.inter(
                                     fontSize: 10.sp,
                                     fontWeight: FontWeight.w700,

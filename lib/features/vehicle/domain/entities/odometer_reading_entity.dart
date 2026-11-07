@@ -7,8 +7,10 @@ import 'package:equatable/equatable.dart';
 /// They all land in this one append-only log so the readings can corroborate —
 /// or contradict — one another.
 enum OdometerSource {
-  /// The weekly Thursday prompt on the dashboard. The most trusted source:
-  /// someone stood at the vehicle and read the cluster.
+  /// The Monday / Thursday prompt on the dashboard. The most trusted source:
+  /// someone stood at the vehicle and read the cluster. Still named
+  /// `weeklyUpdate` from when it was weekly, because the name is stored on
+  /// every reading.
   weeklyUpdate,
 
   /// Captured while logging a maintenance record.
@@ -36,7 +38,7 @@ extension OdometerSourceX on OdometerSource {
   String get label {
     switch (this) {
       case OdometerSource.weeklyUpdate:
-        return 'Weekly update';
+        return 'Mon/Thu update';
       case OdometerSource.maintenance:
         return 'Maintenance record';
       case OdometerSource.followUp:
