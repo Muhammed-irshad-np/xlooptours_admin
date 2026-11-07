@@ -943,7 +943,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
       if (mounted) {
         Navigator.pop(context, true);
-        AppSnackBar.showSuccess(context, 'Employee saved successfully');
+        AppSnackBar.showSuccess(
+          context,
+          widget.employee == null
+              ? 'Employee added successfully'
+              : 'Employee details updated successfully',
+        );
       }
     } catch (e) {
       if (mounted) {
