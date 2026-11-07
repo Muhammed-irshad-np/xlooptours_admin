@@ -9,6 +9,7 @@ import 'employee_document_models.dart';
 class EmployeeModel extends EmployeeEntity {
   const EmployeeModel({
     required super.id,
+    super.employeeCode,
     required super.fullName,
     required super.position,
     required super.email,
@@ -41,6 +42,8 @@ class EmployeeModel extends EmployeeEntity {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      // Left out when null so an update() can never wipe an assigned code.
+      if (employeeCode != null) 'employeeCode': employeeCode,
       'fullName': fullName,
       'position': position,
       'email': email,
@@ -146,6 +149,7 @@ class EmployeeModel extends EmployeeEntity {
   factory EmployeeModel.fromJson(Map<String, dynamic> json) {
     return EmployeeModel(
       id: json['id'] as String,
+      employeeCode: json['employeeCode'] as String?,
       fullName: json['fullName'] as String,
       position: json['position'] as String,
       email: json['email'] as String? ?? '',
@@ -259,6 +263,7 @@ class EmployeeModel extends EmployeeEntity {
   factory EmployeeModel.fromEntity(EmployeeEntity entity) {
     return EmployeeModel(
       id: entity.id,
+      employeeCode: entity.employeeCode,
       fullName: entity.fullName,
       position: entity.position,
       email: entity.email,
@@ -292,6 +297,7 @@ class EmployeeModel extends EmployeeEntity {
   @override
   EmployeeModel copyWith({
     String? id,
+    String? employeeCode,
     String? fullName,
     String? position,
     String? email,
@@ -334,6 +340,7 @@ class EmployeeModel extends EmployeeEntity {
   }) {
     return EmployeeModel(
       id: id ?? this.id,
+      employeeCode: employeeCode ?? this.employeeCode,
       fullName: fullName ?? this.fullName,
       position: position ?? this.position,
       email: email ?? this.email,

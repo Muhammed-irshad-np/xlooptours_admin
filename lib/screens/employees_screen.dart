@@ -152,6 +152,9 @@ class _EmployeesScreenState extends State<EmployeesScreen>
           .where(
             (e) =>
                 e.fullName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                (e.employeeCode ?? '')
+                    .toLowerCase()
+                    .contains(_searchQuery.toLowerCase()) ||
                 e.position.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                 e.phoneNumber.contains(_searchQuery) ||
                 (e.externalVehicle?.plateNumber ?? '')
@@ -310,7 +313,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                       Expanded(
                         child: TextField(
                           decoration: InputDecoration(
-                            hintText: 'Search employees...',
+                            hintText: 'Search by name, code, phone...',
                             prefixIcon: const Icon(Icons.search),
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),

@@ -186,9 +186,25 @@ class _EmployeeTableState extends State<EmployeeTable> {
                 _buildAvatar(employee, 36),
                 const SizedBox(width: 12),
                 Flexible(
-                  child: _NameLink(
-                    name: employee.fullName,
-                    onTap: () => widget.onOpen(employee),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _NameLink(
+                        name: employee.fullName,
+                        onTap: () => widget.onOpen(employee),
+                      ),
+                      if (employee.employeeCode != null)
+                        Text(
+                          employee.employeeCode!,
+                          style: TextStyle(
+                            fontSize: 11.sp,
+                            color: Colors.blue,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
@@ -243,6 +259,7 @@ class _EmployeeTableState extends State<EmployeeTable> {
 
   Widget _buildCompactRow(EmployeeEntity employee) {
     final subtitle = [
+      ?employee.employeeCode,
       employee.position,
       if (employee.isExternal) employee.employmentType,
       _formatPhone(employee),
