@@ -27,6 +27,8 @@ import '../widgets/searchable_dropdown.dart';
 import '../core/utils/form_validation_helper.dart';
 import '../core/widgets/confirm_save_dialog.dart';
 import '../core/widgets/unsaved_changes_guard.dart';
+import '../features/notifications/presentation/providers/notification_provider.dart';
+import '../features/xloop_vault/presentation/providers/vault_provider.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
   // ... (rest of class)
@@ -393,6 +395,21 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _availableVehicleModels.value = models;
     _availableVehicleYears.value = years;
     _availableVehicleColors.value = colors;
+  }
+
+  /// Recomputes expiry alerts from the just-saved data so the employee
+  /// card's warning icon updates without a page refresh.
+  Future<void> _refreshExpiryAlerts() async {
+    final employeeProvider = context.read<EmployeeProvider>();
+    final vehicleProvider = context.read<VehicleProvider>();
+    await context.read<NotificationProvider>().refreshAlerts(
+      vehicles: vehicleProvider.vehicles,
+      maintenanceTypes: vehicleProvider.maintenanceTypes,
+      employees: employeeProvider.employees,
+      employeeSettings: employeeProvider.settings,
+      vehicleSettings: vehicleProvider.settings,
+      vaultData: context.read<VaultProvider>().vaultData,
+    );
   }
 
   @override
@@ -946,6 +963,10 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       }
 
 
+
+      if (mounted) {
+        await _refreshExpiryAlerts();
+      }
 
       if (mounted) {
         Navigator.pop(context, true);
