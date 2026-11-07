@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../../core/rbac/rbac_manager.dart';
 import '../../../../core/utils/activity_logger.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/utils/input_validators.dart';
 import '../../../employee/domain/entities/employee_entity.dart';
 import '../../../employee/presentation/providers/employee_provider.dart';
 import '../../domain/entities/managed_user_entity.dart';
@@ -426,9 +427,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
                       borderRadius: BorderRadius.circular(8.r),
                     ),
                   ),
-                  validator: (val) => val == null || val.trim().isEmpty
-                      ? 'Name is required'
-                      : null,
+                  validator: (val) =>
+                      InputValidators.personName(val, label: 'Display name'),
                 ),
                 SizedBox(height: 16.h),
 
@@ -445,15 +445,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
                       helperText:
                           'What they type at login. Linking an employee only fills this if empty — it is not the employee contact email.',
                     ),
-                    validator: (val) {
-                      if (val == null || val.trim().isEmpty) {
-                        return 'Login email is required';
-                      }
-                      if (!val.contains('@')) {
-                        return 'Enter a valid email address';
-                      }
-                      return null;
-                    },
+                    validator: (val) =>
+                        InputValidators.email(val, label: 'Login email'),
                   )
                 else
                   _LoginEmailFixSection(
@@ -485,13 +478,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                         borderRadius: BorderRadius.circular(8.r),
                       ),
                     ),
-                    validator: (val) {
-                      if (val == null || val.isEmpty) {
-                        return 'Password is required';
-                      }
-                      if (val.length < 6) return 'Minimum 6 characters';
-                      return null;
-                    },
+                    validator: InputValidators.password,
                   ),
                   SizedBox(height: 16.h),
                 ],
@@ -619,7 +606,7 @@ class _LoginEmailFixSectionState extends State<_LoginEmailFixSection> {
 
   Future<void> _save() async {
     final email = _controller.text.trim().toLowerCase();
-    if (email.isEmpty || !email.contains('@')) {
+    if (!InputValidators.isValidEmail(email)) {
       AppSnackBar.showWarning(context, 'Enter a valid login email');
       return;
     }
