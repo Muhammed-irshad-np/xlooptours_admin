@@ -145,7 +145,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
           ),
           ConfirmDetailEntry(
             label: 'Login Email',
-            value: widget.userToEdit?.email ?? _emailController.text.trim(),
+            value: _emailController.text.trim(),
           ),
           ConfirmDetailEntry(
             label: 'Role',
@@ -201,10 +201,11 @@ class _UserFormDialogState extends State<UserFormDialog> {
       }
       if (_selectedEmployeeId == null) photoUrl = null;
 
-      // Login email is immutable here — never take it from the employee link.
+      // Login email is never taken from the employee link. It only changes
+      // through _LoginEmailFixSection, which keeps _emailController in sync.
       final updatedUser = ManagedUserEntity(
         uid: widget.userToEdit!.uid,
-        email: widget.userToEdit!.email,
+        email: _emailController.text.trim(),
         displayName: _nameController.text.trim(),
         roleId: roleId,
         roleName: roleName,
@@ -237,9 +238,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (success) {
-        final emailVal = widget.userToEdit != null
-            ? widget.userToEdit!.email
-            : _emailController.text.trim();
+        final emailVal = _emailController.text.trim();
         final uidVal = widget.userToEdit?.uid;
         await ActivityLogger.log(
           context,
@@ -446,7 +445,9 @@ class _UserFormDialogState extends State<UserFormDialog> {
                 else
                   _LoginEmailFixSection(
                     uid: widget.userToEdit!.uid,
-                    currentEmail: widget.userToEdit!.email,
+                    currentEmail: _emailController.text.trim(),
+                    onEmailChanged: (email) =>
+                        setState(() => _emailController.text = email),
                   ),
                 SizedBox(height: 16.h),
 
@@ -567,7 +568,14 @@ class _LoginEmailFixSection extends StatefulWidget {
   final String uid;
   final String currentEmail;
 
-  const _LoginEmailFixSection({required this.uid, required this.currentEmail});
+  /// Called with the saved email so the parent form shows and saves it.
+  final ValueChanged<String> onEmailChanged;
+
+  const _LoginEmailFixSection({
+    required this.uid,
+    required this.currentEmail,
+    required this.onEmailChanged,
+  });
 
   @override
   State<_LoginEmailFixSection> createState() => _LoginEmailFixSectionState();
@@ -605,6 +613,7 @@ class _LoginEmailFixSectionState extends State<_LoginEmailFixSection> {
     setState(() => _saving = false);
     final provider = context.read<UserManagementProvider>();
     if (ok) {
+      widget.onEmailChanged(email);
       AppSnackBar.showSuccess(context, 'Login email updated in User Management');
       setState(() => _expanded = false);
     } else {
