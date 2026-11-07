@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../../core/rbac/rbac_manager.dart';
 import '../../../../core/utils/activity_logger.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../employee/domain/entities/employee_entity.dart';
 import '../../../employee/presentation/providers/employee_provider.dart';
 import '../../domain/entities/managed_user_entity.dart';
@@ -53,6 +54,18 @@ class _UserFormDialogState extends State<UserFormDialog> {
         emp.fetchAllEmployees();
       }
     });
+  }
+
+  /// True when the user being edited is the account currently signed in.
+  bool get _isEditingSelf {
+    final user = widget.userToEdit;
+    final me = context.read<AuthProvider>().user;
+    if (user == null || me == null) return false;
+    if (me.id == user.uid) return true;
+    final myEmail = me.email?.trim().toLowerCase();
+    return myEmail != null &&
+        myEmail.isNotEmpty &&
+        myEmail == user.email.trim().toLowerCase();
   }
 
   @override
@@ -508,11 +521,17 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   SwitchListTile(
                     title: const Text('Active Account'),
                     subtitle: Text(
-                      _isActive ? 'User can sign in' : 'Account is deactivated',
+                      _isEditingSelf
+                          ? 'You cannot disable your own account'
+                          : _isActive
+                              ? 'User can sign in'
+                              : 'Account is deactivated',
                     ),
                     value: _isActive,
                     activeThumbColor: const Color(0xFF13B1F2),
-                    onChanged: (val) => setState(() => _isActive = val),
+                    onChanged: _isEditingSelf
+                        ? null
+                        : (val) => setState(() => _isActive = val),
                   ),
                   SizedBox(height: 8.h),
                 ],

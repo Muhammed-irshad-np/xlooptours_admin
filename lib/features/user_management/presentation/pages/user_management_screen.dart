@@ -611,6 +611,17 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
     );
   }
 
+  /// True when [user] is the account currently signed in.
+  bool _isCurrentUser(BuildContext context, ManagedUserEntity user) {
+    final me = context.read<AuthProvider>().user;
+    if (me == null) return false;
+    if (me.id == user.uid) return true;
+    final myEmail = me.email?.trim().toLowerCase();
+    return myEmail != null &&
+        myEmail.isNotEmpty &&
+        myEmail == user.email.trim().toLowerCase();
+  }
+
   Widget _buildUserCard(
     BuildContext context,
     ManagedUserEntity user,
@@ -782,13 +793,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                 ),
               ),
               SizedBox(width: 4.w),
-              Switch(
+              Tooltip(
+                message: _isCurrentUser(context, user)
+                    ? 'You cannot disable your own account'
+                    : '',
+                child: Switch(
                 value: user.isActive,
                 activeThumbColor: const Color(0xFF13B1F2),
                 onChanged:
                     RbacManager.canManageUsers(
-                      context.read<AuthProvider>().user,
-                    )
+                          context.read<AuthProvider>().user,
+                        ) &&
+                        !_isCurrentUser(context, user)
                     ? (val) async {
                         final ok = await provider.toggleStatus(user.uid, val);
                         if (context.mounted && ok) {
@@ -801,6 +817,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                         }
                       }
                     : null,
+              ),
               ),
             ],
           ),
