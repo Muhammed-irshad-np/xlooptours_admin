@@ -32,6 +32,7 @@ import '../widgets/inline_expense_section.dart';
 import '../../injection_container.dart';
 import '../utils/activity_logger.dart';
 import '../utils/change_diff_helper.dart';
+import 'capitalize_first_letter_formatter.dart';
 
 class UpdateDialogHelper {
   static void showUpdateDialog(
@@ -629,6 +630,8 @@ class UpdateDialogHelper {
                       if (documentType == 'Passport') ...[
                         TextFormField(
                           controller: nameController,
+                          textCapitalization: TextCapitalization.words,
+                          inputFormatters: const [CapitalizeFirstLetterFormatter()],
                           decoration: const InputDecoration(
                             labelText: 'Name on Passport',
                             border: OutlineInputBorder(),

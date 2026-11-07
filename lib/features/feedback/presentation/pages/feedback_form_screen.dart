@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,6 +10,7 @@ import 'package:xloop_invoice/features/employee/presentation/providers/employee_
 import 'package:xloop_invoice/features/employee/domain/entities/employee_entity.dart';
 import '../../domain/entities/feedback_entity.dart';
 import '../providers/feedback_provider.dart';
+import '../../../../core/utils/capitalize_first_letter_formatter.dart';
 
 class FeedbackFormScreen extends StatefulWidget {
   final String? prefilledClientName;
@@ -532,6 +534,8 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
                               _buildTextField(
                                 controller: _clientNameController,
                                 hintText: 'Enter your name',
+                                textCapitalization: TextCapitalization.words,
+                                inputFormatters: const [CapitalizeFirstLetterFormatter()],
                                 readOnly: widget.prefilledClientName != null,
                                 suffixIcon: widget.prefilledClientName != null
                                     ? const Icon(Icons.lock_outline, color: Colors.grey)
@@ -778,6 +782,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
     Widget? suffixIcon,
     VoidCallback? onTap,
     TextCapitalization textCapitalization = TextCapitalization.none,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
       controller: controller,
@@ -786,6 +791,7 @@ class _FeedbackFormScreenState extends State<FeedbackFormScreen> {
       readOnly: readOnly,
       onTap: onTap,
       textCapitalization: textCapitalization,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         hintText: hintText,
         hintStyle: TextStyle(color: Colors.grey[400]),

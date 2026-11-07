@@ -29,6 +29,7 @@ import '../core/widgets/confirm_save_dialog.dart';
 import '../core/widgets/unsaved_changes_guard.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../features/xloop_vault/presentation/providers/vault_provider.dart';
+import '../core/utils/capitalize_first_letter_formatter.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
   // ... (rest of class)
@@ -1175,6 +1176,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           controller: _nameController,
                           label: 'Full Name *',
                           icon: Icons.person,
+                          isName: true,
                           validator: (v) =>
                               v!.isEmpty ? 'Please enter full name' : null,
                         ),
@@ -1954,6 +1956,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               controller: _passportNameController,
                               label: 'Name on Passport',
                               icon: Icons.person,
+                              isName: true,
                             ),
                           ),
                         ],
@@ -2478,10 +2481,13 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     required IconData icon,
     String? Function(String?)? validator,
     TextInputType? keyboardType,
+    bool isName = false,
   }) {
     // Automatically derive inputFormatters from keyboardType
     List<TextInputFormatter>? formatters;
-    if (keyboardType == TextInputType.number) {
+    if (isName) {
+      formatters = const [CapitalizeFirstLetterFormatter()];
+    } else if (keyboardType == TextInputType.number) {
       formatters = [FilteringTextInputFormatter.digitsOnly];
     } else if (keyboardType == TextInputType.phone) {
       formatters = [FilteringTextInputFormatter.digitsOnly];
@@ -2495,6 +2501,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: formatters,
+      textCapitalization:
+          isName ? TextCapitalization.words : TextCapitalization.none,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 20),

@@ -10,6 +10,7 @@ import '../../../employee/presentation/providers/employee_provider.dart';
 import '../../domain/entities/managed_user_entity.dart';
 import '../providers/user_management_provider.dart';
 import '../../../../core/widgets/confirm_save_dialog.dart';
+import '../../../../core/utils/capitalize_first_letter_formatter.dart';
 
 class UserFormDialog extends StatefulWidget {
   final ManagedUserEntity? userToEdit;
@@ -404,6 +405,8 @@ class _UserFormDialogState extends State<UserFormDialog> {
                 TextFormField(
                   controller: _nameController,
                   onChanged: (val) => _ownName = val,
+                  textCapitalization: TextCapitalization.words,
+                  inputFormatters: const [CapitalizeFirstLetterFormatter()],
                   decoration: InputDecoration(
                     labelText: 'Display name',
                     prefixIcon: const Icon(Icons.person_outline),
