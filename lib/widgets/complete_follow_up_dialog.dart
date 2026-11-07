@@ -99,6 +99,15 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
     return null;
   }
 
+  /// Cost is required so it isn't left blank by accident; 0 is accepted when
+  /// the work was free.
+  String? _validateCost(String? v) {
+    final text = v?.trim() ?? '';
+    if (text.isEmpty) return 'Required (enter 0 if no cost)';
+    if (double.tryParse(text) == null) return 'Invalid';
+    return null;
+  }
+
   @override
   void dispose() {
     _dateController.dispose();
@@ -398,8 +407,9 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
               TextFormField(
                 controller: _costController,
                 decoration: InputDecoration(
-                  labelText: 'Cost (Optional)',
+                  labelText: 'Cost *',
                   prefixText: 'SAR ',
+                  helperText: 'Enter 0 if there was no cost',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8.r),
                   ),
@@ -408,6 +418,7 @@ class _CompleteFollowUpDialogState extends State<CompleteFollowUpDialog> {
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
                 ],
+                validator: _validateCost,
               ),
               SizedBox(height: 16.h),
               TextFormField(

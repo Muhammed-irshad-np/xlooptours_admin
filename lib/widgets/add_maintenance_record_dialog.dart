@@ -605,6 +605,15 @@ class _AddMaintenanceRecordDialogState
     return null;
   }
 
+  /// Cost is required so it isn't left blank by accident; 0 is accepted when
+  /// the service was free.
+  String? _validateCost(String? v) {
+    final text = v?.trim() ?? '';
+    if (text.isEmpty) return 'Required (enter 0 if no cost)';
+    if (double.tryParse(text) == null) return 'Invalid';
+    return null;
+  }
+
   /// Maps a [typeId] to the correct named field on [VehicleMaintenance].
   VehicleMaintenance _applyTypedRecord(
     VehicleMaintenance m,
@@ -878,8 +887,11 @@ class _AddMaintenanceRecordDialogState
                               child: TextFormField(
                                 controller: entry.costController,
                                 decoration: InputDecoration(
-                                  labelText: 'Cost (Optional)',
+                                  labelText: 'Cost *',
                                   prefixText: '\$ ',
+                                  helperText: 'Enter 0 if there was no cost',
+                                  helperMaxLines: 2,
+                                  errorMaxLines: 2,
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8.r),
                                   ),
@@ -893,6 +905,7 @@ class _AddMaintenanceRecordDialogState
                                     RegExp(r'^\d*\.?\d*'),
                                   ),
                                 ],
+                                validator: _validateCost,
                               ),
                             ),
                             SizedBox(width: 16.w),

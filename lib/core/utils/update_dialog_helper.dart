@@ -1118,8 +1118,9 @@ class UpdateDialogHelper {
                     TextFormField(
                       controller: costController,
                       decoration: const InputDecoration(
-                        labelText: 'Cost (Optional)',
+                        labelText: 'Cost *',
                         prefixText: 'SAR ',
+                        helperText: 'Enter 0 if there was no cost',
                         border: OutlineInputBorder(),
                       ),
                       keyboardType: const TextInputType.numberWithOptions(
@@ -1318,6 +1319,14 @@ class UpdateDialogHelper {
                             AppSnackBar.showWarning(
                               context,
                               'Please enter a valid mileage',
+                            );
+                            return;
+                          }
+                          if (double.tryParse(costController.text.trim()) ==
+                              null) {
+                            AppSnackBar.showWarning(
+                              context,
+                              'Please enter the cost (enter 0 if there was no cost)',
                             );
                             return;
                           }
