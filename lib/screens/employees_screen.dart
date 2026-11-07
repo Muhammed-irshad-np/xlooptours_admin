@@ -155,7 +155,6 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                 (e.employeeCode ?? '')
                     .toLowerCase()
                     .contains(_searchQuery.toLowerCase()) ||
-                e.position.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                 e.phoneNumber.contains(_searchQuery) ||
                 (e.externalVehicle?.plateNumber ?? '')
                     .toLowerCase()
