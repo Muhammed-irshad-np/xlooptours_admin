@@ -9,6 +9,9 @@ import 'package:provider/provider.dart';
 import '../../features/notifications/domain/entities/notification_entity.dart';
 import '../../features/employee/presentation/providers/employee_provider.dart';
 import '../../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../../features/vehicle/presentation/providers/odometer_provider.dart';
+import '../../features/vehicle/domain/entities/odometer_reading_entity.dart';
+import '../../features/vehicle/domain/entities/odometer_policy.dart';
 import '../../features/notifications/presentation/providers/notification_provider.dart';
 import '../../widgets/custom_date_picker.dart';
 import '../../widgets/complete_follow_up_dialog.dart';
@@ -1319,6 +1322,24 @@ class UpdateDialogHelper {
                             return;
                           }
 
+                          // Same rule as Add Maintenance Record: a little below
+                          // the last reading is a late bill, far below is a typo.
+                          // Too far *above* is judged by the odometer log below,
+                          // which holds it for review instead of trusting it.
+                          final lastKm = vehicle.currentOdometer;
+                          final typedKm = int.parse(mileageController.text);
+                          if (lastKm != null &&
+                              lastKm - typedKm >
+                                  OdometerPolicy.maxServiceKmBelowLast) {
+                            AppSnackBar.showWarning(
+                              context,
+                              'Odometer is over '
+                              '${OdometerPolicy.maxServiceKmBelowLast} km below '
+                              'the last reading ($lastKm km)',
+                            );
+                            return;
+                          }
+
                           // Check the inline expense before anything is written.
                           final problem = inlineExpense.validate(
                             financeProvider.policy,
@@ -1467,6 +1488,9 @@ class UpdateDialogHelper {
 
                           // What was stored just before this save, for the rollback below.
                           VehicleEntity? before;
+                          VehicleEntity? savedVehicle;
+                          final odometerProvider = context
+                              .read<OdometerProvider>();
 
                           try {
                             // Prepared before the vehicle is written, so the only
@@ -1493,25 +1517,17 @@ class UpdateDialogHelper {
                             // Added to the stored copy, not `vehicle`: a page
                             // loaded earlier would otherwise write back its old
                             // list and lose records added since.
-                            await vehicleProvider.modifyVehicle(vehicle.id, (
-                              latest,
-                            ) {
+                            // The odometer is not set here: it goes through the
+                            // odometer log after the save, where it is validated.
+                            savedVehicle = await vehicleProvider.modifyVehicle(
+                              vehicle.id,
+                              (latest) {
                               before = latest;
-                              int updatedOdometer = latest.currentOdometer ?? 0;
-                              if (newMileage > updatedOdometer) {
-                                updatedOdometer = newMileage;
-                              }
-
                               return latest.copyWith(
                                 maintenance: withTypedRecord(
                                   latest.maintenance ??
                                       const VehicleMaintenance(),
                                 ),
-                                currentOdometer: updatedOdometer,
-                                lastOdometerUpdateDate:
-                                    newMileage > (latest.currentOdometer ?? 0)
-                                    ? DateTime.now()
-                                    : latest.lastOdometerUpdateDate,
                                 maintenanceHistory: [
                                   ...?latest.maintenanceHistory,
                                   newRecord,
@@ -1540,9 +1556,6 @@ class UpdateDialogHelper {
                                     maintenance:
                                         stored.maintenance ??
                                         const VehicleMaintenance(),
-                                    currentOdometer: stored.currentOdometer,
-                                    lastOdometerUpdateDate:
-                                        stored.lastOdometerUpdateDate,
                                   ),
                                 );
                                 rethrow;
@@ -1559,6 +1572,34 @@ class UpdateDialogHelper {
                               );
                             }
                             return;
+                          }
+
+                          // The service mileage is an odometer observation. Log
+                          // it like Add Maintenance Record does, so it is checked
+                          // against the vehicle's history and an implausible jump
+                          // is held for review instead of becoming the odometer.
+                          // A mileage below the current odometer is a late bill:
+                          // it stays on the maintenance record only.
+                          var heldForReview = false;
+                          final forOdometer = savedVehicle;
+                          if (newMileage >=
+                              (forOdometer.currentOdometer ?? 0)) {
+                            final result = await odometerProvider
+                                .recordSilently(
+                                  vehicle: forOdometer,
+                                  value: newMileage,
+                                  source: OdometerSource.maintenance,
+                                  readingAt: selectedDate,
+                                  enteredByUid: user?.id,
+                                  enteredByName: username,
+                                  note: 'Captured while logging $category.',
+                                );
+                            heldForReview = result?.needsReview ?? false;
+                            if (result?.updatedVehicle != null) {
+                              vehicleProvider.applyVehicleLocally(
+                                result!.updatedVehicle!,
+                              );
+                            }
                           }
 
                           if (context.mounted) {
@@ -1596,12 +1637,20 @@ class UpdateDialogHelper {
 
                             navigator.pop();
                             if (context.mounted) {
-                              AppSnackBar.showSuccess(
-                                context,
-                                inlineExpense.enabled
-                                    ? 'Updated · expense logged as pending'
-                                    : 'Updated successfully',
-                              );
+                              if (heldForReview) {
+                                AppSnackBar.showError(
+                                  context,
+                                  'Saved, but the odometer is held for review '
+                                  'before it affects maintenance alerts',
+                                );
+                              } else {
+                                AppSnackBar.showSuccess(
+                                  context,
+                                  inlineExpense.enabled
+                                      ? 'Updated · expense logged as pending'
+                                      : 'Updated successfully',
+                                );
+                              }
                             }
                           }
                         },
