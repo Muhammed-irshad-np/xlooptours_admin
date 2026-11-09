@@ -15,6 +15,9 @@ import '../features/vehicle/domain/entities/vehicle_make_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/domain/entities/vehicle_documents.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
+import '../features/vehicle/presentation/providers/odometer_provider.dart';
+import '../features/vehicle/presentation/widgets/odometer_entry_dialog.dart';
+import '../features/vehicle/domain/entities/odometer_reading_entity.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../widgets/custom_date_picker.dart';
 import 'package:file_picker/file_picker.dart';
@@ -94,6 +97,12 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       TextEditingController();
   final TextEditingController _currentOdometerController =
       TextEditingController();
+
+  /// Set when a reading is recorded from this form, so saving the rest of the
+  /// vehicle writes back the reading just logged instead of the stale value
+  /// the page was opened with.
+  int? _recordedOdometer;
+  DateTime? _recordedOdometerAt;
 
   final ValueNotifier<DateTime?> _purchaseDate = ValueNotifier(null);
 
@@ -724,8 +733,14 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
           clearPurchasePrice: _purchasePriceController.text.isEmpty,
           purchaseOdometer: int.tryParse(_purchaseOdometerController.text),
           clearPurchaseOdometer: _purchaseOdometerController.text.isEmpty,
-          // Not clearable: it is the latest accepted odometer reading.
-          currentOdometer: int.tryParse(_currentOdometerController.text),
+          // Not editable here: it is the latest accepted reading in the log,
+          // and changes go through [_recordOdometerReading]. Write back the
+          // stored value (or the one just recorded) so a typed number can
+          // never reach the vehicle without validation.
+          currentOdometer:
+              _recordedOdometer ?? widget.vehicle!.currentOdometer,
+          lastOdometerUpdateDate:
+              _recordedOdometerAt ?? widget.vehicle!.lastOdometerUpdateDate,
           gvwr: _gvwrController.text.isNotEmpty ? _gvwrController.text : null,
           clearGvwr: _gvwrController.text.isEmpty,
           tireSize: _tireSizeController.text.isNotEmpty
@@ -885,7 +900,9 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     _tireSizeController,
     _purchasePriceController,
     _purchaseOdometerController,
-    _currentOdometerController,
+    // On an existing vehicle the odometer is saved by its own dialog the
+    // moment it is recorded, so it is never an unsaved change of this form.
+    if (widget.vehicle == null) _currentOdometerController,
     _purchaseDate,
     _fuelType,
     _transmission,
@@ -1132,14 +1149,17 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                         // Open to every role; only the purchase fields above
                         // are admin-only.
                         SizedBox(height: 16.h),
-                        _buildTextField(
-                          'Current Odometer',
-                          _currentOdometerController,
-                          isNumber: true,
-                          required: false,
-                          helperText: _currentOdometerHelper,
-                          extraValidator: _validateCurrentOdometer,
-                        ),
+                        if (widget.vehicle == null)
+                          _buildTextField(
+                            'Current Odometer',
+                            _currentOdometerController,
+                            isNumber: true,
+                            required: false,
+                            helperText: _currentOdometerHelper,
+                            extraValidator: _validateCurrentOdometer,
+                          )
+                        else
+                          _buildCurrentOdometerReadOnly(),
 
                         SizedBox(height: 32.h),
                         _buildSectionHeader('Documents (Expiry Dates)'),
@@ -1758,6 +1778,88 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     final existing = widget.vehicle?.currentOdometer;
     if (existing == null) return 'Sets the starting point for all future checks';
     return 'Recorded: $existing km. Mon & Thu readings are validated against this.';
+  }
+
+  /// The odometer on an existing vehicle is shown, not typed into.
+  ///
+  /// Typing a new value here used to overwrite the vehicle directly, skipping
+  /// the plausibility checks and the review queue, so a mistyped jump of tens
+  /// of thousands of km was saved as-is. Changes now go through the same
+  /// [OdometerEntryDialog] as the dashboard's weekly update.
+  Widget _buildCurrentOdometerReadOnly() {
+    return TextFormField(
+      controller: _currentOdometerController,
+      readOnly: true,
+      onTap: _recordOdometerReading,
+      decoration: InputDecoration(
+        labelText: 'Current Odometer',
+        suffixText: 'KM',
+        helperText:
+            'Recorded value. Use Update to log a new reading — it is '
+            'checked against this vehicle\'s history like the weekly update.',
+        helperMaxLines: 2,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.r)),
+        suffixIcon: Padding(
+          padding: EdgeInsets.only(right: 4.w),
+          child: TextButton.icon(
+            onPressed: _recordOdometerReading,
+            icon: const Icon(Icons.speed_rounded, size: 18),
+            label: const Text('Update'),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _recordOdometerReading() async {
+    final vehicle = widget.vehicle;
+    if (vehicle == null) return;
+
+    final oldKm = _recordedOdometer ?? vehicle.currentOdometer ?? 0;
+    final reading = await OdometerEntryDialog.show(
+      context,
+      vehicle: vehicle,
+      source: OdometerSource.vehicleForm,
+    );
+    if (reading == null || !mounted) return;
+
+    // The dialog has written the reading and refreshed the vehicle; mirror the
+    // latest accepted value here. A reading held for review does not move it.
+    final latest = context.read<OdometerProvider>().lastAcceptedFor(vehicle);
+    if (latest != null) {
+      _recordedOdometer = latest.value;
+      _recordedOdometerAt = latest.readingAt;
+      _currentOdometerController.text = latest.value.toString();
+      context.read<VehicleProvider>().applyVehicleLocally(
+        vehicle.copyWith(
+          currentOdometer: latest.value,
+          lastOdometerUpdateDate: latest.readingAt,
+        ),
+      );
+    }
+
+    await ActivityLogger.log(
+      context,
+      title: reading.needsReview
+          ? 'Odometer Flagged for Review'
+          : 'Odometer Updated',
+      message:
+          'Odometer recorded for ${vehicle.make} ${vehicle.model} '
+          '(${vehicle.plateNumber}) from the vehicle form: '
+          '$oldKm KM → ${reading.value} KM.'
+          '${reading.needsReview ? ' Outside the plausible range — held for review.' : ''}',
+      relatedId: vehicle.id,
+    );
+
+    if (!mounted) return;
+    if (reading.needsReview) {
+      AppSnackBar.showError(
+        context,
+        'Saved, but held for review before it affects maintenance alerts',
+      );
+    } else {
+      AppSnackBar.showSuccess(context, 'Odometer updated successfully');
+    }
   }
 
 
