@@ -66,11 +66,35 @@ class _EmployeesScreenState extends State<EmployeesScreen>
       _filterEmployees();
       if (mounted) setState(() {});
     });
+    _employeeProvider = context.read<EmployeeProvider>()
+      ..addListener(_onEmployeesChanged);
     _loadEmployees();
+  }
+
+  late final EmployeeProvider _employeeProvider;
+
+  /// The table shows a filtered copy of the provider's list, so an edit made
+  /// elsewhere (e.g. a document updated from Action Items) would otherwise
+  /// leave the old employee in the row until the next reload. Opening Edit on
+  /// that stale row then saved the old document dates back over the new ones.
+  void _onEmployeesChanged() {
+    if (!mounted || _isLoading.value) return;
+    _allEmployees = _employeeProvider.employees;
+    _filterEmployees();
+  }
+
+  /// The provider's current copy of [employee], so Edit and View never open
+  /// with data that changed after the table was built.
+  EmployeeEntity _latest(EmployeeEntity employee) {
+    for (final e in _employeeProvider.employees) {
+      if (e.id == employee.id) return e;
+    }
+    return employee;
   }
 
   @override
   void dispose() {
+    _employeeProvider.removeListener(_onEmployeesChanged);
     _tabController.dispose();
     _isLoading.dispose();
     _statusFilter.dispose();
@@ -189,7 +213,9 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EmployeeFormScreen(employee: employee),
+        builder: (context) => EmployeeFormScreen(
+          employee: employee == null ? null : _latest(employee),
+        ),
       ),
     );
 
@@ -448,7 +474,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
       context,
       MaterialPageRoute(
         builder: (context) => EmployeeDetailsScreen(
-          employee: employee,
+          employee: _latest(employee),
         ),
       ),
     );
