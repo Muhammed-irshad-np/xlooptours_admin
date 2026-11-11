@@ -1128,16 +1128,18 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
                               ),
                             ],
                           ),
-                          SizedBox(height: 16.h),
-                          _buildTextField(
-                            'Current Odometer',
-                            _currentOdometerController,
-                            isNumber: true,
-                            required: false,
-                            helperText: _currentOdometerHelper,
-                            extraValidator: _validateCurrentOdometer,
-                          ),
                         ],
+                        // Open to every role; only the purchase fields above
+                        // are admin-only.
+                        SizedBox(height: 16.h),
+                        _buildTextField(
+                          'Current Odometer',
+                          _currentOdometerController,
+                          isNumber: true,
+                          required: false,
+                          helperText: _currentOdometerHelper,
+                          extraValidator: _validateCurrentOdometer,
+                        ),
 
                         SizedBox(height: 32.h),
                         _buildSectionHeader('Documents (Expiry Dates)'),

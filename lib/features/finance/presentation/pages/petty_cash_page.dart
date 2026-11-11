@@ -40,10 +40,8 @@ class _PettyCashPageState extends State<PettyCashPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final accProv = context.read<FundAccountProvider>();
-      final pettyAccounts = accProv.activeAccounts
-          .where((a) => a.isPettyCash)
-          .toList();
+      final pettyAccounts =
+          _visiblePettyAccounts(context.read<FundAccountProvider>());
 
       if (pettyAccounts.isNotEmpty) {
         setState(() => _selectedAccountId = pettyAccounts.first.id);
@@ -52,12 +50,22 @@ class _PettyCashPageState extends State<PettyCashPage> {
     });
   }
 
+  /// Admins see every petty cash account; everyone else only the ones
+  /// assigned to them.
+  List<FundAccountEntity> _visiblePettyAccounts(FundAccountProvider accProv) {
+    return accProv
+        .visibleAccountsFor(
+          context.read<AuthProvider>().user,
+          employees: context.read<EmployeeProvider>().employees,
+        )
+        .where((a) => a.isPettyCash)
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final accProv = context.watch<FundAccountProvider>();
-    final pettyAccounts = accProv.activeAccounts
-        .where((a) => a.isPettyCash)
-        .toList();
+    final pettyAccounts = _visiblePettyAccounts(accProv);
 
     return Consumer<PettyCashProvider>(
       builder: (context, provider, _) {
@@ -115,7 +123,9 @@ class _PettyCashPageState extends State<PettyCashPage> {
             SizedBox(height: 20.h),
 
             if (_selectedAccountId == null)
-              _buildNoPettyAccounts()
+              _buildNoPettyAccounts(
+                noneAssigned: accProv.activeAccounts.any((a) => a.isPettyCash),
+              )
             else ...[
               // Current Session Status Card & KPI Metrics
               _buildCurrentSessionCard(context, provider, selectedAcc),
@@ -281,7 +291,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
     );
   }
 
-  Widget _buildNoPettyAccounts() {
+  Widget _buildNoPettyAccounts({required bool noneAssigned}) {
     return Container(
       padding: EdgeInsets.all(40.w),
       decoration: BoxDecoration(
@@ -295,12 +305,16 @@ class _PettyCashPageState extends State<PettyCashPage> {
             Icon(Icons.account_balance_wallet_outlined, size: 40.sp, color: FinDT.textMuted),
             SizedBox(height: 12.h),
             Text(
-              'No Petty Cash Accounts Configured',
+              noneAssigned
+                  ? 'No Petty Cash Account Assigned to You'
+                  : 'No Petty Cash Accounts Configured',
               style: GoogleFonts.inter(fontSize: 15.sp, fontWeight: FontWeight.w700, color: FinDT.textPrimary),
             ),
             SizedBox(height: 4.h),
             Text(
-              'Please create a Petty Cash account in the Virtual Accounts tab first.',
+              noneAssigned
+                  ? 'Ask an admin to assign you a petty cash account.'
+                  : 'Please create a Petty Cash account in the Virtual Accounts tab first.',
               style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
             ),
           ],

@@ -1,4 +1,7 @@
 import 'package:flutter/foundation.dart';
+import '../../../auth/domain/entities/user_entity.dart';
+import '../../../employee/domain/entities/employee_entity.dart';
+import '../../domain/services/finance_permission_service.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../../domain/entities/fund_account_type_entity.dart';
 import '../../domain/entities/fund_transaction_entity.dart';
@@ -63,6 +66,33 @@ class FundAccountProvider with ChangeNotifier {
   List<FundAccountEntity> get accounts => _accounts;
   List<FundAccountEntity> get activeAccounts =>
       _accounts.where((a) => a.isActive).toList();
+
+  /// Active accounts [user] may see: every one for admins, otherwise only the
+  /// ones assigned to them. [employees] gives the user's current employee
+  /// name when it has been loaded.
+  List<FundAccountEntity> visibleAccountsFor(
+    UserEntity? user, {
+    List<EmployeeEntity> employees = const [],
+  }) {
+    String? employeeName;
+    final employeeId = user?.employeeId ?? '';
+    if (employeeId.isNotEmpty) {
+      for (final e in employees) {
+        if (e.id == employeeId) {
+          employeeName = e.fullName;
+          break;
+        }
+      }
+    }
+    return activeAccounts
+        .where((a) => FinancePermissionService.canSeeAccount(
+              user: user,
+              account: a,
+              employeeName: employeeName,
+            ))
+        .toList();
+  }
+
   List<FundAccountTypeEntity> get accountTypes =>
       _accountTypes.where((t) => t.isActive).toList();
   List<FundAccountTypeEntity> get allAccountTypes => _accountTypes;

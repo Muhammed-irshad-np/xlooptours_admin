@@ -281,6 +281,81 @@ void main() {
         isFalse,
       );
     });
+
+    test('canSeeAccount shows admins everything, others only their own', () {
+      final nameOnlyAccount = FundAccountEntity(
+        id: 'pc_jeddah',
+        name: 'Jeddah Petty Cash',
+        code: 'PC002',
+        type: FundAccountType.pettyCash,
+        currency: 'SAR',
+        assignedTo: 'Driver Sami',
+        createdAt: DateTime(2026, 1, 1),
+      );
+      final unassignedAccount = FundAccountEntity(
+        id: 'bank_main',
+        name: 'Main Bank',
+        code: 'BK001',
+        type: FundAccountType.bank,
+        currency: 'SAR',
+        createdAt: DateTime(2026, 1, 1),
+      );
+
+      const superAdmin = UserEntity(id: 'sa_1', roleId: 'super_admin');
+      for (final account in [pettyAccount, nameOnlyAccount, unassignedAccount]) {
+        expect(
+          FinancePermissionService.canSeeAccount(user: adminUser, account: account),
+          isTrue,
+        );
+        expect(
+          FinancePermissionService.canSeeAccount(user: superAdmin, account: account),
+          isTrue,
+        );
+      }
+
+      // Assigned by id
+      expect(
+        FinancePermissionService.canSeeAccount(user: coordinatorUser, account: pettyAccount),
+        isTrue,
+      );
+      expect(
+        FinancePermissionService.canSeeAccount(
+          user: otherCoordinatorUser,
+          account: pettyAccount,
+        ),
+        isFalse,
+      );
+
+      // Assigned by the linked employee's name, ignoring case
+      const linkedUser = UserEntity(
+        id: 'drv_1',
+        roleId: 'driver',
+        displayName: 'sami@xloop',
+        employeeId: 'emp_9',
+      );
+      expect(
+        FinancePermissionService.canSeeAccount(user: linkedUser, account: nameOnlyAccount),
+        isFalse,
+      );
+      expect(
+        FinancePermissionService.canSeeAccount(
+          user: linkedUser,
+          account: nameOnlyAccount,
+          employeeName: 'driver sami ',
+        ),
+        isTrue,
+      );
+
+      // Nobody but admins sees an unassigned account
+      expect(
+        FinancePermissionService.canSeeAccount(user: managerUser, account: unassignedAccount),
+        isFalse,
+      );
+      expect(
+        FinancePermissionService.canSeeAccount(user: null, account: pettyAccount),
+        isFalse,
+      );
+    });
   });
 
   group('FinancePolicyEntity Serialization & Backward Compatibility', () {

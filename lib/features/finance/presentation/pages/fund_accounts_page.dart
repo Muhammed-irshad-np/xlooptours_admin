@@ -39,13 +39,25 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = context.read<FundAccountProvider>();
       provider.fetchAllAccounts().then((_) {
-        if (provider.activeAccounts.isNotEmpty) {
-          final targetId =
-              provider.selectedAccountId ?? provider.activeAccounts.first.id;
+        if (!mounted) return;
+        final visible = _visibleAccounts(provider);
+        if (visible.isNotEmpty) {
+          final selectedId = provider.selectedAccountId;
+          final targetId = visible.any((a) => a.id == selectedId)
+              ? selectedId!
+              : visible.first.id;
           provider.selectAccount(targetId);
         }
       });
     });
+  }
+
+  /// Admins see every account; everyone else only the ones assigned to them.
+  List<FundAccountEntity> _visibleAccounts(FundAccountProvider provider) {
+    return provider.visibleAccountsFor(
+      context.read<AuthProvider>().user,
+      employees: context.read<EmployeeProvider>().employees,
+    );
   }
 
   @override
@@ -125,7 +137,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
   }
 
   Widget _buildTreasurySummaryBanner(FundAccountProvider provider) {
-    final active = provider.activeAccounts;
+    final active = _visibleAccounts(provider);
     final formatter = NumberFormat('#,##0.00', 'en_US');
 
     double totalBalance = 0;
@@ -287,7 +299,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     BuildContext context,
     FundAccountProvider provider,
   ) {
-    final active = provider.activeAccounts;
+    final active = _visibleAccounts(provider);
     if (active.isEmpty) {
       return _buildEmptyAccounts(context, provider);
     }
@@ -411,6 +423,46 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
   }
 
   Widget _buildEmptyAccounts(BuildContext context, FundAccountProvider provider) {
+    // Accounts exist, but none are assigned to this login.
+    if (provider.activeAccounts.isNotEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 40.h),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: FinDT.border),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              Icons.account_balance_wallet_outlined,
+              size: 32.sp,
+              color: FinDT.textSecondary,
+            ),
+            SizedBox(height: 12.h),
+            Text(
+              'No Accounts Assigned to You',
+              style: GoogleFonts.inter(
+                fontSize: 15.sp,
+                fontWeight: FontWeight.w700,
+                color: FinDT.textPrimary,
+              ),
+            ),
+            SizedBox(height: 6.h),
+            Text(
+              'Ask an admin to assign you a fund account.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 12.sp,
+                color: FinDT.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 40.h),
@@ -1345,7 +1397,9 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     BuildContext context,
     FundAccountProvider provider,
   ) {
-    final selected = provider.selectedAccount;
+    final selected = _visibleAccounts(provider)
+        .where((a) => a.id == provider.selectedAccountId)
+        .firstOrNull;
     if (selected == null) {
       return Container(
         width: double.infinity,
