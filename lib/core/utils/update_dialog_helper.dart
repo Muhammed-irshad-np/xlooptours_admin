@@ -97,7 +97,7 @@ class UpdateDialogHelper {
   ///
   /// Deliberately done *before* the host dialog writes its own record, so the
   /// only step left that can fail is the insert itself.
-  static Future<ExpenseEntity?> _prepareInlineExpense(
+  static Future<ExpenseEntity?> prepareInlineExpense(
     InlineExpenseController c, {
     required FinanceProvider finance,
     required ExpenseAttribution attribution,
@@ -136,7 +136,7 @@ class UpdateDialogHelper {
 
   /// Loads what the inline expense dropdowns need. The alert can be opened
   /// from any screen, so finance may never have been visited this session.
-  static Future<void> _primeFinanceForInlineExpense(
+  static Future<void> primeFinanceForInlineExpense(
     FinanceProvider finance,
     FundAccountProvider accounts,
   ) async {
@@ -148,7 +148,7 @@ class UpdateDialogHelper {
 
   /// Active seeded types under [category], with [fallback] guaranteed present
   /// so the dropdown always has the mapped default even before any seeding.
-  static List<String> _expenseTypeOptions(
+  static List<String> expenseTypeOptions(
     FinanceProvider finance,
     String category,
     String fallback,
@@ -199,7 +199,7 @@ class UpdateDialogHelper {
       'Commercial Registration (CR) Renewal';
 
   /// Expense category every vehicle cost lands under.
-  static const String _vehicleExpenseCategory = 'VEHICLES';
+  static const String vehicleExpenseCategory = 'VEHICLES';
 
   /// Vehicle document label → seeded expense type.
   static const Map<String, String> _vehicleDocumentExpenseTypes = {
@@ -217,7 +217,7 @@ class UpdateDialogHelper {
   static String _vehicleLabel(VehicleEntity v) =>
       '${v.plateNumber} · ${v.make} ${v.model}';
 
-  static ExpenseAttribution _vehicleAttribution(
+  static ExpenseAttribution vehicleAttribution(
     VehicleEntity v, {
     double? mileageKm,
   }) => ExpenseAttribution(
@@ -378,7 +378,7 @@ class UpdateDialogHelper {
       amountSource: usesRechargeCost ? costController : null,
     );
 
-    await _primeFinanceForInlineExpense(financeProvider, fundAccountProvider);
+    await primeFinanceForInlineExpense(financeProvider, fundAccountProvider);
     if (!context.mounted) return;
 
     /// Employee the cost is attributed to. For a swapped SIM this is whoever
@@ -845,7 +845,7 @@ class UpdateDialogHelper {
                         submitterLabel: authUser?.actorLabel ?? 'You',
                         accounts: fundAccountProvider.activeAccounts,
                         employees: employeeProvider.employees,
-                        typeOptions: _expenseTypeOptions(
+                        typeOptions: expenseTypeOptions(
                           financeProvider,
                           _employeeExpenseCategory,
                           inlineExpense.expenseType,
@@ -899,7 +899,7 @@ class UpdateDialogHelper {
                             );
 
                             final target = beneficiaryEmployee();
-                            final expense = await _prepareInlineExpense(
+                            final expense = await prepareInlineExpense(
                               inlineExpense,
                               finance: financeProvider,
                               attribution: attribution(),
@@ -1029,12 +1029,12 @@ class UpdateDialogHelper {
 
     // The dialog already asks for a service cost; reuse it as the amount.
     final inlineExpense = InlineExpenseController(
-      category: _vehicleExpenseCategory,
+      category: vehicleExpenseCategory,
       defaultType: 'Maintenance & Repairs',
       amountSource: costController,
     );
 
-    await _primeFinanceForInlineExpense(financeProvider, fundAccountProvider);
+    await primeFinanceForInlineExpense(financeProvider, fundAccountProvider);
     if (!context.mounted) return;
 
     await showDialog(
@@ -1221,7 +1221,7 @@ class UpdateDialogHelper {
                     ],
                     InlineExpenseSection(
                       controller: inlineExpense,
-                      attribution: _vehicleAttribution(
+                      attribution: vehicleAttribution(
                         vehicle,
                         mileageKm: double.tryParse(mileageController.text),
                       ),
@@ -1229,9 +1229,9 @@ class UpdateDialogHelper {
                       submitterLabel: authUser?.actorLabel ?? 'You',
                       accounts: fundAccountProvider.activeAccounts,
                       employees: employeeProvider.employees,
-                      typeOptions: _expenseTypeOptions(
+                      typeOptions: expenseTypeOptions(
                         financeProvider,
-                        _vehicleExpenseCategory,
+                        vehicleExpenseCategory,
                         inlineExpense.expenseType,
                       ),
                       policy: financeProvider.policy,
@@ -1495,10 +1495,10 @@ class UpdateDialogHelper {
                           try {
                             // Prepared before the vehicle is written, so the only
                             // step that can still fail is the insert itself.
-                            final expense = await _prepareInlineExpense(
+                            final expense = await prepareInlineExpense(
                               inlineExpense,
                               finance: financeProvider,
-                              attribution: _vehicleAttribution(
+                              attribution: vehicleAttribution(
                                 vehicle,
                                 mileageKm: newMileage.toDouble(),
                               ),
@@ -1707,7 +1707,7 @@ class UpdateDialogHelper {
       defaultType: _expenseTypeForVaultDocument(documentType),
     );
 
-    await _primeFinanceForInlineExpense(financeProvider, fundAccountProvider);
+    await primeFinanceForInlineExpense(financeProvider, fundAccountProvider);
     if (!context.mounted) return;
 
     await showDialog(
@@ -1792,7 +1792,7 @@ class UpdateDialogHelper {
                         submitterLabel: authUser?.actorLabel ?? 'You',
                         accounts: fundAccountProvider.activeAccounts,
                         employees: employeeProvider.employees,
-                        typeOptions: _expenseTypeOptions(
+                        typeOptions: expenseTypeOptions(
                           financeProvider,
                           _companyExpenseCategory,
                           inlineExpense.expenseType,
@@ -1857,7 +1857,7 @@ class UpdateDialogHelper {
 
                             // Prepared before the vault is written, so the
                             // only step that can still fail is the insert.
-                            final expense = await _prepareInlineExpense(
+                            final expense = await prepareInlineExpense(
                               inlineExpense,
                               finance: financeProvider,
                               attribution: ExpenseAttribution(
@@ -1983,11 +1983,11 @@ class UpdateDialogHelper {
     final authUser = context.read<AuthProvider>().user;
 
     final inlineExpense = InlineExpenseController(
-      category: _vehicleExpenseCategory,
+      category: vehicleExpenseCategory,
       defaultType: _expenseTypeForVehicleDocument(documentType),
     );
 
-    await _primeFinanceForInlineExpense(financeProvider, fundAccountProvider);
+    await primeFinanceForInlineExpense(financeProvider, fundAccountProvider);
     if (!context.mounted) return;
 
     TafweedRecord? existingTafweed;
@@ -2299,14 +2299,14 @@ class UpdateDialogHelper {
                       ],
                       InlineExpenseSection(
                         controller: inlineExpense,
-                        attribution: _vehicleAttribution(vehicle),
+                        attribution: vehicleAttribution(vehicle),
                         enableLabel: 'Log renewal cost to Finance',
                         submitterLabel: authUser?.actorLabel ?? 'You',
                         accounts: fundAccountProvider.activeAccounts,
                         employees: employeeProvider.employees,
-                        typeOptions: _expenseTypeOptions(
+                        typeOptions: expenseTypeOptions(
                           financeProvider,
-                          _vehicleExpenseCategory,
+                          vehicleExpenseCategory,
                           inlineExpense.expenseType,
                         ),
                         policy: financeProvider.policy,
@@ -2611,10 +2611,10 @@ class UpdateDialogHelper {
 
                             // Prepared before the vehicle is written, so the
                             // only step that can still fail is the insert.
-                            final expense = await _prepareInlineExpense(
+                            final expense = await prepareInlineExpense(
                               inlineExpense,
                               finance: financeProvider,
-                              attribution: _vehicleAttribution(vehicle),
+                              attribution: vehicleAttribution(vehicle),
                               description: _expenseDescription(
                                 documentType: documentType,
                                 subject: _vehicleLabel(vehicle),

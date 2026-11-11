@@ -18,6 +18,12 @@ import '../features/vehicle/domain/entities/odometer_policy.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
+import '../core/utils/update_dialog_helper.dart';
+import '../core/widgets/inline_expense_section.dart';
+import '../features/employee/presentation/providers/employee_provider.dart';
+import '../features/finance/domain/entities/expense_entity.dart';
+import '../features/finance/presentation/providers/finance_provider.dart';
+import '../features/finance/presentation/providers/fund_account_provider.dart';
 import 'searchable_dropdown.dart';
 
 /// Special sentinel IDs for built-in extras that are not part of the
@@ -55,7 +61,16 @@ class _MaintenanceEntry {
   final TextEditingController notificationDaysController =
       TextEditingController(text: '7');
 
+  /// Inline "log this cost to Finance" answers. Reuses [costController] as the
+  /// amount, the same way the dashboard maintenance alert does.
+  late final InlineExpenseController expense = InlineExpenseController(
+    category: UpdateDialogHelper.vehicleExpenseCategory,
+    defaultType: 'Maintenance & Repairs',
+    amountSource: costController,
+  );
+
   void dispose() {
+    expense.dispose();
     customTypeController.dispose();
     dateController.dispose();
     serviceKmController.dispose();
@@ -103,6 +118,14 @@ class _AddMaintenanceRecordDialogState
         // Normally already loaded at startup; without them the dropdown
         // offers only the built-in Car Wash and Other.
         provider.ensureMaintenanceTypesLoaded();
+        // Accounts, expense types and the receipt policy for the
+        // "Log cost to Finance" section; Finance may not be visited yet.
+        UpdateDialogHelper.primeFinanceForInlineExpense(
+          context.read<FinanceProvider>(),
+          context.read<FundAccountProvider>(),
+        ).then((_) {
+          if (mounted) setState(() {});
+        });
       }
     });
   }
@@ -392,6 +415,24 @@ class _AddMaintenanceRecordDialogState
       }
     }
 
+    // Check every "Log cost to Finance" section before anything is written.
+    final financeProvider = context.read<FinanceProvider>();
+    final fundAccountProvider = context.read<FundAccountProvider>();
+    final employeeProvider = context.read<EmployeeProvider>();
+    for (final entry in _entries) {
+      final c = entry.expense;
+      // A receipt attached to the record also serves as the expense receipt,
+      // so it does not have to be attached twice.
+      if (c.enabled && c.receipt == null && entry.pickedFiles.isNotEmpty) {
+        c.receipt = entry.pickedFiles.first;
+      }
+      final problem = c.validate(financeProvider.policy);
+      if (problem != null) {
+        AppSnackBar.showError(context, problem);
+        return;
+      }
+    }
+
     setState(() {
       _isSaving = true;
     });
@@ -401,6 +442,7 @@ class _AddMaintenanceRecordDialogState
       final odometerProvider = context.read<OdometerProvider>();
 
       final List<({String typeId, MaintenanceRecord record})> recordsToAdd = [];
+      final List<ExpenseEntity> expensesToAdd = [];
 
       for (int entryIndex = 0; entryIndex < _entries.length; entryIndex++) {
         final entry = _entries[entryIndex];
@@ -484,13 +526,37 @@ class _AddMaintenanceRecordDialogState
             performedBy: username,
           ),
         ));
+
+        // Prepared before the vehicle is written, so the only step that can
+        // still fail afterwards is the insert itself.
+        final expense = await UpdateDialogHelper.prepareInlineExpense(
+          entry.expense,
+          finance: financeProvider,
+          attribution: UpdateDialogHelper.vehicleAttribution(
+            widget.vehicle,
+            mileageKm: currentOdo > 0 ? currentOdo.toDouble() : null,
+          ),
+          description:
+              '$typeName — ${widget.vehicle.plateNumber}'
+              '${(entry.selectedShopName ?? '').isNotEmpty ? " at ${entry.selectedShopName}" : ""}',
+          accounts: fundAccountProvider.activeAccounts,
+          employees: employeeProvider.employees,
+          submitterName: user?.actorLabel ?? username ?? '',
+          submitterRole: user?.role.name.toUpperCase() ?? 'USER',
+          submitterUserId: user?.id,
+        );
+        if (expense != null) expensesToAdd.add(expense);
       }
+
+      // What was stored just before this save, for the rollback below.
+      VehicleEntity? before;
 
       // Added to the stored copy, not widget.vehicle: a page loaded earlier
       // would otherwise write back its old list and lose records added since.
       final updatedVehicle = await provider.modifyVehicle(widget.vehicle.id, (
         latest,
       ) {
+        before = latest;
         // Append to flat history list
         final List<MaintenanceRecord> updatedHistory = List.from(
           latest.maintenanceHistory ?? [],
@@ -516,6 +582,37 @@ class _AddMaintenanceRecordDialogState
           maintenance: updatedMaintenance,
         );
       });
+
+      // Keep the two in step: if a cost cannot be recorded, the costs already
+      // logged are removed and the service records go back to what they were,
+      // rather than silently diverging. Others' changes are kept.
+      final inserted = <String>[];
+      try {
+        for (final expense in expensesToAdd) {
+          await financeProvider.insertExpense(expense);
+          inserted.add(expense.id);
+        }
+      } catch (_) {
+        for (final id in inserted) {
+          try {
+            await financeProvider.deleteExpense(id);
+          } catch (_) {}
+        }
+        final added = recordsToAdd.map((e) => e.record).toList();
+        final stored = before!;
+        await provider.modifyVehicle(
+          widget.vehicle.id,
+          (latest) => latest.copyWith(
+            maintenanceHistory: [
+              for (final r
+                  in latest.maintenanceHistory ?? const <MaintenanceRecord>[])
+                if (!added.contains(r)) r,
+            ],
+            maintenance: stored.maintenance ?? const VehicleMaintenance(),
+          ),
+        );
+        throw 'Could not log the cost to Finance. Nothing was saved.';
+      }
 
       // Every service mileage typed here is an odometer observation. Logging
       // them gives the plausibility engine a second, independent source to
@@ -553,7 +650,12 @@ class _AddMaintenanceRecordDialogState
 
       if (mounted) {
         Navigator.pop(context, true);
-        AppSnackBar.showSuccess(context, 'Maintenance record(s) added successfully');
+        AppSnackBar.showSuccess(
+          context,
+          expensesToAdd.isEmpty
+              ? 'Maintenance record(s) added successfully'
+              : 'Maintenance record(s) added · expense logged as pending',
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -877,7 +979,7 @@ class _AddMaintenanceRecordDialogState
                                 controller: entry.costController,
                                 decoration: InputDecoration(
                                   labelText: 'Cost (Optional)',
-                                  prefixText: '\$ ',
+                                  prefixText: 'SAR ',
                                   border: OutlineInputBorder(
                                     borderRadius: BorderRadius.circular(8.r),
                                   ),
@@ -891,6 +993,8 @@ class _AddMaintenanceRecordDialogState
                                     RegExp(r'^\d*\.?\d*'),
                                   ),
                                 ],
+                                // The Finance section below reads this amount.
+                                onChanged: (_) => setState(() {}),
                               ),
                             ),
                             SizedBox(width: 16.w),
@@ -1229,6 +1333,33 @@ class _AddMaintenanceRecordDialogState
                                     ),
                             ),
                           ],
+                        ),
+
+                        // ── Log this service cost to Finance ──
+                        InlineExpenseSection(
+                          controller: entry.expense,
+                          attribution: UpdateDialogHelper.vehicleAttribution(
+                            widget.vehicle,
+                            mileageKm: double.tryParse(
+                              entry.serviceKmController.text,
+                            ),
+                          ),
+                          enableLabel: 'Log service cost to Finance',
+                          submitterLabel:
+                              context.read<AuthProvider>().user?.actorLabel ??
+                              'You',
+                          accounts: context
+                              .watch<FundAccountProvider>()
+                              .activeAccounts,
+                          employees: context.read<EmployeeProvider>().employees,
+                          typeOptions: UpdateDialogHelper.expenseTypeOptions(
+                            context.read<FinanceProvider>(),
+                            UpdateDialogHelper.vehicleExpenseCategory,
+                            entry.expense.expenseType,
+                          ),
+                          policy: context.read<FinanceProvider>().policy,
+                          isSaving: _isSaving,
+                          onChanged: () => setState(() {}),
                         ),
                       ],
                     );
