@@ -2890,8 +2890,9 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       _advances,
       _dayLocks,
       firestore.collection('petty_cash_sessions'),
-      firestore.collection('finance_audits'),
+      _audit,
       _salaryPayments,
+      _salaryStructures,
     ];
 
     for (final col in collections) {
