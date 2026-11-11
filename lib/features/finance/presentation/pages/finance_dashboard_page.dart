@@ -173,7 +173,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
           '• Ledger transaction history\n'
           '• Petty cash sessions & day locks\n'
           '• Cash advances\n'
-          '• Salary payments\n\n'
+          '• Salary payments & payroll setup\n\n'
           'Are you sure you want to wipe all finance test data and start fresh?',
       confirmLabel: 'Wipe & Reset All',
       confirmColor: FinDT.danger,
@@ -183,6 +183,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
 
     final finProv = context.read<FinanceProvider>();
     final fundProv = context.read<FundAccountProvider>();
+    final advanceProv = context.read<CashAdvanceProvider>();
+    final salaryProv = context.read<SalaryProvider>();
 
     try {
       await finProv.resetFinanceData();
@@ -190,6 +192,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
         finProv.fetchAllExpenses(),
         finProv.fetchCategories(),
         fundProv.fetchAllAccounts(),
+        advanceProv.load(),
+        salaryProv.load(),
       ]);
 
       if (mounted) {
