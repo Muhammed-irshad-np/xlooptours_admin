@@ -10,6 +10,7 @@ import '../features/customer/presentation/providers/customer_provider.dart';
 import '../widgets/responsive_layout.dart';
 import '../core/utils/activity_logger.dart';
 import '../core/utils/change_diff_helper.dart';
+import '../core/utils/phone_parts.dart';
 import '../core/widgets/confirm_save_dialog.dart';
 import '../core/utils/capitalize_first_letter_formatter.dart';
 import '../core/widgets/unsaved_changes_guard.dart';
@@ -63,17 +64,9 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
           customer.lastName ?? nameParts.skip(1).join(' ');
       
       // Parse phone number to extract country code and actual number
-      if (customer.phone.contains(' ')) {
-        final parts = customer.phone.split(' ');
-        if (parts.length > 1) {
-          _countryCode = parts[0];
-          _phoneController.text = parts.sublist(1).join(' ');
-        } else {
-          _phoneController.text = customer.phone;
-        }
-      } else {
-        _phoneController.text = customer.phone;
-      }
+      final phone = splitStoredPhone(customer.phone, defaultCode: _countryCode);
+      _countryCode = phone.code;
+      _phoneController.text = phone.number;
       
       _assignedCaseCodes.value = List.from(customer.assignedCaseCodes);
     }
