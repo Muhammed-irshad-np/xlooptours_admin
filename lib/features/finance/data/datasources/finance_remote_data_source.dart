@@ -87,6 +87,10 @@ abstract class FinanceRemoteDataSource {
   Future<List<FundAccountModel>> getAllFundAccounts();
   Future<void> insertFundAccount(FundAccountModel account);
   Future<void> updateFundAccount(FundAccountModel account);
+
+  /// Saves the grid order: each id in [orderedIds] gets its index as
+  /// `sortOrder`.
+  Future<void> updateFundAccountOrder(List<String> orderedIds);
   Future<void> deactivateFundAccount(String id);
   Future<void> deleteFundAccount(String id);
 
@@ -863,6 +867,15 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     data.remove('cashBalanceMinor');
     data.remove('stcPayBalanceMinor');
     await _accounts.doc(account.id).update(data);
+  }
+
+  @override
+  Future<void> updateFundAccountOrder(List<String> orderedIds) async {
+    final batch = firestore.batch();
+    for (var i = 0; i < orderedIds.length; i++) {
+      batch.update(_accounts.doc(orderedIds[i]), {'sortOrder': i});
+    }
+    await batch.commit();
   }
 
   @override

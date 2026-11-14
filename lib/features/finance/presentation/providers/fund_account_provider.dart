@@ -10,6 +10,7 @@ import '../../domain/usecases/generate_account_code_usecase.dart';
 import '../../domain/usecases/get_all_fund_accounts_usecase.dart';
 import '../../domain/usecases/insert_fund_account_usecase.dart';
 import '../../domain/usecases/update_fund_account_usecase.dart';
+import '../../domain/usecases/reorder_fund_accounts_usecase.dart';
 import '../../domain/usecases/delete_fund_account_usecase.dart';
 import '../../domain/usecases/get_transactions_usecase.dart';
 import '../../domain/usecases/get_transaction_by_id_usecase.dart';
@@ -25,6 +26,7 @@ class FundAccountProvider with ChangeNotifier {
   final GetAllFundAccountsUseCase getAllFundAccountsUseCase;
   final InsertFundAccountUseCase insertFundAccountUseCase;
   final UpdateFundAccountUseCase updateFundAccountUseCase;
+  final ReorderFundAccountsUseCase reorderFundAccountsUseCase;
   final DeleteFundAccountUseCase deleteFundAccountUseCase;
   final GetTransactionsUseCase getTransactionsUseCase;
   final GetTransactionByIdUseCase getTransactionByIdUseCase;
@@ -41,6 +43,7 @@ class FundAccountProvider with ChangeNotifier {
     required this.getAllFundAccountsUseCase,
     required this.insertFundAccountUseCase,
     required this.updateFundAccountUseCase,
+    required this.reorderFundAccountsUseCase,
     required this.deleteFundAccountUseCase,
     required this.getTransactionsUseCase,
     required this.getTransactionByIdUseCase,
@@ -129,7 +132,7 @@ class FundAccountProvider with ChangeNotifier {
         }),
       ]);
 
-      _accounts = results[0] as List<FundAccountEntity>;
+      _accounts = _sortedByGridOrder(results[0] as List<FundAccountEntity>);
       final types = results[1] as List<FundAccountTypeEntity>;
       if (types.isNotEmpty) {
         _accountTypes = types;
@@ -244,8 +247,14 @@ class FundAccountProvider with ChangeNotifier {
       finalCode = generateUniqueCode(account.accountTypeId ?? account.type);
     }
 
-    final cleanAccount = account.copyWith(code: finalCode);
-    _accounts = [cleanAccount, ..._accounts];
+    // Once the grid has been reordered, a new account goes at the end of it.
+    final orders = _accounts.map((a) => a.sortOrder).whereType<int>();
+    final cleanAccount = account.copyWith(
+      code: finalCode,
+      sortOrder: account.sortOrder ??
+          (orders.isEmpty ? null : orders.reduce((a, b) => a > b ? a : b) + 1),
+    );
+    _accounts = _sortedByGridOrder([cleanAccount, ..._accounts]);
     notifyListeners();
 
     try {
@@ -254,6 +263,55 @@ class FundAccountProvider with ChangeNotifier {
       _accounts = _accounts.where((a) => a.id != cleanAccount.id).toList();
       _error = e.toString();
       debugPrint('Error inserting fund account: $e');
+      notifyListeners();
+    }
+  }
+
+  /// Saved grid order first; accounts never reordered follow, by name.
+  static List<FundAccountEntity> _sortedByGridOrder(
+    List<FundAccountEntity> accounts,
+  ) {
+    final sorted = [...accounts];
+    sorted.sort((a, b) {
+      final ao = a.sortOrder;
+      final bo = b.sortOrder;
+      if (ao != null && bo != null && ao != bo) return ao.compareTo(bo);
+      if (ao != null && bo == null) return -1;
+      if (ao == null && bo != null) return 1;
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return sorted;
+  }
+
+  /// Moves [movedId] to where [targetId] sits in the grid and saves the new
+  /// order for everyone. The list updates straight away and is put back if
+  /// the save fails.
+  Future<void> moveAccount({
+    required String movedId,
+    required String targetId,
+  }) async {
+    if (movedId == targetId) return;
+    final from = _accounts.indexWhere((a) => a.id == movedId);
+    final to = _accounts.indexWhere((a) => a.id == targetId);
+    if (from == -1 || to == -1) return;
+
+    final previous = _accounts;
+    final reordered = [..._accounts];
+    final moved = reordered.removeAt(from);
+    reordered.insert(to, moved);
+    _accounts = [
+      for (var i = 0; i < reordered.length; i++)
+        reordered[i].copyWith(sortOrder: i),
+    ];
+    _error = null;
+    notifyListeners();
+
+    try {
+      await reorderFundAccountsUseCase(_accounts.map((a) => a.id).toList());
+    } catch (e) {
+      _accounts = previous;
+      _error = e.toString();
+      debugPrint('Error saving fund account order: $e');
       notifyListeners();
     }
   }

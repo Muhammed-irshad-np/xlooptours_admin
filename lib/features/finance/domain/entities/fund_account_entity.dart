@@ -116,6 +116,10 @@ class FundAccountEntity extends Equatable {
   final bool isActive;
   final DateTime createdAt;
 
+  /// Position in the accounts grid, set by dragging cards. Null for accounts
+  /// never reordered; those come after the ordered ones, by name.
+  final int? sortOrder;
+
   const FundAccountEntity({
     required this.id,
     required this.name,
@@ -131,6 +135,7 @@ class FundAccountEntity extends Equatable {
     this.assignedToId,
     this.isActive = true,
     required this.createdAt,
+    this.sortOrder,
   });
 
   factory FundAccountEntity.empty() {
@@ -196,6 +201,7 @@ class FundAccountEntity extends Equatable {
     String? assignedToId,
     bool? isActive,
     DateTime? createdAt,
+    int? sortOrder,
     bool clearAssignedTo = false,
     bool clearAssignedToId = false,
   }) {
@@ -216,6 +222,7 @@ class FundAccountEntity extends Equatable {
           clearAssignedToId ? null : (assignedToId ?? this.assignedToId),
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
+      sortOrder: sortOrder ?? this.sortOrder,
     );
   }
 
@@ -235,5 +242,6 @@ class FundAccountEntity extends Equatable {
         assignedToId,
         isActive,
         createdAt,
+        sortOrder,
       ];
 }
