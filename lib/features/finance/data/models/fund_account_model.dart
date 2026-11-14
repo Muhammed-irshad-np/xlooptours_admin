@@ -23,6 +23,7 @@ class FundAccountModel extends FundAccountEntity {
     super.assignedToId,
     super.isActive = true,
     required super.createdAt,
+    super.sortOrder,
   });
 
   Map<String, dynamic> toJson() {
@@ -46,6 +47,8 @@ class FundAccountModel extends FundAccountEntity {
       'assignedToId': assignedToId,
       'isActive': isActive,
       'createdAt': createdAt.toIso8601String(),
+      // Left out when unset so an edit never wipes a saved position.
+      if (sortOrder != null) 'sortOrder': sortOrder,
     };
   }
 
@@ -103,6 +106,7 @@ class FundAccountModel extends FundAccountEntity {
       assignedToId: json['assignedToId'] as String?,
       isActive: json['isActive'] as bool? ?? true,
       createdAt: _parseDateTime(json['createdAt']) ?? DateTime.now(),
+      sortOrder: (json['sortOrder'] as num?)?.toInt(),
     );
   }
 
@@ -135,6 +139,7 @@ class FundAccountModel extends FundAccountEntity {
       assignedToId: entity.assignedToId,
       isActive: entity.isActive,
       createdAt: entity.createdAt,
+      sortOrder: entity.sortOrder,
     );
   }
 

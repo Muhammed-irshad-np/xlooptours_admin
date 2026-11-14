@@ -30,6 +30,9 @@ class FundAccountsPage extends StatefulWidget {
 class _FundAccountsPageState extends State<FundAccountsPage> {
   String _accountFilter = 'ALL';
   String _txFilter = 'ALL';
+
+  /// Account card being dragged to a new place in the grid, if any.
+  String? _draggingAccountId;
   final _txSearchController = TextEditingController();
 
   @override
@@ -304,6 +307,11 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
       return _buildEmptyAccounts(context, provider);
     }
 
+    final canReorder = FinancePermissionService.canManageAccounts(
+      user: context.read<AuthProvider>().user,
+      policy: context.read<FinanceProvider>().policy,
+    );
+
     final filtered = active.where((a) {
       if (_accountFilter == 'ALL') return true;
       if (_accountFilter == 'PETTY_CASH') return a.isPettyCash;
@@ -387,14 +395,123 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
             itemBuilder: (context, index) {
               final account = filtered[index];
               final isSelected = provider.selectedAccountId == account.id;
-              return FundAccountCard(
-                account: account,
-                isSelected: isSelected,
-                onTap: () => provider.selectAccount(account.id),
+              if (!canReorder) {
+                return FundAccountCard(
+                  account: account,
+                  isSelected: isSelected,
+                  onTap: () => provider.selectAccount(account.id),
+                );
+              }
+              return _buildReorderableAccountCard(
+                provider,
+                account,
+                isSelected,
               );
             },
           ),
       ],
+    );
+  }
+
+  /// A grid cell that can be dragged by its grip and dropped onto another
+  /// card; the dragged account then takes that card's place.
+  Widget _buildReorderableAccountCard(
+    FundAccountProvider provider,
+    FundAccountEntity account,
+    bool isSelected,
+  ) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final cellSize = Size(constraints.maxWidth, constraints.maxHeight);
+
+        Widget card({Widget? handle}) => FundAccountCard(
+              account: account,
+              isSelected: isSelected,
+              onTap: () => provider.selectAccount(account.id),
+              dragHandle: handle,
+            );
+
+        final handle = Draggable<String>(
+          data: account.id,
+          dragAnchorStrategy: pointerDragAnchorStrategy,
+          onDragStarted: () => setState(() => _draggingAccountId = account.id),
+          onDragEnd: (_) => setState(() => _draggingAccountId = null),
+          feedback: Transform.translate(
+            // Hold the card by its top-right corner, where the grip is.
+            offset: Offset(-cellSize.width + 24.w, -20.h),
+            child: Material(
+              color: Colors.transparent,
+              elevation: 10,
+              shadowColor: Colors.black26,
+              borderRadius: BorderRadius.circular(16.r),
+              child: SizedBox.fromSize(
+                size: cellSize,
+                child: Opacity(opacity: 0.92, child: card()),
+              ),
+            ),
+          ),
+          child: Tooltip(
+            message: 'Drag to reorder',
+            waitDuration: const Duration(milliseconds: 500),
+            child: MouseRegion(
+              cursor: SystemMouseCursors.grab,
+              child: Padding(
+                padding: EdgeInsets.all(2.w),
+                child: Icon(
+                  Icons.drag_indicator,
+                  size: 18.sp,
+                  color: FinDT.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        );
+
+        return DragTarget<String>(
+          onWillAcceptWithDetails: (details) => details.data != account.id,
+          onAcceptWithDetails: (details) async {
+            await provider.moveAccount(
+              movedId: details.data,
+              targetId: account.id,
+            );
+            if (!mounted || provider.error == null) return;
+            ScaffoldMessenger.of(this.context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Could not save the new order. Please try again.',
+                  style: GoogleFonts.inter(color: Colors.white),
+                ),
+                backgroundColor: FinDT.danger,
+              ),
+            );
+          },
+          builder: (context, candidates, _) {
+            final isDropTarget = candidates.isNotEmpty;
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: _draggingAccountId == account.id ? 0.35 : 1,
+                    child: card(handle: handle),
+                  ),
+                ),
+                if (isDropTarget)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: FinDT.brand.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(16.r),
+                          border: Border.all(color: FinDT.brand, width: 2),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -2595,6 +2712,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                   cashBalanceMinor: isEditing ? account.cashBalanceMinor : 0,
                   stcPayBalanceMinor: isEditing ? account.stcPayBalanceMinor : 0,
                   createdAt: isEditing ? account.createdAt : DateTime.now(),
+                  sortOrder: isEditing ? account.sortOrder : null,
                 );
 
                 setStateDialog(() => isSaving = true);

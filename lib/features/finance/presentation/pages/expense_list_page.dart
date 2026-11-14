@@ -72,6 +72,10 @@ class ExpenseListPage extends StatelessWidget {
 /// dropdown. Each tab carries that account's pending commitments, the same
 /// figure the Wallet Position strip shows, so it's visible without opening
 /// the account first.
+///
+/// Users who manage accounts can drag a tab onto another to reorder them.
+/// This is the same saved order as the Accounts grid, so moving a tab here
+/// moves the card there too.
 class _AccountTabs extends StatelessWidget {
   final FinanceProvider provider;
   final FundAccountProvider accountProvider;
@@ -96,6 +100,11 @@ class _AccountTabs extends StatelessWidget {
       (sum, a) => sum + provider.outstandingCountFor(a.id),
     );
 
+    final canReorder = FinancePermissionService.canManageAccounts(
+      user: context.read<AuthProvider>().user,
+      policy: provider.policy,
+    );
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -110,18 +119,66 @@ class _AccountTabs extends StatelessWidget {
           ),
           for (final account in accounts) ...[
             SizedBox(width: 10.w),
-            _buildTab(
-              label: account.name,
-              icon: Icons.account_balance_wallet_outlined,
-              pendingCount: provider.outstandingCountFor(account.id),
-              pendingText:
-                  '${_money.format(provider.outstandingOutflowMinorFor(account.id) / 100.0)} ${account.currency}',
-              isSelected: selectedId == account.id,
-              onTap: () => provider.setAccountFilter(account.id),
+            _reorderable(
+              context,
+              enabled: canReorder,
+              accountId: account.id,
+              tab: ({bool isDropTarget = false}) => _buildTab(
+                label: account.name,
+                icon: Icons.account_balance_wallet_outlined,
+                pendingCount: provider.outstandingCountFor(account.id),
+                pendingText:
+                    '${_money.format(provider.outstandingOutflowMinorFor(account.id) / 100.0)} ${account.currency}',
+                isSelected: selectedId == account.id,
+                isDropTarget: isDropTarget,
+                draggable: canReorder,
+                onTap: () => provider.setAccountFilter(account.id),
+              ),
             ),
           ],
         ],
       ),
+    );
+  }
+
+  /// Click and drag a tab onto another tab to put it in that tab's place.
+  Widget _reorderable(
+    BuildContext context, {
+    required bool enabled,
+    required String accountId,
+    required Widget Function({bool isDropTarget}) tab,
+  }) {
+    if (!enabled) return tab();
+
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (details) => details.data != accountId,
+      onAcceptWithDetails: (details) async {
+        await accountProvider.moveAccount(
+          movedId: details.data,
+          targetId: accountId,
+        );
+        if (accountProvider.error != null && context.mounted) {
+          AppSnackBar.showError(
+            context,
+            'Could not save the new order. Please try again.',
+          );
+        }
+      },
+      builder: (context, candidates, _) {
+        final isDropTarget = candidates.isNotEmpty;
+        return Draggable<String>(
+          data: accountId,
+          feedback: Material(
+            color: Colors.transparent,
+            elevation: 8,
+            shadowColor: Colors.black26,
+            borderRadius: BorderRadius.circular(12.r),
+            child: tab(),
+          ),
+          childWhenDragging: Opacity(opacity: 0.35, child: tab()),
+          child: tab(isDropTarget: isDropTarget),
+        );
+      },
     );
   }
 
@@ -132,6 +189,8 @@ class _AccountTabs extends StatelessWidget {
     required String? pendingText,
     required bool isSelected,
     required VoidCallback onTap,
+    bool isDropTarget = false,
+    bool draggable = false,
   }) {
     final fgColor = isSelected ? Colors.white : FinDT.textPrimary;
     final subColor = isSelected
@@ -146,12 +205,18 @@ class _AccountTabs extends StatelessWidget {
       borderRadius: BorderRadius.circular(12.r),
       child: InkWell(
         onTap: onTap,
+        mouseCursor: draggable ? SystemMouseCursors.grab : null,
         borderRadius: BorderRadius.circular(12.r),
         child: Container(
           padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12.r),
-            border: Border.all(color: isSelected ? FinDT.brand : FinDT.border),
+            border: Border.all(
+              color: isDropTarget
+                  ? FinDT.warning
+                  : (isSelected ? FinDT.brand : FinDT.border),
+              width: isDropTarget ? 2 : 1,
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

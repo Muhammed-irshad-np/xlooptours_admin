@@ -486,7 +486,9 @@ class InlineExpenseSection extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                ...employees.map(
+                // Only Xloop's own staff submit expenses; external
+                // (contracted) staff never hold company money.
+                ...employees.where((e) => e.isInternal).map(
                   (e) => DropdownMenuItem<String?>(
                     value: e.id,
                     child: Text(e.fullName, overflow: TextOverflow.ellipsis),

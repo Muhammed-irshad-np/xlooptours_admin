@@ -10,11 +10,16 @@ class FundAccountCard extends StatelessWidget {
   final bool isSelected;
   final VoidCallback? onTap;
 
+  /// Grip shown at the end of the header, used to drag the card to a new
+  /// place in the grid. Null when the viewer may not reorder accounts.
+  final Widget? dragHandle;
+
   const FundAccountCard({
     super.key,
     required this.account,
     this.isSelected = false,
     this.onTap,
+    this.dragHandle,
   });
 
   @override
@@ -156,6 +161,10 @@ class FundAccountCard extends StatelessWidget {
                             ),
                           ),
                         ),
+                      if (dragHandle != null) ...[
+                        SizedBox(width: 4.w),
+                        dragHandle!,
+                      ],
                     ],
                   ),
                 ),

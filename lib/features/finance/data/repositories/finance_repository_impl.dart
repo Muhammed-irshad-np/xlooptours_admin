@@ -152,6 +152,10 @@ class FinanceRepositoryImpl implements FinanceRepository {
   }
 
   @override
+  Future<void> updateFundAccountOrder(List<String> orderedIds) =>
+      remoteDataSource.updateFundAccountOrder(orderedIds);
+
+  @override
   Future<void> deleteFundAccount(String id) =>
       remoteDataSource.deleteFundAccount(id);
 

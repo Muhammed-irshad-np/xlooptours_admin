@@ -64,6 +64,7 @@ abstract class FinanceRepository {
   Future<List<FundAccountEntity>> getAllFundAccounts();
   Future<void> insertFundAccount(FundAccountEntity account);
   Future<void> updateFundAccount(FundAccountEntity account);
+  Future<void> updateFundAccountOrder(List<String> orderedIds);
   Future<void> deleteFundAccount(String id);
 
   Future<FundTransactionEntity?> getTransactionById(String id);

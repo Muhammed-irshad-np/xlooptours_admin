@@ -2193,7 +2193,10 @@ class _PettyCashPageState extends State<PettyCashPage> {
     final empProv = context.read<EmployeeProvider>();
     final advProv = context.read<CashAdvanceProvider>();
     final fundAccProv = context.read<FundAccountProvider>();
-    final employees = empProv.employees;
+    // A shortage is recovered from the coordinator's salary, and external
+    // (contracted) staff are never coordinators or on the payroll.
+    final employees =
+        empProv.employees.where((e) => e.isInternal).toList();
     final fundAccount = fundAccProv.getAccountById(session.fundAccountId);
     final formatter = NumberFormat('#,##0.00', 'en_US');
 

@@ -188,6 +188,9 @@ class FakeFinanceRepository implements FinanceRepository {
   Future<void> updateFundAccount(FundAccountEntity account) async {}
 
   @override
+  Future<void> updateFundAccountOrder(List<String> orderedIds) async {}
+
+  @override
   Future<void> deleteFundAccount(String id) async {}
 
   @override
