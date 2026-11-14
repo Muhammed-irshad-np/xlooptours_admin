@@ -6,7 +6,8 @@ class InsertEmployeeUseCase {
 
   InsertEmployeeUseCase(this.repository);
 
-  Future<void> call(EmployeeEntity employee) async {
+  /// Returns the employee code issued to the new record.
+  Future<String> call(EmployeeEntity employee) async {
     return await repository.insertEmployee(employee);
   }
 }

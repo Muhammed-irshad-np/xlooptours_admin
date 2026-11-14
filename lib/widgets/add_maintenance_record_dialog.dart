@@ -25,6 +25,7 @@ import '../features/finance/domain/entities/expense_entity.dart';
 import '../features/finance/presentation/providers/finance_provider.dart';
 import '../features/finance/presentation/providers/fund_account_provider.dart';
 import 'searchable_dropdown.dart';
+import '../core/utils/capitalize_first_letter_formatter.dart';
 
 /// Special sentinel IDs for built-in extras that are not part of the
 /// Firestore-managed maintenance-type master list.
@@ -161,6 +162,7 @@ class _AddMaintenanceRecordDialogState
                           prefixIcon: Icon(Icons.storefront),
                         ),
                         textCapitalization: TextCapitalization.words,
+                        inputFormatters: const [CapitalizeFirstLetterFormatter()],
                         validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
                       ),
                       SizedBox(height: 12.h),

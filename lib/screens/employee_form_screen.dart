@@ -27,6 +27,9 @@ import '../widgets/searchable_dropdown.dart';
 import '../core/utils/form_validation_helper.dart';
 import '../core/widgets/confirm_save_dialog.dart';
 import '../core/widgets/unsaved_changes_guard.dart';
+import '../features/notifications/presentation/providers/notification_provider.dart';
+import '../features/xloop_vault/presentation/providers/vault_provider.dart';
+import '../core/utils/capitalize_first_letter_formatter.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
   // ... (rest of class)
@@ -160,6 +163,10 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   final ValueNotifier<String?> _licenseAttachmentUrl = ValueNotifier(null);
 
   final ValueNotifier<bool> _isSaving = ValueNotifier(false);
+
+  // Generated once so a retry after a network timeout overwrites the same
+  // document instead of creating a duplicate when the queued write syncs.
+  late final String _employeeId = widget.employee?.id ?? const Uuid().v4();
   late final ValueNotifier<String> _primaryCountryCode;
 
   // Role names from Employee Masters → Employee Roles.
@@ -389,6 +396,21 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _availableVehicleModels.value = models;
     _availableVehicleYears.value = years;
     _availableVehicleColors.value = colors;
+  }
+
+  /// Recomputes expiry alerts from the just-saved data so the employee
+  /// card's warning icon updates without a page refresh.
+  Future<void> _refreshExpiryAlerts() async {
+    final employeeProvider = context.read<EmployeeProvider>();
+    final vehicleProvider = context.read<VehicleProvider>();
+    await context.read<NotificationProvider>().refreshAlerts(
+      vehicles: vehicleProvider.vehicles,
+      maintenanceTypes: vehicleProvider.maintenanceTypes,
+      employees: employeeProvider.employees,
+      employeeSettings: employeeProvider.settings,
+      vehicleSettings: vehicleProvider.settings,
+      vaultData: context.read<VaultProvider>().vaultData,
+    );
   }
 
   @override
@@ -676,7 +698,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     _isSaving.value = true;
 
     try {
-      final id = widget.employee?.id ?? const Uuid().v4();
+      final id = _employeeId;
       final provider = context.read<EmployeeProvider>();
 
       // Upload profile image if changed
@@ -869,6 +891,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
       final newEmployee = EmployeeEntity(
         id: id,
+        employeeCode: widget.employee?.employeeCode,
         fullName: _nameController.text.trim(),
         position: _selectedPosition.value,
         // Everything below the minimal external set is deliberately blanked so
@@ -910,13 +933,14 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
 
       if (mounted) {
         if (widget.employee == null) {
-          await provider.addEmployee(newEmployee);
+          final saved = await provider.addEmployee(newEmployee);
           if (mounted) {
             await ActivityLogger.log(
               context,
               title: 'Employee Added',
-              message: 'Employee ${newEmployee.fullName} has been added.',
-              relatedId: newEmployee.id,
+              message:
+                  'Employee ${saved.fullName} (${saved.employeeCode}) has been added.',
+              relatedId: saved.id,
             );
           }
         } else {
@@ -940,6 +964,10 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       }
 
 
+
+      if (mounted) {
+        await _refreshExpiryAlerts();
+      }
 
       if (mounted) {
         Navigator.pop(context, true);
@@ -1122,6 +1150,23 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                       ],
                     ),
                   ),
+                  SizedBox(height: 12.h),
+                  // Read-only: the code is issued by the data layer on first
+                  // save and never changes.
+                  Center(
+                    child: Chip(
+                      avatar: Icon(Icons.badge_outlined, size: 18.sp),
+                      label: Text(
+                        widget.employee?.employeeCode ??
+                            'Employee code assigned automatically',
+                        style: TextStyle(
+                          fontWeight: widget.employee?.employeeCode != null
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
+                      ),
+                    ),
+                  ),
                   SizedBox(height: 24.h),
 
                   Row(
@@ -1131,6 +1176,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                           controller: _nameController,
                           label: 'Full Name *',
                           icon: Icons.person,
+                          isName: true,
                           validator: (v) =>
                               v!.isEmpty ? 'Please enter full name' : null,
                         ),
@@ -1910,6 +1956,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                               controller: _passportNameController,
                               label: 'Name on Passport',
                               icon: Icons.person,
+                              isName: true,
                             ),
                           ),
                         ],
@@ -2434,10 +2481,13 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     required IconData icon,
     String? Function(String?)? validator,
     TextInputType? keyboardType,
+    bool isName = false,
   }) {
     // Automatically derive inputFormatters from keyboardType
     List<TextInputFormatter>? formatters;
-    if (keyboardType == TextInputType.number) {
+    if (isName) {
+      formatters = const [CapitalizeFirstLetterFormatter()];
+    } else if (keyboardType == TextInputType.number) {
       formatters = [FilteringTextInputFormatter.digitsOnly];
     } else if (keyboardType == TextInputType.phone) {
       formatters = [FilteringTextInputFormatter.digitsOnly];
@@ -2451,6 +2501,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       controller: controller,
       keyboardType: keyboardType,
       inputFormatters: formatters,
+      textCapitalization:
+          isName ? TextCapitalization.words : TextCapitalization.none,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, size: 20),
