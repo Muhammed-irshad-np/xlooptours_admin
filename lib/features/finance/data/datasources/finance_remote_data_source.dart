@@ -1771,6 +1771,18 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   Future<CashAdvanceModel> issueCashAdvance({
     required CashAdvanceModel advance,
   }) async {
+    // Only an active employee can be given company cash.
+    if (advance.employeeId.isNotEmpty) {
+      final empSnap =
+          await firestore.collection('employees').doc(advance.employeeId).get();
+      final data = empSnap.data();
+      if (empSnap.exists && data != null && data['isActive'] == false) {
+        throw StateError(
+          '${advance.employeeName} is inactive and cannot be issued an advance',
+        );
+      }
+    }
+
     // Petty cash rules, same as an expense or salary: cash only leaves the
     // drawer inside an open session, so it shows up in that day's count.
     final account = await _getFundAccountOrThrow(advance.fundAccountId);

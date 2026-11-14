@@ -1415,7 +1415,13 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
     String? employmentType;
     var issueDate = DateUtils.dateOnly(DateTime.now());
     final accounts = context.read<FundAccountProvider>().activeAccounts;
-    final employees = context.read<EmployeeProvider>().employees;
+    // Inactive employees have left or are suspended, so they can't be given
+    // company cash.
+    final employees = context
+        .read<EmployeeProvider>()
+        .employees
+        .where((e) => e.isActive)
+        .toList();
 
     if (accounts.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1434,7 +1440,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'No employee records found. Add employees in the Employee module first.',
+            'No active employees found. Add or reactivate an employee in the Employee module first.',
             style: GoogleFonts.inter(color: Colors.white),
           ),
           backgroundColor: FinDT.danger,
