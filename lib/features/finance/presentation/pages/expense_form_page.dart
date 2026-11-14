@@ -23,6 +23,7 @@ import '../../../../features/employee/domain/entities/employee_entity.dart';
 import '../../../../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../../../../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../../../../core/widgets/unsaved_changes_guard.dart';
+import '../../../../widgets/searchable_dropdown.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
 
@@ -1055,35 +1056,30 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       }
     }
 
-    final categoryNames = <String>{};
-    final items = <DropdownMenuItem<String>>[];
-
+    // De-duplicated names; a saved category no longer in master data stays
+    // first so editing an old expense keeps its value.
+    final categoryNames = <String>[];
     for (final c in activeCategories) {
-      if (categoryNames.add(c.name)) {
-        items.add(DropdownMenuItem(value: c.name, child: Text(c.name)));
-      }
+      if (!categoryNames.contains(c.name)) categoryNames.add(c.name);
     }
-
     if (resolvedCategory != null && resolvedCategory.isNotEmpty && !categoryNames.contains(resolvedCategory)) {
-      categoryNames.add(resolvedCategory);
-      items.insert(
-        0,
-        DropdownMenuItem(
-          value: resolvedCategory,
-          child: Text(resolvedCategory),
-        ),
-      );
+      categoryNames.insert(0, resolvedCategory);
     }
 
     final hasValidValue = resolvedCategory != null && categoryNames.contains(resolvedCategory);
 
     return _FieldWrapper(
       label: 'Category *',
-      child: DropdownButtonFormField<String>(
+      child: SearchableDropdown<String>(
         key: ValueKey('category_${resolvedCategory ?? "none"}'),
-        initialValue: hasValidValue ? resolvedCategory : null,
-        items: items,
+        value: hasValidValue ? resolvedCategory : null,
+        items: categoryNames,
+        labelText: 'Select Category',
+        searchHint: 'Search category…',
+        itemToString: (c) => c,
         onChanged: (v) {
+          // Re-picking the same category shouldn't wipe the chosen type.
+          if (v == _selectedCategory) return;
           setState(() {
             _selectedCategory = v;
             _selectedType = null;
@@ -1125,34 +1121,28 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       }
     }
 
-    final typeNames = <String>{};
-    final items = <DropdownMenuItem<String>>[];
-
+    // De-duplicated names; a saved type no longer in master data stays first
+    // so editing an old expense keeps its value.
+    final typeNames = <String>[];
     for (final t in types) {
-      if (typeNames.add(t.name)) {
-        items.add(DropdownMenuItem(value: t.name, child: Text(t.name)));
-      }
+      if (!typeNames.contains(t.name)) typeNames.add(t.name);
     }
-
     if (resolvedType != null && resolvedType.isNotEmpty && !typeNames.contains(resolvedType)) {
-      typeNames.add(resolvedType);
-      items.insert(
-        0,
-        DropdownMenuItem(
-          value: resolvedType,
-          child: Text(resolvedType),
-        ),
-      );
+      typeNames.insert(0, resolvedType);
     }
 
     final hasValidValue = resolvedType != null && typeNames.contains(resolvedType);
 
     return _FieldWrapper(
       label: 'Type *',
-      child: DropdownButtonFormField<String>(
+      child: SearchableDropdown<String>(
         key: ValueKey('type_${_selectedCategory ?? "none"}_${resolvedType ?? "none"}'),
-        initialValue: hasValidValue ? resolvedType : null,
-        items: items,
+        value: hasValidValue ? resolvedType : null,
+        items: typeNames,
+        labelText: 'Select Type',
+        searchHint: 'Search type…',
+        itemToString: (t) => t,
+        enabled: _selectedCategory != null,
         onChanged: (v) {
           setState(() {
             _selectedType = v;
