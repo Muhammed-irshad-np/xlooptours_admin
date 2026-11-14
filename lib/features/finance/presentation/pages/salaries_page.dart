@@ -4,8 +4,11 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:uuid/uuid.dart';
+import '../../../../widgets/searchable_dropdown.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../employee/domain/entities/employee_entity.dart';
+import '../../../employee/domain/entities/employee_role_entity.dart';
 import '../../../employee/presentation/providers/employee_provider.dart';
 import '../../domain/entities/cash_advance_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
@@ -19,7 +22,7 @@ import '../providers/salary_provider.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
 
-/// Which list the page shows: staff payroll or external drivers' trip closing.
+/// Which list the page shows: staff payroll or the month's external staff.
 enum _SalaryTab { payroll, trips }
 
 /// One line of the monthly payroll: an employee on the payroll (or an external
@@ -43,7 +46,7 @@ class _PayrollRow {
 
   bool get isTrip => kind == SalaryPaymentKind.tripSettlement;
 
-  /// Basic salary, or the month's trip earnings for an external driver.
+  /// Basic salary, or the month's earnings for an external employee.
   double get basic => payment?.basicSalary ?? structure?.basicSalary ?? 0;
   int? get tripCount => payment?.tripCount;
   double get allowances => payment?.allowances ?? structure?.allowances ?? 0;
@@ -66,9 +69,11 @@ class _PayrollRow {
   String get currency => payment?.currency ?? structure?.currency ?? 'SAR';
 }
 
-/// Monthly staff payroll: set a salary per employee, then pay each one out of
-/// a fund account for the selected month. A second tab closes the month for
-/// external drivers, who are paid for their trips rather than a salary.
+/// Monthly staff payroll, paid in two steps: a finalizer sets each month's
+/// amounts and fund account and finalizes them, then a payer (coordinator)
+/// pays the finalized amount. Who may do each step is set in Finance Master
+/// Data. A second tab holds external staff, who have no fixed salary: the
+/// finalizer adds whoever worked this month, so every month starts empty.
 class SalariesPage extends StatefulWidget {
   const SalariesPage({super.key});
 
@@ -116,14 +121,18 @@ class _SalariesPageState extends State<SalariesPage> {
     return active.where((a) => allowed.contains(a.id)).toList();
   }
 
-  bool get _canManage {
-    final user = context.read<AuthProvider>().user;
-    final policy = context.read<FinanceProvider>().policy;
-    return FinancePermissionService.canManageSalaries(
-      user: user,
-      policy: policy,
-    );
-  }
+  /// Step 1: manage the payroll, set the month's amounts, finalize, reopen
+  /// and void.
+  bool get _canFinalize => FinancePermissionService.canFinalizeSalaries(
+        user: context.read<AuthProvider>().user,
+        policy: context.read<FinanceProvider>().policy,
+      );
+
+  /// Step 2: pay what has been finalized.
+  bool get _canPay => FinancePermissionService.canPaySalaries(
+        user: context.read<AuthProvider>().user,
+        policy: context.read<FinanceProvider>().policy,
+      );
 
   /// Employees that can be put on the payroll: active internal staff only.
   List<EmployeeEntity> _payrollEligibleEmployees() {
@@ -135,38 +144,28 @@ class _SalariesPageState extends State<SalariesPage> {
       ..sort((a, b) => a.fullName.compareTo(b.fullName));
   }
 
-  /// Drivers whose month is closed on the trips tab: active external drivers.
-  List<EmployeeEntity> _externalDrivers() {
+  /// Active external staff not yet on [provider]'s month, drivers first.
+  List<EmployeeEntity> _externalStaffNotInMonth(SalaryProvider provider) {
+    final inMonth = provider.tripPayments.map((p) => p.employeeId).toSet();
     return context
         .read<EmployeeProvider>()
         .employees
-        .where((e) => e.isActive && e.isExternalDriver)
-        .toList();
+        .where((e) => e.isActive && e.isExternal && !inMonth.contains(e.id))
+        .toList()
+      ..sort((a, b) {
+        if (a.isDriver != b.isDriver) return a.isDriver ? -1 : 1;
+        return a.fullName.compareTo(b.fullName);
+      });
   }
 
   List<_PayrollRow> _buildRows(SalaryProvider provider) =>
       _isTrips ? _buildTripRows(provider) : _buildPayrollRows(provider);
 
+  /// Only the people the finalizer added to this month — external staff
+  /// change from month to month, so a new month starts with an empty list.
   List<_PayrollRow> _buildTripRows(SalaryProvider provider) {
     final rows = <_PayrollRow>[];
-    final seen = <String>{};
-
-    for (final e in _externalDrivers()) {
-      seen.add(e.id);
-      rows.add(
-        _PayrollRow(
-          employeeId: e.id,
-          employeeName: e.fullName,
-          position: e.position,
-          kind: SalaryPaymentKind.tripSettlement,
-          payment: provider.tripPaymentFor(e.id),
-        ),
-      );
-    }
-
-    // A driver deactivated after being paid still belongs to the month.
     for (final p in provider.tripPayments) {
-      if (seen.contains(p.employeeId)) continue;
       rows.add(
         _PayrollRow(
           employeeId: p.employeeId,
@@ -222,9 +221,13 @@ class _SalariesPageState extends State<SalariesPage> {
   List<_PayrollRow> _filterRows(List<_PayrollRow> rows) {
     return rows.where((r) {
       final status = r.payment?.status;
-      // No payment row yet counts as pending — it hasn't been paid.
+      // No payment row yet counts as pending — nothing has been finalized.
       final isPending = status == null || status == SalaryPaymentStatus.pending;
       if (_statusFilter == 'PENDING' && !isPending) return false;
+      if (_statusFilter == 'FINALIZED' &&
+          status != SalaryPaymentStatus.finalized) {
+        return false;
+      }
       if (_statusFilter == 'PAID' && status != SalaryPaymentStatus.paid) {
         return false;
       }
@@ -339,9 +342,9 @@ class _SalariesPageState extends State<SalariesPage> {
         SizedBox(width: 8.w),
         tab(
           _SalaryTab.trips,
-          'External Driver Trips',
+          'External Staff',
           Icons.local_taxi_outlined,
-          _externalDrivers().length,
+          provider.tripPayments.length,
         ),
       ],
     );
@@ -389,7 +392,7 @@ class _SalariesPageState extends State<SalariesPage> {
               children: [
                 Text(
                   _isTrips
-                      ? 'External Driver Trip Closing'
+                      ? 'External Staff — Monthly Payments'
                       : 'Payroll & Salaries',
                   style: GoogleFonts.inter(
                     fontSize: 15.sp,
@@ -400,8 +403,8 @@ class _SalariesPageState extends State<SalariesPage> {
                 SizedBox(height: 2.h),
                 Text(
                   _isTrips
-                      ? 'Enter each driver\'s trip earnings for the month, recover advances, then pay'
-                      : 'Set a monthly salary per employee, then pay each one from a fund account',
+                      ? 'Add who worked this month and finalize their amount — the coordinator then pays'
+                      : 'Finalize each salary for the month — the coordinator then pays it from the chosen account',
                   style: GoogleFonts.inter(
                     fontSize: 11.sp,
                     color: FinDT.textSecondary,
@@ -486,13 +489,15 @@ class _SalariesPageState extends State<SalariesPage> {
               ),
             ),
           ),
-          if (!_isTrips) ...[
+          if (_canFinalize) ...[
             SizedBox(width: 8.w),
             OutlinedButton.icon(
-              onPressed: () => _showStructureDialog(context),
+              onPressed: () => _isTrips
+                  ? _showAddExternalDialog(context, provider)
+                  : _showStructureDialog(context),
               icon: Icon(Icons.person_add_alt_1_outlined, size: 15.sp),
               label: Text(
-                'Add to Payroll',
+                _isTrips ? 'Add to This Month' : 'Add to Payroll',
                 style: GoogleFonts.inter(
                   fontSize: 12.sp,
                   fontWeight: FontWeight.w600,
@@ -531,8 +536,11 @@ class _SalariesPageState extends State<SalariesPage> {
       final owed = SalaryPaymentEntity.totalOutstanding(
         advances.where((a) => a.employeeId == r.employeeId).toList(),
       );
-      // A row already carrying a recovery has had it taken off its net.
-      final recoverable = r.advanceRecovery > 0 ? 0.0 : owed;
+      // A row already carrying a recovery has had it taken off its net, and a
+      // finalized row's net is locked whatever it recovers.
+      final locked = r.advanceRecovery > 0 ||
+          r.payment?.status == SalaryPaymentStatus.finalized;
+      final recoverable = locked ? 0.0 : owed;
       final take = recoverable < r.net ? recoverable : r.net;
       gross += r.net;
       after += r.net - take;
@@ -557,6 +565,9 @@ class _SalariesPageState extends State<SalariesPage> {
     final pending = _pendingTotals(unpaidRows);
     final totalPending = pending.gross;
     final currency = rows.isEmpty ? 'SAR' : rows.first.currency;
+    final readyToPay = unpaidRows
+        .where((r) => r.payment?.status == SalaryPaymentStatus.finalized)
+        .length;
 
     return SizedBox(
       height: 96.h,
@@ -587,7 +598,8 @@ class _SalariesPageState extends State<SalariesPage> {
             child: _buildKpiCard(
               title: 'Pending',
               value: fmt.format(totalPending),
-              subtitle: '${unpaidRows.length} awaiting payment',
+              subtitle: '${unpaidRows.length - readyToPay} to finalize · '
+                  '$readyToPay ready to pay',
               icon: Icons.schedule_outlined,
               color: FinDT.warning,
             ),
@@ -615,7 +627,12 @@ class _SalariesPageState extends State<SalariesPage> {
     final unclosedRows = rows
         .where((r) => r.payment?.status != SalaryPaymentStatus.paid)
         .toList();
-    final notClosed = unclosedRows.length;
+    final notFinalized = rows
+        .where((r) =>
+            r.payment == null ||
+            r.payment!.status == SalaryPaymentStatus.pending)
+        .length;
+    final readyToPay = unclosedRows.length - notFinalized;
     final pending = _pendingTotals(unclosedRows);
     final driverIds = rows.map((r) => r.employeeId).toSet();
     final driverAdvances = context
@@ -632,9 +649,9 @@ class _SalariesPageState extends State<SalariesPage> {
         children: [
           Expanded(
             child: _buildKpiCard(
-              title: 'Not Closed Yet',
-              value: '$notClosed',
-              subtitle: 'of ${rows.length} external drivers',
+              title: 'Not Finalized',
+              value: '$notFinalized',
+              subtitle: 'of ${rows.length} added this month',
               icon: Icons.schedule_outlined,
               color: FinDT.warning,
             ),
@@ -644,7 +661,7 @@ class _SalariesPageState extends State<SalariesPage> {
             child: _buildKpiCard(
               title: 'Paid This Month',
               value: fmt.format(provider.totalTripPaid),
-              subtitle: '${provider.paidTripPayments.length} drivers paid',
+              subtitle: '${provider.paidTripPayments.length} people paid',
               icon: Icons.check_circle_outline,
               color: FinDT.success,
             ),
@@ -654,7 +671,7 @@ class _SalariesPageState extends State<SalariesPage> {
             child: _buildKpiCard(
               title: 'Total Pending',
               value: fmt.format(pending.gross),
-              subtitle: '$notClosed awaiting closing',
+              subtitle: '$readyToPay ready to pay',
               icon: Icons.hourglass_empty_outlined,
               color: FinDT.warning,
             ),
@@ -796,6 +813,13 @@ class _SalariesPageState extends State<SalariesPage> {
                   ),
                   SizedBox(width: 8.w),
                   _buildStatusPill(
+                    label: 'Finalized',
+                    count: countOf(SalaryPaymentStatus.finalized),
+                    value: 'FINALIZED',
+                    color: FinDT.brand,
+                  ),
+                  SizedBox(width: 8.w),
+                  _buildStatusPill(
                     label: 'Paid',
                     count: countOf(SalaryPaymentStatus.paid),
                     value: 'PAID',
@@ -892,7 +916,7 @@ class _SalariesPageState extends State<SalariesPage> {
             !payrollEmpty
                 ? 'Nothing matches this filter'
                 : _isTrips
-                    ? 'No external drivers'
+                    ? 'No one added for this month'
                     : 'No one on the payroll yet',
             style: GoogleFonts.inter(
               fontSize: 14.sp,
@@ -905,8 +929,8 @@ class _SalariesPageState extends State<SalariesPage> {
             !payrollEmpty
                 ? 'Try another status or clear the search.'
                 : _isTrips
-                ? 'Drivers set as External in Employees appear here for their monthly trip closing.'
-                : 'Use "Add to Payroll" to set an employee\'s monthly salary, then generate the month.',
+                ? 'Use "Add to This Month" to add the external staff who worked this month, or create a new one.'
+                : 'Use "Add to Payroll" to set an employee\'s monthly salary.',
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textSecondary),
           ),
@@ -925,13 +949,22 @@ class _SalariesPageState extends State<SalariesPage> {
   ) {
     final payment = row.payment;
     final status = payment?.status;
-    // No payment row yet reads the same as pending — it just hasn't been paid.
+    // No payment row yet reads the same as pending — nothing finalized yet.
     final statusColor = switch (status) {
       null || SalaryPaymentStatus.pending => FinDT.warning,
+      SalaryPaymentStatus.finalized => FinDT.brand,
       SalaryPaymentStatus.paid => FinDT.success,
       SalaryPaymentStatus.voided => FinDT.danger,
     };
-    final statusLabel = status?.displayName ?? 'Pending';
+    final statusLabel = switch (status) {
+      SalaryPaymentStatus.finalized => 'Ready to Pay',
+      _ => status?.displayName ?? 'Pending',
+    };
+    // An external row added to the month has no amount until it's finalized.
+    final hasAmount = !row.isTrip ||
+        (payment != null &&
+            (payment.status != SalaryPaymentStatus.pending ||
+                payment.basicSalary > 0));
 
     return Container(
       padding: EdgeInsets.all(14.w),
@@ -983,9 +1016,9 @@ class _SalariesPageState extends State<SalariesPage> {
             Expanded(
               flex: 2,
               child: _amountCell(
-                'Trip earnings',
-                payment == null ? '—' : fmt.format(row.basic),
-                payment == null ? '' : row.currency,
+                'Earnings',
+                hasAmount ? fmt.format(row.basic) : '—',
+                hasAmount ? row.currency : '',
                 note: row.tripCount != null ? '${row.tripCount} trips' : null,
               ),
             ),
@@ -1034,8 +1067,8 @@ class _SalariesPageState extends State<SalariesPage> {
             flex: 2,
             child: _amountCell(
               'Net pay',
-              row.isTrip && payment == null ? '—' : fmt.format(row.net),
-              row.isTrip && payment == null ? '' : row.currency,
+              hasAmount ? fmt.format(row.net) : '—',
+              hasAmount ? row.currency : '',
               emphasize: true,
             ),
           ),
@@ -1060,11 +1093,23 @@ class _SalariesPageState extends State<SalariesPage> {
                     ),
                   ),
                 ),
+                if (payment?.status == SalaryPaymentStatus.finalized) ...[
+                  SizedBox(height: 4.h),
+                  Text(
+                    'From ${payment!.fundAccountName ?? 'account'}\n'
+                    'Finalized by ${payment.finalizedBy ?? '—'}',
+                    style: GoogleFonts.inter(
+                      fontSize: 10.sp,
+                      color: FinDT.textMuted,
+                    ),
+                  ),
+                ],
                 if (payment?.status == SalaryPaymentStatus.paid) ...[
                   SizedBox(height: 4.h),
                   Text(
                     '${payment!.fundAccountName ?? 'Account'} · '
-                    '${DateFormat('d MMM').format(payment.paidAt ?? payment.createdAt)}',
+                    '${DateFormat('d MMM').format(payment.paidAt ?? payment.createdAt)}'
+                    '${payment.paidBy != null ? '\nPaid by ${payment.paidBy}' : ''}',
                     style: GoogleFonts.inter(
                       fontSize: 10.sp,
                       color: FinDT.textMuted,
@@ -1119,43 +1164,84 @@ class _SalariesPageState extends State<SalariesPage> {
     _PayrollRow row,
   ) {
     final payment = row.payment;
-    final canPay = payment == null || payment.status.canPay;
+    final status = payment?.status ?? SalaryPaymentStatus.pending;
+    final canFinalize = _canFinalize;
+    final canPay = _canPay;
+
+    final menu = <PopupMenuEntry<String>>[
+      if (canFinalize) ...[
+        if (row.structure != null && !row.isTrip)
+          const PopupMenuItem(value: 'edit', child: Text('Edit salary')),
+        if (status.canReopen)
+          const PopupMenuItem(
+            value: 'reopen',
+            child: Text('Reopen to change amounts'),
+          ),
+        if (payment != null && status.canDelete)
+          const PopupMenuItem(
+            value: 'delete',
+            child: Text('Remove from this month'),
+          ),
+        if (status.canVoid)
+          const PopupMenuItem(
+            value: 'void',
+            child: Text('Void payment'),
+          ),
+        if (row.structure != null && !row.isTrip)
+          const PopupMenuItem(
+            value: 'off_payroll',
+            child: Text('Take off payroll'),
+          ),
+      ],
+    ];
+
+    Widget? primary;
+    if (status.canFinalize && canFinalize) {
+      primary = finDialogActionButton(
+        onPressed: () => _showFinalizeDialog(context, provider, row),
+        label: 'Finalize',
+        icon: Icons.fact_check_outlined,
+      );
+    } else if (status.canPay && canPay) {
+      primary = finDialogActionButton(
+        onPressed: () => _showPayDialog(context, provider, row),
+        label: 'Pay',
+        icon: Icons.payments_outlined,
+      );
+    } else if (status.canFinalize) {
+      primary = _waitingLabel('Awaiting finalize');
+    } else if (status.canPay) {
+      primary = _waitingLabel('Awaiting payment');
+    }
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (canPay)
-          finDialogActionButton(
-            onPressed: () => _showPayDialog(context, provider, row),
-            label: row.isTrip ? 'Close & Pay' : 'Pay',
-            icon: Icons.payments_outlined,
-          ),
-        PopupMenuButton<String>(
-          tooltip: 'More',
-          icon: Icon(Icons.more_vert, size: 18.sp, color: FinDT.textSecondary),
-          itemBuilder: (_) => [
-            if (row.structure != null)
-              const PopupMenuItem(value: 'edit', child: Text('Edit salary')),
-            if (payment != null && payment.status.canDelete)
-              const PopupMenuItem(
-                value: 'delete',
-                child: Text('Remove this month'),
-              ),
-            if (payment != null && payment.status.canVoid)
-              const PopupMenuItem(
-                value: 'void',
-                child: Text('Void payment'),
-              ),
-            if (row.structure != null)
-              const PopupMenuItem(
-                value: 'off_payroll',
-                child: Text('Take off payroll'),
-              ),
-          ],
-          onSelected: (action) =>
-              _handleRowAction(context, provider, row, action),
-        ),
+        if (primary != null) primary,
+        if (menu.isNotEmpty)
+          PopupMenuButton<String>(
+            tooltip: 'More',
+            icon:
+                Icon(Icons.more_vert, size: 18.sp, color: FinDT.textSecondary),
+            itemBuilder: (_) => menu,
+            onSelected: (action) =>
+                _handleRowAction(context, provider, row, action),
+          )
+        else
+          SizedBox(width: 40.w),
       ],
+    );
+  }
+
+  /// Shown in place of an action button the viewer isn't allowed to press.
+  Widget _waitingLabel(String text) {
+    return Text(
+      text,
+      style: GoogleFonts.inter(
+        fontSize: 11.sp,
+        fontWeight: FontWeight.w600,
+        color: FinDT.textMuted,
+      ),
     );
   }
 
@@ -1168,6 +1254,9 @@ class _SalariesPageState extends State<SalariesPage> {
     switch (action) {
       case 'edit':
         await _showStructureDialog(context, existing: row.structure);
+        break;
+      case 'reopen':
+        await _reopenPayment(context, provider, row);
         break;
       case 'delete':
         await _deletePendingPayment(context, provider, row);
@@ -1183,23 +1272,57 @@ class _SalariesPageState extends State<SalariesPage> {
 
   // ─── Actions ────────────────────────────────────────────────
 
+  Future<void> _reopenPayment(
+    BuildContext context,
+    SalaryProvider provider,
+    _PayrollRow row,
+  ) async {
+    if (!_guardFinalize(context)) return;
+    final confirmed = await showFinConfirmationDialog(
+      context: context,
+      title: 'Reopen ${row.isTrip ? 'Payment' : 'Salary'}',
+      icon: Icons.lock_open_outlined,
+      message:
+          '${row.employeeName}\'s ${row.isTrip ? 'payment' : 'salary'} goes back '
+          'to Pending so you can change the amounts. It can\'t be paid until '
+          'you finalize it again.',
+      confirmLabel: 'Reopen',
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final user = context.read<AuthProvider>().user;
+    try {
+      await provider.reopen(
+        paymentId: row.payment!.id,
+        actorName: user?.actorLabel ?? 'Admin',
+        actorUserId: user?.id,
+      );
+      if (context.mounted) {
+        _snack(context, 'Reopened — finalize it again when ready.',
+            FinDT.success);
+      }
+    } catch (e) {
+      if (context.mounted) _snack(context, 'Failed: $e', FinDT.danger);
+    }
+  }
+
   Future<void> _deletePendingPayment(
     BuildContext context,
     SalaryProvider provider,
     _PayrollRow row,
   ) async {
-    if (!_guardPermission(context)) return;
+    if (!_guardFinalize(context)) return;
     final confirmed = await showFinConfirmationDialog(
       context: context,
-      title: row.isTrip ? 'Remove Trip Closing' : 'Remove Salary Row',
+      title: 'Remove From This Month',
       icon: Icons.delete_outline_rounded,
       iconColor: FinDT.danger,
       confirmColor: FinDT.danger,
       message: row.isTrip
-          ? 'Remove ${row.employeeName}\'s unpaid trip closing for this month? '
-                'You can close the month again later.'
-          : 'Remove ${row.employeeName}\'s pending salary for this month? '
-                'You can regenerate it later.',
+          ? 'Remove ${row.employeeName} from this month\'s external staff? '
+                'Nothing has been paid. You can add them again later.'
+          : 'Remove ${row.employeeName}\'s unpaid salary for this month? '
+                'Nothing has been paid. You can finalize it again later.',
       confirmLabel: 'Remove',
     );
     if (confirmed != true || !context.mounted) return;
@@ -1209,7 +1332,7 @@ class _SalariesPageState extends State<SalariesPage> {
       if (context.mounted) {
         _snack(
           context,
-          row.isTrip ? 'Trip closing removed.' : 'Salary row removed.',
+          '${row.employeeName} removed from this month.',
           FinDT.success,
         );
       }
@@ -1223,7 +1346,7 @@ class _SalariesPageState extends State<SalariesPage> {
     SalaryProvider provider,
     _PayrollRow row,
   ) async {
-    if (!_guardPermission(context)) return;
+    if (!_guardFinalize(context)) return;
     final confirmed = await showFinConfirmationDialog(
       context: context,
       title: 'Take Off Payroll',
@@ -1254,7 +1377,7 @@ class _SalariesPageState extends State<SalariesPage> {
     BuildContext context, {
     SalaryStructureEntity? existing,
   }) async {
-    if (!_guardPermission(context)) return;
+    if (!_guardFinalize(context)) return;
 
     final provider = context.read<SalaryProvider>();
     final accounts = _payrollAccounts(SalaryPaymentKind.salary);
@@ -1518,15 +1641,15 @@ class _SalariesPageState extends State<SalariesPage> {
     );
   }
 
-  /// Pay one salary (or close an external driver's month): pick the account
-  /// and bucket, optionally deduct and recover outstanding advances, then post
-  /// the money.
-  Future<void> _showPayDialog(
+  /// Step 1 — finalize one salary (or an external employee's month): set the
+  /// month's amounts, the advance recovery and the account it is paid from.
+  /// Nothing is paid here; the payer does that afterwards.
+  Future<void> _showFinalizeDialog(
     BuildContext context,
     SalaryProvider provider,
     _PayrollRow row,
   ) async {
-    if (!_guardPermission(context)) return;
+    if (!_guardFinalize(context)) return;
 
     final allAccounts = _payrollAccounts(row.kind);
     final accounts =
@@ -1563,16 +1686,19 @@ class _SalariesPageState extends State<SalariesPage> {
     );
     final extraNoteCtrl =
         TextEditingController(text: row.payment?.extraAllowanceNote ?? '');
-    final recoveryCtrl = TextEditingController();
+    // A reopened row keeps the recovery it was finalized with.
+    final recoveryCtrl = TextEditingController(
+      text: row.advanceRecovery > 0
+          ? row.advanceRecovery.toStringAsFixed(2)
+          : '',
+    );
     // Salary only: unpaid leave days, each costing a day's pay.
     final leaveDaysCtrl = TextEditingController(
       text: row.leaveDays > 0 ? row.leaveDays.toString() : '',
     );
-    // Trip closing only: the month's trip earnings are typed in at closing.
+    // External staff only: the month's earnings are typed in each month.
     final tripAmountCtrl = TextEditingController(
-      text: row.isTrip && row.payment != null
-          ? row.basic.toStringAsFixed(2)
-          : '',
+      text: row.isTrip && row.basic > 0 ? row.basic.toStringAsFixed(2) : '',
     );
     final tripCountCtrl = TextEditingController(
       text: row.tripCount?.toString() ?? '',
@@ -1582,7 +1708,6 @@ class _SalariesPageState extends State<SalariesPage> {
         row.structure?.defaultFundAccountId ??
         accounts.first.id;
     if (accounts.every((a) => a.id != accountId)) accountId = accounts.first.id;
-    String paymentMethod = row.payment?.paymentMethod ?? 'cash';
     bool isPaying = false;
 
     final fmt = NumberFormat('#,##0.00');
@@ -1597,12 +1722,6 @@ class _SalariesPageState extends State<SalariesPage> {
             (a) => a.id == accountId,
             orElse: () => accounts.first,
           );
-          // Petty cash wallets track physical cash and STC Pay separately, so
-          // the payer has to say which one the salary came out of.
-          final usesBuckets = account.isPettyCash ||
-              account.cashBalance > 0 ||
-              account.stcPayBalance > 0;
-          final effectiveMethod = usesBuckets ? paymentMethod : 'bank';
 
           final extra = double.tryParse(extraCtrl.text.trim()) ?? 0;
           final deduction = double.tryParse(deductionCtrl.text.trim()) ?? 0;
@@ -1641,31 +1760,14 @@ class _SalariesPageState extends State<SalariesPage> {
             deductions: deduction,
             advanceRecovery: recovery,
           );
-          // Mirrors the server's bucket resolution: a wallet whose cash and
-          // STC buckets are both empty is spent from the total balance, so
-          // validating against an empty bucket would block it wrongly.
-          final usesSplitBalances =
-              account.cashBalance > 0 || account.stcPayBalance > 0;
-          final bucketBalance = !usesSplitBalances
-              ? account.currentBalance
-              : switch (effectiveMethod) {
-                  'cash' => account.cashBalance,
-                  'stcPay' => account.stcPayBalance,
-                  _ => account.currentBalance,
-                };
-          final balanceLabel = usesSplitBalances
-              ? _methodLabel(effectiveMethod)
-              : 'Account';
 
           return AlertDialog(
             backgroundColor: Colors.white,
             surfaceTintColor: Colors.transparent,
             shape: finDialogShape,
             title: finDialogTitle(
-              row.isTrip
-                  ? 'Close Trips — ${row.employeeName}'
-                  : 'Pay Salary — ${row.employeeName}',
-              icon: Icons.payments_outlined,
+              'Finalize — ${row.employeeName}',
+              icon: Icons.fact_check_outlined,
             ),
             content: SizedBox(
               width: 460.w,
@@ -1678,17 +1780,26 @@ class _SalariesPageState extends State<SalariesPage> {
                     children: [
                       SizedBox(height: 8.h),
                       Text(
-                        '${row.isTrip ? 'Trip month' : 'Payroll month'}: $monthLabel',
+                        'Month: $monthLabel',
                         style: GoogleFonts.inter(
                           fontSize: 11.sp,
                           color: FinDT.textSecondary,
                         ),
+                      ),
+                      SizedBox(height: 8.h),
+                      _buildInfoStrip(
+                        'Finalizing locks these amounts and the account. The '
+                        'coordinator then pays it and can\'t change anything — '
+                        'reopen it if a figure needs to change.',
+                        Icons.lock_outline,
+                        FinDT.brand,
                       ),
                       SizedBox(height: 12.h),
                       DropdownButtonFormField<String>(
                         initialValue: accountId,
                         decoration: finDialogInputDecoration(
                           label: 'Pay From Account *',
+                          hint: 'The coordinator pays from this account',
                           prefixIcon: Icons.account_balance_wallet_outlined,
                         ),
                         style: GoogleFonts.inter(
@@ -1709,26 +1820,6 @@ class _SalariesPageState extends State<SalariesPage> {
                             ? null
                             : (v) => setInner(() => accountId = v!),
                       ),
-                      if (usesBuckets) ...[
-                        SizedBox(height: 14.h),
-                        _buildMethodSelector(
-                          selected: effectiveMethod,
-                          account: account,
-                          fmt: fmt,
-                          enabled: !isPaying,
-                          onChanged: (m) =>
-                              setInner(() => paymentMethod = m),
-                        ),
-                        if (account.isPettyCash) ...[
-                          SizedBox(height: 8.h),
-                          _buildInfoStrip(
-                            'Petty cash rules apply: the day\'s session must be '
-                            'open and not yet verified, or the payment is rejected.',
-                            Icons.info_outline,
-                            FinDT.brand,
-                          ),
-                        ],
-                      ],
                       if (row.isTrip) ...[
                         SizedBox(height: 14.h),
                         Row(
@@ -1750,8 +1841,8 @@ class _SalariesPageState extends State<SalariesPage> {
                                 ],
                                 onChanged: (_) => setInner(() {}),
                                 decoration: finDialogInputDecoration(
-                                  label: 'Trip Earnings *',
-                                  hint: 'Total for the month',
+                                  label: 'Earnings This Month *',
+                                  hint: 'Trips / work done this month',
                                   prefixIcon: Icons.local_taxi_outlined,
                                   suffixText: row.currency,
                                 ),
@@ -1762,7 +1853,7 @@ class _SalariesPageState extends State<SalariesPage> {
                                 validator: (v) {
                                   final n = double.tryParse(v ?? '');
                                   if (n == null || n <= 0) {
-                                    return 'Enter the month\'s trip earnings';
+                                    return 'Enter what they earned this month';
                                   }
                                   return null;
                                 },
@@ -1793,8 +1884,8 @@ class _SalariesPageState extends State<SalariesPage> {
                         ),
                         SizedBox(height: 8.h),
                         _buildInfoStrip(
-                          'No receipt needed — this closing record is the '
-                          'proof of payment.',
+                          'No receipt needed — this record is the proof of '
+                          'payment.',
                           Icons.receipt_long_outlined,
                           FinDT.textSecondary,
                         ),
@@ -1955,7 +2046,7 @@ class _SalariesPageState extends State<SalariesPage> {
                           fmt: fmt,
                           enabled: !isPaying,
                           recoverLabel: row.isTrip
-                              ? 'Recover From This Trip Payment'
+                              ? 'Recover From This Payment'
                               : 'Recover From This Salary',
                           onChanged: () => setInner(() {}),
                           onRecoverAll: () => setInner(() {
@@ -1975,9 +2066,6 @@ class _SalariesPageState extends State<SalariesPage> {
                         deduction: deduction,
                         recovery: recovery,
                         net: net,
-                        account: account,
-                        balanceLabel: balanceLabel,
-                        bucketBalance: bucketBalance,
                         fmt: fmt,
                       ),
                     ],
@@ -1989,34 +2077,19 @@ class _SalariesPageState extends State<SalariesPage> {
               finDialogCancelButton(ctx, onPressed: isPaying ? () {} : null),
               finDialogActionButton(
                 isLoading: isPaying,
-                label: net <= 0 && recovery > 0
-                    ? 'Settle Against Advance'
-                    : 'Pay ${fmt.format(net)} ${row.currency}',
+                label: 'Finalize ${fmt.format(net)} ${row.currency}',
                 onPressed: () async {
                   if (!formKey.currentState!.validate()) return;
                   if (net <= 0 && recovery <= 0) {
                     _snack(context, 'Net pay must be above zero.', FinDT.danger);
                     return;
                   }
-                  if (net > bucketBalance + 1e-9) {
-                    _snack(
-                      context,
-                      'Net pay exceeds the available $balanceLabel balance '
-                      '(${fmt.format(bucketBalance)} ${account.currency}).',
-                      FinDT.danger,
-                    );
-                    return;
-                  }
 
                   final user = context.read<AuthProvider>().user;
                   final actorName = user?.actorLabel ?? 'Admin';
-                  final fundProv = context.read<FundAccountProvider>();
-                  final advanceProv = context.read<CashAdvanceProvider>();
 
                   setInner(() => isPaying = true);
                   try {
-                    // Upsert the salary row first so the amounts being paid are
-                    // exactly what the dialog shows.
                     final paymentId = row.payment?.id ??
                         (row.isTrip
                             ? SalaryPaymentEntity.buildTripId(
@@ -2028,53 +2101,325 @@ class _SalariesPageState extends State<SalariesPage> {
                                 row.employeeId,
                               ));
                     final base = row.payment;
-                    final toSave = SalaryPaymentEntity(
-                      id: paymentId,
-                      period: provider.period,
-                      kind: row.kind,
-                      employeeId: row.employeeId,
-                      employeeName: row.employeeName,
-                      position: row.position,
-                      basicSalary: basic,
-                      tripCount: row.isTrip
-                          ? int.tryParse(tripCountCtrl.text.trim())
-                          : null,
-                      allowances: row.allowances,
-                      extraAllowance: extra,
-                      extraAllowanceNote:
-                          extra <= 0 || extraNoteCtrl.text.trim().isEmpty
-                              ? null
-                              : extraNoteCtrl.text.trim(),
-                      leaveDays: leaveDays,
-                      leaveDeduction: leaveDeduction,
-                      deductions: deduction,
-                      deductionNote: deduction <= 0 ||
-                              deductionNoteCtrl.text.trim().isEmpty
-                          ? null
-                          : deductionNoteCtrl.text.trim(),
-                      netAmount: net,
-                      netAmountMinor: (net * 100).round(),
-                      currency: row.currency,
-                      fundAccountId: account.id,
-                      fundAccountName: account.name,
-                      paymentMethod: effectiveMethod,
-                      status: SalaryPaymentStatus.pending,
-                      notes: base?.notes,
-                      createdAt: base?.createdAt ?? DateTime.now(),
-                      createdBy: base?.createdBy ?? actorName,
-                    );
-                    await provider.savePayment(toSave);
-                    await provider.pay(
-                      paymentId: paymentId,
-                      fundAccountId: account.id,
+                    await provider.finalize(
+                      payment: SalaryPaymentEntity(
+                        id: paymentId,
+                        period: provider.period,
+                        kind: row.kind,
+                        employeeId: row.employeeId,
+                        employeeName: row.employeeName,
+                        position: row.position,
+                        basicSalary: basic,
+                        tripCount: row.isTrip
+                            ? int.tryParse(tripCountCtrl.text.trim())
+                            : null,
+                        allowances: row.allowances,
+                        extraAllowance: extra,
+                        extraAllowanceNote:
+                            extra <= 0 || extraNoteCtrl.text.trim().isEmpty
+                                ? null
+                                : extraNoteCtrl.text.trim(),
+                        leaveDays: leaveDays,
+                        leaveDeduction: leaveDeduction,
+                        deductions: deduction,
+                        deductionNote: deduction <= 0 ||
+                                deductionNoteCtrl.text.trim().isEmpty
+                            ? null
+                            : deductionNoteCtrl.text.trim(),
+                        advanceRecovery: recovery,
+                        netAmount: net,
+                        netAmountMinor: (net * 100).round(),
+                        currency: row.currency,
+                        fundAccountId: account.id,
+                        fundAccountName: account.name,
+                        paymentMethod: base?.paymentMethod ?? 'cash',
+                        notes: base?.notes,
+                        createdAt: base?.createdAt ?? DateTime.now(),
+                        createdBy: base?.createdBy ?? actorName,
+                      ),
                       actorName: actorName,
                       actorUserId: user?.id,
-                      paymentMethod: effectiveMethod,
-                      advanceRecoveries:
-                          SalaryPaymentEntity.allocateAdvanceRecovery(
-                        amount: recovery,
-                        advances: openAdvances,
+                    );
+
+                    if (ctx.mounted) finSafePop(ctx);
+                    if (context.mounted) {
+                      _snack(
+                        context,
+                        'Finalized ${fmt.format(net)} ${row.currency} for '
+                        '${row.employeeName} — ready to be paid from '
+                        '${account.name}.',
+                        FinDT.success,
+                      );
+                    }
+                  } catch (e) {
+                    if (ctx.mounted) {
+                      setInner(() => isPaying = false);
+                      _snack(context, 'Failed to finalize: $e', FinDT.danger);
+                    }
+                  }
+                },
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Step 2 — pay a finalized salary. Every amount and the account are fixed
+  /// by the finalizer; the payer only says whether the money went out as cash
+  /// or STC Pay, then confirms.
+  Future<void> _showPayDialog(
+    BuildContext context,
+    SalaryProvider provider,
+    _PayrollRow row,
+  ) async {
+    if (!_guardPay(context)) return;
+    final payment = row.payment;
+    if (payment == null || !payment.status.canPay) return;
+
+    final account = context
+        .read<FundAccountProvider>()
+        .accounts
+        .where((a) => a.id == payment.fundAccountId)
+        .firstOrNull;
+    if (account == null || !account.isActive) {
+      _snack(
+        context,
+        'The account chosen at finalize '
+        '(${payment.fundAccountName ?? 'unknown'}) is no longer available. '
+        'Ask the finalizer to reopen this ${row.isTrip ? 'payment' : 'salary'}.',
+        FinDT.danger,
+      );
+      return;
+    }
+
+    // The finalizer fixed how much is recovered; spread it over the advances
+    // still open now, oldest first.
+    final openAdvances = context
+        .read<CashAdvanceProvider>()
+        .advances
+        .where((a) => a.employeeId == row.employeeId && a.isOpen)
+        .toList()
+      ..sort((a, b) => a.issuedAt.compareTo(b.issuedAt));
+    final allocation = SalaryPaymentEntity.allocateAdvanceRecovery(
+      amount: payment.advanceRecovery,
+      advances: openAdvances,
+    );
+    final allocated = allocation.values.fold(0.0, (sum, v) => sum + v);
+    if ((allocated - payment.advanceRecovery).abs() > 0.005) {
+      _snack(
+        context,
+        '${row.employeeName}\'s advances changed after this was finalized. '
+        'Ask the finalizer to reopen and finalize it again.',
+        FinDT.danger,
+      );
+      return;
+    }
+
+    final fmt = NumberFormat('#,##0.00');
+    final monthLabel = DateFormat('MMMM y').format(provider.periodDate);
+    final net = payment.netAmount;
+    final recovery = payment.advanceRecovery;
+    String paymentMethod =
+        payment.paymentMethod == 'stcPay' ? 'stcPay' : 'cash';
+    bool isPaying = false;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) {
+          // Petty cash wallets track physical cash and STC Pay separately, so
+          // the payer says which one the money came out of.
+          final usesBuckets = account.isPettyCash ||
+              account.cashBalance > 0 ||
+              account.stcPayBalance > 0;
+          final effectiveMethod = usesBuckets ? paymentMethod : 'bank';
+          // Mirrors the server's bucket resolution: a wallet whose cash and
+          // STC buckets are both empty is spent from the total balance.
+          final usesSplitBalances =
+              account.cashBalance > 0 || account.stcPayBalance > 0;
+          final bucketBalance = !usesSplitBalances
+              ? account.currentBalance
+              : switch (effectiveMethod) {
+                  'cash' => account.cashBalance,
+                  'stcPay' => account.stcPayBalance,
+                  _ => account.currentBalance,
+                };
+          final balanceLabel =
+              usesSplitBalances ? _methodLabel(effectiveMethod) : 'Account';
+
+          final reasons = [
+            if ((payment.extraAllowanceNote ?? '').isNotEmpty)
+              'Extra: ${payment.extraAllowanceNote}',
+            if ((payment.deductionNote ?? '').isNotEmpty)
+              'Deduction: ${payment.deductionNote}',
+            if (row.isTrip && payment.tripCount != null)
+              '${payment.tripCount} trips',
+          ];
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: finDialogShape,
+            title: finDialogTitle(
+              'Pay — ${row.employeeName}',
+              icon: Icons.payments_outlined,
+            ),
+            content: SizedBox(
+              width: 460.w,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(height: 8.h),
+                    Text(
+                      'Month: $monthLabel',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        color: FinDT.textSecondary,
                       ),
+                    ),
+                    SizedBox(height: 8.h),
+                    _buildInfoStrip(
+                      'Finalized by ${payment.finalizedBy ?? '—'}'
+                      '${payment.finalizedAt != null ? ' on ${DateFormat('d MMM y').format(payment.finalizedAt!)}' : ''}. '
+                      'The amounts and account are locked.',
+                      Icons.verified_outlined,
+                      FinDT.brand,
+                    ),
+                    SizedBox(height: 12.h),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(12.w),
+                      decoration: BoxDecoration(
+                        color: FinDT.bgPage,
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(color: FinDT.border),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.account_balance_wallet_outlined,
+                            size: 18.sp,
+                            color: FinDT.textSecondary,
+                          ),
+                          SizedBox(width: 10.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Pay From',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.sp,
+                                    color: FinDT.textMuted,
+                                  ),
+                                ),
+                                Text(
+                                  account.name,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.w700,
+                                    color: FinDT.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            '${fmt.format(account.currentBalance)} '
+                            '${account.currency}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w600,
+                              color: FinDT.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (usesBuckets) ...[
+                      SizedBox(height: 14.h),
+                      _buildMethodSelector(
+                        selected: effectiveMethod,
+                        account: account,
+                        fmt: fmt,
+                        enabled: !isPaying,
+                        onChanged: (m) => setInner(() => paymentMethod = m),
+                      ),
+                      if (account.isPettyCash) ...[
+                        SizedBox(height: 8.h),
+                        _buildInfoStrip(
+                          'Petty cash rules apply: the day\'s session must be '
+                          'open and not yet verified, or the payment is rejected.',
+                          Icons.info_outline,
+                          FinDT.brand,
+                        ),
+                      ],
+                    ],
+                    SizedBox(height: 16.h),
+                    _buildPaySummary(
+                      row: row,
+                      basic: payment.basicSalary,
+                      extra: payment.extraAllowance,
+                      leaveDays: payment.leaveDays,
+                      leaveDeduction: payment.leaveDeduction,
+                      deduction: payment.deductions,
+                      recovery: recovery,
+                      net: net,
+                      fmt: fmt,
+                      account: account,
+                      balanceLabel: balanceLabel,
+                      bucketBalance: bucketBalance,
+                    ),
+                    if (reasons.isNotEmpty) ...[
+                      SizedBox(height: 8.h),
+                      Text(
+                        reasons.join(' · '),
+                        style: GoogleFonts.inter(
+                          fontSize: 10.sp,
+                          color: FinDT.textMuted,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              finDialogCancelButton(ctx, onPressed: isPaying ? () {} : null),
+              finDialogActionButton(
+                isLoading: isPaying,
+                label: net <= 0 && recovery > 0
+                    ? 'Settle Against Advance'
+                    : 'Pay ${fmt.format(net)} ${row.currency}',
+                onPressed: () async {
+                  if (net > bucketBalance + 1e-9) {
+                    _snack(
+                      context,
+                      'Net pay exceeds the available $balanceLabel balance '
+                      '(${fmt.format(bucketBalance)} ${account.currency}).',
+                      FinDT.danger,
+                    );
+                    return;
+                  }
+
+                  final user = context.read<AuthProvider>().user;
+                  final fundProv = context.read<FundAccountProvider>();
+                  final advanceProv = context.read<CashAdvanceProvider>();
+
+                  setInner(() => isPaying = true);
+                  try {
+                    await provider.pay(
+                      paymentId: payment.id,
+                      fundAccountId: account.id,
+                      actorName: user?.actorLabel ?? 'Admin',
+                      actorUserId: user?.id,
+                      paymentMethod: effectiveMethod,
+                      advanceRecoveries: allocation,
                     );
                     await Future.wait([
                       fundProv.fetchAllAccounts(),
@@ -2105,6 +2450,360 @@ class _SalariesPageState extends State<SalariesPage> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  /// Adds an external employee to the selected month (picking an existing one
+  /// or creating a new one), then goes straight on to finalizing their amount.
+  Future<void> _showAddExternalDialog(
+    BuildContext context,
+    SalaryProvider provider,
+  ) async {
+    if (!_guardFinalize(context)) return;
+
+    final candidates = _externalStaffNotInMonth(provider);
+    final monthLabel = DateFormat('MMMM y').format(provider.periodDate);
+    final tripAccounts = _payrollAccounts(SalaryPaymentKind.tripSettlement);
+    final currency =
+        tripAccounts.isEmpty ? 'SAR' : tripAccounts.first.currency;
+    EmployeeEntity? selected;
+    bool isSaving = false;
+
+    final added = await showDialog<SalaryPaymentEntity>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle(
+            'Add to $monthLabel',
+            icon: Icons.person_add_alt_1_outlined,
+          ),
+          content: SizedBox(
+            width: 420.w,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 8.h),
+                SearchableDropdown<EmployeeEntity>(
+                  // Rebuilt when a new employee is created and selected.
+                  key: ValueKey(selected?.id),
+                  value: selected,
+                  labelText: 'External Employee',
+                  searchHint: 'Search by name…',
+                  decoration: finDialogInputDecoration(
+                    label: 'External Employee *',
+                    hint: candidates.isEmpty
+                        ? 'Everyone is already added — create a new one'
+                        : 'Pick who worked this month',
+                    prefixIcon: Icons.person_outline,
+                  ),
+                  style: GoogleFonts.inter(
+                    fontSize: 12.sp,
+                    color: FinDT.textPrimary,
+                  ),
+                  items: candidates,
+                  itemToString: (e) => e.position.isEmpty
+                      ? e.fullName
+                      : '${e.fullName} · ${e.position}',
+                  enabled: !isSaving,
+                  onChanged: (e) => setInner(() => selected = e),
+                ),
+                SizedBox(height: 10.h),
+                TextButton.icon(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          final created =
+                              await _showQuickAddExternalDialog(ctx);
+                          if (created == null) return;
+                          setInner(() {
+                            candidates.insert(0, created);
+                            selected = created;
+                          });
+                        },
+                  icon: Icon(Icons.add, size: 16.sp),
+                  label: Text(
+                    'New External Employee',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(foregroundColor: FinDT.brand),
+                ),
+                SizedBox(height: 6.h),
+                _buildInfoStrip(
+                  'External staff are added month by month — next month\'s '
+                  'list starts empty.',
+                  Icons.info_outline,
+                  FinDT.textSecondary,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            finDialogCancelButton(ctx, onPressed: isSaving ? () {} : null),
+            finDialogActionButton(
+              isLoading: isSaving,
+              label: 'Add & Set Amount',
+              onPressed: () async {
+                final employee = selected;
+                if (employee == null) {
+                  _snack(context, 'Pick an external employee first.',
+                      FinDT.danger);
+                  return;
+                }
+                final user = context.read<AuthProvider>().user;
+                setInner(() => isSaving = true);
+                try {
+                  await provider.savePayment(
+                    SalaryPaymentEntity(
+                      id: SalaryPaymentEntity.buildTripId(
+                        provider.period,
+                        employee.id,
+                      ),
+                      period: provider.period,
+                      kind: SalaryPaymentKind.tripSettlement,
+                      employeeId: employee.id,
+                      employeeName: employee.fullName,
+                      position: employee.position,
+                      basicSalary: 0,
+                      netAmount: 0,
+                      currency: currency,
+                      createdAt: DateTime.now(),
+                      createdBy: user?.actorLabel ?? 'Admin',
+                    ),
+                  );
+                  if (ctx.mounted) {
+                    Navigator.of(ctx).pop(provider.tripPaymentFor(employee.id));
+                  }
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setInner(() => isSaving = false);
+                    _snack(context, 'Failed to add: $e', FinDT.danger);
+                  }
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (added == null || !context.mounted) return;
+    await _showFinalizeDialog(
+      context,
+      provider,
+      _PayrollRow(
+        employeeId: added.employeeId,
+        employeeName: added.employeeName,
+        position: added.position,
+        kind: SalaryPaymentKind.tripSettlement,
+        payment: added,
+      ),
+    );
+  }
+
+  /// Creates a minimal external employee record (the same fields the
+  /// Employees form keeps for external staff) and returns it.
+  Future<EmployeeEntity?> _showQuickAddExternalDialog(
+    BuildContext context,
+  ) async {
+    final employeeProv = context.read<EmployeeProvider>();
+    if (employeeProv.roles.isEmpty) {
+      try {
+        await employeeProv.fetchEmployeeRoles();
+      } catch (_) {
+        // Fall back to the built-in positions below.
+      }
+    }
+    if (!context.mounted) return null;
+    final positions = (employeeProv.roles.isEmpty
+            ? EmployeeRoleEntity.defaults
+            : employeeProv.roles)
+        .map((r) => r.name)
+        .toList();
+
+    final formKey = GlobalKey<FormState>();
+    final nameCtrl = TextEditingController();
+    final phoneCtrl = TextEditingController();
+    final nationalityCtrl = TextEditingController();
+    String position = positions.contains('Driver') ? 'Driver' : positions.first;
+    String gender = 'Male';
+    bool isSaving = false;
+
+    return showDialog<EmployeeEntity>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          backgroundColor: Colors.white,
+          surfaceTintColor: Colors.transparent,
+          shape: finDialogShape,
+          title: finDialogTitle(
+            'New External Employee',
+            icon: Icons.person_add_alt_outlined,
+          ),
+          content: SizedBox(
+            width: 400.w,
+            child: SingleChildScrollView(
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(height: 8.h),
+                    TextFormField(
+                      controller: nameCtrl,
+                      enabled: !isSaving,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: finDialogInputDecoration(
+                        label: 'Full Name *',
+                        prefixIcon: Icons.person_outline,
+                      ),
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        color: FinDT.textPrimary,
+                      ),
+                      validator: (v) {
+                        final name = v?.trim() ?? '';
+                        if (name.isEmpty) return 'Required';
+                        final taken = employeeProv.employees.any((e) =>
+                            e.isExternal &&
+                            e.fullName.trim().toLowerCase() ==
+                                name.toLowerCase());
+                        if (taken) {
+                          return 'Already exists — pick them from the list';
+                        }
+                        return null;
+                      },
+                    ),
+                    SizedBox(height: 14.h),
+                    DropdownButtonFormField<String>(
+                      initialValue: position,
+                      decoration: finDialogInputDecoration(
+                        label: 'Position *',
+                        prefixIcon: Icons.work_outline,
+                      ),
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        color: FinDT.textPrimary,
+                      ),
+                      items: positions
+                          .map((p) => DropdownMenuItem(value: p, child: Text(p)))
+                          .toList(),
+                      onChanged: isSaving
+                          ? null
+                          : (v) => setInner(() => position = v ?? position),
+                    ),
+                    SizedBox(height: 14.h),
+                    TextFormField(
+                      controller: phoneCtrl,
+                      enabled: !isSaving,
+                      keyboardType: TextInputType.phone,
+                      decoration: finDialogInputDecoration(
+                        label: 'Phone',
+                        hint: 'Optional',
+                        prefixIcon: Icons.phone_outlined,
+                      ),
+                      style: GoogleFonts.inter(
+                        fontSize: 12.sp,
+                        color: FinDT.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 14.h),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: nationalityCtrl,
+                            enabled: !isSaving,
+                            textCapitalization: TextCapitalization.words,
+                            decoration: finDialogInputDecoration(
+                              label: 'Nationality',
+                              hint: 'Optional',
+                              prefixIcon: Icons.flag_outlined,
+                            ),
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              color: FinDT.textPrimary,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: 10.w),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            initialValue: gender,
+                            decoration: finDialogInputDecoration(
+                              label: 'Gender',
+                              prefixIcon: Icons.wc_outlined,
+                            ),
+                            style: GoogleFonts.inter(
+                              fontSize: 12.sp,
+                              color: FinDT.textPrimary,
+                            ),
+                            items: const ['Male', 'Female']
+                                .map((g) =>
+                                    DropdownMenuItem(value: g, child: Text(g)))
+                                .toList(),
+                            onChanged: isSaving
+                                ? null
+                                : (v) => setInner(() => gender = v ?? gender),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 10.h),
+                    _buildInfoStrip(
+                      'Saved in Employees as External. Add vehicle details '
+                      'there later if needed.',
+                      Icons.info_outline,
+                      FinDT.textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            finDialogCancelButton(ctx, onPressed: isSaving ? () {} : null),
+            finDialogActionButton(
+              isLoading: isSaving,
+              label: 'Create Employee',
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final employee = EmployeeEntity(
+                  id: const Uuid().v4(),
+                  fullName: nameCtrl.text.trim(),
+                  position: position,
+                  email: '',
+                  phoneNumber: phoneCtrl.text.trim(),
+                  nationality: nationalityCtrl.text.trim(),
+                  idType: '',
+                  idNumber: '',
+                  gender: gender,
+                  employmentType: EmploymentType.external,
+                );
+                setInner(() => isSaving = true);
+                try {
+                  await employeeProv.addEmployee(employee);
+                  if (ctx.mounted) Navigator.of(ctx).pop(employee);
+                } catch (e) {
+                  if (ctx.mounted) {
+                    setInner(() => isSaving = false);
+                    _snack(context, 'Failed to create employee: $e',
+                        FinDT.danger);
+                  }
+                }
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -2350,10 +3049,11 @@ class _SalariesPageState extends State<SalariesPage> {
     required double deduction,
     required double recovery,
     required double net,
-    required FundAccountEntity account,
-    required String balanceLabel,
-    required double bucketBalance,
     required NumberFormat fmt,
+    // Shown on the pay step only, where money actually leaves the account.
+    FundAccountEntity? account,
+    String? balanceLabel,
+    double? bucketBalance,
   }) {
     Widget line(String label, String value, {bool bold = false, Color? color}) {
       return Padding(
@@ -2393,7 +3093,7 @@ class _SalariesPageState extends State<SalariesPage> {
       child: Column(
         children: [
           if (row.isTrip)
-            line('Trip earnings', '${fmt.format(basic)} ${row.currency}')
+            line('Earnings', '${fmt.format(basic)} ${row.currency}')
           else ...[
             line('Basic', '${fmt.format(basic)} ${row.currency}'),
             line('Allowances', '${fmt.format(row.allowances)} ${row.currency}'),
@@ -2422,12 +3122,14 @@ class _SalariesPageState extends State<SalariesPage> {
           ),
           Divider(height: 14.h, color: FinDT.border),
           line('Net pay', '${fmt.format(net)} ${row.currency}', bold: true),
-          SizedBox(height: 6.h),
-          line(
-            '$balanceLabel balance after',
-            '${fmt.format(bucketBalance - net)} ${account.currency}',
-            color: bucketBalance - net < 0 ? FinDT.danger : null,
-          ),
+          if (account != null && bucketBalance != null) ...[
+            SizedBox(height: 6.h),
+            line(
+              '${balanceLabel ?? 'Account'} balance after',
+              '${fmt.format(bucketBalance - net)} ${account.currency}',
+              color: bucketBalance - net < 0 ? FinDT.danger : null,
+            ),
+          ],
           if (recovery > 0) ...[
             SizedBox(height: 8.h),
             Text(
@@ -2451,7 +3153,7 @@ class _SalariesPageState extends State<SalariesPage> {
     SalaryProvider provider,
     SalaryPaymentEntity payment,
   ) async {
-    if (!_guardPermission(context)) return;
+    if (!_guardFinalize(context)) return;
 
     final reasonCtrl = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -2552,11 +3254,22 @@ class _SalariesPageState extends State<SalariesPage> {
 
   // ─── Helpers ────────────────────────────────────────────────
 
-  bool _guardPermission(BuildContext context) {
-    if (_canManage) return true;
+  bool _guardFinalize(BuildContext context) {
+    if (_canFinalize) return true;
     _snack(
       context,
-      'Your role is not allowed to manage salaries.',
+      'Only a salary finalizer can do this — see Salary Finalize in '
+      'Master Data.',
+      FinDT.danger,
+    );
+    return false;
+  }
+
+  bool _guardPay(BuildContext context) {
+    if (_canPay) return true;
+    _snack(
+      context,
+      'You are not allowed to pay salaries — see Salary Pay in Master Data.',
       FinDT.danger,
     );
     return false;

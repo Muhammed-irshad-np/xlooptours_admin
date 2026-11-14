@@ -86,10 +86,19 @@ class SalaryStructureEntity extends Equatable {
 
 /// Lifecycle of a single month's salary for one employee.
 ///
-/// pending → paid → (optional voided)
+/// pending → finalized → paid → (optional voided)
+///
+/// Two people are involved: a finalizer (admin / finance) sets the amounts and
+/// the fund account and finalizes the row; a payer (coordinator) then pays the
+/// finalized amount without being able to change it. Who may do each step is
+/// set in Finance Master Data.
 enum SalaryPaymentStatus {
-  /// Generated for the month but money has not left a fund account yet.
+  /// On the month's list but the amounts are still being worked out. Only the
+  /// finalizer can edit it; it cannot be paid yet.
   pending,
+
+  /// Amounts and fund account locked by the finalizer; waiting to be paid.
+  finalized,
 
   /// Money posted to the ledger and deducted from a fund account.
   paid,
@@ -101,6 +110,8 @@ enum SalaryPaymentStatus {
     switch (this) {
       case SalaryPaymentStatus.pending:
         return 'Pending';
+      case SalaryPaymentStatus.finalized:
+        return 'Finalized';
       case SalaryPaymentStatus.paid:
         return 'Paid';
       case SalaryPaymentStatus.voided:
@@ -109,8 +120,21 @@ enum SalaryPaymentStatus {
   }
 
   bool get isPosted => this == SalaryPaymentStatus.paid;
-  bool get canPay => this == SalaryPaymentStatus.pending;
-  bool get canDelete => this == SalaryPaymentStatus.pending;
+
+  /// The finalizer may still change the amounts.
+  bool get canEdit => this == SalaryPaymentStatus.pending;
+  bool get canFinalize => this == SalaryPaymentStatus.pending;
+
+  /// Send a finalized row back to the finalizer for changes.
+  bool get canReopen => this == SalaryPaymentStatus.finalized;
+
+  /// Only a finalized row can be paid.
+  bool get canPay => this == SalaryPaymentStatus.finalized;
+
+  /// Nothing has been paid yet, so the row can simply be removed.
+  bool get canDelete =>
+      this == SalaryPaymentStatus.pending ||
+      this == SalaryPaymentStatus.finalized;
   bool get canVoid => this == SalaryPaymentStatus.paid;
 }
 
@@ -199,6 +223,11 @@ class SalaryPaymentEntity extends Equatable {
 
   final SalaryPaymentStatus status;
 
+  /// Who locked the amounts, and when. Cleared again when the row is reopened.
+  final DateTime? finalizedAt;
+  final String? finalizedBy;
+  final String? finalizedByUserId;
+
   final DateTime? paidAt;
   final String? paidBy;
   final String? paidByUserId;
@@ -241,6 +270,9 @@ class SalaryPaymentEntity extends Equatable {
     this.paymentMethod = 'cash',
     this.expenseId,
     this.status = SalaryPaymentStatus.pending,
+    this.finalizedAt,
+    this.finalizedBy,
+    this.finalizedByUserId,
     this.paidAt,
     this.paidBy,
     this.paidByUserId,
@@ -369,6 +401,9 @@ class SalaryPaymentEntity extends Equatable {
     String? paymentMethod,
     String? expenseId,
     SalaryPaymentStatus? status,
+    DateTime? finalizedAt,
+    String? finalizedBy,
+    String? finalizedByUserId,
     DateTime? paidAt,
     String? paidBy,
     String? paidByUserId,
@@ -405,6 +440,9 @@ class SalaryPaymentEntity extends Equatable {
       paymentMethod: paymentMethod ?? this.paymentMethod,
       expenseId: expenseId ?? this.expenseId,
       status: status ?? this.status,
+      finalizedAt: finalizedAt ?? this.finalizedAt,
+      finalizedBy: finalizedBy ?? this.finalizedBy,
+      finalizedByUserId: finalizedByUserId ?? this.finalizedByUserId,
       paidAt: paidAt ?? this.paidAt,
       paidBy: paidBy ?? this.paidBy,
       paidByUserId: paidByUserId ?? this.paidByUserId,
@@ -430,6 +468,7 @@ class SalaryPaymentEntity extends Equatable {
         netAmount,
         advanceRecovery,
         status,
+        finalizedAt,
         fundAccountId,
         paymentMethod,
         ledgerEntryId,

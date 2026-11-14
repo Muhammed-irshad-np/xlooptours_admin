@@ -153,6 +153,20 @@ abstract class FinanceRepository {
 
   Future<SalaryPaymentEntity> saveSalaryPayment(SalaryPaymentEntity payment);
 
+  /// Locks the amounts and fund account of [payment] so it can be paid.
+  Future<SalaryPaymentEntity> finalizeSalaryPayment({
+    required SalaryPaymentEntity payment,
+    required String actorName,
+    String? actorUserId,
+  });
+
+  /// Sends a finalized, unpaid salary back to pending for changes.
+  Future<SalaryPaymentEntity> reopenSalaryPayment({
+    required String paymentId,
+    required String actorName,
+    String? actorUserId,
+  });
+
   /// Pays the net salary, applying the same wallet rules as an expense
   /// payment, recovering [advanceRecoveries] (advanceId → amount) against the
   /// employee's cash advances, and mirroring the payment into `expenses`.
