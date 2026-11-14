@@ -118,20 +118,51 @@ void main() {
       expect(payment.grossSalary, 4250);
     });
 
-    test('each leave day costs a 30th of basic plus allowances', () {
+    test('days in period follows the calendar month', () {
+      expect(SalaryPaymentEntity.daysInPeriod('2026-01'), 31);
+      expect(SalaryPaymentEntity.daysInPeriod('2026-02'), 28);
+      expect(SalaryPaymentEntity.daysInPeriod('2028-02'), 29);
+      expect(SalaryPaymentEntity.daysInPeriod('2026-04'), 30);
+      expect(SalaryPaymentEntity.daysInPeriod('2026-12'), 31);
+      expect(() => SalaryPaymentEntity.daysInPeriod('2026'), throwsArgumentError);
+    });
+
+    test('each leave day costs one calendar day of basic plus allowances', () {
+      // 30-day month: 3600 / 30 = 120 a day.
       expect(
         SalaryPaymentEntity.leaveDeductionFor(
           basicSalary: 3000,
           allowances: 600,
           leaveDays: 2,
+          daysInMonth: 30,
         ),
         240,
+      );
+      // February 2026: 2800 / 28 = 100 a day.
+      expect(
+        SalaryPaymentEntity.leaveDeductionFor(
+          basicSalary: 2500,
+          allowances: 300,
+          leaveDays: 3,
+          daysInMonth: SalaryPaymentEntity.daysInPeriod('2026-02'),
+        ),
+        300,
+      );
+      // 31-day month: 3100 / 31 = 100 a day.
+      expect(
+        SalaryPaymentEntity.leaveDeductionFor(
+          basicSalary: 3100,
+          leaveDays: 1,
+          daysInMonth: SalaryPaymentEntity.daysInPeriod('2026-03'),
+        ),
+        100,
       );
       expect(
         SalaryPaymentEntity.leaveDeductionFor(
           basicSalary: 3000,
           allowances: 600,
           leaveDays: 0,
+          daysInMonth: 30,
         ),
         0,
       );
@@ -144,6 +175,7 @@ void main() {
           basicSalary: 3000,
           allowances: 500,
           leaveDays: 1,
+          daysInMonth: 30,
         ),
         116.67,
       );

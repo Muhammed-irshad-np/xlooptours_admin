@@ -1797,6 +1797,8 @@ class _SalariesPageState extends State<SalariesPage> {
 
     final fmt = NumberFormat('#,##0.00');
     final monthLabel = DateFormat('MMMM y').format(provider.periodDate);
+    // Leave is charged per calendar day of this month (28–31).
+    final daysInMonth = SalaryPaymentEntity.daysInPeriod(provider.period);
 
     await showDialog(
       context: context,
@@ -1822,11 +1824,13 @@ class _SalariesPageState extends State<SalariesPage> {
           final dailyRate = SalaryPaymentEntity.dailyRate(
             basicSalary: basic,
             allowances: row.allowances,
+            daysInMonth: daysInMonth,
           );
           final leaveDeduction = SalaryPaymentEntity.leaveDeductionFor(
             basicSalary: basic,
             allowances: row.allowances,
             leaveDays: leaveDays,
+            daysInMonth: daysInMonth,
           );
           // Never recover more than is owed, nor more than what is left after
           // leave and manual deductions.
@@ -2054,9 +2058,8 @@ class _SalariesPageState extends State<SalariesPage> {
                             if (v == null || v.trim().isEmpty) return null;
                             final n = int.tryParse(v);
                             if (n == null || n < 0) return 'Enter a valid number';
-                            if (n > SalaryPaymentEntity.payrollDaysPerMonth) {
-                              return 'At most '
-                                  '${SalaryPaymentEntity.payrollDaysPerMonth} days';
+                            if (n > daysInMonth) {
+                              return 'At most $daysInMonth days in $monthLabel';
                             }
                             return null;
                           },
@@ -2064,8 +2067,8 @@ class _SalariesPageState extends State<SalariesPage> {
                         SizedBox(height: 6.h),
                         Text(
                           'One day = ${fmt.format(dailyRate)} ${row.currency} '
-                          '(basic + allowances ÷ '
-                          '${SalaryPaymentEntity.payrollDaysPerMonth})',
+                          '(basic + allowances ÷ $daysInMonth days '
+                          'in $monthLabel)',
                           style: GoogleFonts.inter(
                             fontSize: 10.sp,
                             color: FinDT.textMuted,

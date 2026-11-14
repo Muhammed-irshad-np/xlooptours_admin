@@ -2251,12 +2251,9 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         advanceRecovery < 0) {
       throw StateError('Salary amounts cannot be negative');
     }
-    if (payment.leaveDays < 0 ||
-        payment.leaveDays > SalaryPaymentEntity.payrollDaysPerMonth) {
-      throw StateError(
-        'Leave days must be between 0 and '
-        '${SalaryPaymentEntity.payrollDaysPerMonth}',
-      );
+    final daysInMonth = SalaryPaymentEntity.daysInPeriod(payment.period);
+    if (payment.leaveDays < 0 || payment.leaveDays > daysInMonth) {
+      throw StateError('Leave days must be between 0 and $daysInMonth');
     }
     // Trip settlements have no leave.
     final leaveDeduction = payment.isTripSettlement
@@ -2265,6 +2262,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             basicSalary: payment.basicSalary,
             allowances: payment.allowances,
             leaveDays: payment.leaveDays,
+            daysInMonth: daysInMonth,
           );
     final net = SalaryPaymentEntity.computeNet(
       basicSalary: payment.basicSalary,

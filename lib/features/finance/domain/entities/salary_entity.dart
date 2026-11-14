@@ -310,28 +310,43 @@ class SalaryPaymentEntity extends Equatable {
       '${date.year.toString().padLeft(4, '0')}-'
       '${date.month.toString().padLeft(2, '0')}';
 
-  /// Days in a payroll month when working out a day's pay. Fixed at 30 so a
-  /// leave day costs the same in February as in March.
-  static const int payrollDaysPerMonth = 30;
+  /// Calendar days in the payroll month [period] (`yyyy-MM`): 28 or 29 for
+  /// February, 30 or 31 otherwise. A day's pay is the monthly pay spread over
+  /// this many days, so a leave day in February costs more than one in March.
+  static int daysInPeriod(String period) {
+    final parts = period.split('-');
+    final year = parts.isNotEmpty ? int.tryParse(parts[0]) : null;
+    final month = parts.length > 1 ? int.tryParse(parts[1]) : null;
+    if (year == null || month == null || month < 1 || month > 12) {
+      throw ArgumentError.value(period, 'period', 'Expected yyyy-MM');
+    }
+    // Day 0 of the next month is the last day of this one.
+    return DateTime.utc(year, month + 1, 0).day;
+  }
 
   /// One day's pay: the fixed monthly pay (basic + allowances) spread over
-  /// [payrollDaysPerMonth].
+  /// the [daysInMonth] calendar days of the payroll month.
   static double dailyRate({
     required double basicSalary,
     double allowances = 0,
+    required int daysInMonth,
   }) =>
-      (basicSalary + allowances) / payrollDaysPerMonth;
+      (basicSalary + allowances) / daysInMonth;
 
   /// Pay withheld for [leaveDays] unpaid leave days, rounded to halalas.
   static double leaveDeductionFor({
     required double basicSalary,
     double allowances = 0,
     required int leaveDays,
+    required int daysInMonth,
   }) {
     if (leaveDays <= 0) return 0;
-    final amount =
-        dailyRate(basicSalary: basicSalary, allowances: allowances) *
-            leaveDays;
+    final amount = dailyRate(
+          basicSalary: basicSalary,
+          allowances: allowances,
+          daysInMonth: daysInMonth,
+        ) *
+        leaveDays;
     return (amount * 100).round() / 100.0;
   }
 
