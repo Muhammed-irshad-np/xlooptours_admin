@@ -257,6 +257,10 @@ class _SalariesPageState extends State<SalariesPage> {
       builder: (context, provider, _) {
         final rows = _buildRows(provider);
         final filtered = _filterRows(rows);
+        // Open advances per employee, shown on each row as "Advance pending".
+        final advancesOwed = _openAdvancesByEmployee(
+          context.watch<CashAdvanceProvider>().advances,
+        );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,8 +288,13 @@ class _SalariesPageState extends State<SalariesPage> {
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: filtered.length,
                 separatorBuilder: (_, __) => SizedBox(height: 10.h),
-                itemBuilder: (_, i) =>
-                    _buildSalaryCard(context, provider, filtered[i], fmt),
+                itemBuilder: (_, i) => _buildSalaryCard(
+                  context,
+                  provider,
+                  filtered[i],
+                  fmt,
+                  advancesOwed[filtered[i].employeeId],
+                ),
               ),
           ],
         );
@@ -941,11 +950,28 @@ class _SalariesPageState extends State<SalariesPage> {
 
   // ─── Salary row ─────────────────────────────────────────────
 
+  /// Outstanding balance and number of open advances, per employee.
+  static Map<String, ({double owed, int count})> _openAdvancesByEmployee(
+    List<CashAdvanceEntity> advances,
+  ) {
+    final out = <String, ({double owed, int count})>{};
+    for (final a in advances) {
+      if (!a.isOpen || a.outstanding <= 0) continue;
+      final prev = out[a.employeeId];
+      out[a.employeeId] = (
+        owed: (prev?.owed ?? 0) + a.outstanding,
+        count: (prev?.count ?? 0) + 1,
+      );
+    }
+    return out;
+  }
+
   Widget _buildSalaryCard(
     BuildContext context,
     SalaryProvider provider,
     _PayrollRow row,
     NumberFormat fmt,
+    ({double owed, int count})? advances,
   ) {
     final payment = row.payment;
     final status = payment?.status;
@@ -1047,6 +1073,26 @@ class _SalariesPageState extends State<SalariesPage> {
               ),
             ),
           ],
+          Expanded(
+            flex: 2,
+            child: _amountCell(
+              'Advance pending',
+              fmt.format(advances?.owed ?? 0),
+              row.currency,
+              color: (advances?.owed ?? 0) > 0 ? FinDT.warning : FinDT.textMuted,
+              note: [
+                if (advances != null)
+                  '${advances.count} open '
+                      '${advances.count == 1 ? 'advance' : 'advances'}',
+                // Recovery already set on an unpaid row comes off this
+                // balance when it is paid.
+                if (row.advanceRecovery > 0 &&
+                    row.payment?.status != SalaryPaymentStatus.paid &&
+                    row.payment?.status != SalaryPaymentStatus.voided)
+                  '${fmt.format(row.advanceRecovery)} recovering this month',
+              ].join('\n'),
+            ),
+          ),
           Expanded(
             flex: 2,
             child: _amountCell(
