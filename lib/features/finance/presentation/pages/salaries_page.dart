@@ -30,6 +30,10 @@ enum _SalaryTab { payroll, trips }
 class _PayrollRow {
   final String employeeId;
   final String employeeName;
+
+  /// The employee's unique code (EMP#X1001), read live from the employee
+  /// record; null when the employee has none or no longer exists.
+  final String? employeeCode;
   final String position;
   final SalaryPaymentKind kind;
   final SalaryStructureEntity? structure;
@@ -38,6 +42,7 @@ class _PayrollRow {
   const _PayrollRow({
     required this.employeeId,
     required this.employeeName,
+    this.employeeCode,
     required this.position,
     this.kind = SalaryPaymentKind.salary,
     this.structure,
@@ -158,6 +163,19 @@ class _SalariesPageState extends State<SalariesPage> {
       });
   }
 
+  /// Employee codes by employee id, for showing and searching salary rows.
+  Map<String, String> _employeeCodes() => {
+        for (final e in context.read<EmployeeProvider>().employees)
+          if (e.employeeCode != null) e.id: e.employeeCode!,
+      };
+
+  /// "Name · EMP#X1001 · Position" for the employee pickers.
+  static String _employeeLabel(EmployeeEntity e) => [
+        e.fullName,
+        if (e.employeeCode != null) e.employeeCode!,
+        if (e.position.isNotEmpty) e.position,
+      ].join(' · ');
+
   List<_PayrollRow> _buildRows(SalaryProvider provider) =>
       _isTrips ? _buildTripRows(provider) : _buildPayrollRows(provider);
 
@@ -165,11 +183,13 @@ class _SalariesPageState extends State<SalariesPage> {
   /// change from month to month, so a new month starts with an empty list.
   List<_PayrollRow> _buildTripRows(SalaryProvider provider) {
     final rows = <_PayrollRow>[];
+    final codes = _employeeCodes();
     for (final p in provider.tripPayments) {
       rows.add(
         _PayrollRow(
           employeeId: p.employeeId,
           employeeName: p.employeeName,
+          employeeCode: codes[p.employeeId],
           position: p.position,
           kind: SalaryPaymentKind.tripSettlement,
           payment: p,
@@ -184,6 +204,7 @@ class _SalariesPageState extends State<SalariesPage> {
   List<_PayrollRow> _buildPayrollRows(SalaryProvider provider) {
     final rows = <_PayrollRow>[];
     final seen = <String>{};
+    final codes = _employeeCodes();
 
     for (final s in provider.structures) {
       if (!s.isActive) continue;
@@ -192,6 +213,7 @@ class _SalariesPageState extends State<SalariesPage> {
         _PayrollRow(
           employeeId: s.employeeId,
           employeeName: s.employeeName,
+          employeeCode: codes[s.employeeId],
           position: s.position,
           structure: s,
           payment: provider.paymentFor(s.employeeId),
@@ -207,6 +229,7 @@ class _SalariesPageState extends State<SalariesPage> {
         _PayrollRow(
           employeeId: p.employeeId,
           employeeName: p.employeeName,
+          employeeCode: codes[p.employeeId],
           position: p.position,
           structure: provider.structureFor(p.employeeId),
           payment: p,
@@ -239,7 +262,9 @@ class _SalariesPageState extends State<SalariesPage> {
       if (q.isNotEmpty) {
         final nameMatch = r.employeeName.toLowerCase().contains(q);
         final posMatch = r.position.toLowerCase().contains(q);
-        if (!nameMatch && !posMatch) return false;
+        final codeMatch =
+            (r.employeeCode ?? '').toLowerCase().contains(q);
+        if (!nameMatch && !posMatch && !codeMatch) return false;
       }
       return true;
     }).toList();
@@ -478,6 +503,7 @@ class _SalariesPageState extends State<SalariesPage> {
                         _isTrips
                             ? provider.tripPayments
                             : provider.salaryPayments,
+                        employeeCodes: _employeeCodes(),
                       ),
                     );
                   },
@@ -801,7 +827,7 @@ class _SalariesPageState extends State<SalariesPage> {
               style: GoogleFonts.inter(fontSize: 12.sp),
               decoration: finDialogInputDecoration(
                 label: 'Search',
-                hint: 'Employee or position',
+                hint: 'Name, employee code or position',
                 prefixIcon: Icons.search,
               ),
             ),
@@ -1028,8 +1054,25 @@ class _SalariesPageState extends State<SalariesPage> {
                   ),
                 ),
                 SizedBox(height: 2.h),
-                Text(
-                  row.position.isEmpty ? '—' : row.position,
+                Text.rich(
+                  TextSpan(
+                    children: [
+                      if (row.employeeCode != null) ...[
+                        TextSpan(
+                          text: row.employeeCode,
+                          style: GoogleFonts.inter(
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                            color: FinDT.brand,
+                          ),
+                        ),
+                        const TextSpan(text: ' · '),
+                      ],
+                      TextSpan(
+                        text: row.position.isEmpty ? '—' : row.position,
+                      ),
+                    ],
+                  ),
                   style: GoogleFonts.inter(
                     fontSize: 11.sp,
                     color: FinDT.textSecondary,
@@ -1510,11 +1553,7 @@ class _SalariesPageState extends State<SalariesPage> {
                               .map(
                                 (e) => DropdownMenuItem(
                                   value: e,
-                                  child: Text(
-                                    e.position.isEmpty
-                                        ? e.fullName
-                                        : '${e.fullName} · ${e.position}',
-                                  ),
+                                  child: Text(_employeeLabel(e)),
                                 ),
                               )
                               .toList(),
@@ -2540,7 +2579,7 @@ class _SalariesPageState extends State<SalariesPage> {
                   key: ValueKey(selected?.id),
                   value: selected,
                   labelText: 'External Employee',
-                  searchHint: 'Search by name…',
+                  searchHint: 'Search by name or code…',
                   decoration: finDialogInputDecoration(
                     label: 'External Employee *',
                     hint: candidates.isEmpty
@@ -2553,9 +2592,7 @@ class _SalariesPageState extends State<SalariesPage> {
                     color: FinDT.textPrimary,
                   ),
                   items: candidates,
-                  itemToString: (e) => e.position.isEmpty
-                      ? e.fullName
-                      : '${e.fullName} · ${e.position}',
+                  itemToString: _employeeLabel,
                   enabled: !isSaving,
                   onChanged: (e) => setInner(() => selected = e),
                 ),
@@ -2648,6 +2685,7 @@ class _SalariesPageState extends State<SalariesPage> {
       _PayrollRow(
         employeeId: added.employeeId,
         employeeName: added.employeeName,
+        employeeCode: _employeeCodes()[added.employeeId],
         position: added.position,
         kind: SalaryPaymentKind.tripSettlement,
         payment: added,

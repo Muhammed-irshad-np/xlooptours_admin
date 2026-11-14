@@ -98,10 +98,14 @@ class FinanceExportService {
     return buf.toString();
   }
 
-  static String salariesToCsv(List<SalaryPaymentEntity> payments) {
+  /// [employeeCodes] maps employee id to employee code (EMP#X1001).
+  static String salariesToCsv(
+    List<SalaryPaymentEntity> payments, {
+    Map<String, String> employeeCodes = const {},
+  }) {
     final buf = StringBuffer();
     buf.writeln(
-      'id,period,kind,employeeName,position,basicSalary,tripCount,allowances,'
+      'id,period,kind,employeeCode,employeeName,position,basicSalary,tripCount,allowances,'
       'extraAllowance,'
       'extraAllowanceNote,leaveDays,leaveDeduction,deductions,'
       'advanceRecovery,netAmount,currency,status,fundAccountName,paymentMethod,'
@@ -112,6 +116,7 @@ class FinanceExportService {
         _csvEscape(p.id),
         p.period,
         p.kind.name,
+        _csvEscape(employeeCodes[p.employeeId] ?? ''),
         _csvEscape(p.employeeName),
         _csvEscape(p.position),
         p.basicSalary.toStringAsFixed(2),
