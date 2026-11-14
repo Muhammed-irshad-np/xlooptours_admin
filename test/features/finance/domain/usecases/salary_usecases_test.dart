@@ -318,6 +318,106 @@ void main() {
     });
   });
 
+  group('Finalize then pay lifecycle', () {
+    test('only a finalized salary can be paid', () {
+      expect(SalaryPaymentStatus.pending.canPay, isFalse);
+      expect(SalaryPaymentStatus.finalized.canPay, isTrue);
+      expect(SalaryPaymentStatus.paid.canPay, isFalse);
+      expect(SalaryPaymentStatus.voided.canPay, isFalse);
+    });
+
+    test('amounts can only change while pending', () {
+      expect(SalaryPaymentStatus.pending.canEdit, isTrue);
+      expect(SalaryPaymentStatus.pending.canFinalize, isTrue);
+      expect(SalaryPaymentStatus.finalized.canEdit, isFalse);
+      expect(SalaryPaymentStatus.finalized.canFinalize, isFalse);
+      expect(SalaryPaymentStatus.paid.canEdit, isFalse);
+    });
+
+    test('a finalized row can be reopened or removed, a paid one only voided',
+        () {
+      expect(SalaryPaymentStatus.finalized.canReopen, isTrue);
+      expect(SalaryPaymentStatus.finalized.canDelete, isTrue);
+      expect(SalaryPaymentStatus.pending.canReopen, isFalse);
+      expect(SalaryPaymentStatus.paid.canReopen, isFalse);
+      expect(SalaryPaymentStatus.paid.canDelete, isFalse);
+      expect(SalaryPaymentStatus.paid.canVoid, isTrue);
+      expect(SalaryPaymentStatus.finalized.canVoid, isFalse);
+    });
+
+    test('finalize stamp survives a JSON round trip', () {
+      final model = SalaryPaymentModel(
+        id: '2026-11_emp1',
+        period: '2026-11',
+        employeeId: 'emp1',
+        employeeName: 'Ali',
+        basicSalary: 3000,
+        advanceRecovery: 200,
+        netAmount: 2800,
+        fundAccountId: 'acc1',
+        status: SalaryPaymentStatus.finalized,
+        finalizedAt: DateTime(2026, 11, 28, 10),
+        finalizedBy: 'Finance Fay',
+        finalizedByUserId: 'f1',
+        createdAt: DateTime(2026, 11, 1),
+      );
+      final parsed = SalaryPaymentModel.fromJson(model.toJson());
+      expect(parsed.status, SalaryPaymentStatus.finalized);
+      expect(parsed.finalizedBy, 'Finance Fay');
+      expect(parsed.finalizedByUserId, 'f1');
+      expect(parsed.finalizedAt, DateTime(2026, 11, 28, 10));
+      expect(parsed.advanceRecovery, 200);
+      expect(parsed.fundAccountId, 'acc1');
+    });
+
+    test('rows saved before finalize existed still read as before', () {
+      final parsed = SalaryPaymentModel.fromJson({
+        'id': '2026-09_emp1',
+        'period': '2026-09',
+        'employeeId': 'emp1',
+        'employeeName': 'Ali',
+        'basicSalary': 3000,
+        'netAmount': 3000,
+        'status': 'paid',
+        'createdAt': '2026-09-01T00:00:00.000',
+      });
+      expect(parsed.status, SalaryPaymentStatus.paid);
+      expect(parsed.finalizedBy, isNull);
+    });
+
+    test('finalize stamps the finalizer; reopen sends it back to pending',
+        () async {
+      final repo = FakeFinanceRepository();
+      final finalize = FinalizeSalaryPaymentUseCase(repo);
+      final reopen = ReopenSalaryPaymentUseCase(repo);
+
+      final finalized = await finalize(
+        payment: SalaryPaymentEntity(
+          id: 'trip_2026-11_ext1',
+          period: '2026-11',
+          kind: SalaryPaymentKind.tripSettlement,
+          employeeId: 'ext1',
+          employeeName: 'Omar',
+          basicSalary: 1800,
+          netAmount: 1800,
+          fundAccountId: 'acc1',
+          createdAt: DateTime(2026, 11, 1),
+        ),
+        actorName: 'Finance Fay',
+        actorUserId: 'f1',
+      );
+      expect(finalized.status, SalaryPaymentStatus.finalized);
+      expect(finalized.finalizedBy, 'Finance Fay');
+
+      final reopened = await reopen(
+        paymentId: 'trip_2026-11_ext1',
+        actorName: 'Finance Fay',
+      );
+      expect(reopened.status, SalaryPaymentStatus.pending);
+      expect(reopened.finalizedBy, isNull);
+    });
+  });
+
   group('Salary use cases', () {
     late FakeFinanceRepository fakeRepo;
     late GetSalaryStructuresUseCase getStructures;

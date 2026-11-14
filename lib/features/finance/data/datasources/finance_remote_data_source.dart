@@ -178,8 +178,24 @@ abstract class FinanceRemoteDataSource {
     String? actorUserId,
   });
 
-  /// Upsert of an unpaid salary row (amounts, deductions, notes).
+  /// Upsert of a pending salary row (amounts, deductions, notes). Always
+  /// saved as pending; a finalized row must be reopened before it can change.
   Future<SalaryPaymentModel> saveSalaryPayment(SalaryPaymentModel payment);
+
+  /// Locks [payment]'s amounts and fund account so it can be paid. The net
+  /// and leave deduction are recomputed here, never trusted from the UI.
+  Future<SalaryPaymentModel> finalizeSalaryPayment({
+    required SalaryPaymentModel payment,
+    required String actorName,
+    String? actorUserId,
+  });
+
+  /// Sends a finalized (unpaid) row back to pending so its amounts can change.
+  Future<SalaryPaymentModel> reopenSalaryPayment({
+    required String paymentId,
+    required String actorName,
+    String? actorUserId,
+  });
 
   /// Posts the net salary out of [fundAccountId] and marks the row paid.
   ///
@@ -2174,15 +2190,199 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     final snap = await ref.get();
     if (snap.exists && snap.data() != null) {
       final existing = SalaryPaymentModel.fromJson(snap.data()!);
-      if (!existing.status.canPay) {
+      if (!existing.status.canEdit) {
+        throw StateError(_lockedMessage(existing.status));
+      }
+    }
+    // Finalizing goes through [finalizeSalaryPayment] only, so a plain save
+    // can never skip its checks.
+    final pending = SalaryPaymentModel.fromEntity(
+      payment.copyWith(status: SalaryPaymentStatus.pending),
+    );
+    await ref.set(pending.toJson(), SetOptions(merge: true));
+    return pending;
+  }
+
+  static String _lockedMessage(SalaryPaymentStatus status) =>
+      switch (status) {
+        SalaryPaymentStatus.finalized =>
+          'This salary is finalized. Reopen it before changing the amounts.',
+        SalaryPaymentStatus.paid =>
+          'This salary is already paid. Void it first.',
+        SalaryPaymentStatus.voided => 'This salary was voided.',
+        SalaryPaymentStatus.pending => '',
+      };
+
+  /// Leave deduction and net pay worked out from [payment]'s own components,
+  /// with [advanceRecovery] taken off. Throws when the figures don't add up.
+  ({double leaveDeduction, double net}) _computeSalaryNet(
+    SalaryPaymentEntity payment,
+    double advanceRecovery,
+  ) {
+    if (payment.basicSalary < 0 ||
+        payment.allowances < 0 ||
+        payment.extraAllowance < 0 ||
+        payment.deductions < 0 ||
+        advanceRecovery < 0) {
+      throw StateError('Salary amounts cannot be negative');
+    }
+    if (payment.leaveDays < 0 ||
+        payment.leaveDays > SalaryPaymentEntity.payrollDaysPerMonth) {
+      throw StateError(
+        'Leave days must be between 0 and '
+        '${SalaryPaymentEntity.payrollDaysPerMonth}',
+      );
+    }
+    // Trip settlements have no leave.
+    final leaveDeduction = payment.isTripSettlement
+        ? 0.0
+        : SalaryPaymentEntity.leaveDeductionFor(
+            basicSalary: payment.basicSalary,
+            allowances: payment.allowances,
+            leaveDays: payment.leaveDays,
+          );
+    final net = SalaryPaymentEntity.computeNet(
+      basicSalary: payment.basicSalary,
+      allowances: payment.allowances,
+      extraAllowance: payment.extraAllowance,
+      leaveDeduction: leaveDeduction,
+      deductions: payment.deductions,
+      advanceRecovery: advanceRecovery,
+    );
+    if (net <= 0 && advanceRecovery <= 0) {
+      throw StateError('Net salary must be greater than zero');
+    }
+    if (payment.grossSalary -
+            leaveDeduction -
+            payment.deductions -
+            advanceRecovery <
+        -1e-9) {
+      throw StateError(
+        'Leave, deductions and advance recovery exceed gross pay',
+      );
+    }
+    return (leaveDeduction: leaveDeduction, net: net);
+  }
+
+  @override
+  Future<SalaryPaymentModel> finalizeSalaryPayment({
+    required SalaryPaymentModel payment,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    final ref = _salaryPayments.doc(payment.id);
+    final snap = await ref.get();
+    if (snap.exists && snap.data() != null) {
+      final existing = SalaryPaymentModel.fromJson(snap.data()!);
+      if (!existing.status.canFinalize) {
+        throw StateError(_lockedMessage(existing.status));
+      }
+    }
+
+    final fundAccountId = payment.fundAccountId;
+    if (fundAccountId == null || fundAccountId.isEmpty) {
+      throw StateError('Choose the fund account this is paid from');
+    }
+    final accSnap = await _accounts.doc(fundAccountId).get();
+    if (!accSnap.exists || accSnap.data() == null) {
+      throw StateError('Fund account not found');
+    }
+    final account = FundAccountModel.fromJson(accSnap.data()!);
+    if (!account.isActive) {
+      throw StateError('Fund account is inactive');
+    }
+    if (account.currency != payment.currency) {
+      throw StateError(
+        'Account currency ${account.currency} does not match salary currency '
+        '${payment.currency}',
+      );
+    }
+
+    final recovery = (payment.advanceRecovery * 100).round() / 100.0;
+    if (recovery > 0) {
+      final advSnap = await _advances
+          .where('employeeId', isEqualTo: payment.employeeId)
+          .get();
+      final outstanding = SalaryPaymentEntity.totalOutstanding(
+        advSnap.docs.map((d) => CashAdvanceModel.fromJson(d.data())).toList(),
+      );
+      if (recovery > outstanding + 1e-9) {
         throw StateError(
-          'Cannot edit a ${existing.status.displayName.toLowerCase()} salary. '
-          'Void it first.',
+          'Advance recovery ${recovery.toStringAsFixed(2)} exceeds the '
+          '${outstanding.toStringAsFixed(2)} ${payment.employeeName} still owes',
         );
       }
     }
-    await ref.set(payment.toJson(), SetOptions(merge: true));
-    return payment;
+
+    final totals = _computeSalaryNet(payment, recovery);
+    final now = DateTime.now();
+    final finalized = SalaryPaymentModel.fromEntity(
+      payment.copyWith(
+        status: SalaryPaymentStatus.finalized,
+        leaveDays: payment.isTripSettlement ? 0 : payment.leaveDays,
+        leaveDeduction: totals.leaveDeduction,
+        advanceRecovery: recovery,
+        // Which advances are settled is decided when the money moves.
+        advanceRecoveries: const {},
+        netAmount: totals.net,
+        netAmountMinor: (totals.net * 100).round(),
+        fundAccountName: account.name,
+        finalizedAt: now,
+        finalizedBy: actorName,
+        finalizedByUserId: actorUserId,
+      ),
+    );
+    // Not null-stripped: a note or deduction cleared by the finalizer must
+    // overwrite the old value.
+    await ref.set(finalized.toJson(), SetOptions(merge: true));
+    await _writeAudit(
+      action: 'salary.finalize',
+      entityType: 'salary_payment',
+      entityId: payment.id,
+      actorUserId: actorUserId,
+      actorName: actorName,
+      detail:
+          '${payment.kind.name} ${payment.employeeName} ${payment.period} '
+          'net=${totals.net} ${payment.currency} '
+          'advanceRecovery=$recovery from ${account.name}',
+    );
+    return finalized;
+  }
+
+  @override
+  Future<SalaryPaymentModel> reopenSalaryPayment({
+    required String paymentId,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    final ref = _salaryPayments.doc(paymentId);
+    final snap = await ref.get();
+    if (!snap.exists || snap.data() == null) {
+      throw StateError('Salary record not found');
+    }
+    final payment = SalaryPaymentModel.fromJson(snap.data()!);
+    if (!payment.status.canReopen) {
+      throw StateError(
+        'Only a finalized, unpaid salary can be reopened '
+        '(this one is ${payment.status.displayName.toLowerCase()})',
+      );
+    }
+    await ref.update({
+      'status': SalaryPaymentStatus.pending.name,
+      'finalizedAt': FieldValue.delete(),
+      'finalizedBy': FieldValue.delete(),
+      'finalizedByUserId': FieldValue.delete(),
+    });
+    await _writeAudit(
+      action: 'salary.reopen',
+      entityType: 'salary_payment',
+      entityId: paymentId,
+      actorUserId: actorUserId,
+      actorName: actorName,
+      detail: '${payment.employeeName} ${payment.period}',
+    );
+    final fresh = await ref.get();
+    return SalaryPaymentModel.fromJson(fresh.data()!);
   }
 
   @override
@@ -2191,7 +2391,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     if (!snap.exists || snap.data() == null) return;
     final payment = SalaryPaymentModel.fromJson(snap.data()!);
     if (!payment.status.canDelete) {
-      throw StateError('Only pending salaries can be removed. Void instead.');
+      throw StateError('Only unpaid salaries can be removed. Void instead.');
     }
     await _salaryPayments.doc(paymentId).delete();
     await _writeAudit(
@@ -2218,7 +2418,19 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     final payment = SalaryPaymentModel.fromJson(snap.data()!);
     if (!payment.status.canPay) {
       throw StateError(
-        'Salary is already ${payment.status.displayName.toLowerCase()}',
+        payment.status == SalaryPaymentStatus.pending
+            ? 'This salary has not been finalized yet'
+            : 'Salary is already ${payment.status.displayName.toLowerCase()}',
+      );
+    }
+    // The finalizer chose the account; the payer cannot switch it.
+    final finalizedAccountId = payment.fundAccountId;
+    if (finalizedAccountId != null &&
+        finalizedAccountId.isNotEmpty &&
+        finalizedAccountId != fundAccountId) {
+      throw StateError(
+        'This salary was finalized to be paid from '
+        '${payment.fundAccountName ?? 'another account'}',
       );
     }
 
@@ -2280,46 +2492,21 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       totalRecovery += amount;
     }
 
-    if (payment.extraAllowance < 0) {
-      throw StateError('Extra allowance cannot be negative');
-    }
-    if (payment.leaveDays < 0 ||
-        payment.leaveDays > SalaryPaymentEntity.payrollDaysPerMonth) {
+    // The finalizer fixed how much is recovered; only how it spreads over the
+    // employee's advances is worked out now.
+    if ((totalRecovery - payment.advanceRecovery).abs() > 0.005) {
       throw StateError(
-        'Leave days must be between 0 and '
-        '${SalaryPaymentEntity.payrollDaysPerMonth}',
+        'Advance recovery ${totalRecovery.toStringAsFixed(2)} does not match '
+        'the finalized ${payment.advanceRecovery.toStringAsFixed(2)}. '
+        'Ask the finalizer to reopen this salary.',
       );
     }
 
     // Net (and the leave deduction feeding it) is always recomputed here —
-    // never trusted from the UI. Trip settlements have no leave.
-    final leaveDeduction = payment.isTripSettlement
-        ? 0.0
-        : SalaryPaymentEntity.leaveDeductionFor(
-            basicSalary: payment.basicSalary,
-            allowances: payment.allowances,
-            leaveDays: payment.leaveDays,
-          );
-    final net = SalaryPaymentEntity.computeNet(
-      basicSalary: payment.basicSalary,
-      allowances: payment.allowances,
-      extraAllowance: payment.extraAllowance,
-      leaveDeduction: leaveDeduction,
-      deductions: payment.deductions,
-      advanceRecovery: totalRecovery,
-    );
-    if (net <= 0 && totalRecovery <= 0) {
-      throw StateError('Net salary must be greater than zero');
-    }
-    if (payment.grossSalary -
-            leaveDeduction -
-            payment.deductions -
-            totalRecovery <
-        -1e-9) {
-      throw StateError(
-        'Leave, deductions and advance recovery exceed gross pay',
-      );
-    }
+    // never trusted from the UI.
+    final totals = _computeSalaryNet(payment, totalRecovery);
+    final leaveDeduction = totals.leaveDeduction;
+    final net = totals.net;
     final payable = payment.copyWith(
       leaveDays: payment.isTripSettlement ? 0 : payment.leaveDays,
       leaveDeduction: leaveDeduction,
@@ -2403,9 +2590,10 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         status: ExpenseStatus.paid,
         employeeId: payment.employeeId,
         employeeName: payment.employeeName,
-        approvedBy: actorName,
-        approvedByUserId: actorUserId,
-        approvedAt: now,
+        // The finalizer approved the amount; the payer handed it over.
+        approvedBy: payment.finalizedBy ?? actorName,
+        approvedByUserId: payment.finalizedByUserId ?? actorUserId,
+        approvedAt: payment.finalizedAt ?? now,
         ledgerEntryId: tx.id,
         paidBy: actorName,
         paidByUserId: actorUserId,

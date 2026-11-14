@@ -690,6 +690,8 @@ Future<void> init() async {
       getSalaryPaymentsUseCase: sl(),
       generateSalaryRunUseCase: sl(),
       saveSalaryPaymentUseCase: sl(),
+      finalizeSalaryPaymentUseCase: sl(),
+      reopenSalaryPaymentUseCase: sl(),
       paySalaryUseCase: sl(),
       deleteSalaryPaymentUseCase: sl(),
       voidSalaryPaymentUseCase: sl(),
@@ -732,6 +734,8 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetSalaryPaymentsUseCase(sl()));
   sl.registerLazySingleton(() => GenerateSalaryRunUseCase(sl()));
   sl.registerLazySingleton(() => SaveSalaryPaymentUseCase(sl()));
+  sl.registerLazySingleton(() => FinalizeSalaryPaymentUseCase(sl()));
+  sl.registerLazySingleton(() => ReopenSalaryPaymentUseCase(sl()));
   sl.registerLazySingleton(() => PaySalaryUseCase(sl()));
   sl.registerLazySingleton(() => DeleteSalaryPaymentUseCase(sl()));
   sl.registerLazySingleton(() => VoidSalaryPaymentUseCase(sl()));

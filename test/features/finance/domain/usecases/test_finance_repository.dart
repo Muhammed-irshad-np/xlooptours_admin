@@ -353,6 +353,53 @@ class FakeFinanceRepository implements FinanceRepository {
   }
 
   @override
+  Future<SalaryPaymentEntity> finalizeSalaryPayment({
+    required SalaryPaymentEntity payment,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    if (salaryError != null) throw salaryError!;
+    final finalized = payment.copyWith(
+      status: SalaryPaymentStatus.finalized,
+      finalizedBy: actorName,
+      finalizedByUserId: actorUserId,
+      finalizedAt: DateTime(2026),
+    );
+    salaryPayments = [
+      ...salaryPayments.where((p) => p.id != payment.id),
+      finalized,
+    ];
+    return finalized;
+  }
+
+  @override
+  Future<SalaryPaymentEntity> reopenSalaryPayment({
+    required String paymentId,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    if (salaryError != null) throw salaryError!;
+    final payment = salaryPayments.firstWhere((p) => p.id == paymentId);
+    // copyWith can't clear fields, so rebuild the finalize stamp away.
+    final reopened = SalaryPaymentEntity(
+      id: payment.id,
+      period: payment.period,
+      kind: payment.kind,
+      employeeId: payment.employeeId,
+      employeeName: payment.employeeName,
+      basicSalary: payment.basicSalary,
+      allowances: payment.allowances,
+      netAmount: payment.netAmount,
+      createdAt: payment.createdAt,
+    );
+    salaryPayments = [
+      ...salaryPayments.where((p) => p.id != paymentId),
+      reopened,
+    ];
+    return reopened;
+  }
+
+  @override
   Future<SalaryPaymentEntity> paySalary({
     required String paymentId,
     required String fundAccountId,

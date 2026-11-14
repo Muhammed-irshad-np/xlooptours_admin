@@ -172,12 +172,21 @@ class FinancePermissionService {
     return _check(user, policy.cashAdvanceManagement);
   }
 
-  /// Can [user] set up salaries and pay staff?
-  static bool canManageSalaries({
+  /// Can [user] finalize salaries — manage the payroll, set the month's
+  /// amounts and fund account, reopen finalized rows and void paid ones?
+  static bool canFinalizeSalaries({
     required UserEntity? user,
     required FinancePolicyEntity policy,
   }) {
     return _check(user, policy.salaryManagement);
+  }
+
+  /// Can [user] pay salaries that have been finalized?
+  static bool canPaySalaries({
+    required UserEntity? user,
+    required FinancePolicyEntity policy,
+  }) {
+    return _check(user, policy.salaryPayment);
   }
 
   // ─── View Access ─────────────────────────────────────────────
@@ -206,6 +215,7 @@ class FinancePermissionService {
       policy.masterDataManagement,
       policy.cashAdvanceManagement,
       policy.salaryManagement,
+      policy.salaryPayment,
     ];
     return configs.any((c) => c.isAuthorized(roleId, user.id));
   }

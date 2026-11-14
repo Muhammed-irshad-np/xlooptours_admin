@@ -101,6 +101,9 @@ class SalaryPaymentModel extends SalaryPaymentEntity {
     super.paymentMethod,
     super.expenseId,
     super.status,
+    super.finalizedAt,
+    super.finalizedBy,
+    super.finalizedByUserId,
     super.paidAt,
     super.paidBy,
     super.paidByUserId,
@@ -140,6 +143,9 @@ class SalaryPaymentModel extends SalaryPaymentEntity {
         'paymentMethod': paymentMethod,
         'expenseId': expenseId,
         'status': status.name,
+        'finalizedAt': finalizedAt?.toIso8601String(),
+        'finalizedBy': finalizedBy,
+        'finalizedByUserId': finalizedByUserId,
         'paidAt': paidAt?.toIso8601String(),
         'paidBy': paidBy,
         'paidByUserId': paidByUserId,
@@ -189,6 +195,11 @@ class SalaryPaymentModel extends SalaryPaymentEntity {
         (s) => s.name == json['status'],
         orElse: () => SalaryPaymentStatus.pending,
       ),
+      finalizedAt: json['finalizedAt'] != null
+          ? DateTime.parse(json['finalizedAt'] as String)
+          : null,
+      finalizedBy: json['finalizedBy'] as String?,
+      finalizedByUserId: json['finalizedByUserId'] as String?,
       paidAt: json['paidAt'] != null
           ? DateTime.parse(json['paidAt'] as String)
           : null,
@@ -236,6 +247,9 @@ class SalaryPaymentModel extends SalaryPaymentEntity {
         paymentMethod: e.paymentMethod,
         expenseId: e.expenseId,
         status: e.status,
+        finalizedAt: e.finalizedAt,
+        finalizedBy: e.finalizedBy,
+        finalizedByUserId: e.finalizedByUserId,
         paidAt: e.paidAt,
         paidBy: e.paidBy,
         paidByUserId: e.paidByUserId,

@@ -105,7 +105,7 @@ class FinanceExportService {
       'extraAllowance,'
       'extraAllowanceNote,leaveDays,leaveDeduction,deductions,'
       'advanceRecovery,netAmount,currency,status,fundAccountName,paymentMethod,'
-      'expenseId,paidAt,paidBy,notes',
+      'expenseId,finalizedAt,finalizedBy,paidAt,paidBy,notes',
     );
     for (final p in payments) {
       buf.writeln([
@@ -129,6 +129,8 @@ class FinanceExportService {
         _csvEscape(p.fundAccountName),
         _csvEscape(p.paymentMethod),
         _csvEscape(p.expenseId),
+        p.finalizedAt?.toIso8601String() ?? '',
+        _csvEscape(p.finalizedBy),
         p.paidAt?.toIso8601String() ?? '',
         _csvEscape(p.paidBy),
         _csvEscape(p.notes),

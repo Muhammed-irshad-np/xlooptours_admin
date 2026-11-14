@@ -13,6 +13,8 @@ class SalaryProvider with ChangeNotifier {
   final GetSalaryPaymentsUseCase getSalaryPaymentsUseCase;
   final GenerateSalaryRunUseCase generateSalaryRunUseCase;
   final SaveSalaryPaymentUseCase saveSalaryPaymentUseCase;
+  final FinalizeSalaryPaymentUseCase finalizeSalaryPaymentUseCase;
+  final ReopenSalaryPaymentUseCase reopenSalaryPaymentUseCase;
   final PaySalaryUseCase paySalaryUseCase;
   final DeleteSalaryPaymentUseCase deleteSalaryPaymentUseCase;
   final VoidSalaryPaymentUseCase voidSalaryPaymentUseCase;
@@ -24,6 +26,8 @@ class SalaryProvider with ChangeNotifier {
     required this.getSalaryPaymentsUseCase,
     required this.generateSalaryRunUseCase,
     required this.saveSalaryPaymentUseCase,
+    required this.finalizeSalaryPaymentUseCase,
+    required this.reopenSalaryPaymentUseCase,
     required this.paySalaryUseCase,
     required this.deleteSalaryPaymentUseCase,
     required this.voidSalaryPaymentUseCase,
@@ -58,8 +62,11 @@ class SalaryProvider with ChangeNotifier {
     return DateTime(int.parse(parts[0]), int.parse(parts[1]));
   }
 
+  /// Salary rows not paid yet — still pending or finalized and waiting.
   List<SalaryPaymentEntity> get pendingPayments => salaryPayments
-      .where((p) => p.status == SalaryPaymentStatus.pending)
+      .where((p) =>
+          p.status == SalaryPaymentStatus.pending ||
+          p.status == SalaryPaymentStatus.finalized)
       .toList();
   List<SalaryPaymentEntity> get paidPayments => salaryPayments
       .where((p) => p.status == SalaryPaymentStatus.paid)
@@ -195,6 +202,51 @@ class SalaryProvider with ChangeNotifier {
     _error = null;
     try {
       final saved = await saveSalaryPaymentUseCase(payment);
+      _upsert(saved);
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Locks the amounts and fund account so the payer can pay it.
+  Future<SalaryPaymentEntity> finalize({
+    required SalaryPaymentEntity payment,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    _error = null;
+    try {
+      final saved = await finalizeSalaryPaymentUseCase(
+        payment: payment,
+        actorName: actorName,
+        actorUserId: actorUserId,
+      );
+      _upsert(saved);
+      notifyListeners();
+      return saved;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  /// Sends a finalized row back to pending so the finalizer can change it.
+  Future<void> reopen({
+    required String paymentId,
+    required String actorName,
+    String? actorUserId,
+  }) async {
+    _error = null;
+    try {
+      final saved = await reopenSalaryPaymentUseCase(
+        paymentId: paymentId,
+        actorName: actorName,
+        actorUserId: actorUserId,
+      );
       _upsert(saved);
       notifyListeners();
     } catch (e) {
