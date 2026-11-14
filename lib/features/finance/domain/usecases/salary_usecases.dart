@@ -50,6 +50,36 @@ class SaveSalaryPaymentUseCase {
       repository.saveSalaryPayment(payment);
 }
 
+class FinalizeSalaryPaymentUseCase {
+  final FinanceRepository repository;
+  FinalizeSalaryPaymentUseCase(this.repository);
+  Future<SalaryPaymentEntity> call({
+    required SalaryPaymentEntity payment,
+    required String actorName,
+    String? actorUserId,
+  }) =>
+      repository.finalizeSalaryPayment(
+        payment: payment,
+        actorName: actorName,
+        actorUserId: actorUserId,
+      );
+}
+
+class ReopenSalaryPaymentUseCase {
+  final FinanceRepository repository;
+  ReopenSalaryPaymentUseCase(this.repository);
+  Future<SalaryPaymentEntity> call({
+    required String paymentId,
+    required String actorName,
+    String? actorUserId,
+  }) =>
+      repository.reopenSalaryPayment(
+        paymentId: paymentId,
+        actorName: actorName,
+        actorUserId: actorUserId,
+      );
+}
+
 class PaySalaryUseCase {
   final FinanceRepository repository;
   PaySalaryUseCase(this.repository);

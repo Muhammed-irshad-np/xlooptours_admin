@@ -358,6 +358,110 @@ void main() {
     });
   });
 
+  group('Two-step salary permissions', () {
+    const admin = UserEntity(id: 'a1', roleId: 'admin', displayName: 'Admin');
+    const finance =
+        UserEntity(id: 'f1', roleId: 'finance', displayName: 'Finance Fay');
+    const coordinator =
+        UserEntity(id: 'c1', roleId: 'coordinator', displayName: 'Coord Cal');
+    const driver =
+        UserEntity(id: 'd1', roleId: 'driver', displayName: 'Driver Dan');
+
+    test('defaults: finance finalizes, the coordinator pays', () {
+      const policy = FinancePolicyEntity();
+
+      expect(
+        FinancePermissionService.canFinalizeSalaries(
+            user: finance, policy: policy),
+        isTrue,
+      );
+      expect(
+        FinancePermissionService.canPaySalaries(user: finance, policy: policy),
+        isFalse,
+      );
+      expect(
+        FinancePermissionService.canFinalizeSalaries(
+            user: coordinator, policy: policy),
+        isFalse,
+      );
+      expect(
+        FinancePermissionService.canPaySalaries(
+            user: coordinator, policy: policy),
+        isTrue,
+      );
+      expect(
+        FinancePermissionService.canPaySalaries(user: driver, policy: policy),
+        isFalse,
+      );
+    });
+
+    test('admin can do both steps whatever the settings', () {
+      const policy = FinancePolicyEntity(
+        salaryManagement: WorkflowPermissionConfig(),
+        salaryPayment: WorkflowPermissionConfig(),
+      );
+      expect(
+        FinancePermissionService.canFinalizeSalaries(user: admin, policy: policy),
+        isTrue,
+      );
+      expect(
+        FinancePermissionService.canPaySalaries(user: admin, policy: policy),
+        isTrue,
+      );
+    });
+
+    test('a specific person can be named as payer in master data', () {
+      const policy = FinancePolicyEntity(
+        salaryPayment: WorkflowPermissionConfig(
+          allowedUserIds: ['d1'],
+          allowedUserNames: ['Driver Dan'],
+        ),
+      );
+      expect(
+        FinancePermissionService.canPaySalaries(user: driver, policy: policy),
+        isTrue,
+      );
+      expect(
+        FinancePermissionService.canPaySalaries(
+            user: coordinator, policy: policy),
+        isFalse,
+      );
+    });
+
+    test('a payer-only user can still open Finance', () {
+      const policy = FinancePolicyEntity(
+        sessionClose: WorkflowPermissionConfig(),
+        expenseSubmit: WorkflowPermissionConfig(),
+        fundMovement: WorkflowPermissionConfig(),
+        salaryPayment: WorkflowPermissionConfig(allowedRoles: ['coordinator']),
+      );
+      expect(
+        FinancePermissionService.canViewFinance(
+            user: coordinator, policy: policy),
+        isTrue,
+      );
+    });
+
+    test('pay permission survives a JSON round trip; old policies default it',
+        () {
+      const policy = FinancePolicyEntity(
+        salaryPayment: WorkflowPermissionConfig(allowedRoles: ['manager']),
+      );
+      final parsed = FinancePolicyEntity.fromJson(policy.toJson());
+      expect(parsed.salaryPayment.allowedRoles, ['manager']);
+
+      // A policy saved before the split keeps its salary setting as the
+      // finalize permission and gets the default payers.
+      final legacy = FinancePolicyEntity.fromJson({
+        'salaryManagement': {
+          'allowedRoles': ['finance'],
+        },
+      });
+      expect(legacy.salaryManagement.allowedRoles, ['finance']);
+      expect(legacy.salaryPayment.allowedRoles, contains('coordinator'));
+    });
+  });
+
   group('FinancePolicyEntity Serialization & Backward Compatibility', () {
     test('toJson and fromJson preserves all workflow configs and approval chain', () {
       const original = FinancePolicyEntity(

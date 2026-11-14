@@ -995,18 +995,38 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
                 finProv, updated, 'Cash advance permission updated');
           },
         ),
+        SizedBox(height: 12.h),
+
         _buildPermissionConfigCard(
-          title: 'Salary Management',
+          title: 'Salary Finalize (Step 1)',
           description:
-              'Authorized to put employees on the payroll, set monthly salaries, and pay them out of a fund account.',
-          icon: Icons.badge_outlined,
+              'Authorized to manage the payroll and the monthly external staff list, set each month\'s salary, allowances, leave, deductions and advance recovery, choose the fund account, finalize, reopen, and void paid salaries.',
+          icon: Icons.fact_check_outlined,
           color: const Color(0xFF0EA5E9),
           config: policy.salaryManagement,
           allRoles: userMgmt.roles,
           allUsers: userMgmt.users,
           onSave: (newConfig) async {
             final updated = policy.copyWith(salaryManagement: newConfig);
-            await _savePolicy(finProv, updated, 'Salary permission updated');
+            await _savePolicy(
+                finProv, updated, 'Salary finalize permission updated');
+          },
+        ),
+        SizedBox(height: 12.h),
+
+        _buildPermissionConfigCard(
+          title: 'Salary Pay (Step 2)',
+          description:
+              'Authorized to pay salaries and external staff payments that have been finalized. Payers cannot change any amount or the fund account.',
+          icon: Icons.payments_outlined,
+          color: const Color(0xFF059669),
+          config: policy.salaryPayment,
+          allRoles: userMgmt.roles,
+          allUsers: userMgmt.users,
+          onSave: (newConfig) async {
+            final updated = policy.copyWith(salaryPayment: newConfig);
+            await _savePolicy(
+                finProv, updated, 'Salary pay permission updated');
           },
         ),
       ],

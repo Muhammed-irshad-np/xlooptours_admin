@@ -381,6 +381,32 @@ class FinanceRepositoryImpl implements FinanceRepository {
   }
 
   @override
+  Future<SalaryPaymentEntity> finalizeSalaryPayment({
+    required SalaryPaymentEntity payment,
+    required String actorName,
+    String? actorUserId,
+  }) {
+    return remoteDataSource.finalizeSalaryPayment(
+      payment: SalaryPaymentModel.fromEntity(payment),
+      actorName: actorName,
+      actorUserId: actorUserId,
+    );
+  }
+
+  @override
+  Future<SalaryPaymentEntity> reopenSalaryPayment({
+    required String paymentId,
+    required String actorName,
+    String? actorUserId,
+  }) {
+    return remoteDataSource.reopenSalaryPayment(
+      paymentId: paymentId,
+      actorName: actorName,
+      actorUserId: actorUserId,
+    );
+  }
+
+  @override
   Future<SalaryPaymentEntity> paySalary({
     required String paymentId,
     required String fundAccountId,
