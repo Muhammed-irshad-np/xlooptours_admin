@@ -9,7 +9,6 @@ import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/employee/domain/entities/employee_role_entity.dart';
 import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
-import '../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../features/xloop_vault/presentation/providers/vault_provider.dart';
 
@@ -31,10 +30,12 @@ class EmployeesScreen extends StatefulWidget {
 }
 
 class _EmployeesScreenState extends State<EmployeesScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   List<EmployeeEntity> _allEmployees = [];
   String _searchQuery = '';
   late TabController _tabController;
+  late TabController _driverTabController;
+  final List<String> _driverSubTabs = const ['All', 'Internal', 'External'];
   bool _isAdmin = false;
   bool _isSuperAdmin = false;
 
@@ -63,6 +64,14 @@ class _EmployeesScreenState extends State<EmployeesScreen>
     }
     _tabController = TabController(length: _tabs.length, vsync: this);
     _tabController.addListener(() {
+      _filterEmployees();
+      if (mounted) setState(() {});
+    });
+    _driverTabController = TabController(
+      length: _driverSubTabs.length,
+      vsync: this,
+    );
+    _driverTabController.addListener(() {
       _filterEmployees();
       if (mounted) setState(() {});
     });
@@ -96,6 +105,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
   void dispose() {
     _employeeProvider.removeListener(_onEmployeesChanged);
     _tabController.dispose();
+    _driverTabController.dispose();
     _isLoading.dispose();
     _statusFilter.dispose();
     _filteredEmployees.dispose();
@@ -202,7 +212,15 @@ class _EmployeesScreenState extends State<EmployeesScreen>
             .toSet();
         temp = temp.where((e) => positions.contains(e.position)).toList();
       } else if (selectedTab == 'Drivers') {
-        temp = temp.where((e) => e.isDriver).toList();
+        final subTab = _driverSubTabs[_driverTabController.index];
+        if (subTab == 'Internal') {
+          temp = temp.where((e) => e.isDriver && e.isInternal).toList();
+        } else if (subTab == 'External') {
+          temp = temp.where((e) => e.isDriver && e.isExternal).toList();
+        } else {
+          // 'All'
+          temp = temp.where((e) => e.isDriver).toList();
+        }
       } else if (selectedTab == 'External') {
         temp = temp.where((e) => e.isExternal).toList();
       }
@@ -307,7 +325,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                 ),
               ),
               style: TextButton.styleFrom(
-                backgroundColor: Colors.blue.withOpacity(0.08),
+                backgroundColor: Colors.blue.withValues(alpha: 0.08),
                 padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8.r),
@@ -331,8 +349,15 @@ class _EmployeesScreenState extends State<EmployeesScreen>
           ? const EmployeeMasterScreen()
           : Column(
               children: [
+                if (_tabs[_tabController.index] == 'Drivers')
+                  _buildDriverSubTabs(),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  padding: EdgeInsets.fromLTRB(
+                    16.w,
+                    _tabs[_tabController.index] == 'Drivers' ? 10.h : 16.h,
+                    16.w,
+                    12.h,
+                  ),
                   child: Row(
                     children: [
                       Expanded(
@@ -341,11 +366,11 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                             hintText: 'Search by name, code, phone...',
                             prefixIcon: const Icon(Icons.search),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(12.r),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 16.w,
+                              vertical: 12.h,
                             ),
                           ),
                           onChanged: (val) {
@@ -410,7 +435,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
                             child: EmployeeTable(
                               employees: filteredEmployees,
                               filterKey:
-                                  '$_searchQuery|${_tabController.index}|${_statusFilter.value}',
+                                  '$_searchQuery|${_tabController.index}|${_driverTabController.index}|${_statusFilter.value}',
                               canDelete: _isSuperAdmin,
                               onOpen: _showDetails,
                               onEdit: _navigateToForm,
@@ -428,6 +453,54 @@ class _EmployeesScreenState extends State<EmployeesScreen>
       floatingActionButton: FloatingActionButton(
         onPressed: () => _navigateToForm(null),
         child: const Icon(Icons.add),
+      ),
+    );
+  }
+
+  Widget _buildDriverSubTabs() {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: SizedBox(
+          width: ResponsiveLayout.isMobile(context) ? double.infinity : 320.w,
+          child: Container(
+            padding: EdgeInsets.all(3.r),
+            decoration: BoxDecoration(
+              color: Colors.grey.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10.r),
+            ),
+            child: TabBar(
+              controller: _driverTabController,
+              indicatorSize: TabBarIndicatorSize.tab,
+              dividerColor: Colors.transparent,
+              indicator: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8.r),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 4.r,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              labelColor: Theme.of(context).primaryColor,
+              unselectedLabelColor: Colors.grey[600],
+              labelStyle: TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w700,
+              ),
+              unselectedLabelStyle: TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w500,
+              ),
+              tabs: _driverSubTabs
+                  .map((t) => Tab(height: 32.h, text: t))
+                  .toList(),
+            ),
+          ),
+        ),
       ),
     );
   }
