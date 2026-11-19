@@ -2042,8 +2042,11 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                               ),
                             ),
                             SizedBox(height: 3.h),
-                            Row(
+                            Wrap(
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
+                                _buildTxReferenceChip(tx.displayReference),
+                                SizedBox(width: 6.w),
                                 Text(
                                   DateFormat('dd MMM yyyy, hh:mm a').format(tx.date),
                                   style: GoogleFonts.inter(
@@ -2090,6 +2093,49 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
               },
             ),
         ],
+      ),
+    );
+  }
+
+  /// Transaction ID badge; tapping copies the ID to the clipboard.
+  Widget _buildTxReferenceChip(String reference) {
+    return Tooltip(
+      message: 'Copy transaction ID',
+      child: InkWell(
+        onTap: () async {
+          await Clipboard.setData(ClipboardData(text: reference));
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Copied $reference'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(4.r),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 1.h),
+          decoration: BoxDecoration(
+            color: FinDT.bgPage,
+            borderRadius: BorderRadius.circular(4.r),
+            border: Border.all(color: FinDT.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                reference,
+                style: GoogleFonts.robotoMono(
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w600,
+                  color: FinDT.textSecondary,
+                ),
+              ),
+              SizedBox(width: 3.w),
+              Icon(Icons.copy_rounded, size: 10.sp, color: FinDT.textMuted),
+            ],
+          ),
+        ),
       ),
     );
   }

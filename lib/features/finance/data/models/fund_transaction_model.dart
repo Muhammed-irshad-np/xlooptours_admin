@@ -3,6 +3,7 @@ import '../../domain/entities/fund_transaction_entity.dart';
 class FundTransactionModel extends FundTransactionEntity {
   const FundTransactionModel({
     required super.id,
+    super.referenceNumber,
     required super.fundAccountId,
     required super.type,
     required super.amount,
@@ -27,6 +28,7 @@ class FundTransactionModel extends FundTransactionEntity {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'referenceNumber': referenceNumber,
       'fundAccountId': fundAccountId,
       'type': type.name,
       'amount': amount,
@@ -53,6 +55,7 @@ class FundTransactionModel extends FundTransactionEntity {
     final amount = (json['amount'] as num?)?.toDouble() ?? 0.0;
     return FundTransactionModel(
       id: json['id'] as String,
+      referenceNumber: json['referenceNumber'] as String?,
       fundAccountId: json['fundAccountId'] as String? ?? '',
       type: _parseType(json['type'] as String?),
       amount: amount,
@@ -92,6 +95,7 @@ class FundTransactionModel extends FundTransactionEntity {
   factory FundTransactionModel.fromEntity(FundTransactionEntity entity) {
     return FundTransactionModel(
       id: entity.id,
+      referenceNumber: entity.referenceNumber,
       fundAccountId: entity.fundAccountId,
       type: entity.type,
       amount: entity.amount,
