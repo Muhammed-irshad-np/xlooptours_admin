@@ -2,7 +2,7 @@
   "name": "xloop-admin-functions",
   "description": "Firebase Cloud Functions for Xloop admin",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "main": "index.js",
   "dependencies": {
