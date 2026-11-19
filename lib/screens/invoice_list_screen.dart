@@ -7,6 +7,7 @@ import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/invoice/domain/entities/invoice_entity.dart';
 import '../features/invoice/presentation/providers/invoice_provider.dart';
 import '../widgets/responsive_layout.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class InvoiceListScreen extends StatefulWidget {
   const InvoiceListScreen({super.key});
@@ -217,7 +218,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 20),
-                  DropdownButtonFormField<int?>(
+                  AppDropdownFormField<int?>(
                     initialValue: tempMonth,
                     decoration: const InputDecoration(
                       labelText: 'Month',
@@ -236,7 +237,7 @@ class _InvoiceListScreenState extends State<InvoiceListScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-                  DropdownButtonFormField<int?>(
+                  AppDropdownFormField<int?>(
                     initialValue: tempYear,
                     decoration: const InputDecoration(
                       labelText: 'Year',

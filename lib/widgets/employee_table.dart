@@ -9,6 +9,7 @@ import '../core/widgets/action_items_dialog.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
 import 'web_safe_image.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 /// Paginated employee list: a table on wide screens, compact rows on phones.
 /// Tapping an employee's name opens their details.
@@ -551,7 +552,7 @@ class _EmployeeTableState extends State<EmployeeTable> {
       children: [
         Text('Rows per page', style: textStyle),
         const SizedBox(width: 8),
-        DropdownButton<int>(
+        AppDropdownButton<int>(
           value: _rowsPerPage,
           isDense: true,
           underline: const SizedBox.shrink(),

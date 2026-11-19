@@ -6,6 +6,7 @@ import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_entity.da
 import 'package:xloop_invoice/features/vehicle/domain/entities/vehicle_documents.dart';
 import 'package:xloop_invoice/features/vehicle/presentation/providers/vehicle_provider.dart';
 import 'package:xloop_invoice/widgets/custom_date_picker.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class UpdateTafweedDialog extends StatefulWidget {
   final VehicleEntity vehicle;
@@ -191,7 +192,7 @@ class _UpdateTafweedDialogState extends State<UpdateTafweedDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                DropdownButtonFormField<String>(
+                AppDropdownFormField<String>(
                   decoration: const InputDecoration(
                     labelText: 'Authorized Driver',
                     border: OutlineInputBorder(),

@@ -26,6 +26,7 @@ import '../features/finance/presentation/providers/finance_provider.dart';
 import '../features/finance/presentation/providers/fund_account_provider.dart';
 import 'searchable_dropdown.dart';
 import '../core/utils/capitalize_first_letter_formatter.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 /// Special sentinel IDs for built-in extras that are not part of the
 /// Firestore-managed maintenance-type master list.
@@ -858,7 +859,7 @@ class _AddMaintenanceRecordDialogState
                                   final currentShopName = entry.selectedShopName;
                                   final bool valueInShops = shops.any((s) => s.name == currentShopName);
 
-                                  return DropdownButtonFormField<String>(
+                                  return AppDropdownFormField<String>(
                                     value: valueInShops ? currentShopName : null,
                                     decoration: InputDecoration(
                                       labelText: 'Shop / Workshop (Optional)',

@@ -36,6 +36,7 @@ import '../../injection_container.dart';
 import '../utils/activity_logger.dart';
 import '../utils/change_diff_helper.dart';
 import 'capitalize_first_letter_formatter.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class UpdateDialogHelper {
   static void showUpdateDialog(
@@ -659,7 +660,7 @@ class UpdateDialogHelper {
 
                       // ── Visa Type dropdown ─────────────────────────────
                       if (visaDocTypes.contains(documentType)) ...[
-                        DropdownButtonFormField<VisaType>(
+                        AppDropdownFormField<VisaType>(
                           value: selectedVisaType,
                           decoration: const InputDecoration(
                             labelText: 'Visa Type',
@@ -682,7 +683,7 @@ class UpdateDialogHelper {
 
                       // ── Driving License Type dropdown ──────────────────
                       if (documentType == 'Driving License') ...[
-                        DropdownButtonFormField<DrivingLicenseType>(
+                        AppDropdownFormField<DrivingLicenseType>(
                           value: selectedLicenseType,
                           decoration: const InputDecoration(
                             labelText: 'License Type',
@@ -822,7 +823,7 @@ class UpdateDialogHelper {
                           ],
                         ),
                         const SizedBox(height: 16),
-                        DropdownButtonFormField<String>(
+                        AppDropdownFormField<String>(
                           initialValue: selectedHolderId,
                           decoration: const InputDecoration(
                             labelText: 'Assign Cost To',
@@ -1064,7 +1065,7 @@ class UpdateDialogHelper {
                     Text('Maintenance Category: $category'),
                     const SizedBox(height: 16),
                     // ---------- Shop Selection Dropdown ----------
-                    DropdownButtonFormField<String>(
+                    AppDropdownFormField<String>(
                       value: valueInShops ? selectedShopName : null,
                       decoration: const InputDecoration(
                         labelText: 'Shop / Workshop (Optional)',
@@ -2046,7 +2047,7 @@ class UpdateDialogHelper {
                         ),
                         const SizedBox(height: 16),
                         // Driver selector
-                        DropdownButtonFormField<String>(
+                        AppDropdownFormField<String>(
                           decoration: const InputDecoration(
                             labelText: 'Authorized Driver',
                             border: OutlineInputBorder(),

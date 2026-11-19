@@ -10,6 +10,7 @@ import '../../features/finance/domain/entities/finance_policy_entity.dart';
 import '../../features/finance/domain/entities/fund_account_entity.dart';
 import '../../widgets/custom_date_picker.dart';
 import '../utils/receipt_picker.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 /// What a cost is tracked against — an employee, a vehicle, or both.
 ///
@@ -288,7 +289,7 @@ class InlineExpenseSection extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: DropdownButtonFormField<String>(
+                  child: AppDropdownFormField<String>(
                     initialValue: c.currency,
                     decoration: const InputDecoration(
                       labelText: 'Currency',
@@ -310,7 +311,7 @@ class InlineExpenseSection extends StatelessWidget {
             ),
           const SizedBox(height: 12),
 
-          DropdownButtonFormField<String>(
+          AppDropdownFormField<String>(
             initialValue: c.accountId,
             decoration: const InputDecoration(
               labelText: 'Paid From',
@@ -343,7 +344,7 @@ class InlineExpenseSection extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: DropdownButtonFormField<String>(
+                child: AppDropdownFormField<String>(
                   initialValue: c.paymentMethod,
                   decoration: const InputDecoration(
                     labelText: 'Method',
@@ -365,7 +366,7 @@ class InlineExpenseSection extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: DropdownButtonFormField<String>(
+                child: AppDropdownFormField<String>(
                   initialValue: c.expenseType,
                   decoration: const InputDecoration(
                     labelText: 'Type',
@@ -470,7 +471,7 @@ class InlineExpenseSection extends StatelessWidget {
               },
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<String?>(
+            AppDropdownFormField<String?>(
               initialValue: c.submitterEmployeeId,
               decoration: const InputDecoration(
                 labelText: 'Submitted By',

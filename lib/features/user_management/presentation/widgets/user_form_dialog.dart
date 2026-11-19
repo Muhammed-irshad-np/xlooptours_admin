@@ -11,6 +11,7 @@ import '../../domain/entities/managed_user_entity.dart';
 import '../providers/user_management_provider.dart';
 import '../../../../core/widgets/confirm_save_dialog.dart';
 import '../../../../core/utils/capitalize_first_letter_formatter.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class UserFormDialog extends StatefulWidget {
   final ManagedUserEntity? userToEdit;
@@ -334,7 +335,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   ),
                 ),
                 SizedBox(height: 8.h),
-                DropdownButtonFormField<String?>(
+                AppDropdownFormField<String?>(
                   // ignore: deprecated_member_use
                   value: _selectedEmployeeId,
                   isExpanded: true,
@@ -482,7 +483,7 @@ class _UserFormDialogState extends State<UserFormDialog> {
                   SizedBox(height: 16.h),
                 ],
 
-                DropdownButtonFormField<String>(
+                AppDropdownFormField<String>(
                   // ignore: deprecated_member_use
                   value: _selectedRoleId,
                   decoration: InputDecoration(

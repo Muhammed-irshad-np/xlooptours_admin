@@ -30,6 +30,7 @@ import '../core/widgets/unsaved_changes_guard.dart';
 import '../features/notifications/presentation/providers/notification_provider.dart';
 import '../features/xloop_vault/presentation/providers/vault_provider.dart';
 import '../core/utils/capitalize_first_letter_formatter.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class EmployeeFormScreen extends StatefulWidget {
   // ... (rest of class)
@@ -1441,7 +1442,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       child: ValueListenableBuilder<String>(
         valueListenable: _primaryCountryCode,
         builder: (context, code, _) {
-          return DropdownButtonFormField<String>(
+          return AppDropdownFormField<String>(
             initialValue: code,
             decoration: InputDecoration(
               labelText: 'Code',
@@ -1489,7 +1490,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     return AnimatedBuilder(
       animation: Listenable.merge([_selectedVehicleMake, _allVehicleMakes]),
       builder: (context, _) {
-        return DropdownButtonFormField<String>(
+        return AppDropdownFormField<String>(
           initialValue: _selectedVehicleMake.value,
           decoration: InputDecoration(
             labelText: 'Make *',
@@ -1521,7 +1522,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         _availableVehicleModels,
       ]),
       builder: (context, _) {
-        return DropdownButtonFormField<String>(
+        return AppDropdownFormField<String>(
           initialValue: _selectedVehicleModel.value,
           decoration: InputDecoration(
             labelText: 'Model *',
@@ -1550,7 +1551,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         _availableVehicleYears,
       ]),
       builder: (context, _) {
-        return DropdownButtonFormField<int>(
+        return AppDropdownFormField<int>(
           initialValue: _selectedVehicleYear.value,
           decoration: InputDecoration(
             labelText: 'Year',
@@ -1578,7 +1579,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
         _availableVehicleColors,
       ]),
       builder: (context, _) {
-        return DropdownButtonFormField<String>(
+        return AppDropdownFormField<String>(
           initialValue: _selectedVehicleColor.value,
           decoration: InputDecoration(
             labelText: 'Color *',
@@ -2522,7 +2523,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
     required List<String> items,
     required void Function(String?) onChanged,
   }) {
-    return DropdownButtonFormField<String>(
+    return AppDropdownFormField<String>(
       initialValue: value,
       decoration: InputDecoration(
         labelText: label,
@@ -2806,7 +2807,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
             children: [
               SizedBox(
                 width: 120.w,
-                child: DropdownButtonFormField<String>(
+                child: AppDropdownFormField<String>(
                   value: entry.countryCode.value,
                   decoration: InputDecoration(
                     labelText: 'Code',

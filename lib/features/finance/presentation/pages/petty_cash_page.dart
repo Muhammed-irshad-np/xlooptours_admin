@@ -24,6 +24,7 @@ import '../../domain/services/finance_permission_service.dart';
 import '../widgets/expense_review_dialog.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 /// Screen for managing daily petty cash open/close flows and verification.
 class PettyCashPage extends StatefulWidget {
@@ -190,7 +191,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
                 Row(
                   children: [
                     DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
+                      child: AppDropdownButton<String>(
                         value: _selectedAccountId,
                         items: accounts
                             .map((a) => DropdownMenuItem(
@@ -2436,7 +2437,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
                           style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.danger),
                         )
                       else ...[
-                        DropdownButtonFormField<EmployeeEntity>(
+                        AppDropdownFormField<EmployeeEntity>(
                           initialValue: selectedEmployee,
                           decoration: finDialogInputDecoration(
                             label: 'Coordinator Employee Recipient *',
