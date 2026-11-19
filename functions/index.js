@@ -1,5 +1,7 @@
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onDocumentWritten } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
+const { logger } = require("firebase-functions");
 const { initializeApp } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore } = require("firebase-admin/firestore");
@@ -433,3 +435,181 @@ exports.auditOdometerHistory = onCall(async (request) => {
 
   return report;
 });
+
+// ─── Petty cash: auto-open the daily session ─────────────────────────────────
+
+const PETTY_CASH_TZ = "Asia/Riyadh";
+const AUTO_OPEN_ACTOR = "System (auto-open 8 AM)";
+
+/** Wall-clock date/time in Riyadh, independent of the server's timezone. */
+function riyadhNow() {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: PETTY_CASH_TZ,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(new Date())
+      .map((p) => [p.type, p.value])
+  );
+  const dayKey = `${parts.year}-${parts.month}-${parts.day}`;
+  // Same shape the app writes with DateTime.now().toIso8601String() (local
+  // time, no offset), so day comparisons in the app keep working.
+  const localIso = `${dayKey}T${parts.hour}:${parts.minute}:${parts.second}.000`;
+  return { dayKey, localIso };
+}
+
+/** Mirrors FundAccountEntity.isPettyCash (a missing type parses as pettyCash). */
+function isPettyCashAccount(a) {
+  const typeId = a.accountTypeId ?? a.type;
+  return (
+    a.type == null ||
+    a.type === "pettyCash" ||
+    typeId === "pettyCash" ||
+    typeId === "petty_cash" ||
+    (a.accountTypeName || "").toLowerCase() === "petty cash"
+  );
+}
+
+/** Mirrors FundAccountModel.fromJson balance parsing, in minor units. */
+function bucketBalancesMinor(a) {
+  const minor = (minorKey, majorKey) => {
+    const m = Number.isInteger(a[minorKey]) ? a[minorKey] : null;
+    const M = typeof a[majorKey] === "number" ? a[majorKey] : null;
+    if (m === null) return M !== null ? Math.round(M * 100) : 0;
+    if (m === 0 && M !== null && M !== 0) return Math.round(M * 100);
+    return m;
+  };
+  const current = minor("currentBalanceMinor", "currentBalance");
+  let cash = minor("cashBalanceMinor", "cashBalance");
+  let stc = minor("stcPayBalanceMinor", "stcPayBalance");
+  if (stc === 0 && cash > current) {
+    cash = current;
+  } else if (cash + stc > current && current >= 0) {
+    if (cash >= current) {
+      cash = current;
+      stc = 0;
+    } else {
+      stc = current - cash;
+    }
+  }
+  return { cash, stc };
+}
+
+/**
+ * Opens one petty cash account's session for today, or returns why it didn't.
+ * Same guards as the app's openPettyCashSession: no open session already
+ * (including yesterday's, which still needs counting and closing), no session
+ * for today, day not locked, account active. Opening balances are snapshotted
+ * from the ledger inside the transaction.
+ */
+async function autoOpenPettyCashSession(db, accountId, dayKey, localIso) {
+  const accountRef = db.collection("fund_accounts").doc(accountId);
+  const lockRef = db.collection("finance_day_locks").doc(`${accountId}_${dayKey}`);
+  const sessionId = `auto_${accountId}_${dayKey}`;
+  const sessionRef = db.collection("petty_cash_sessions").doc(sessionId);
+  const sessionsQuery = db
+    .collection("petty_cash_sessions")
+    .where("fundAccountId", "==", accountId);
+
+  return db.runTransaction(async (txn) => {
+    const [accSnap, lockSnap, sessionsSnap] = await Promise.all([
+      txn.get(accountRef),
+      txn.get(lockRef),
+      txn.get(sessionsQuery),
+    ]);
+
+    if (!accSnap.exists) return "account missing";
+    const account = accSnap.data();
+    if (account.isActive === false) return "account inactive";
+    if (lockSnap.exists) return "day already locked";
+
+    for (const doc of sessionsSnap.docs) {
+      const s = doc.data();
+      if (s.status === "open") {
+        return `session ${doc.id} is still open (dated ${String(s.date).slice(0, 10)})`;
+      }
+      if (String(s.date || "").slice(0, 10) === dayKey) {
+        return `today's session already exists (${s.status})`;
+      }
+    }
+
+    const { cash, stc } = bucketBalancesMinor(account);
+    txn.set(sessionRef, {
+      id: sessionId,
+      fundAccountId: accountId,
+      date: localIso,
+      openedBy: AUTO_OPEN_ACTOR,
+      closedBy: null,
+      openingCashBalance: cash / 100,
+      openingStcPayBalance: stc / 100,
+      cashDeposits: 0,
+      stcPayDeposits: 0,
+      cashExpenses: 0,
+      stcPayExpenses: 0,
+      closingBalance: 0,
+      cashInHand: 0,
+      stcPayBalance: null,
+      otherDigitalBalance: null,
+      closingSheetUrl: null,
+      status: "open",
+      verifiedBy: null,
+      verifiedAt: null,
+      discrepancy: null,
+      notes: null,
+      createdAt: localIso,
+    });
+    return "opened";
+  });
+}
+
+/**
+ * Every day at 08:00 Riyadh time, opens today's petty cash session for each
+ * active petty cash account. An account whose previous session was never
+ * closed is skipped, since that day still needs its cash count; the manual
+ * "Open Session" button stays available for it once it's closed.
+ */
+exports.autoOpenPettyCashSessions = onSchedule(
+  { schedule: "0 8 * * *", timeZone: PETTY_CASH_TZ, retryCount: 3 },
+  async () => {
+    const db = getFirestore();
+    const { dayKey, localIso } = riyadhNow();
+
+    const accounts = await db.collection("fund_accounts").get();
+    for (const doc of accounts.docs) {
+      const account = doc.data();
+      if (!isPettyCashAccount(account) || account.isActive === false) continue;
+
+      let result;
+      try {
+        result = await autoOpenPettyCashSession(db, doc.id, dayKey, localIso);
+      } catch (err) {
+        logger.error(`Petty cash auto-open failed for ${doc.id}`, err);
+        continue;
+      }
+
+      if (result === "opened") {
+        logger.info(`Opened petty cash session for ${doc.id} on ${dayKey}`);
+        await db
+          .collection("finance_audit_log")
+          .add({
+            action: "petty_cash.auto_open",
+            entityType: "petty_cash_session",
+            entityId: `auto_${doc.id}_${dayKey}`,
+            actorUserId: null,
+            actorName: AUTO_OPEN_ACTOR,
+            detail: `fundAccount=${doc.id}`,
+            createdAt: localIso,
+          })
+          .catch(() => {});
+      } else {
+        logger.info(`Skipped petty cash auto-open for ${doc.id}: ${result}`);
+      }
+    }
+  }
+);
