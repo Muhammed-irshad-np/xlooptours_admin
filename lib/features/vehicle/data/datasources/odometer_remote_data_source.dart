@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:xloop_invoice/core/utils/upload_progress.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -104,9 +105,15 @@ class OdometerRemoteDataSourceImpl implements OdometerRemoteDataSource {
     final metadata = SettableMetadata(contentType: 'image/jpeg');
 
     if (kIsWeb) {
-      await ref.putData(await photo.readAsBytes(), metadata);
+      await trackUpload(
+        ref.putData(await photo.readAsBytes(), metadata),
+        label: 'odometer photo',
+      );
     } else {
-      await ref.putFile(File(photo.path), metadata);
+      await trackUpload(
+        ref.putFile(File(photo.path), metadata),
+        label: 'odometer photo',
+      );
     }
     return await ref.getDownloadURL();
   }

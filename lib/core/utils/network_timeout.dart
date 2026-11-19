@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:firebase_storage/firebase_storage.dart';
 
 import '../error/exceptions.dart';
+import 'upload_progress.dart';
 
 /// How long a Firestore write, or an upload that stops making progress,
 /// may wait before it is treated as a lost connection.
@@ -19,10 +20,14 @@ extension NetworkTimeout<T> on Future<T> {
 /// Waits for [task], cancelling it with a [NetworkException] if no bytes are
 /// transferred for [stallTimeout]. A slow upload keeps going as long as it
 /// makes progress; an offline one would otherwise retry for minutes.
+///
+/// The upload also shows in the app-wide progress card as [label].
 Future<TaskSnapshot> awaitUpload(
   UploadTask task, {
+  String label = 'file',
   Duration stallTimeout = kNetworkTimeout,
 }) {
+  UploadProgressTracker.instance.track(task, label: label);
   final completer = Completer<TaskSnapshot>();
   Timer? timer;
 
