@@ -106,15 +106,17 @@ class _ExpenseReviewDialogState extends State<_ExpenseReviewDialog> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final dialogWidth = size.width * 0.92 > 1040.0 ? 1040.0 : size.width * 0.92;
-    final dialogHeight = size.height * 0.88 > 700.0 ? 700.0 : size.height * 0.88;
+    // Large enough that the full detail pane (amount, receipt facts, wallet
+    // impact, policy, verification) fits without scrolling on desktop.
+    final dialogWidth = size.width * 0.95 > 1360.0 ? 1360.0 : size.width * 0.95;
+    final dialogHeight = size.height * 0.94 > 1000.0 ? 1000.0 : size.height * 0.94;
     final isWide = dialogWidth >= 860;
 
     return Dialog(
       backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       shape: finDialogShape,
-      insetPadding: EdgeInsets.symmetric(horizontal: 20.w, vertical: 20.h),
+      insetPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
       child: SizedBox(
         width: dialogWidth,
         height: dialogHeight,
@@ -127,9 +129,9 @@ class _ExpenseReviewDialogState extends State<_ExpenseReviewDialog> {
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(flex: 6, child: _ReceiptPane(state: this)),
+                        Expanded(flex: 1, child: _ReceiptPane(state: this)),
                         VerticalDivider(width: 1, color: FinDT.border),
-                        Expanded(flex: 5, child: _buildDetailPane()),
+                        Expanded(flex: 1, child: _buildDetailPane()),
                       ],
                     )
                   : Column(
