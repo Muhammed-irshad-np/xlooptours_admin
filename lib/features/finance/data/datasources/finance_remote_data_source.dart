@@ -277,6 +277,23 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   DocumentReference<Map<String, dynamic>> get _policyDoc =>
       firestore.collection('finance_settings').doc('policy');
 
+  /// Last issued ledger number for `fund_transactions` (TXN-xxxxx).
+  DocumentReference<Map<String, dynamic>> get _txReferenceCounter =>
+      _counters.doc('fund_transaction_reference');
+
+  /// Reserves [count] consecutive ledger numbers (`TXN-10001`, ...) inside
+  /// [txn], so a ledger row and its number commit or fail together.
+  /// Firestore needs every read before the first write, so call this after
+  /// the transaction's other reads and before any `txn.set`/`txn.update`.
+  Future<List<String>> _reserveTxReferences(Transaction txn,
+      [int count = 1]) async {
+    final snap = await txn.get(_txReferenceCounter);
+    final last = (snap.data()?['value'] as num?)?.toInt() ?? 10000;
+    txn.set(_txReferenceCounter, {'value': last + count},
+        SetOptions(merge: true));
+    return [for (var i = 1; i <= count; i++) 'TXN-${last + i}'];
+  }
+
   // ─── Expenses ───────────────────────────────────────────────
 
   @override
@@ -625,11 +642,13 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
           }
 
           ledgerId = _uuid.v4();
+          final ledgerRef = (await _reserveTxReferences(txn)).single;
           final balBefore = balBeforeMinor / 100.0;
           balAfter = balAfterMinor / 100.0;
 
           final tx = FundTransactionModel(
             id: ledgerId,
+            referenceNumber: ledgerRef,
             fundAccountId: expense.fundAccountId,
             type: FundTransactionType.expensePayment,
             amount: amountMajor,
@@ -797,8 +816,10 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         }
 
         reverseId = _uuid.v4();
+        final reverseRef = (await _reserveTxReferences(txn)).single;
         final tx = FundTransactionModel(
           id: reverseId,
+          referenceNumber: reverseRef,
           fundAccountId: expense.fundAccountId,
           type: FundTransactionType.reversal,
           amount: amountMajor,
@@ -1018,9 +1039,11 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       final balBefore = balBeforeMinor / 100.0;
       final balAfter = balAfterMinor / 100.0;
       final id = _uuid.v4();
+      final txRef = (await _reserveTxReferences(txn)).single;
 
       final tx = FundTransactionModel(
         id: id,
+        referenceNumber: txRef,
         fundAccountId: request.fundAccountId,
         type: request.type,
         amount: amountMajor,
@@ -1148,9 +1171,11 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       final now = DateTime.now();
       final outId = _uuid.v4();
       final inId = _uuid.v4();
+      final pairRefs = await _reserveTxReferences(txn, 2);
 
       final outTx = FundTransactionModel(
         id: outId,
+        referenceNumber: pairRefs[0],
         fundAccountId: fromAccountId,
         type: FundTransactionType.transfer,
         amount: amount,
@@ -1169,6 +1194,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       );
       final inTx = FundTransactionModel(
         id: inId,
+        referenceNumber: pairRefs[1],
         fundAccountId: toAccountId,
         type: FundTransactionType.transfer,
         amount: amount,
@@ -1272,8 +1298,10 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       // Balance total stays the same so balanceBefore == balanceAfter.
       final totalBalance = account.currentBalanceMinor / 100.0;
       final txId = _uuid.v4();
+      final adjustRef = (await _reserveTxReferences(txn)).single;
       final adjustTx = FundTransactionModel(
         id: txId,
+        referenceNumber: adjustRef,
         fundAccountId: fundAccountId,
         type: FundTransactionType.adjustment,
         amount: amount,

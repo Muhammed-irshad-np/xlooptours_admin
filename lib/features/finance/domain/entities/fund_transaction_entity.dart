@@ -49,6 +49,10 @@ enum FundBucket {
 /// Append-only money movement. Balances on this row are computed server-side.
 class FundTransactionEntity extends Equatable {
   final String id;
+
+  /// Human-readable sequential ledger number, e.g. `TXN-10001`.
+  /// Null only on rows written before numbering existed and not yet backfilled.
+  final String? referenceNumber;
   final String fundAccountId;
   final FundTransactionType type;
 
@@ -78,6 +82,7 @@ class FundTransactionEntity extends Equatable {
 
   const FundTransactionEntity({
     required this.id,
+    this.referenceNumber,
     required this.fundAccountId,
     required this.type,
     required this.amount,
@@ -98,6 +103,11 @@ class FundTransactionEntity extends Equatable {
     this.isReversed = false,
     this.auditNote,
   });
+
+  /// ID to show users: the sequential number, or a short form of the
+  /// document id for rows that have not been numbered.
+  String get displayReference => referenceNumber ??
+      'TX-${id.length > 8 ? id.substring(0, 8).toUpperCase() : id.toUpperCase()}';
 
   int get resolvedAmountMinor => amountMinor ?? (amount * 100).round();
 
@@ -120,6 +130,7 @@ class FundTransactionEntity extends Equatable {
   @override
   List<Object?> get props => [
         id,
+        referenceNumber,
         fundAccountId,
         type,
         amount,
