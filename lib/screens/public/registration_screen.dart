@@ -17,6 +17,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:country_picker/country_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/services.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class RegistrationScreen extends StatefulWidget {
   final String? companyId;
@@ -985,7 +986,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                     ],
                   ),
                   child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
+                    child: AppDropdownButton<String>(
                       value: _isArabic.value ? 'ar' : 'en',
                       dropdownColor: Colors.white,
                       icon: Icon(
@@ -1163,7 +1164,7 @@ class _RegistrationScreenState extends State<RegistrationScreen>
                   ),
                   padding: EdgeInsets.symmetric(horizontal: 12.w),
                   child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
+                    child: AppDropdownButton<String>(
                       value: _isArabic.value ? 'ar' : 'en',
                       dropdownColor:
                           Colors.grey[900], // Dark background for dropdown

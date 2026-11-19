@@ -14,6 +14,7 @@ import '../core/utils/phone_parts.dart';
 import '../core/widgets/confirm_save_dialog.dart';
 import '../core/utils/capitalize_first_letter_formatter.dart';
 import '../core/widgets/unsaved_changes_guard.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class CustomerFormScreen extends StatefulWidget {
   final CustomerEntity? customer;
@@ -540,7 +541,7 @@ class _CustomerFormScreenState extends State<CustomerFormScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        DropdownButtonFormField<CompanyEntity>(
+                        AppDropdownFormField<CompanyEntity>(
                           initialValue: selectedCompany,
                           decoration: const InputDecoration(
                             labelText: 'Select Company',

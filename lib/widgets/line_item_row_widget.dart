@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../features/invoice/domain/entities/line_item_entity.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class LineItemRowWidget extends StatelessWidget {
   final LineItemEntity item;
@@ -117,7 +118,7 @@ class LineItemRowWidget extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 flex: 2,
-                child: DropdownButtonFormField<String>(
+                child: AppDropdownFormField<String>(
                   initialValue: item.unitType,
                   decoration: _buildInputDecoration('Unit'),
                   items: const [

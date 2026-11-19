@@ -18,6 +18,7 @@ import '../providers/cash_advance_provider.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import 'finance_dialog_helpers.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 /// Settles an advance as cash handed back and/or what the employee spent it
 /// on. Each spend is recorded as a tracking-only expense, so the Expenses
@@ -306,7 +307,7 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
           Row(
             children: [
               Expanded(
-                child: DropdownButtonFormField<String>(
+                child: AppDropdownFormField<String>(
                   initialValue: line.category,
                   isExpanded: true,
                   decoration: finDialogInputDecoration(label: 'Category *'),
@@ -328,7 +329,7 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
               ),
               SizedBox(width: 10.w),
               Expanded(
-                child: DropdownButtonFormField<String>(
+                child: AppDropdownFormField<String>(
                   key: ValueKey('type_${line.hashCode}_${line.category}'),
                   initialValue: line.type,
                   isExpanded: true,

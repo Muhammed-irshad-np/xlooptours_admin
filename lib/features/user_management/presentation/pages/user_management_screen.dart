@@ -19,6 +19,7 @@ import '../widgets/user_form_dialog.dart';
 import '../../../../core/utils/activity_logger.dart';
 import '../../../notifications/domain/entities/notification_entity.dart';
 import '../../../notifications/presentation/providers/notification_provider.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class UserManagementScreen extends StatefulWidget {
   const UserManagementScreen({super.key});
@@ -517,7 +518,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
+                  child: AppDropdownButton<String>(
                     value: _roleFilter,
                     icon: const Icon(
                       Icons.filter_list,
@@ -556,7 +557,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                 ),
                 child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
+                  child: AppDropdownButton<String>(
                     value: _statusFilter,
                     icon: const Icon(
                       Icons.tune,

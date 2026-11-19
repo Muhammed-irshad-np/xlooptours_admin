@@ -11,6 +11,7 @@ import 'package:xloop_invoice/screens/document_viewer_screen.dart';
 import 'package:xloop_invoice/features/auth/presentation/providers/auth_provider.dart';
 import 'package:xloop_invoice/widgets/complete_follow_up_dialog.dart';
 import 'package:xloop_invoice/core/utils/activity_logger.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class VehicleMaintenanceHistoryScreen extends StatefulWidget {
   final VehicleEntity vehicle;
@@ -265,7 +266,7 @@ class _VehicleMaintenanceHistoryScreenState
               ),
               if (availableShops.length > 1) ...[
                 SizedBox(width: 8.w),
-                DropdownButton<String>(
+                AppDropdownButton<String>(
                   value: _selectedShopFilter,
                   icon: const Icon(Icons.filter_list),
                   underline: const SizedBox(),

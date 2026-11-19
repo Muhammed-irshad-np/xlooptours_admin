@@ -21,6 +21,7 @@ import '../providers/fund_account_provider.dart';
 import '../providers/salary_provider.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 /// Which list the page shows: staff payroll or the month's external staff.
 enum _SalaryTab { payroll, trips }
@@ -1495,7 +1496,7 @@ class _SalariesPageState extends State<SalariesPage> {
                     children: [
                       SizedBox(height: 8.h),
                       if (existing == null)
-                        DropdownButtonFormField<EmployeeEntity>(
+                        AppDropdownFormField<EmployeeEntity>(
                           initialValue: employee,
                           decoration: finDialogInputDecoration(
                             label: 'Employee *',
@@ -1541,7 +1542,7 @@ class _SalariesPageState extends State<SalariesPage> {
                           ),
                         ),
                       SizedBox(height: 14.h),
-                      DropdownButtonFormField<String>(
+                      AppDropdownFormField<String>(
                         initialValue: accountId,
                         decoration: finDialogInputDecoration(
                           label: 'Default Pay Account *',
@@ -1841,7 +1842,7 @@ class _SalariesPageState extends State<SalariesPage> {
                         FinDT.brand,
                       ),
                       SizedBox(height: 12.h),
-                      DropdownButtonFormField<String>(
+                      AppDropdownFormField<String>(
                         initialValue: accountId,
                         decoration: finDialogInputDecoration(
                           label: 'Pay From Account *',
@@ -2730,7 +2731,7 @@ class _SalariesPageState extends State<SalariesPage> {
                       },
                     ),
                     SizedBox(height: 14.h),
-                    DropdownButtonFormField<String>(
+                    AppDropdownFormField<String>(
                       initialValue: position,
                       decoration: finDialogInputDecoration(
                         label: 'Position *',
@@ -2783,7 +2784,7 @@ class _SalariesPageState extends State<SalariesPage> {
                         ),
                         SizedBox(width: 10.w),
                         Expanded(
-                          child: DropdownButtonFormField<String>(
+                          child: AppDropdownFormField<String>(
                             initialValue: gender,
                             decoration: finDialogInputDecoration(
                               label: 'Gender',

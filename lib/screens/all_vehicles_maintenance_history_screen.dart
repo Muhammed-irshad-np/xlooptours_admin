@@ -11,6 +11,7 @@ import 'package:xloop_invoice/screens/vehicle_detail_screen.dart';
 import 'package:xloop_invoice/screens/document_viewer_screen.dart';
 import 'package:xloop_invoice/widgets/complete_follow_up_dialog.dart';
 import 'package:xloop_invoice/core/utils/activity_logger.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class _VehicleMaintenanceItem {
   final VehicleEntity vehicle;
@@ -460,7 +461,7 @@ class _AllVehiclesMaintenanceHistoryScreenState
                     border: Border.all(color: Colors.grey.shade300),
                   ),
                   child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
+                    child: AppDropdownButton<String>(
                       value: vehicleOptions.containsKey(_selectedVehicleFilter)
                           ? _selectedVehicleFilter
                           : 'All Vehicles',
@@ -504,7 +505,7 @@ class _AllVehiclesMaintenanceHistoryScreenState
                       border: Border.all(color: Colors.grey.shade300),
                     ),
                     child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
+                      child: AppDropdownButton<String>(
                         value: _selectedShopFilter,
                         isExpanded: true,
                         icon: Icon(Icons.storefront, size: 16.sp, color: Colors.teal[700]),
@@ -1123,7 +1124,7 @@ class _AllVehiclesMaintenanceHistoryScreenState
                 'Per page: ',
                 style: TextStyle(fontSize: 11.sp, color: Colors.grey[700]),
               ),
-              DropdownButton<int>(
+              AppDropdownButton<int>(
                 value: _itemsPerPage,
                 isDense: true,
                 underline: const SizedBox(),

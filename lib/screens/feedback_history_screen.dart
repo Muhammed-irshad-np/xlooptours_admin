@@ -16,6 +16,7 @@ import '../features/feedback/domain/entities/feedback_entity.dart';
 import '../features/feedback/presentation/providers/feedback_provider.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../widgets/responsive_layout.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class FeedbackHistoryScreen extends StatefulWidget {
   const FeedbackHistoryScreen({super.key});
@@ -333,7 +334,7 @@ class _FeedbackHistoryScreenState extends State<FeedbackHistoryScreen>
             borderRadius: BorderRadius.circular(10.r),
           ),
           child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
+            child: AppDropdownButton<String>(
               isExpanded: true,
               value: value,
               hint: Text('All', style: GoogleFonts.inter(color: _textMuted)),

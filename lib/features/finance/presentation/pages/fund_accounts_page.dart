@@ -18,6 +18,7 @@ import '../../../../features/employee/presentation/providers/employee_provider.d
 import '../../../../features/employee/domain/entities/employee_entity.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 /// Screen for managing virtual fund accounts and viewing transaction history.
 class FundAccountsPage extends StatefulWidget {
@@ -1045,7 +1046,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                         ),
                       ),
                       SizedBox(height: 16.h),
-                      DropdownButtonFormField<String>(
+                      AppDropdownFormField<String>(
                         initialValue: fromId,
                         decoration: finDialogInputDecoration(
                           label: 'Source (Debit Account) *',
@@ -1237,7 +1238,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                         ),
                       ],
                       SizedBox(height: 14.h),
-                      DropdownButtonFormField<String>(
+                      AppDropdownFormField<String>(
                         initialValue: toId,
                         decoration: finDialogInputDecoration(
                           label: 'Destination (Credit Account) *',
@@ -2497,7 +2498,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                     SizedBox(height: 14.h),
 
                     // Account Type Dropdown
-                    DropdownButtonFormField<String>(
+                    AppDropdownFormField<String>(
                       key: ValueKey(selectedType.id),
                       initialValue: provider.accountTypes.any((t) => t.id == selectedType.id)
                           ? selectedType.id
@@ -2593,7 +2594,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                       validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                     ),
                     SizedBox(height: 14.h),
-                    DropdownButtonFormField<String>(
+                    AppDropdownFormField<String>(
                       initialValue: currency,
                       decoration: _dialogInputDecoration(
                         label: 'Currency',

@@ -27,6 +27,7 @@ import '../../../../widgets/searchable_dropdown.dart';
 import '../widgets/expense_submit_confirm_dialog.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 /// Full-featured expense entry/edit form.
 class ExpenseFormPage extends StatefulWidget {
@@ -600,7 +601,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
     return _FieldWrapper(
       label: 'Currency',
-      child: DropdownButtonFormField<String>(
+      child: AppDropdownFormField<String>(
         initialValue: resolvedCur,
         items: currencies
             .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -1198,7 +1199,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       children: [
         _FieldWrapper(
           label: 'Fund Account *',
-          child: DropdownButtonFormField<String>(
+          child: AppDropdownFormField<String>(
             key: ValueKey('account_${_selectedAccountId ?? "none"}'),
             initialValue: hasValidValue ? _selectedAccountId : null,
             isExpanded: true,
@@ -2216,10 +2217,10 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
       return;
     }
 
-    setState(() => _isSaving = true);
     if (!await _confirmDetails(amountVal)) return;
     if (!mounted) return;
 
+    setState(() => _isSaving = true);
 
     try {
       final accProv = context.read<FundAccountProvider>();
@@ -2302,7 +2303,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     }
   }
 
-  /// Feeds the mileage typed onto an expense into the odometer log.
   /// Last look at what is about to be saved; true when the user confirms.
   Future<bool> _confirmDetails(double amount) {
     final account = context
@@ -2356,6 +2356,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     );
   }
 
+  /// Feeds the mileage typed onto an expense into the odometer log.
   ///
   /// It used to be stored on the expense and never looked at again. As a
   /// reading it becomes a second, independent observation the plausibility
