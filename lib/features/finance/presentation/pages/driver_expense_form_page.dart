@@ -14,6 +14,7 @@ import '../../../vehicle/presentation/providers/odometer_provider.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../pages/finance_dashboard_page.dart';
+import '../widgets/expense_submit_confirm_dialog.dart';
 import '../widgets/finance_dialog_helpers.dart';
 
 /// Public-facing mobile web form for drivers to submit daily expenses.
@@ -374,6 +375,29 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
     }
 
     setState(() => _isSaving = true);
+    final vehicle = context
+        .read<VehicleProvider>()
+        .vehicles
+        .where((v) => v.id == _selectedVehicleId)
+        .firstOrNull;
+    final confirmed = await showExpenseSubmitConfirmDialog(
+      context: context,
+      amount: double.tryParse(_amountCtrl.text) ?? 0,
+      currency: 'SAR',
+      rows: [
+        ExpenseConfirmRow('Driver', _driverNameCtrl.text.trim()),
+        ExpenseConfirmRow(
+          'Vehicle',
+          vehicle == null ? '' : '${vehicle.plateNumber} - ${vehicle.model}',
+        ),
+        ExpenseConfirmRow('Expense Type', _selectedType ?? ''),
+        ExpenseConfirmRow('Mileage (KM)', _mileageCtrl.text.trim()),
+        ExpenseConfirmRow('Notes', _notesCtrl.text.trim()),
+        const ExpenseConfirmRow('Receipt', '1 photo attached'),
+      ],
+    );
+    if (!confirmed || !mounted) return;
+
 
     try {
       final vehicleProv = context.read<VehicleProvider>();
