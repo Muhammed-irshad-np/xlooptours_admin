@@ -231,12 +231,15 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     final metadata = SettableMetadata(contentType: 'image/jpeg');
 
     if (kIsWeb) {
-      await awaitUpload(storageRef.putData(
-        await image.readAsBytes(),
-        metadata,
-      ));
+      await awaitUpload(
+        storageRef.putData(await image.readAsBytes(), metadata),
+        label: 'employee photo',
+      );
     } else {
-      await awaitUpload(storageRef.putFile(File(image.path), metadata));
+      await awaitUpload(
+        storageRef.putFile(File(image.path), metadata),
+        label: 'employee photo',
+      );
     }
 
     return await storageRef.getDownloadURL().withNetworkTimeout();
@@ -258,12 +261,15 @@ class EmployeeRemoteDataSourceImpl implements EmployeeRemoteDataSource {
     final metadata = SettableMetadata(contentType: _getMimeType(ext));
 
     if (kIsWeb) {
-      await awaitUpload(storageRef.putData(
-        await file.readAsBytes(),
-        metadata,
-      ));
+      await awaitUpload(
+        storageRef.putData(await file.readAsBytes(), metadata),
+        label: file.name,
+      );
     } else {
-      await awaitUpload(storageRef.putFile(File(file.path), metadata));
+      await awaitUpload(
+        storageRef.putFile(File(file.path), metadata),
+        label: file.name,
+      );
     }
 
     return await storageRef.getDownloadURL().withNetworkTimeout();

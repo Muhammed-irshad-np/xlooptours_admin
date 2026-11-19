@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cross_file/cross_file.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:xloop_invoice/core/utils/upload_progress.dart';
 import '../models/vault_data_model.dart';
 
 abstract class VaultRemoteDataSource {
@@ -86,12 +87,15 @@ class VaultRemoteDataSourceImpl implements VaultRemoteDataSource {
     // Use putData to avoid platform-specific "unsupported file _namespace"
     // errors that occur on iOS/macOS when using putFile with security-scoped paths.
     final bytes = await file.readAsBytes();
-    final uploadTask = await ref.putData(
-      bytes,
-      SettableMetadata(
-        contentType: _mimeType(extension),
-        customMetadata: {'originalName': file.name},
+    final uploadTask = await trackUpload(
+      ref.putData(
+        bytes,
+        SettableMetadata(
+          contentType: _mimeType(extension),
+          customMetadata: {'originalName': file.name},
+        ),
       ),
+      label: file.name,
     );
     final url = await uploadTask.ref.getDownloadURL();
     return VaultDocumentModel(url: url, name: file.name);

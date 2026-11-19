@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:xloop_invoice/core/utils/upload_progress.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:xloop_invoice/features/vehicle/data/models/vehicle_settings_model.dart';
@@ -169,9 +170,15 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
     final metadata = SettableMetadata(contentType: 'image/jpeg');
 
     if (kIsWeb) {
-      await storageRef.putData(await image.readAsBytes(), metadata);
+      await trackUpload(
+        storageRef.putData(await image.readAsBytes(), metadata),
+        label: 'vehicle image',
+      );
     } else {
-      await storageRef.putFile(File(image.path), metadata);
+      await trackUpload(
+        storageRef.putFile(File(image.path), metadata),
+        label: 'vehicle image',
+      );
     }
 
     return await storageRef.getDownloadURL();
@@ -193,9 +200,15 @@ class VehicleRemoteDataSourceImpl implements VehicleRemoteDataSource {
     final metadata = SettableMetadata(contentType: _getMimeType(ext));
 
     if (kIsWeb) {
-      await storageRef.putData(await file.readAsBytes(), metadata);
+      await trackUpload(
+        storageRef.putData(await file.readAsBytes(), metadata),
+        label: file.name,
+      );
     } else {
-      await storageRef.putFile(File(file.path), metadata);
+      await trackUpload(
+        storageRef.putFile(File(file.path), metadata),
+        label: file.name,
+      );
     }
 
     return await storageRef.getDownloadURL();
