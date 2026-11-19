@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -1123,11 +1124,11 @@ class _ExpenseDataTable extends StatelessWidget {
                             accountName: accountName,
                             formatter: formatter,
                           )
-                        : null,
-                    extraNote: (expense.status != ExpenseStatus.paid &&
-                            expense.ledgerEntryId != null)
-                        ? 'Ledger Entry: ${expense.ledgerEntryId}'
-                        : null,
+                        : (expense.ledgerEntryId?.isNotEmpty ?? false)
+                            ? _LedgerReferenceLine(
+                                ledgerEntryId: expense.ledgerEntryId!,
+                              )
+                            : null,
                     isLast: !isVoided,
                   ),
                 ],
@@ -1146,6 +1147,13 @@ class _ExpenseDataTable extends StatelessWidget {
                     extraNote: expense.voidReason != null
                         ? 'Reason: "${expense.voidReason}"\nFunds refunded (+${formatter.format(expense.amount)} ${expense.currency}) to $accountName.'
                         : 'Funds refunded to $accountName.',
+                    extraWidget:
+                        (expense.reverseLedgerEntryId?.isNotEmpty ?? false)
+                            ? _LedgerReferenceLine(
+                                ledgerEntryId: expense.reverseLedgerEntryId!,
+                                label: 'Reversal Entry',
+                              )
+                            : null,
                     isAlert: true,
                     alertColor: const Color(0xFF7C3AED),
                     isLast: true,
@@ -1277,10 +1285,7 @@ class _ExpenseDataTable extends StatelessWidget {
                       color: FinDT.textSecondary,
                     ),
                   ),
-                  if (extraWidget != null) ...[
-                    SizedBox(height: 6.h),
-                    extraWidget,
-                  ] else if (extraNote != null) ...[
+                  if (extraNote != null) ...[
                     SizedBox(height: 6.h),
                     Container(
                       width: double.infinity,
@@ -1307,6 +1312,10 @@ class _ExpenseDataTable extends StatelessWidget {
                         ),
                       ),
                     ),
+                  ],
+                  if (extraWidget != null) ...[
+                    SizedBox(height: 6.h),
+                    extraWidget,
                   ],
                 ],
               ),
@@ -1395,12 +1404,8 @@ class _ExpenseDataTable extends StatelessWidget {
             borderRadius: BorderRadius.circular(6.r),
             border: Border.all(color: FinDT.border),
           ),
-          child: Text(
-            'Ledger Entry: ${expense.ledgerEntryId}',
-            style: GoogleFonts.inter(
-              fontSize: 11.sp,
-              color: FinDT.textSecondary,
-            ),
+          child: _LedgerReferenceLine(
+            ledgerEntryId: expense.ledgerEntryId!,
           ),
         );
       },
@@ -1459,13 +1464,7 @@ class _ExpenseDataTable extends StatelessWidget {
           ),
           if (ledgerEntryId != null && ledgerEntryId.isNotEmpty) ...[
             SizedBox(height: 4.h),
-            Text(
-              'Ledger Entry: $ledgerEntryId',
-              style: GoogleFonts.inter(
-                fontSize: 10.sp,
-                color: FinDT.textMuted,
-              ),
-            ),
+            _LedgerReferenceLine(ledgerEntryId: ledgerEntryId),
           ],
         ],
       ),
@@ -1906,6 +1905,72 @@ class _ExpenseDataTable extends StatelessWidget {
             context,
           ).showSnackBar(const SnackBar(content: Text('Expense deleted')));
         }
+      },
+    );
+  }
+}
+
+/// "Ledger Entry: TXN-10023" for an expense's fund transaction. Tapping
+/// copies the number so it can be looked up in the account history.
+class _LedgerReferenceLine extends StatefulWidget {
+  const _LedgerReferenceLine({
+    required this.ledgerEntryId,
+    this.label = 'Ledger Entry',
+  });
+
+  final String ledgerEntryId;
+  final String label;
+
+  @override
+  State<_LedgerReferenceLine> createState() => _LedgerReferenceLineState();
+}
+
+class _LedgerReferenceLineState extends State<_LedgerReferenceLine> {
+  late final Future<FundTransactionEntity?> _tx = context
+      .read<FundAccountProvider>()
+      .getTransactionById(widget.ledgerEntryId);
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<FundTransactionEntity?>(
+      future: _tx,
+      builder: (context, snapshot) {
+        final style = GoogleFonts.inter(
+          fontSize: 10.sp,
+          color: FinDT.textMuted,
+        );
+        if (snapshot.connectionState != ConnectionState.done) {
+          return Text('${widget.label}: …', style: style);
+        }
+        final reference = snapshot.data?.displayReference ??
+            FundTransactionEntity.shortReference(widget.ledgerEntryId);
+        return Tooltip(
+          message: 'Copy transaction ID',
+          child: InkWell(
+            onTap: () async {
+              await Clipboard.setData(ClipboardData(text: reference));
+              if (!context.mounted) return;
+              AppSnackBar.showInfo(context, 'Copied $reference');
+            },
+            borderRadius: BorderRadius.circular(4.r),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('${widget.label}: ', style: style),
+                Text(
+                  reference,
+                  style: GoogleFonts.robotoMono(
+                    fontSize: 10.sp,
+                    fontWeight: FontWeight.w600,
+                    color: FinDT.textSecondary,
+                  ),
+                ),
+                SizedBox(width: 3.w),
+                Icon(Icons.copy_rounded, size: 10.sp, color: FinDT.textMuted),
+              ],
+            ),
+          ),
+        );
       },
     );
   }

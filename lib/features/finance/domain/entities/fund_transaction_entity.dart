@@ -106,8 +106,11 @@ class FundTransactionEntity extends Equatable {
 
   /// ID to show users: the sequential number, or a short form of the
   /// document id for rows that have not been numbered.
-  String get displayReference => referenceNumber ??
-      'TX-${id.length > 8 ? id.substring(0, 8).toUpperCase() : id.toUpperCase()}';
+  String get displayReference => referenceNumber ?? shortReference(id);
+
+  /// Short form of a ledger document id, e.g. `TX-3F9A2C1B`.
+  static String shortReference(String id) =>
+      'TX-${(id.length > 8 ? id.substring(0, 8) : id).toUpperCase()}';
 
   int get resolvedAmountMinor => amountMinor ?? (amount * 100).round();
 
