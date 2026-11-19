@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:xloop_invoice/core/utils/upload_progress.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:xloop_invoice/core/utils/image_compression_helper.dart';
@@ -120,7 +121,7 @@ class DriverFormProvider extends ChangeNotifier {
         SettableMetadata(contentType: 'image/jpeg'),
       );
 
-      final snapshot = await uploadTask;
+      final snapshot = await trackUpload(uploadTask, label: 'photo');
       final url = await snapshot.ref.getDownloadURL();
 
       _mediaUploads[fieldKey] = UploadState(

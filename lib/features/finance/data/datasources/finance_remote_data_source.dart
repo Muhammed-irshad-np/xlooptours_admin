@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:xloop_invoice/core/utils/upload_progress.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
 import '../../domain/entities/cash_advance_entity.dart';
@@ -441,7 +442,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     );
     final bytes = await file.readAsBytes();
     final metadata = SettableMetadata(contentType: _getMimeType(ext));
-    await ref.putData(bytes, metadata);
+    await trackUpload(ref.putData(bytes, metadata), label: 'receipt');
     return ref.getDownloadURL();
   }
 
@@ -2906,7 +2907,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     final ref = storage.ref('petty_cash/$sessionId/closing_sheet.$ext');
     final bytes = await file.readAsBytes();
     final metadata = SettableMetadata(contentType: _getMimeType(ext));
-    await ref.putData(bytes, metadata);
+    await trackUpload(ref.putData(bytes, metadata), label: 'closing sheet');
     return ref.getDownloadURL();
   }
 

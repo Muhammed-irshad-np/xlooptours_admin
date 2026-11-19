@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:xloop_invoice/core/utils/upload_progress.dart';
 import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -53,6 +54,7 @@ class ImageService {
         task = ref.putFile(File(file.path), metadata);
       }
 
+      UploadProgressTracker.instance.track(task, label: 'vehicle image');
       task.snapshotEvents.listen((TaskSnapshot snapshot) {
         final progress = snapshot.bytesTransferred / snapshot.totalBytes;
         debugPrint('ImageService: Progress $progress');
