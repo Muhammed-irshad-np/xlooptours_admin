@@ -24,6 +24,7 @@ import '../../../../features/vehicle/presentation/providers/vehicle_provider.dar
 import '../../../../features/vehicle/domain/entities/vehicle_entity.dart';
 import '../../../../core/widgets/unsaved_changes_guard.dart';
 import '../../../../widgets/searchable_dropdown.dart';
+import '../widgets/expense_submit_confirm_dialog.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
 
@@ -2216,6 +2217,9 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     }
 
     setState(() => _isSaving = true);
+    if (!await _confirmDetails(amountVal)) return;
+    if (!mounted) return;
+
 
     try {
       final accProv = context.read<FundAccountProvider>();
@@ -2299,6 +2303,59 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   }
 
   /// Feeds the mileage typed onto an expense into the odometer log.
+  /// Last look at what is about to be saved; true when the user confirms.
+  Future<bool> _confirmDetails(double amount) {
+    final account = context
+        .read<FundAccountProvider>()
+        .getAccountById(_selectedAccountId ?? '');
+    final paymentLabel = switch (_paymentMethod) {
+      'cash' => 'Cash',
+      'stcPay' => 'STC Pay',
+      _ => _paymentMethod,
+    };
+    final receipts = _receiptUrls.length;
+
+    return showExpenseSubmitConfirmDialog(
+      context: context,
+      isEditing: _isEditing,
+      amount: amount,
+      currency: _selectedCurrency,
+      rows: [
+        ExpenseConfirmRow(
+          'Date',
+          DateFormat('dd MMM yyyy').format(_selectedDate),
+        ),
+        ExpenseConfirmRow('Category', _selectedCategory ?? ''),
+        ExpenseConfirmRow('Expense Type', _selectedType ?? ''),
+        ExpenseConfirmRow('Fund Account', account?.name ?? ''),
+        ExpenseConfirmRow('Payment Method', paymentLabel),
+        if (_paymentMethod != 'cash')
+          ExpenseConfirmRow(
+            'Payment Details',
+            _paymentDetailsController.text,
+          ),
+        ExpenseConfirmRow('Submitted By', _submitterName),
+        if (_isEmployeeRelated)
+          ExpenseConfirmRow('For Employee', _beneficiaryEmployeeName ?? ''),
+        if (_isVehicleRelated) ...[
+          ExpenseConfirmRow('Vehicle', _selectedVehicleName ?? ''),
+          ExpenseConfirmRow(
+            'Mileage (KM)',
+            _mileageController.text.trim(),
+          ),
+        ],
+        ExpenseConfirmRow('Description', _descriptionController.text.trim()),
+        ExpenseConfirmRow('Notes', _notesController.text.trim()),
+        ExpenseConfirmRow(
+          'Receipts',
+          receipts == 0
+              ? 'None attached'
+              : '$receipts file${receipts == 1 ? '' : 's'} attached',
+        ),
+      ],
+    );
+  }
+
   ///
   /// It used to be stored on the expense and never looked at again. As a
   /// reading it becomes a second, independent observation the plausibility
