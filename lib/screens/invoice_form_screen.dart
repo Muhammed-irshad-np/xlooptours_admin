@@ -15,6 +15,7 @@ import '../widgets/responsive_layout.dart';
 import '../widgets/custom_date_picker.dart';
 import '../core/widgets/confirm_save_dialog.dart';
 import '../core/widgets/unsaved_changes_guard.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class InvoiceFormScreen extends StatefulWidget {
   final InvoiceEntity? invoiceToEdit;
@@ -614,7 +615,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
                                               ],
                                             ),
                                             const SizedBox(height: 16),
-                                            DropdownButtonFormField<String>(
+                                            AppDropdownFormField<String>(
                                               initialValue:
                                                   _selectedPaymentTermsOption
                                                       .value,
@@ -808,7 +809,7 @@ class _InvoiceFormScreenState extends State<InvoiceFormScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
+            AppDropdownFormField<String>(
               initialValue: _selectedPaymentTermsOption.value,
               decoration: _buildInputDecoration('Payment Terms', Icons.payment),
               items: _paymentTermsOptions

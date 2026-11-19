@@ -9,6 +9,7 @@ import '../features/vehicle/presentation/providers/vehicle_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/constants/vehicle_types.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class VehicleMakesScreen extends StatefulWidget {
   const VehicleMakesScreen({super.key});
@@ -791,7 +792,7 @@ class _AddEditMakeDialogState extends State<_AddEditMakeDialog> {
                     child: ValueListenableBuilder<String?>(
                       valueListenable: _modelType,
                       builder: (context, val, _) {
-                        return DropdownButtonFormField<String>(
+                        return AppDropdownFormField<String>(
                           // ignore: deprecated_member_use
                           value: val,
                           isDense: true,

@@ -17,6 +17,7 @@ import '../providers/finance_provider.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import '../widgets/settle_advance_dialog.dart';
 import 'finance_dashboard_page.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 /// Issue, monitor, and settle staff cash advances / operational floats.
 class CashAdvancesPage extends StatefulWidget {
@@ -378,7 +379,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                           final accounts = fundProv.accounts;
                           return SizedBox(
                             width: 220.w,
-                            child: DropdownButtonFormField<String?>(
+                            child: AppDropdownFormField<String?>(
                               initialValue: _selectedFundAccountFilter,
                               decoration: InputDecoration(
                                 hintText: 'All Fund Sources',
@@ -1521,7 +1522,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(height: 8.h),
-                      DropdownButtonFormField<String>(
+                      AppDropdownFormField<String>(
                         initialValue: accountId,
                         decoration: finDialogInputDecoration(
                           label: 'Fund Account Source *',

@@ -71,3 +71,14 @@ lib/
     - Expose strictly necessary state variables.
     - Use `notifyListeners()` only when actual state changes.
     - Inject `UseCases` into the `ChangeNotifier`.
+
+## 6. UI Rules
+### Dropdowns must be searchable (4+ items)
+- Any dropdown that can show **4 or more items** must let the user search.
+- **Never use `DropdownButtonFormField` or `DropdownButton` directly.** Use the drop-in replacements in `lib/core/widgets/app_dropdown.dart`:
+    - `AppDropdownFormField<T>` instead of `DropdownButtonFormField<T>`
+    - `AppDropdownButton<T>` instead of `DropdownButton<T>`
+- They take the same parameters and look identical when closed. With `kSearchableDropdownThreshold` (4) or more items, tapping opens a search dialog; with fewer, the normal menu opens. Pass `searchable: true/false` only to override.
+- Search matches the `Text` inside each `DropdownMenuItem.child`; if the child has no text, the item's value is used. Keep item labels as `Text` so they stay searchable.
+- `SearchableDropdown<T>` (`lib/widgets/searchable_dropdown.dart`) is still fine for lists of entities built with `itemToString`.
+- `PopupMenuButton` action menus (Edit / Delete / ...) are not selection dropdowns and are exempt.

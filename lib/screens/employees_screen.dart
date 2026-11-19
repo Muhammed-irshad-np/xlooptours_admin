@@ -21,6 +21,7 @@ import 'employee_expiry_tracker_screen.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../core/widgets/modern_tab_bar.dart';
 import '../core/utils/activity_logger.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class EmployeesScreen extends StatefulWidget {
   const EmployeesScreen({super.key});
@@ -516,7 +517,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
             borderRadius: BorderRadius.circular(12),
           ),
           child: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
+            child: AppDropdownButton<String>(
               value: status,
               borderRadius: BorderRadius.circular(12),
               style: TextStyle(

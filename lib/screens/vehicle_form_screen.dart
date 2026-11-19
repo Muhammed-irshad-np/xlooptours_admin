@@ -28,6 +28,7 @@ import '../core/utils/change_diff_helper.dart';
 import '../core/widgets/confirm_save_dialog.dart';
 import '../core/constants/vehicle_types.dart';
 import '../core/widgets/unsaved_changes_guard.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class VehicleFormScreen extends StatefulWidget {
   final VehicleEntity? vehicle;
@@ -1489,7 +1490,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     return AnimatedBuilder(
       animation: Listenable.merge([_selectedMake, _allMakes]),
       builder: (context, _) {
-        return DropdownButtonFormField<String>(
+        return AppDropdownFormField<String>(
           initialValue: _selectedMake.value,
           decoration: InputDecoration(
             labelText: 'Make',
@@ -1524,7 +1525,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
         _availableModels,
       ]),
       builder: (context, _) {
-        return DropdownButtonFormField<String>(
+        return AppDropdownFormField<String>(
           initialValue: _selectedModel.value,
           decoration: InputDecoration(
             labelText: 'Model',
@@ -1578,7 +1579,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
         _availableYears,
       ]),
       builder: (context, _) {
-        return DropdownButtonFormField<int>(
+        return AppDropdownFormField<int>(
           initialValue: _selectedYear.value,
           decoration: InputDecoration(
             labelText: 'Year',
@@ -1612,7 +1613,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
         _availableColors,
       ]),
       builder: (context, _) {
-        return DropdownButtonFormField<String>(
+        return AppDropdownFormField<String>(
           initialValue: _selectedColor.value,
           decoration: InputDecoration(
             labelText: 'Color',
@@ -1863,7 +1864,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
       valueListenable: _typeController,
       builder: (context, typeValue, _) {
         final val = typeValue.text.trim();
-        return DropdownButtonFormField<String>(
+        return AppDropdownFormField<String>(
           // ignore: deprecated_member_use
           value: val.isEmpty ? null : val,
           focusNode: _typeFocusNode,
@@ -1887,7 +1888,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     return ValueListenableBuilder<String?>(
       valueListenable: _fuelType,
       builder: (context, val, _) {
-        return DropdownButtonFormField<String>(
+        return AppDropdownFormField<String>(
           // ignore: deprecated_member_use
           value: val,
           decoration: InputDecoration(
@@ -1909,7 +1910,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     return ValueListenableBuilder<String?>(
       valueListenable: _transmission,
       builder: (context, val, _) {
-        return DropdownButtonFormField<String>(
+        return AppDropdownFormField<String>(
           // ignore: deprecated_member_use
           value: val,
           decoration: InputDecoration(
@@ -1931,7 +1932,7 @@ class _VehicleFormScreenState extends State<VehicleFormScreen> {
     return ValueListenableBuilder<String>(
       valueListenable: _status,
       builder: (context, val, _) {
-        return DropdownButtonFormField<String>(
+        return AppDropdownFormField<String>(
           // ignore: deprecated_member_use
           value: val,
           decoration: InputDecoration(
