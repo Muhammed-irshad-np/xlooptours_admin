@@ -11,6 +11,7 @@ import 'package:cross_file/cross_file.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/activity_logger.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class VatFilingDialog extends StatefulWidget {
   final VatFiling? filing;
@@ -452,7 +453,7 @@ class _VatFilingDialogState extends State<VatFilingDialog> {
         borderRadius: BorderRadius.circular(12.r),
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButtonFormField<String>(
+        child: AppDropdownFormField<String>(
           value: _currency,
           decoration: const InputDecoration(border: InputBorder.none),
           items: ['SAR', 'BHD']

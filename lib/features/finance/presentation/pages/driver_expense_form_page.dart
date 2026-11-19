@@ -16,6 +16,7 @@ import '../../domain/entities/fund_account_entity.dart';
 import '../pages/finance_dashboard_page.dart';
 import '../widgets/expense_submit_confirm_dialog.dart';
 import '../widgets/finance_dialog_helpers.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 /// Public-facing mobile web form for drivers to submit daily expenses.
 class DriverExpenseFormPage extends StatefulWidget {
@@ -120,7 +121,7 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
 
                       // Vehicle Dropdown
                       _buildLabel('Select Vehicle *'),
-                      DropdownButtonFormField<String>(
+                      AppDropdownFormField<String>(
                         initialValue: _selectedVehicleId,
                         decoration: _inputDecoration('Choose vehicle plate/model'),
                         items: vehicleProv.vehicles.map((v) {
@@ -136,7 +137,7 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
 
                       // Expense Type
                       _buildLabel('Expense Type *'),
-                      DropdownButtonFormField<String>(
+                      AppDropdownFormField<String>(
                         initialValue: _selectedType,
                         decoration: _inputDecoration('Choose expense type'),
                         items: _expenseTypes.map((t) {
@@ -374,7 +375,6 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
       return;
     }
 
-    setState(() => _isSaving = true);
     final vehicle = context
         .read<VehicleProvider>()
         .vehicles
@@ -398,6 +398,7 @@ class _DriverExpenseFormPageState extends State<DriverExpenseFormPage> {
     );
     if (!confirmed || !mounted) return;
 
+    setState(() => _isSaving = true);
 
     try {
       final vehicleProv = context.read<VehicleProvider>();

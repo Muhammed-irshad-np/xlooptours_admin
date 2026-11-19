@@ -19,6 +19,7 @@ import '../../domain/services/finance_permission_service.dart';
 import 'expense_form_page.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 /// Expense list page with filtering, search, and data table.
 class ExpenseListPage extends StatelessWidget {
@@ -448,7 +449,7 @@ class _FilterDropdown<T> extends StatelessWidget {
         borderRadius: BorderRadius.circular(10.r),
       ),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
+        child: AppDropdownButton<T>(
           value: effectiveValue,
           hint: Text(
             hint,

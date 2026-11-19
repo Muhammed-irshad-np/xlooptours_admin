@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 
+import '../core/widgets/app_dropdown.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../features/employee/domain/entities/document_renewal_entity.dart';
 import '../features/employee/domain/entities/employee_entity.dart';
@@ -147,7 +148,7 @@ class _DocumentRenewalHistoryScreenState
         Row(
           children: [
             Expanded(
-              child: DropdownButtonFormField<int?>(
+              child: AppDropdownFormField<int?>(
                 // Rebuilt on change so "Clear filters" resets the field too.
                 key: ValueKey(_year),
                 initialValue: years.contains(_year) ? _year : null,

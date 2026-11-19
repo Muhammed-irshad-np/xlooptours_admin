@@ -9,6 +9,7 @@ import '../features/employee/presentation/providers/employee_provider.dart';
 import '../core/widgets/modern_app_bar.dart';
 import '../features/auth/presentation/providers/auth_provider.dart';
 import '../core/widgets/confirm_save_dialog.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class EmployeeRoleMasterScreen extends StatefulWidget {
   const EmployeeRoleMasterScreen({super.key});
@@ -351,7 +352,7 @@ class _AddEditRoleDialogState extends State<_AddEditRoleDialog> {
                 },
               ),
               const SizedBox(height: 20),
-              DropdownButtonFormField<String>(
+              AppDropdownFormField<String>(
                 initialValue: _category,
                 decoration: const InputDecoration(
                   labelText: 'Employees List Group',

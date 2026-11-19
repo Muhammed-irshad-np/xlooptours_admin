@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../features/analytics/presentation/providers/analytics_provider.dart';
 import '../features/analytics/domain/entities/analytics_entity.dart';
 import '../widgets/responsive_layout.dart';
+import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
@@ -174,7 +175,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }) {
     final children = [
       Expanded(
-        child: DropdownButtonFormField<int>(
+        child: AppDropdownFormField<int>(
           initialValue: selectedYear,
           decoration: const InputDecoration(
             labelText: 'Year',
@@ -195,7 +196,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       ),
       if (!isRow) const SizedBox(height: 16) else const SizedBox(width: 16),
       Expanded(
-        child: DropdownButtonFormField<int?>(
+        child: AppDropdownFormField<int?>(
           initialValue: selectedMonth,
           decoration: const InputDecoration(
             labelText: 'Month (Optional)',
