@@ -101,6 +101,17 @@ class FinancePolicyEntity extends Equatable {
   /// Empty = any active account.
   final List<String> tripPaymentAccountIds;
 
+  // ─── Petty Cash Closing Rules ───────────────────────────────
+
+  /// When Cash or STC Pay is off by more than this (SAR) at closing, the
+  /// closer must count again before the register can close.
+  final double pettyCashRecountAbove;
+
+  /// When the total difference at closing is more than this (SAR), only
+  /// someone allowed to verify sessions can close the register.
+  /// 0 = off.
+  final double pettyCashAdminCloseAbove;
+
   const FinancePolicyEntity({
     // Legacy approval limits
     this.approvalLimits = const {
@@ -168,6 +179,8 @@ class FinancePolicyEntity extends Equatable {
     ),
     this.salaryAccountIds = const [],
     this.tripPaymentAccountIds = const [],
+    this.pettyCashRecountAbove = 5,
+    this.pettyCashAdminCloseAbove = 500,
   });
 
   // ─── Query Helpers ──────────────────────────────────────────
@@ -220,6 +233,8 @@ class FinancePolicyEntity extends Equatable {
     WorkflowPermissionConfig? salaryPayment,
     List<String>? salaryAccountIds,
     List<String>? tripPaymentAccountIds,
+    double? pettyCashRecountAbove,
+    double? pettyCashAdminCloseAbove,
   }) {
     return FinancePolicyEntity(
       approvalLimits: approvalLimits ?? this.approvalLimits,
@@ -249,6 +264,10 @@ class FinancePolicyEntity extends Equatable {
       salaryAccountIds: salaryAccountIds ?? this.salaryAccountIds,
       tripPaymentAccountIds:
           tripPaymentAccountIds ?? this.tripPaymentAccountIds,
+      pettyCashRecountAbove:
+          pettyCashRecountAbove ?? this.pettyCashRecountAbove,
+      pettyCashAdminCloseAbove:
+          pettyCashAdminCloseAbove ?? this.pettyCashAdminCloseAbove,
     );
   }
 
@@ -275,6 +294,8 @@ class FinancePolicyEntity extends Equatable {
         'salaryPayment': salaryPayment.toJson(),
         'salaryAccountIds': salaryAccountIds,
         'tripPaymentAccountIds': tripPaymentAccountIds,
+        'pettyCashRecountAbove': pettyCashRecountAbove,
+        'pettyCashAdminCloseAbove': pettyCashAdminCloseAbove,
       };
 
   factory FinancePolicyEntity.fromJson(Map<String, dynamic>? json) {
@@ -371,6 +392,10 @@ class FinancePolicyEntity extends Equatable {
               ?.map((e) => e.toString())
               .toList() ??
           const [],
+      pettyCashRecountAbove:
+          (json['pettyCashRecountAbove'] as num?)?.toDouble() ?? 5,
+      pettyCashAdminCloseAbove:
+          (json['pettyCashAdminCloseAbove'] as num?)?.toDouble() ?? 500,
     );
   }
 
@@ -398,5 +423,7 @@ class FinancePolicyEntity extends Equatable {
         salaryPayment,
         salaryAccountIds,
         tripPaymentAccountIds,
+        pettyCashRecountAbove,
+        pettyCashAdminCloseAbove,
       ];
 }

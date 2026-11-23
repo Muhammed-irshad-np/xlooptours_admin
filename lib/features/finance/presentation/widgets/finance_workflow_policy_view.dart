@@ -331,7 +331,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
         _buildPermissionConfigCard(
           title: 'Close Daily Session & Declare Cash Count',
           description:
-              'Authorized to end daily operations, count remaining physical cash/STC float, upload receipt tally sheets, and submit for audit. Note: The assigned coordinator always retains access.',
+              'Authorized to end daily operations, count the physical cash and the STC Pay balance, explain any difference, and submit for audit. Note: The assigned coordinator always retains access.',
           icon: Icons.lock_clock_outlined,
           color: const Color(0xFFD97706),
           config: policy.sessionClose,
@@ -358,7 +358,186 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
             await _savePolicy(finProv, updated, 'Verify & lock permission updated');
           },
         ),
+        SizedBox(height: 12.h),
+        _buildClosingRulesCard(finProv, policy),
       ],
+    );
+  }
+
+  /// Recount and admin-close thresholds for the daily register count.
+  Widget _buildClosingRulesCard(
+    FinanceProvider finProv,
+    FinancePolicyEntity policy,
+  ) {
+    final formatter = NumberFormat('#,##0.00', 'en_US');
+    final adminOff = policy.pettyCashAdminCloseAbove <= 0;
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12.r),
+        border: Border.all(color: FinDT.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.rule_rounded, size: 20.sp, color: FinDT.warning),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Text(
+                  'Closing Count Rules',
+                  style: GoogleFonts.inter(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w700,
+                    color: FinDT.textPrimary,
+                  ),
+                ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () => _showClosingRulesDialog(finProv, policy),
+                icon: Icon(Icons.edit_outlined, size: 14.sp),
+                label: Text(
+                  'Edit Rules',
+                  style: GoogleFonts.inter(
+                      fontSize: 11.sp, fontWeight: FontWeight.w600),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: FinDT.brand,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding:
+                      EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8.r),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 12.h),
+          _buildRuleTile(
+            title: 'Any difference needs a reason',
+            subtitle:
+                'Closing with Cash or STC Pay not matching always requires an explanation. The account is set to the counted amounts.',
+            isActive: true,
+          ),
+          SizedBox(height: 10.h),
+          _buildRuleTile(
+            title: 'Recount above ${formatter.format(policy.pettyCashRecountAbove)} SAR',
+            subtitle:
+                'If Cash or STC Pay is off by more than this, the closer must count everything again before closing.',
+            isActive: true,
+          ),
+          SizedBox(height: 10.h),
+          _buildRuleTile(
+            title: adminOff
+                ? 'Admin close: off'
+                : 'Admin must close above ${formatter.format(policy.pettyCashAdminCloseAbove)} SAR',
+            subtitle:
+                'If the total difference is more than this, only someone allowed to verify sessions can close the register.',
+            isActive: !adminOff,
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showClosingRulesDialog(
+    FinanceProvider finProv,
+    FinancePolicyEntity policy,
+  ) {
+    final formKey = GlobalKey<FormState>();
+    final recountCtrl = TextEditingController(
+        text: policy.pettyCashRecountAbove.toStringAsFixed(2));
+    final adminCtrl = TextEditingController(
+        text: policy.pettyCashAdminCloseAbove.toStringAsFixed(2));
+    bool isSaving = false;
+
+    String? validateAmount(String? v) {
+      final n = double.tryParse((v ?? '').trim());
+      if (n == null || n < 0) return 'Enter 0 or more';
+      return null;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: finDialogShape,
+          title: finDialogTitle('Closing Count Rules', icon: Icons.rule_rounded),
+          content: SizedBox(
+            width: 420.w,
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: recountCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,2}')),
+                    ],
+                    decoration: finDialogInputDecoration(
+                      label: 'Recount when Cash or STC Pay is off by more than (SAR)',
+                      prefixIcon: Icons.replay_rounded,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp),
+                    validator: validateAmount,
+                  ),
+                  SizedBox(height: 14.h),
+                  TextFormField(
+                    controller: adminCtrl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,2}')),
+                    ],
+                    decoration: finDialogInputDecoration(
+                      label: 'Admin must close when the total is off by more than (SAR, 0 = off)',
+                      prefixIcon: Icons.admin_panel_settings_outlined,
+                    ),
+                    style: GoogleFonts.inter(fontSize: 12.sp),
+                    validator: validateAmount,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            finDialogCancelButton(ctx, onPressed: isSaving ? () {} : null),
+            finDialogActionButton(
+              onPressed: () async {
+                if (!formKey.currentState!.validate()) return;
+                final updated = policy.copyWith(
+                  pettyCashRecountAbove:
+                      double.parse(recountCtrl.text.trim()),
+                  pettyCashAdminCloseAbove:
+                      double.parse(adminCtrl.text.trim()),
+                );
+                setDialogState(() => isSaving = true);
+                try {
+                  await _savePolicy(
+                      finProv, updated, 'Closing count rules updated');
+                  if (ctx.mounted) finSafePop(ctx);
+                } catch (_) {
+                  if (ctx.mounted) setDialogState(() => isSaving = false);
+                }
+              },
+              label: 'Save Rules',
+              backgroundColor: FinDT.brand,
+              isLoading: isSaving,
+            ),
+          ],
+        ),
+      ),
     );
   }
 
