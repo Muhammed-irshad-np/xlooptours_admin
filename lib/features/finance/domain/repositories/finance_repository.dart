@@ -71,6 +71,8 @@ abstract class FinanceRepository {
   Future<List<FundTransactionEntity>> getTransactionsForAccount(
     String accountId,
   );
+  /// Every ledger row across all fund accounts, newest first.
+  Future<List<FundTransactionEntity>> getAllTransactions();
   Future<FundTransactionEntity> postFundMovement(PostFundRequest request);
   Future<void> transferBetweenAccounts({
     required String fromAccountId,

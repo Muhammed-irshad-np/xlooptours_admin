@@ -202,6 +202,9 @@ class FakeFinanceRepository implements FinanceRepository {
   ) async => [];
 
   @override
+  Future<List<FundTransactionEntity>> getAllTransactions() async => [];
+
+  @override
   Future<List<PettyCashSessionEntity>> getPettyCashSessions(
     String accountId,
   ) async => [];

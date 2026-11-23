@@ -20,6 +20,7 @@ class FinanceNavTabs extends StatelessWidget {
     _TabData(icon: Icons.book_outlined, label: 'Petty Cash'),
     _TabData(icon: Icons.payments_outlined, label: 'Advances'),
     _TabData(icon: Icons.badge_outlined, label: 'Salaries'),
+    _TabData(icon: Icons.assessment_outlined, label: 'Reports'),
     _TabData(icon: Icons.dns_outlined, label: 'Master Data'),
   ];
 
