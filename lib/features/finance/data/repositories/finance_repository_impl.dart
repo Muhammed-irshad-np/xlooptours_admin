@@ -173,6 +173,11 @@ class FinanceRepositoryImpl implements FinanceRepository {
   }
 
   @override
+  Future<List<FundTransactionEntity>> getAllTransactions() async {
+    return List.from(await remoteDataSource.getAllTransactions());
+  }
+
+  @override
   Future<FundTransactionEntity> postFundMovement(PostFundRequest request) {
     return remoteDataSource.postFundMovement(request);
   }

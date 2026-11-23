@@ -98,6 +98,9 @@ abstract class FinanceRemoteDataSource {
   // Fund transactions
   Future<FundTransactionModel?> getTransactionById(String id);
   Future<List<FundTransactionModel>> getTransactionsForAccount(String accountId);
+
+  /// Every ledger row across all fund accounts, newest first (reports).
+  Future<List<FundTransactionModel>> getAllTransactions();
   Future<FundTransactionModel> postFundMovement(PostFundRequest request);
   Future<void> transferBetweenAccounts({
     required String fromAccountId,
@@ -959,6 +962,19 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     // index deploy. Optional index still speeds large accounts later.
     final snapshot =
         await _txs.where('fundAccountId', isEqualTo: accountId).get();
+    final list = snapshot.docs
+        .map((d) => FundTransactionModel.fromJson(d.data()))
+        .toList();
+    list.sort((a, b) => b.date.compareTo(a.date));
+    return list;
+  }
+
+  @override
+  Future<List<FundTransactionModel>> getAllTransactions() async {
+    // Unfiltered on purpose: reports need the full history for opening
+    // balances, and filtering client-side also covers legacy rows whose
+    // `date` is not an ISO string.
+    final snapshot = await _txs.get();
     final list = snapshot.docs
         .map((d) => FundTransactionModel.fromJson(d.data()))
         .toList();

@@ -18,6 +18,7 @@ import 'petty_cash_page.dart';
 import 'cash_advances_page.dart';
 import 'salaries_page.dart';
 import 'finance_master_data_page.dart';
+import 'finance_reports_page.dart';
 import '../../domain/entities/expense_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
 
@@ -45,7 +46,9 @@ class FinDT {
 /// - Expenses (list with filters)
 /// - Fund Accounts
 /// - Petty Cash Sessions
-/// - Expense Categories
+/// - Cash Advances / Salaries
+/// - Reports (filtered ledger / income / expense reports, Excel & PDF)
+/// - Master Data
 class FinanceDashboardPage extends StatefulWidget {
   const FinanceDashboardPage({super.key});
 
@@ -359,6 +362,8 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
       case 5:
         return const SalariesPage(key: ValueKey('salaries'));
       case 6:
+        return const FinanceReportsPage(key: ValueKey('reports'));
+      case 7:
         return const FinanceMasterDataPage(key: ValueKey('master_data'));
       default:
         return const SizedBox.shrink();
