@@ -9,6 +9,7 @@ import '../../domain/entities/fund_account_type_entity.dart';
 import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/entities/ledger_day_totals.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
+import '../../domain/entities/petty_cash_close_request.dart';
 import '../../domain/entities/post_fund_request.dart';
 import '../../domain/entities/salary_entity.dart';
 import '../../domain/entities/session_expense_item.dart';
@@ -245,17 +246,13 @@ class FinanceRepositoryImpl implements FinanceRepository {
   }
 
   @override
-  Future<PettyCashSessionEntity> closePettyCashSession({
-    required PettyCashSessionEntity session,
-    required String closedBy,
-    required String? closedByUserId,
-  }) {
-    return remoteDataSource.closePettyCashSession(
-      session: PettyCashSessionModel.fromEntity(session),
-      closedBy: closedBy,
-      closedByUserId: closedByUserId,
-    );
-  }
+  Future<PettyCashSessionEntity> closePettyCashSession(
+          PettyCashCloseRequest request) =>
+      remoteDataSource.closePettyCashSession(request);
+
+  @override
+  Future<FundAccountEntity> getFundAccountById(String accountId) =>
+      remoteDataSource.getFundAccountById(accountId);
 
   @override
   Future<void> verifyPettyCashSession({
@@ -263,12 +260,14 @@ class FinanceRepositoryImpl implements FinanceRepository {
     required String verifiedBy,
     required String? verifiedByUserId,
     String? resolutionNotes,
+    PettyCashResolution? resolution,
   }) {
     return remoteDataSource.verifyPettyCashSession(
       sessionId: sessionId,
       verifiedBy: verifiedBy,
       verifiedByUserId: verifiedByUserId,
       resolutionNotes: resolutionNotes,
+      resolution: resolution,
     );
   }
 

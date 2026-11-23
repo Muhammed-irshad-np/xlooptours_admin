@@ -9,6 +9,7 @@ import '../entities/fund_account_type_entity.dart';
 import '../entities/fund_transaction_entity.dart';
 import '../entities/ledger_day_totals.dart';
 import '../entities/petty_cash_session_entity.dart';
+import '../entities/petty_cash_close_request.dart';
 import '../entities/post_fund_request.dart';
 import '../entities/salary_entity.dart';
 import '../entities/session_expense_item.dart';
@@ -100,17 +101,16 @@ abstract class FinanceRepository {
   Future<List<PettyCashSessionEntity>> getPettyCashSessions(String accountId);
   Future<PettyCashSessionEntity?> getOpenSession(String accountId);
   Future<void> openPettyCashSession(PettyCashSessionEntity session);
-  Future<PettyCashSessionEntity> closePettyCashSession({
-    required PettyCashSessionEntity session,
-    required String closedBy,
-    required String? closedByUserId,
-  });
+  Future<PettyCashSessionEntity> closePettyCashSession(
+      PettyCashCloseRequest request);
   Future<void> verifyPettyCashSession({
     required String sessionId,
     required String verifiedBy,
     required String? verifiedByUserId,
     String? resolutionNotes,
+    PettyCashResolution? resolution,
   });
+  Future<FundAccountEntity> getFundAccountById(String accountId);
   Future<String> uploadClosingSheet(XFile file, String sessionId);
   Future<List<SessionExpenseItem>> getSessionExpenses(PettyCashSessionEntity session);
   Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt});
