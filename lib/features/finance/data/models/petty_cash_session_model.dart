@@ -25,6 +25,20 @@ class PettyCashSessionModel extends PettyCashSessionEntity {
     super.discrepancy,
     super.notes,
     required super.createdAt,
+    super.closedAt,
+    super.expectedCashAtClose,
+    super.expectedStcPayAtClose,
+    super.varianceCorrected = false,
+    super.closeTransactionIds = const [],
+    super.closeTransferCashToStc = 0.0,
+    super.recountCount = 0,
+    super.firstCountCash,
+    super.firstCountStcPay,
+    super.resolution,
+    super.salaryRecoveryAmount,
+    super.writeOffAmount,
+    super.resolutionAdvanceId,
+    super.resolutionExpenseId,
   });
 
   Map<String, dynamic> toJson() {
@@ -51,6 +65,20 @@ class PettyCashSessionModel extends PettyCashSessionEntity {
       'discrepancy': discrepancy,
       'notes': notes,
       'createdAt': createdAt.toIso8601String(),
+      'closedAt': closedAt?.toIso8601String(),
+      'expectedCashAtClose': expectedCashAtClose,
+      'expectedStcPayAtClose': expectedStcPayAtClose,
+      'varianceCorrected': varianceCorrected,
+      'closeTransactionIds': closeTransactionIds,
+      'closeTransferCashToStc': closeTransferCashToStc,
+      'recountCount': recountCount,
+      'firstCountCash': firstCountCash,
+      'firstCountStcPay': firstCountStcPay,
+      'resolution': resolution,
+      'salaryRecoveryAmount': salaryRecoveryAmount,
+      'writeOffAmount': writeOffAmount,
+      'resolutionAdvanceId': resolutionAdvanceId,
+      'resolutionExpenseId': resolutionExpenseId,
     };
   }
 
@@ -83,6 +111,26 @@ class PettyCashSessionModel extends PettyCashSessionEntity {
       discrepancy: (json['discrepancy'] as num?)?.toDouble(),
       notes: json['notes'] as String?,
       createdAt: _parseDateTime(json['createdAt']) ?? DateTime.now(),
+      closedAt: _parseDateTime(json['closedAt']),
+      expectedCashAtClose: (json['expectedCashAtClose'] as num?)?.toDouble(),
+      expectedStcPayAtClose:
+          (json['expectedStcPayAtClose'] as num?)?.toDouble(),
+      varianceCorrected: json['varianceCorrected'] as bool? ?? false,
+      closeTransactionIds: (json['closeTransactionIds'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      closeTransferCashToStc:
+          (json['closeTransferCashToStc'] as num?)?.toDouble() ?? 0.0,
+      recountCount: (json['recountCount'] as num?)?.toInt() ?? 0,
+      firstCountCash: (json['firstCountCash'] as num?)?.toDouble(),
+      firstCountStcPay: (json['firstCountStcPay'] as num?)?.toDouble(),
+      resolution: json['resolution'] as String?,
+      salaryRecoveryAmount:
+          (json['salaryRecoveryAmount'] as num?)?.toDouble(),
+      writeOffAmount: (json['writeOffAmount'] as num?)?.toDouble(),
+      resolutionAdvanceId: json['resolutionAdvanceId'] as String?,
+      resolutionExpenseId: json['resolutionExpenseId'] as String?,
     );
   }
 
@@ -123,6 +171,20 @@ class PettyCashSessionModel extends PettyCashSessionEntity {
       discrepancy: entity.discrepancy,
       notes: entity.notes,
       createdAt: entity.createdAt,
+      closedAt: entity.closedAt,
+      expectedCashAtClose: entity.expectedCashAtClose,
+      expectedStcPayAtClose: entity.expectedStcPayAtClose,
+      varianceCorrected: entity.varianceCorrected,
+      closeTransactionIds: entity.closeTransactionIds,
+      closeTransferCashToStc: entity.closeTransferCashToStc,
+      recountCount: entity.recountCount,
+      firstCountCash: entity.firstCountCash,
+      firstCountStcPay: entity.firstCountStcPay,
+      resolution: entity.resolution,
+      salaryRecoveryAmount: entity.salaryRecoveryAmount,
+      writeOffAmount: entity.writeOffAmount,
+      resolutionAdvanceId: entity.resolutionAdvanceId,
+      resolutionExpenseId: entity.resolutionExpenseId,
     );
   }
 

@@ -12,6 +12,8 @@ import '../../domain/entities/fund_account_entity.dart';
 import '../../domain/entities/fund_transaction_entity.dart';
 import '../../domain/entities/ledger_day_totals.dart';
 import '../../domain/entities/petty_cash_session_entity.dart';
+import '../../domain/entities/petty_cash_close_request.dart';
+import '../../domain/services/petty_cash_close_calculator.dart';
 import '../../domain/entities/post_fund_request.dart';
 import '../../domain/entities/salary_entity.dart';
 import '../../domain/entities/session_expense_item.dart';
@@ -39,6 +41,11 @@ const String driverTripExpenseType = 'Driver Trip Payment';
 /// remainder of a cash advance is written off.
 const String advanceWriteOffExpenseCategory = 'EMPLOYEES';
 const String advanceWriteOffExpenseType = 'Advance Write-off';
+
+/// Category/type of the tracking-only expense recorded when a petty cash
+/// shortage is written off at verification.
+const String pettyCashShortageExpenseCategory = 'COMPANY';
+const String pettyCashShortageExpenseType = 'Petty Cash Shortage';
 
 abstract class FinanceRemoteDataSource {
   // Expenses
@@ -129,18 +136,23 @@ abstract class FinanceRemoteDataSource {
   Future<List<PettyCashSessionModel>> getPettyCashSessions(String accountId);
   Future<PettyCashSessionModel?> getOpenSession(String accountId);
   Future<void> openPettyCashSession(PettyCashSessionModel session);
-  /// Recomputes day ledger totals then closes.
-  Future<PettyCashSessionModel> closePettyCashSession({
-    required PettyCashSessionModel session,
-    required String closedBy,
-    required String? closedByUserId,
-  });
+  /// Closes the register in one transaction: records any Cash↔STC transfer,
+  /// posts the count variance so the account equals what was counted, and
+  /// stores the count on the session.
+  Future<PettyCashSessionModel> closePettyCashSession(
+      PettyCashCloseRequest request);
+
+  /// Verifies and locks the day. For sessions whose variance was posted at
+  /// closing, [resolution] says how a shortage is settled (salary recovery
+  /// and/or write-off) or why an overage is accepted.
   Future<void> verifyPettyCashSession({
     required String sessionId,
     required String verifiedBy,
     required String? verifiedByUserId,
     String? resolutionNotes,
+    PettyCashResolution? resolution,
   });
+  Future<FundAccountModel> getFundAccountById(String accountId);
   Future<String> uploadClosingSheet(XFile file, String sessionId);
   Future<List<SessionExpenseItem>> getSessionExpenses(PettyCashSessionEntity session);
   Future<LedgerDayTotals> getLedgerDayTotals(String accountId, DateTime day, {DateTime? sessionOpenedAt});
@@ -1480,53 +1492,240 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
   }
 
   @override
-  Future<PettyCashSessionModel> closePettyCashSession({
-    required PettyCashSessionModel session,
-    required String closedBy,
-    required String? closedByUserId,
-  }) async {
-    if (session.status != PettyCashSessionStatus.open) {
+  Future<FundAccountModel> getFundAccountById(String accountId) =>
+      _getFundAccountOrThrow(accountId);
+
+  @override
+  Future<PettyCashSessionModel> closePettyCashSession(
+    PettyCashCloseRequest request,
+  ) async {
+    final sessionRef =
+        firestore.collection('petty_cash_sessions').doc(request.sessionId);
+    final preSnap = await sessionRef.get();
+    if (!preSnap.exists || preSnap.data() == null) {
+      throw StateError('Session not found');
+    }
+    final pre = PettyCashSessionModel.fromJson(preSnap.data()!);
+    if (pre.status != PettyCashSessionStatus.open) {
       throw StateError('Only open sessions can be closed');
     }
+    // The day's deposits/expenses, kept on the session for the history view.
+    // The expected amounts themselves come from the account inside the
+    // transaction below.
     final totals = await getLedgerDayTotals(
-      session.fundAccountId,
-      session.date,
-      sessionOpenedAt: session.createdAt,
+      pre.fundAccountId,
+      pre.date,
+      sessionOpenedAt: pre.createdAt,
     );
-    final closed = session.copyWith(
-      cashDeposits: totals.cashDeposits,
-      stcPayDeposits: totals.stcPayDeposits,
-      cashExpenses: totals.cashExpenses,
-      stcPayExpenses: totals.stcPayExpenses,
-      closedBy: closedBy,
-      status: PettyCashSessionStatus.closed,
-      discrepancy: session.closingBalance -
-          (session.openingCashBalance +
-              session.openingStcPayBalance +
-              totals.cashDeposits +
-              totals.stcPayDeposits -
-              totals.cashExpenses -
-              totals.stcPayExpenses),
+    final notes = request.notes?.trim();
+    final now = DateTime.now();
+
+    // Run every check once outside the transaction: on Flutter web an error
+    // thrown inside runTransaction loses its message. The same checks run
+    // again inside the transaction against fresh reads.
+    if (await isDayLocked(pre.fundAccountId, now)) {
+      throw StateError(
+        'Day ${DayLockEntity.dayKeyFrom(now)} is already locked for this '
+        'account, so nothing can be posted to it.',
+      );
+    }
+    _planPettyCashClose(
+      request: request,
+      account: await _getFundAccountOrThrow(pre.fundAccountId),
+      // Fresh read (not the cached policy) so both checks use the same rules.
+      policy: FinancePolicyEntity.fromJson((await _policyDoc.get()).data()),
+      notes: notes,
     );
-    // Fix expected using recomputed deposits/expenses
-    final expected = closed.expectedClosingBalance;
-    final withDisc = closed.copyWith(
-      discrepancy: session.closingBalance - expected,
-    );
-    await firestore
-        .collection('petty_cash_sessions')
-        .doc(session.id)
-        .update(PettyCashSessionModel.fromEntity(withDisc).toJson());
+
+    final closed = await firestore.runTransaction((txn) async {
+      // ── Reads (all before the first write) ──
+      final sSnap = await txn.get(sessionRef);
+      if (!sSnap.exists || sSnap.data() == null) {
+        throw StateError('Session not found');
+      }
+      final session = PettyCashSessionModel.fromJson(sSnap.data()!);
+      if (session.status != PettyCashSessionStatus.open) {
+        throw StateError('This register has already been closed');
+      }
+      final accountRef = _accounts.doc(session.fundAccountId);
+      final accSnap = await txn.get(accountRef);
+      if (!accSnap.exists || accSnap.data() == null) {
+        throw StateError('Fund account not found');
+      }
+      final account = FundAccountModel.fromJson(accSnap.data()!);
+      if (!account.isActive) {
+        throw StateError('Fund account is inactive');
+      }
+      final lockSnap = await txn
+          .get(_dayLocks.doc(DayLockEntity.lockId(session.fundAccountId, now)));
+      if (lockSnap.exists) {
+        throw StateError(
+          'Day ${DayLockEntity.dayKeyFrom(now)} is already locked for this '
+          'account, so nothing can be posted to it.',
+        );
+      }
+      final policySnap = await txn.get(_policyDoc);
+      final policy = FinancePolicyEntity.fromJson(policySnap.data());
+
+      final plan = _planPettyCashClose(
+        request: request,
+        account: account,
+        policy: policy,
+        notes: notes,
+      );
+
+      final refs = plan.lines.isEmpty
+          ? const <String>[]
+          : await _reserveTxReferences(txn, plan.lines.length);
+
+      // ── Writes ──
+      final dayKey = DayLockEntity.dayKeyFrom(session.date);
+      final txIds = <String>[];
+      for (var i = 0; i < plan.lines.length; i++) {
+        final line = plan.lines[i];
+        final id = _uuid.v4();
+        txIds.add(id);
+        final isTransfer = line.kind == PettyCashLineKind.transfer;
+        final amount = line.amountMinor / 100.0;
+        final tx = FundTransactionModel(
+          id: id,
+          referenceNumber: refs[i],
+          fundAccountId: session.fundAccountId,
+          type: FundTransactionType.adjustment,
+          amount: amount,
+          amountMinor: line.amountMinor,
+          currency: account.currency,
+          description: isTransfer
+              ? 'Register closing $dayKey: ${line.bucket.displayName} → '
+                  '${line.toBucket!.displayName}'
+              : 'Register closing $dayKey: ${line.bucket.displayName} '
+                  '${line.isCredit ? 'overage' : 'shortage'}',
+          performedBy: request.closedBy,
+          performedByUserId: request.closedByUserId,
+          date: now,
+          createdAt: now,
+          balanceBefore: line.balanceBeforeMinor / 100.0,
+          balanceAfter: line.balanceAfterMinor / 100.0,
+          bucket: line.bucket,
+          auditNote: isTransfer
+              ? 'petty_cash_close_transfer:${session.id}'
+              : 'petty_cash_close_variance:${session.id}',
+        );
+        txn.set(_txs.doc(id), tx.toJson());
+      }
+
+      if (plan.lines.isNotEmpty) {
+        txn.update(accountRef, {
+          'currentBalanceMinor': plan.newTotalMinor,
+          'cashBalanceMinor': plan.newCashMinor,
+          'stcPayBalanceMinor': plan.newStcMinor,
+          'currentBalance': plan.newTotalMinor / 100.0,
+          'cashBalance': plan.newCashMinor / 100.0,
+          'stcPayBalance': plan.newStcMinor / 100.0,
+        });
+      }
+
+      final result = PettyCashSessionModel.fromEntity(session.copyWith(
+        status: PettyCashSessionStatus.closed,
+        closedBy: request.closedBy,
+        closedAt: now,
+        cashDeposits: totals.cashDeposits,
+        stcPayDeposits: totals.stcPayDeposits,
+        cashExpenses: totals.cashExpenses,
+        stcPayExpenses: totals.stcPayExpenses,
+        cashInHand: plan.countedCashMinor / 100.0,
+        stcPayBalance: plan.countedStcMinor / 100.0,
+        closingBalance: plan.countedTotalMinor / 100.0,
+        expectedCashAtClose: plan.expectedCashMinor / 100.0,
+        expectedStcPayAtClose: plan.expectedStcMinor / 100.0,
+        discrepancy: plan.totalVarianceMinor / 100.0,
+        varianceCorrected: true,
+        closeTransactionIds: txIds,
+        closeTransferCashToStc: plan.transferCashToStcMinor / 100.0,
+        recountCount: request.recountCount,
+        firstCountCash: request.firstCountCashMinor == null
+            ? null
+            : request.firstCountCashMinor! / 100.0,
+        firstCountStcPay: request.firstCountStcMinor == null
+            ? null
+            : request.firstCountStcMinor! / 100.0,
+        notes: (notes != null && notes.isNotEmpty) ? notes : null,
+      ));
+      // update (not set) keeps any legacy fields on the document.
+      txn.update(sessionRef, result.toJson());
+      return result;
+    });
+
     await _writeAudit(
       action: 'petty_cash.close',
       entityType: 'petty_cash_session',
-      entityId: session.id,
-      actorUserId: closedByUserId,
-      actorName: closedBy,
-      detail:
-          'disc=${withDisc.discrepancy?.toStringAsFixed(2)} expected=$expected',
+      entityId: closed.id,
+      actorUserId: request.closedByUserId,
+      actorName: request.closedBy,
+      detail: 'counted cash=${closed.cashInHand.toStringAsFixed(2)} '
+          'stc=${(closed.stcPayBalance ?? 0).toStringAsFixed(2)}; '
+          'expected cash=${closed.expectedCashClosing.toStringAsFixed(2)} '
+          'stc=${closed.expectedStcPayClosing.toStringAsFixed(2)}; '
+          'transfer=${closed.closeTransferCashToStc.toStringAsFixed(2)}; '
+          'disc=${closed.discrepancy?.toStringAsFixed(2)}; '
+          'recounts=${closed.recountCount}; '
+          'ledger=${closed.closeTransactionIds.join(',')}',
     );
-    return PettyCashSessionModel.fromEntity(withDisc);
+    return closed;
+  }
+
+  /// Checks a closing against the account and policy and returns what to
+  /// post. Throws with a message the closer can act on.
+  PettyCashClosePlan _planPettyCashClose({
+    required PettyCashCloseRequest request,
+    required FundAccountEntity account,
+    required FinancePolicyEntity policy,
+    required String? notes,
+  }) {
+    if (!account.isActive) {
+      throw StateError('Fund account is inactive');
+    }
+    if (account.cashBalanceMinor != request.seenAccountCashMinor ||
+        account.stcPayBalanceMinor != request.seenAccountStcMinor) {
+      throw PettyCashBalancesChangedError(
+        accountCashMinor: account.cashBalanceMinor,
+        accountStcMinor: account.stcPayBalanceMinor,
+      );
+    }
+    final plan = PettyCashCloseCalculator.plan(
+      accountTotalMinor: account.currentBalanceMinor,
+      accountCashMinor: account.cashBalanceMinor,
+      accountStcMinor: account.stcPayBalanceMinor,
+      countedCashMinor: request.countedCashMinor,
+      countedStcMinor: request.countedStcMinor,
+      transferCashToStcMinor: request.transferCashToStcMinor,
+    );
+    final checks = PettyCashCloseCalculator.checks(
+      cashVarianceMinor: plan.cashVarianceMinor,
+      stcVarianceMinor: plan.stcVarianceMinor,
+      recountAboveMinor:
+          PettyCashCloseCalculator.toMinor(policy.pettyCashRecountAbove),
+      adminCloseAboveMinor:
+          PettyCashCloseCalculator.toMinor(policy.pettyCashAdminCloseAbove),
+    );
+    if (checks.needsReason && (notes == null || notes.isEmpty)) {
+      throw StateError('Please explain the difference before closing.');
+    }
+    if (checks.needsRecount && request.recountCount < 1) {
+      throw StateError(
+        'The difference is more than '
+        '${policy.pettyCashRecountAbove.toStringAsFixed(2)} SAR. '
+        'Please count again before closing.',
+      );
+    }
+    if (checks.needsAdmin && !request.closerCanApproveLargeVariance) {
+      throw StateError(
+        'The difference is more than '
+        '${policy.pettyCashAdminCloseAbove.toStringAsFixed(2)} SAR. '
+        'An admin must close this register.',
+      );
+    }
+    return plan;
   }
 
   @override
@@ -1535,6 +1734,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     required String verifiedBy,
     required String? verifiedByUserId,
     String? resolutionNotes,
+    PettyCashResolution? resolution,
   }) async {
     final ref = firestore.collection('petty_cash_sessions').doc(sessionId);
     final snap = await ref.get();
@@ -1545,6 +1745,215 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     if (session.status != PettyCashSessionStatus.closed) {
       throw StateError('Only closed sessions can be verified');
     }
+    if (!session.varianceCorrected) {
+      return _verifyLegacySession(
+        ref: ref,
+        session: session,
+        sessionId: sessionId,
+        verifiedBy: verifiedBy,
+        verifiedByUserId: verifiedByUserId,
+        resolutionNotes: resolutionNotes,
+      );
+    }
+
+    // The variance was already posted to the account at closing, so the
+    // account is correct. Verifying only decides who carries a shortage:
+    // a salary recovery (an advance with no fund movement, recovered at
+    // payroll) and/or a write-off (recorded as a tracking-only expense).
+    final r = resolution ?? const PettyCashResolution();
+    final reason = r.reason?.trim();
+    final varianceMinor =
+        PettyCashCloseCalculator.toMinor(session.discrepancy ?? 0);
+    var recoveryMinor = 0;
+    var writeOffMinor = 0;
+    final String resolutionKey;
+    if (varianceMinor < 0) {
+      final split = PettyCashCloseCalculator.splitShortage(
+        shortageMinor: -varianceMinor,
+        recoveryMinor: r.salaryRecoveryMinor,
+      );
+      recoveryMinor = split.recoveryMinor;
+      writeOffMinor = split.writeOffMinor;
+      if (recoveryMinor > 0 &&
+          (r.employeeId == null || r.employeeId!.isEmpty)) {
+        throw StateError(
+            'Choose the employee whose salary the shortage is recovered from');
+      }
+      if (writeOffMinor > 0 && (reason == null || reason.isEmpty)) {
+        throw StateError('A reason is required to write off a shortage');
+      }
+      resolutionKey = recoveryMinor > 0 && writeOffMinor > 0
+          ? 'salaryRecoveryAndWriteOff'
+          : (recoveryMinor > 0 ? 'salaryRecovery' : 'writeOff');
+    } else if (varianceMinor > 0) {
+      if (r.salaryRecoveryMinor != 0) {
+        throw StateError('An overage cannot be recovered from salary');
+      }
+      if (reason == null || reason.isEmpty) {
+        throw StateError('Please note why the overage is accepted');
+      }
+      resolutionKey = 'overageAccepted';
+    } else {
+      if (r.salaryRecoveryMinor != 0) {
+        throw StateError('This session is balanced; there is nothing to recover');
+      }
+      resolutionKey = 'balanced';
+    }
+
+    if (recoveryMinor > 0) {
+      final empSnap =
+          await firestore.collection('employees').doc(r.employeeId).get();
+      final data = empSnap.data();
+      if (empSnap.exists && data != null && data['isActive'] == false) {
+        throw StateError(
+          '${r.employeeName ?? 'This employee'} is inactive and cannot be '
+          'charged a salary recovery',
+        );
+      }
+    }
+
+    final account = await _getFundAccountOrThrow(session.fundAccountId);
+    final now = DateTime.now();
+    final dayKey = DayLockEntity.dayKeyFrom(session.date);
+    final fmt = PettyCashCloseCalculator.formatPlain;
+
+    CashAdvanceModel? advance;
+    if (recoveryMinor > 0) {
+      advance = CashAdvanceModel(
+        id: _uuid.v4(),
+        fundAccountId: account.id,
+        fundAccountName: account.name,
+        employeeId: r.employeeId!,
+        employeeName: r.employeeName ?? '',
+        amount: recoveryMinor / 100.0,
+        amountMinor: recoveryMinor,
+        settledAmount: 0,
+        currency: account.currency,
+        purpose: 'Petty cash shortage $dayKey - recover from salary',
+        status: CashAdvanceStatus.open,
+        issuedBy: verifiedBy,
+        issuedByUserId: verifiedByUserId,
+        issuedAt: now,
+        notes: 'Shortage on ${account.name} register $dayKey '
+            '(session ${session.id}). No money left the fund with this '
+            'advance: the shortage was taken off the account when the '
+            'register was closed.',
+        createdAt: now,
+      );
+    }
+
+    ExpenseModel? writeOff;
+    if (writeOffMinor > 0) {
+      writeOff = ExpenseModel(
+        id: _uuid.v4(),
+        referenceNumber: await generateReferenceNumber(),
+        date: now,
+        createdAt: now,
+        submittedBy: verifiedBy,
+        submittedByRole: 'ADMIN',
+        submittedByUserId: verifiedByUserId,
+        expenseCategory: pettyCashShortageExpenseCategory,
+        expenseType: pettyCashShortageExpenseType,
+        description: 'Petty cash shortage written off: ${account.name} '
+            'register $dayKey',
+        amount: writeOffMinor / 100.0,
+        amountMinor: writeOffMinor,
+        currency: account.currency,
+        fundAccountId: account.id,
+        fundAccountName: account.name,
+        // Tracking-only: the shortage already left the account at closing.
+        isNonWallet: true,
+        status: ExpenseStatus.approved,
+        approvedBy: verifiedBy,
+        approvedByUserId: verifiedByUserId,
+        approvedAt: now,
+        notes: reason,
+      );
+    }
+
+    final summary = switch (resolutionKey) {
+      'balanced' => null,
+      'overageAccepted' =>
+        'Overage of ${fmt(varianceMinor)} SAR accepted: $reason',
+      _ => [
+          if (recoveryMinor > 0)
+            '${fmt(recoveryMinor)} SAR to be recovered from '
+                '${r.employeeName}\'s salary',
+          if (writeOffMinor > 0)
+            '${fmt(writeOffMinor)} SAR written off: $reason',
+        ].join('; '),
+    };
+    final existingNotes = session.notes ?? '';
+    final combinedNotes = summary == null
+        ? existingNotes
+        : (existingNotes.isNotEmpty
+            ? '$existingNotes\n[Resolution: $summary]'
+            : '[Resolution: $summary]');
+    final lockId = DayLockEntity.lockId(session.fundAccountId, session.date);
+
+    await firestore.runTransaction((txn) async {
+      final fresh = await txn.get(ref);
+      if (!fresh.exists || fresh.data() == null) {
+        throw StateError('Session not found');
+      }
+      if (PettyCashSessionModel.fromJson(fresh.data()!).status !=
+          PettyCashSessionStatus.closed) {
+        throw StateError('This session has already been verified');
+      }
+      txn.update(ref, _stripNulls({
+        'status': 'verified',
+        'verifiedBy': verifiedBy,
+        'verifiedAt': now.toIso8601String(),
+        'notes': combinedNotes.isNotEmpty ? combinedNotes : null,
+        'resolution': resolutionKey,
+        'salaryRecoveryAmount': recoveryMinor / 100.0,
+        'writeOffAmount': writeOffMinor / 100.0,
+        'resolutionAdvanceId': advance?.id,
+        'resolutionExpenseId': writeOff?.id,
+      }));
+      txn.set(_dayLocks.doc(lockId), {
+        'id': lockId,
+        'fundAccountId': session.fundAccountId,
+        'dayKey': DayLockEntity.dayKeyFrom(session.date),
+        'day': DateTime(session.date.year, session.date.month, session.date.day)
+            .toIso8601String(),
+        'lockedBy': verifiedBy,
+        'lockedByUserId': verifiedByUserId,
+        'lockedAt': now.toIso8601String(),
+        'sessionId': sessionId,
+        'reason': 'Petty cash day verified',
+      });
+      if (advance != null) {
+        txn.set(_advances.doc(advance.id), _stripNulls(advance.toJson()));
+      }
+      if (writeOff != null) {
+        txn.set(_expenses.doc(writeOff.id), _stripNulls(writeOff.toJson()));
+      }
+    });
+
+    await _writeAudit(
+      action: 'petty_cash.verify_and_lock',
+      entityType: 'petty_cash_session',
+      entityId: sessionId,
+      actorUserId: verifiedByUserId,
+      actorName: verifiedBy,
+      detail: 'dayLock=$lockId resolution=$resolutionKey '
+          'recovery=${fmt(recoveryMinor)} writeOff=${fmt(writeOffMinor)}'
+          '${advance != null ? ' advance=${advance.id}' : ''}'
+          '${writeOff != null ? ' expense=${writeOff.id}' : ''}',
+    );
+  }
+
+  /// Sessions closed before closing posted the variance: verifying only
+  /// locks the day and records the note (unchanged behaviour).
+  Future<void> _verifyLegacySession({
+    required DocumentReference<Map<String, dynamic>> ref,
+    required PettyCashSessionModel session,
+    required String sessionId,
+    required String verifiedBy,
+    required String? verifiedByUserId,
+    String? resolutionNotes,
+  }) async {
     final now = DateTime.now();
     final lockId = DayLockEntity.lockId(session.fundAccountId, session.date);
     final dayKey = DayLockEntity.dayKeyFrom(session.date);

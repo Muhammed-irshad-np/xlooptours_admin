@@ -1,3 +1,4 @@
+import '../entities/petty_cash_close_request.dart';
 import '../entities/petty_cash_session_entity.dart';
 import '../repositories/finance_repository.dart';
 
@@ -6,15 +7,7 @@ class ClosePettyCashSessionUseCase {
 
   ClosePettyCashSessionUseCase(this.repository);
 
-  Future<PettyCashSessionEntity> call({
-    required PettyCashSessionEntity session,
-    required String closedBy,
-    required String? closedByUserId,
-  }) {
-    return repository.closePettyCashSession(
-      session: session,
-      closedBy: closedBy,
-      closedByUserId: closedByUserId,
-    );
+  Future<PettyCashSessionEntity> call(PettyCashCloseRequest request) {
+    return repository.closePettyCashSession(request);
   }
 }

@@ -5,7 +5,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/utils/receipt_picker.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -21,8 +20,11 @@ import '../../domain/entities/petty_cash_session_entity.dart';
 import '../../domain/entities/session_expense_item.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../../domain/services/finance_permission_service.dart';
+import '../../domain/services/petty_cash_close_calculator.dart';
+import '../../domain/entities/petty_cash_close_request.dart';
 import '../widgets/expense_review_dialog.dart';
 import '../widgets/finance_dialog_helpers.dart';
+import '../widgets/petty_cash_close_dialog.dart';
 import 'finance_dashboard_page.dart';
 import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
@@ -440,10 +442,18 @@ class _PettyCashPageState extends State<PettyCashPage> {
               final stcDep = live?.stcPayDeposits ?? session.stcPayDeposits;
               final expTotal = cashExp + stcExp;
               final depTotal = cashDep + stcDep;
-              final expectedCash =
-                  session.openingCashBalance + cashDep - cashExp;
-              final expectedStc =
-                  session.openingStcPayBalance + stcDep - stcExp;
+              // Expected = the account's own Cash/STC balances: they include
+              // every posting (transfers, adjustments, voids too), and they
+              // are what the closing count is compared against.
+              final liveAcc = provider.liveAccount;
+              final hasLive =
+                  liveAcc != null && liveAcc.id == session.fundAccountId;
+              final expectedCash = hasLive
+                  ? liveAcc.cashBalance
+                  : session.openingCashBalance + cashDep - cashExp;
+              final expectedStc = hasLive
+                  ? liveAcc.stcPayBalance
+                  : session.openingStcPayBalance + stcDep - stcExp;
               final expected = expectedCash + expectedStc;
 
               return Column(
@@ -951,8 +961,11 @@ class _PettyCashPageState extends State<PettyCashPage> {
                 final cashDep = live?.cashDeposits ?? session.cashDeposits;
                 final stcDep = live?.stcPayDeposits ?? session.stcPayDeposits;
                 final totalDep = cashDep + stcDep;
+                final liveAcc = provider.liveAccount;
                 final expectedBal = live != null
-                    ? (session.openingBalance + totalDep - totalExp)
+                    ? ((liveAcc != null && liveAcc.id == session.fundAccountId)
+                        ? liveAcc.cashBalance + liveAcc.stcPayBalance
+                        : session.openingBalance + totalDep - totalExp)
                     : session.expectedClosingBalance;
 
                 return Container(
@@ -1138,6 +1151,14 @@ class _PettyCashPageState extends State<PettyCashPage> {
                                 ],
                               ],
                             ),
+                            if (session.varianceCorrected &&
+                                session.status != PettyCashSessionStatus.open) ...[
+                              SizedBox(height: 3.h),
+                              Text(
+                                _closingDetailLine(session, formatter),
+                                style: GoogleFonts.inter(fontSize: 10.sp, color: FinDT.textSecondary),
+                              ),
+                            ],
                             if (session.notes != null && session.notes!.trim().isNotEmpty) ...[
                               SizedBox(height: 3.h),
                               Text(
@@ -1418,768 +1439,66 @@ class _PettyCashPageState extends State<PettyCashPage> {
     );
   }
 
-  void _showCloseSessionDialog(
+  Future<void> _showCloseSessionDialog(
     BuildContext context,
     PettyCashProvider provider,
     PettyCashSessionEntity session,
-  ) {
-    final formKey = GlobalKey<FormState>();
-    final live = provider.previewTotals;
-    final liveCashDep = live?.cashDeposits ?? session.cashDeposits;
-    final liveStcDep = live?.stcPayDeposits ?? session.stcPayDeposits;
-    final liveCashExp = live?.cashExpenses ?? session.cashExpenses;
-    final liveStcExp = live?.stcPayExpenses ?? session.stcPayExpenses;
-    // Mutable so they can be recomputed after a bucket transfer
-    double expectedCash = session.openingCashBalance + liveCashDep - liveCashExp;
-    double expectedStc = session.openingStcPayBalance + liveStcDep - liveStcExp;
-    double expectedTotal = expectedCash + expectedStc;
-    final cashCtrl = TextEditingController(text: expectedCash.toStringAsFixed(2));
-    final digitalCtrl = TextEditingController(text: expectedStc.toStringAsFixed(2));
-    final notesCtrl = TextEditingController();
+  ) async {
+    final user = context.read<AuthProvider>().user;
+    final policy = context.read<FinanceProvider>().policy;
+    final fundAccProv = context.read<FundAccountProvider>();
+    final messenger = ScaffoldMessenger.of(context);
     final formatter = NumberFormat('#,##0.00', 'en_US');
-    String? closingSheetUrl;
-    bool isSubmitting = false;
 
-    // Bucket transfer state
-    final transferAmtCtrl = TextEditingController();
-    bool isCashToStc = true; // true = Cash→STC, false = STC→Cash
-    bool isTransferring = false;
-    List<_BucketTransferRecord> appliedTransfers = [];
-
-    showDialog(
+    final closed = await showPettyCashCloseDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setStateDialog) {
-          final enteredCash = double.tryParse(cashCtrl.text.trim()) ?? 0.0;
-          final enteredStc = double.tryParse(digitalCtrl.text.trim()) ?? 0.0;
-          final enteredTotal = enteredCash + enteredStc;
+      provider: provider,
+      session: session,
+      policy: policy,
+      closedBy: user?.actorLabel ?? 'Unknown',
+      closedByUserId: user?.id,
+      canApproveLargeVariance: FinancePermissionService.canVerifySession(
+        user: user,
+        policy: policy,
+      ),
+      onViewExpenses: () => _showSessionExpensesDialog(context, provider, session),
+    );
+    if (closed == null) return;
 
-          final cashDiff = enteredCash - expectedCash;
-          final stcDiff = enteredStc - expectedStc;
-          final totalDiff = enteredTotal - expectedTotal;
-
-          final isBalanced = totalDiff.abs() < 0.01;
-          final isShortage = totalDiff < -0.01;
-
-          return AlertDialog(
-            backgroundColor: Colors.white,
-            surfaceTintColor: Colors.transparent,
-            shape: finDialogShape,
-            title: finDialogTitle('Close Daily Register', icon: Icons.lock_clock_outlined),
-            content: SizedBox(
-              width: 460.w,
-              child: SingleChildScrollView(
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Expected Closing Breakdown Card
-                      Container(
-                        padding: EdgeInsets.all(12.w),
-                        decoration: BoxDecoration(
-                          color: FinDT.brand.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(10.r),
-                          border: Border.all(color: FinDT.brand.withValues(alpha: 0.2)),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Expected Closing Breakdown (Live Ledger):',
-                              style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w600, color: FinDT.textSecondary),
-                            ),
-                            SizedBox(height: 4.h),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Cash: ${formatter.format(expectedCash)} SAR',
-                                  style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w700, color: FinDT.textPrimary),
-                                ),
-                                Text(
-                                  'STC Pay: ${formatter.format(expectedStc)} SAR',
-                                  style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w700, color: const Color(0xFF6D28D9)),
-                                ),
-                              ],
-                            ),
-                            Divider(height: 12.h, color: FinDT.border),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Total Expected:',
-                                  style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
-                                ),
-                                Text(
-                                  '${formatter.format(expectedTotal)} SAR',
-                                  style: GoogleFonts.inter(fontSize: 13.sp, fontWeight: FontWeight.w700, color: FinDT.brand),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 12.h),
-
-                      // ─── Bucket Transfer Section ───
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10.r),
-                          border: Border.all(color: FinDT.border.withValues(alpha: 0.5)),
-                        ),
-                        child: Theme(
-                          data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                          child: ExpansionTile(
-                            tilePadding: EdgeInsets.symmetric(horizontal: 12.w),
-                            childrenPadding: EdgeInsets.fromLTRB(12.w, 0, 12.w, 12.h),
-                            leading: Container(
-                              padding: EdgeInsets.all(6.w),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF8B5CF6).withValues(alpha: 0.12),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(Icons.swap_horiz_rounded, size: 16.sp, color: const Color(0xFF7C3AED)),
-                            ),
-                            title: Text(
-                              'Adjust Cash ↔ STC Pay',
-                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
-                            ),
-                            subtitle: Text(
-                              appliedTransfers.isEmpty
-                                  ? 'Rebalance before closing'
-                                  : '${appliedTransfers.length} transfer${appliedTransfers.length > 1 ? 's' : ''} applied',
-                              style: GoogleFonts.inter(
-                                fontSize: 10.sp,
-                                color: appliedTransfers.isEmpty ? FinDT.textSecondary : const Color(0xFF059669),
-                                fontWeight: appliedTransfers.isNotEmpty ? FontWeight.w600 : FontWeight.w400,
-                              ),
-                            ),
-                            children: [
-                              // Direction toggle
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () => setStateDialog(() => isCashToStc = true),
-                                      child: Container(
-                                        padding: EdgeInsets.symmetric(vertical: 8.h),
-                                        decoration: BoxDecoration(
-                                          color: isCashToStc
-                                              ? const Color(0xFF7C3AED).withValues(alpha: 0.12)
-                                              : FinDT.bgPage,
-                                          borderRadius: BorderRadius.circular(8.r),
-                                          border: Border.all(
-                                            color: isCashToStc
-                                                ? const Color(0xFF7C3AED).withValues(alpha: 0.5)
-                                                : FinDT.border,
-                                          ),
-                                        ),
-                                        child: Column(
-                                          children: [
-                                            Icon(Icons.payments_outlined, size: 14.sp,
-                                                color: isCashToStc ? const Color(0xFF7C3AED) : FinDT.textSecondary),
-                                            SizedBox(height: 2.h),
-                                            Text(
-                                              'Cash → STC Pay',
-                                              textAlign: TextAlign.center,
-                                              style: GoogleFonts.inter(
-                                                fontSize: 10.sp,
-                                                fontWeight: isCashToStc ? FontWeight.w700 : FontWeight.w500,
-                                                color: isCashToStc ? const Color(0xFF7C3AED) : FinDT.textSecondary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  SizedBox(width: 8.w),
-                                  Expanded(
-                                    child: GestureDetector(
-                                      onTap: () => setStateDialog(() => isCashToStc = false),
-                                      child: Container(
-                                        padding: EdgeInsets.symmetric(vertical: 8.h),
-                                        decoration: BoxDecoration(
-                                          color: !isCashToStc
-                                              ? const Color(0xFF7C3AED).withValues(alpha: 0.12)
-                                              : FinDT.bgPage,
-                                          borderRadius: BorderRadius.circular(8.r),
-                                          border: Border.all(
-                                            color: !isCashToStc
-                                                ? const Color(0xFF7C3AED).withValues(alpha: 0.5)
-                                                : FinDT.border,
-                                          ),
-                                        ),
-                                        child: Column(
-                                          children: [
-                                            Icon(Icons.phone_android_outlined, size: 14.sp,
-                                                color: !isCashToStc ? const Color(0xFF7C3AED) : FinDT.textSecondary),
-                                            SizedBox(height: 2.h),
-                                            Text(
-                                              'STC Pay → Cash',
-                                              textAlign: TextAlign.center,
-                                              style: GoogleFonts.inter(
-                                                fontSize: 10.sp,
-                                                fontWeight: !isCashToStc ? FontWeight.w700 : FontWeight.w500,
-                                                color: !isCashToStc ? const Color(0xFF7C3AED) : FinDT.textSecondary,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 10.h),
-                              // Amount + Apply
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: TextFormField(
-                                      controller: transferAmtCtrl,
-                                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                                      ],
-                                      decoration: finDialogInputDecoration(
-                                        label: 'Amount',
-                                        hint: '0.00',
-                                        prefixIcon: Icons.attach_money_rounded,
-                                        suffixText: 'SAR',
-                                      ),
-                                      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                                    ),
-                                  ),
-                                  SizedBox(width: 8.w),
-                                  SizedBox(
-                                    height: 48.h,
-                                    child: ElevatedButton(
-                                      onPressed: isTransferring
-                                          ? null
-                                          : () async {
-                                              final amt = double.tryParse(transferAmtCtrl.text.trim()) ?? 0;
-                                              if (amt <= 0) {
-                                                ScaffoldMessenger.of(context).showSnackBar(
-                                                  SnackBar(
-                                                    content: const Text('Enter a valid amount'),
-                                                    backgroundColor: FinDT.danger,
-                                                  ),
-                                                );
-                                                return;
-                                              }
-                                              final user = context.read<AuthProvider>().user;
-                                              setStateDialog(() => isTransferring = true);
-                                              try {
-                                                await provider.transferBucket(
-                                                  fundAccountId: session.fundAccountId,
-                                                  amountMajor: amt,
-                                                  fromBucket: isCashToStc ? FundBucket.cash : FundBucket.stcPay,
-                                                  toBucket: isCashToStc ? FundBucket.stcPay : FundBucket.cash,
-                                                  performedBy: user?.actorLabel ?? 'Unknown',
-                                                  performedByUserId: user?.id,
-                                                );
-                                                // Recompute expected values from refreshed totals
-                                                final newTotals = provider.previewTotals;
-                                                final newCashDep = newTotals?.cashDeposits ?? session.cashDeposits;
-                                                final newStcDep = newTotals?.stcPayDeposits ?? session.stcPayDeposits;
-                                                final newCashExp = newTotals?.cashExpenses ?? session.cashExpenses;
-                                                final newStcExp = newTotals?.stcPayExpenses ?? session.stcPayExpenses;
-                                                expectedCash = session.openingCashBalance + newCashDep - newCashExp;
-                                                expectedStc = session.openingStcPayBalance + newStcDep - newStcExp;
-                                                expectedTotal = expectedCash + expectedStc;
-                                                cashCtrl.text = expectedCash.toStringAsFixed(2);
-                                                digitalCtrl.text = expectedStc.toStringAsFixed(2);
-                                                appliedTransfers.add(_BucketTransferRecord(
-                                                  amount: amt,
-                                                  isCashToStc: isCashToStc,
-                                                ));
-                                                transferAmtCtrl.clear();
-                                                setStateDialog(() => isTransferring = false);
-                                                if (context.mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    SnackBar(
-                                                      content: Text(
-                                                        '${formatter.format(amt)} SAR moved: ${isCashToStc ? 'Cash → STC Pay' : 'STC Pay → Cash'}',
-                                                      ),
-                                                      backgroundColor: const Color(0xFF059669),
-                                                    ),
-                                                  );
-                                                }
-                                              } catch (e) {
-                                                setStateDialog(() => isTransferring = false);
-                                                if (context.mounted) {
-                                                  ScaffoldMessenger.of(context).showSnackBar(
-                                                    SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
-                                                  );
-                                                }
-                                              }
-                                            },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF7C3AED),
-                                        foregroundColor: Colors.white,
-                                        elevation: 0,
-                                        padding: EdgeInsets.symmetric(horizontal: 16.w),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8.r),
-                                        ),
-                                      ),
-                                      child: isTransferring
-                                          ? SizedBox(
-                                              width: 16.sp,
-                                              height: 16.sp,
-                                              child: CircularProgressIndicator(
-                                                strokeWidth: 2,
-                                                color: Colors.white,
-                                              ),
-                                            )
-                                          : Text(
-                                              'Apply',
-                                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
-                                            ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              // Applied transfers list
-                              if (appliedTransfers.isNotEmpty) ...[
-                                SizedBox(height: 10.h),
-                                Container(
-                                  padding: EdgeInsets.all(8.w),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF059669).withValues(alpha: 0.06),
-                                    borderRadius: BorderRadius.circular(8.r),
-                                    border: Border.all(color: const Color(0xFF059669).withValues(alpha: 0.2)),
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Applied Transfers:',
-                                        style: GoogleFonts.inter(fontSize: 10.sp, fontWeight: FontWeight.w600, color: const Color(0xFF065F46)),
-                                      ),
-                                      SizedBox(height: 4.h),
-                                      ...appliedTransfers.map((t) => Padding(
-                                            padding: EdgeInsets.only(bottom: 2.h),
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.check_circle_outline, size: 12.sp, color: const Color(0xFF059669)),
-                                                SizedBox(width: 4.w),
-                                                Text(
-                                                  '${formatter.format(t.amount)} SAR ${t.isCashToStc ? 'Cash → STC Pay' : 'STC Pay → Cash'}',
-                                                  style: GoogleFonts.inter(fontSize: 10.sp, color: const Color(0xFF065F46)),
-                                                ),
-                                              ],
-                                            ),
-                                          )),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 14.h),
-
-                      // Count Input Fields
-                      TextFormField(
-                        controller: cashCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                        ],
-                        onChanged: (_) => setStateDialog(() {}),
-                        decoration: finDialogInputDecoration(
-                          label: 'Physical Cash in Hand *',
-                          hint: '0.00',
-                          prefixIcon: Icons.payments_outlined,
-                          suffixText: 'SAR',
-                        ),
-                        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                      ),
-                      SizedBox(height: 12.h),
-                      TextFormField(
-                        controller: digitalCtrl,
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
-                        ],
-                        onChanged: (_) => setStateDialog(() {}),
-                        decoration: finDialogInputDecoration(
-                          label: 'STC Pay Balance *',
-                          hint: '0.00',
-                          prefixIcon: Icons.phone_android_outlined,
-                          suffixText: 'SAR',
-                        ),
-                        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                        validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-                      ),
-                      SizedBox(height: 14.h),
-
-                      // LIVE RECONCILIATION & DISCREPANCY STATUS CARD
-                      Container(
-                        padding: EdgeInsets.all(12.w),
-                        decoration: BoxDecoration(
-                          color: isBalanced
-                              ? const Color(0xFF10B981).withValues(alpha: 0.08)
-                              : (isShortage
-                                  ? const Color(0xFFEF4444).withValues(alpha: 0.08)
-                                  : const Color(0xFF3B82F6).withValues(alpha: 0.08)),
-                          borderRadius: BorderRadius.circular(10.r),
-                          border: Border.all(
-                            color: isBalanced
-                                ? const Color(0xFF10B981).withValues(alpha: 0.35)
-                                : (isShortage
-                                    ? const Color(0xFFEF4444).withValues(alpha: 0.35)
-                                    : const Color(0xFF3B82F6).withValues(alpha: 0.35)),
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: EdgeInsets.all(6.w),
-                                  decoration: BoxDecoration(
-                                    color: isBalanced
-                                        ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                                        : (isShortage
-                                            ? const Color(0xFFEF4444).withValues(alpha: 0.15)
-                                            : const Color(0xFF3B82F6).withValues(alpha: 0.15)),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    isBalanced
-                                        ? Icons.check_circle_rounded
-                                        : (isShortage
-                                            ? Icons.warning_amber_rounded
-                                            : Icons.info_outline_rounded),
-                                    size: 18.sp,
-                                    color: isBalanced
-                                        ? const Color(0xFF059669)
-                                        : (isShortage ? const Color(0xFFDC2626) : const Color(0xFF2563EB)),
-                                  ),
-                                ),
-                                SizedBox(width: 8.w),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        isBalanced
-                                            ? 'Balanced (0.00 SAR Discrepancy)'
-                                            : (isShortage
-                                                ? 'Shortage Detected: -${formatter.format(totalDiff.abs())} SAR'
-                                                : 'Overage Detected: +${formatter.format(totalDiff)} SAR'),
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12.sp,
-                                          fontWeight: FontWeight.w700,
-                                          color: isBalanced
-                                              ? const Color(0xFF065F46)
-                                              : (isShortage
-                                                  ? const Color(0xFF991B1B)
-                                                  : const Color(0xFF1E40AF)),
-                                        ),
-                                      ),
-                                      SizedBox(height: 2.h),
-                                      Text(
-                                        isBalanced
-                                            ? 'Declared counts match expected balances exactly.'
-                                            : (isShortage
-                                                ? 'Count is LESS than expected. Recount drawer. Note: Admin will review this to either issue a salary deduction advance or write it off.'
-                                                : 'Count exceeds expected drawer balance. Please verify counts.'),
-                                        style: GoogleFonts.inter(
-                                          fontSize: 10.sp,
-                                          color: isBalanced
-                                              ? const Color(0xFF047857)
-                                              : (isShortage
-                                                  ? const Color(0xFFB91C1C)
-                                                  : const Color(0xFF1D4ED8)),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 10.h),
-                            Divider(height: 1, color: FinDT.border.withValues(alpha: 0.5)),
-                            SizedBox(height: 8.h),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                _miniDiffChip(label: 'Cash Diff', diff: cashDiff, formatter: formatter),
-                                _miniDiffChip(label: 'STC Pay Diff', diff: stcDiff, formatter: formatter),
-                                _miniTotalChip(label: 'Declared Total', amount: enteredTotal, formatter: formatter),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      SizedBox(height: 14.h),
-
-                      // Notes / Reason Field
-                      TextFormField(
-                        controller: notesCtrl,
-                        maxLines: 2,
-                        decoration: finDialogInputDecoration(
-                          label: isBalanced ? 'Closing Remarks (Optional)' : 'Discrepancy Explanation / Reason *',
-                          hint: isBalanced
-                              ? 'Any closing remarks'
-                              : 'Explain reason for variance (e.g. coin rounding, damaged note, unrecorded voucher)',
-                          prefixIcon: Icons.notes_rounded,
-                        ),
-                        style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
-                        validator: (v) {
-                          if (!isBalanced && (v == null || v.trim().isEmpty)) {
-                            return 'Please explain the cause of the discrepancy';
-                          }
-                          return null;
-                        },
-                      ),
-                      SizedBox(height: 14.h),
-
-                      // Closing Sheet Upload
-                      if (closingSheetUrl != null)
-                        Container(
-                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                          decoration: BoxDecoration(
-                            color: FinDT.bgPage,
-                            borderRadius: BorderRadius.circular(10.r),
-                            border: Border.all(color: FinDT.border),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.insert_drive_file_outlined, color: FinDT.brand, size: 16.sp),
-                              SizedBox(width: 8.w),
-                              Expanded(
-                                child: Text(
-                                  'Closing Sheet Attached',
-                                  style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
-                                ),
-                              ),
-                              IconButton(
-                                onPressed: () => setStateDialog(() => closingSheetUrl = null),
-                                icon: Icon(Icons.close, color: FinDT.danger, size: 16.sp),
-                              ),
-                            ],
-                          ),
-                        )
-                      else
-                        OutlinedButton.icon(
-                          onPressed: () async {
-                            final picker = ImagePicker();
-                            final file = await picker.pickImage(source: ImageSource.gallery);
-                            if (file != null) {
-                              final url = await provider.uploadClosingSheet(file, session.id);
-                              setStateDialog(() => closingSheetUrl = url);
-                            }
-                          },
-                          icon: Icon(Icons.upload_file_rounded, size: 16.sp),
-                          label: Text(
-                            'Upload Daily Sheet',
-                            style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: FinDT.brand,
-                            side: BorderSide(color: FinDT.brand.withValues(alpha: 0.5)),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10.r),
-                            ),
-                            padding: EdgeInsets.symmetric(vertical: 12.h),
-                            minimumSize: Size(double.infinity, 44.h),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            actions: [
-              finDialogCancelButton(
-                ctx,
-                onPressed: isSubmitting ? () {} : null,
-              ),
-              finDialogActionButton(
-                onPressed: () async {
-                  if (!formKey.currentState!.validate()) return;
-
-                  final cash = double.parse(cashCtrl.text);
-                  final digital = double.parse(digitalCtrl.text);
-                  final closing = cash + digital;
-
-                  final user = context.read<AuthProvider>().user;
-
-                  // Submitter safeguard: confirm when discrepancy exists
-                  if (!isBalanced) {
-                    final proceed = await showDialog<bool>(
-                      context: ctx,
-                      builder: (alertCtx) => AlertDialog(
-                        backgroundColor: Colors.white,
-                        shape: finDialogShape,
-                        title: finDialogTitle(
-                          'Confirm Discrepancy Closing',
-                          icon: Icons.warning_amber_rounded,
-                          iconColor: isShortage ? FinDT.danger : const Color(0xFF2563EB),
-                        ),
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'A discrepancy of ${totalDiff > 0 ? "+" : ""}${formatter.format(totalDiff)} SAR will be recorded for this session.',
-                              style: GoogleFonts.inter(fontSize: 13.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
-                            ),
-                            SizedBox(height: 8.h),
-                            Text(
-                              isShortage
-                                  ? 'The Admin will review this session upon verification to decide whether to create a salary-deductible advance against the coordinator or approve a write-off as loss.\n\nPlease ensure you have counted your physical cash accurately before proceeding.'
-                                  : 'An overage will be audited by the Admin upon verification. Please confirm counts.',
-                              style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.textSecondary, height: 1.4),
-                            ),
-                          ],
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(alertCtx, false),
-                            child: Text(
-                              'Recount & Correct',
-                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.brand),
-                            ),
-                          ),
-                          ElevatedButton(
-                            onPressed: () => Navigator.pop(alertCtx, true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: isShortage ? FinDT.danger : FinDT.brand,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.r)),
-                            ),
-                            child: Text(
-                              'Proceed & Submit',
-                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (proceed != true) return;
-                  }
-
-                  if (!context.mounted) return;
-                  final submittedNotes = notesCtrl.text.trim();
-                  final closed = session.copyWith(
-                    closingBalance: closing,
-                    cashInHand: cash,
-                    stcPayBalance: digital,
-                    closingSheetUrl: closingSheetUrl,
-                    closedBy: user?.actorLabel ?? 'Unknown',
-                    notes: submittedNotes.isNotEmpty ? submittedNotes : null,
-                  );
-
-                  setStateDialog(() => isSubmitting = true);
-                  try {
-                    await provider.closeSession(
-                      session: closed,
-                      closedBy: user?.actorLabel ?? 'Unknown',
-                      closedByUserId: user?.id,
-                    );
-                    if (ctx.mounted) Navigator.pop(ctx);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            isBalanced
-                                ? 'Session closed successfully (Balanced)'
-                                : 'Session closed with discrepancy (${formatter.format(totalDiff)} SAR). Awaiting Admin verification.',
-                          ),
-                          backgroundColor: isBalanced ? FinDT.success : const Color(0xFFD97706),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (ctx.mounted) {
-                      setStateDialog(() => isSubmitting = false);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('$e'), backgroundColor: FinDT.danger),
-                      );
-                    }
-                  }
-                },
-                label: 'Close Session',
-                backgroundColor: isBalanced ? FinDT.brand : (isShortage ? const Color(0xFFDC2626) : FinDT.brand),
-                isLoading: isSubmitting,
-              ),
-            ],
-          );
-        },
+    // The close may have corrected the account's Cash/STC balances.
+    await fundAccProv.fetchAllAccounts();
+    final diff = closed.discrepancy ?? 0;
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          diff.abs() < 0.005
+              ? 'Register closed - balanced. Awaiting admin verification.'
+              : 'Register closed with a ${formatter.format(diff.abs())} SAR '
+                  '${diff < 0 ? 'shortage' : 'overage'}. The account now matches '
+                  'your count; awaiting admin verification.',
+        ),
+        backgroundColor: diff.abs() < 0.005 ? FinDT.success : FinDT.warning,
       ),
     );
   }
 
-  Widget _miniDiffChip({
-    required String label,
-    required double diff,
-    required NumberFormat formatter,
-  }) {
-    final isZero = diff.abs() < 0.01;
-    final isNeg = diff < -0.01;
-    final color = isZero
-        ? const Color(0xFF16A34A)
-        : (isNeg ? const Color(0xFFDC2626) : const Color(0xFF2563EB));
-    final sign = diff > 0 ? '+' : '';
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(6.r),
-        border: Border.all(color: color.withValues(alpha: 0.25)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 9.sp, color: FinDT.textSecondary)),
-          SizedBox(height: 1.h),
-          Text(
-            isZero ? '0.00' : '$sign${formatter.format(diff)}',
-            style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w700, color: color),
-          ),
-        ],
-      ),
-    );
-  }
+  /// "Cash 1,000.00 (−200.00) • STC Pay 500.00 (0.00) • moved … • recounted"
+  String _closingDetailLine(PettyCashSessionEntity s, NumberFormat f) {
+    String diff(double d) {
+      if (d.abs() < 0.005) return '0.00';
+      return '${d > 0 ? '+' : '−'}${f.format(d.abs())}';
+    }
 
-  Widget _miniTotalChip({
-    required String label,
-    required double amount,
-    required NumberFormat formatter,
-  }) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 4.h),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6.r),
-        border: Border.all(color: FinDT.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: GoogleFonts.inter(fontSize: 9.sp, color: FinDT.textSecondary)),
-          SizedBox(height: 1.h),
-          Text(
-            '${formatter.format(amount)} SAR',
-            style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w700, color: FinDT.textPrimary),
-          ),
-        ],
-      ),
-    );
+    final parts = <String>[
+      'Cash ${f.format(s.cashInHand)} (${diff(s.cashDiscrepancy)})',
+      'STC Pay ${f.format(s.stcPayBalance ?? 0)} (${diff(s.stcPayDiscrepancy)})',
+      if (s.closeTransferCashToStc.abs() >= 0.005)
+        'moved ${f.format(s.closeTransferCashToStc.abs())} '
+            '${s.closeTransferCashToStc > 0 ? 'Cash → STC Pay' : 'STC Pay → Cash'} at closing',
+      if (s.recountCount > 0)
+        'recounted (first count ${f.format((s.firstCountCash ?? 0) + (s.firstCountStcPay ?? 0))})',
+    ];
+    return parts.join(' • ');
   }
 
   /// Interactive resolution dialog for Admin to decide discrepancy outcome:
@@ -2190,6 +1509,11 @@ class _PettyCashPageState extends State<PettyCashPage> {
     PettyCashProvider provider,
     PettyCashSessionEntity session,
   ) async {
+    // Sessions closed with the new count flow already moved the variance
+    // into the account; only who carries it is left to decide.
+    if (session.varianceCorrected) {
+      return _showCorrectedResolutionDialog(context, provider, session);
+    }
     final user = context.read<AuthProvider>().user;
     final empProv = context.read<EmployeeProvider>();
     final advProv = context.read<CashAdvanceProvider>();
@@ -2593,6 +1917,303 @@ class _PettyCashPageState extends State<PettyCashPage> {
     );
   }
 
+  /// Settles the difference of a session whose variance was posted to the
+  /// account at closing. A shortage is recovered from an employee's salary
+  /// and/or written off; an overage is accepted with a note. Nothing here
+  /// moves money in the fund account.
+  Future<void> _showCorrectedResolutionDialog(
+    BuildContext context,
+    PettyCashProvider provider,
+    PettyCashSessionEntity session,
+  ) async {
+    final user = context.read<AuthProvider>().user;
+    final advProv = context.read<CashAdvanceProvider>();
+    final employees = context
+        .read<EmployeeProvider>()
+        .employees
+        .where((e) => e.isInternal && e.isActive)
+        .toList();
+    final messenger = ScaffoldMessenger.of(context);
+    final formatter = NumberFormat('#,##0.00', 'en_US');
+
+    final varianceMinor =
+        PettyCashCloseCalculator.toMinor(session.discrepancy ?? 0);
+    final isShortage = varianceMinor < 0;
+    final shortageMinor = isShortage ? -varianceMinor : 0;
+
+    final closerName =
+        (session.closedBy ?? session.openedBy ?? '').trim().toLowerCase();
+    EmployeeEntity? selectedEmployee;
+    for (final e in employees) {
+      final name = e.fullName.toLowerCase();
+      if (closerName.isNotEmpty &&
+          (name.contains(closerName) || closerName.contains(name))) {
+        selectedEmployee = e;
+        break;
+      }
+    }
+
+    final recoveryCtrl = TextEditingController(
+      text: isShortage ? PettyCashCloseCalculator.formatPlain(shortageMinor) : '',
+    );
+    final reasonCtrl = TextEditingController();
+    bool isProcessing = false;
+    String? error;
+
+    String diffText(double d) => d.abs() < 0.005
+        ? '0.00'
+        : '${d > 0 ? '+' : '−'}${formatter.format(d.abs())}';
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) {
+          final recovery = isShortage
+              ? PettyCashCloseCalculator.parseMinor(recoveryCtrl.text)
+              : 0;
+          final recoveryValid =
+              recovery != null && recovery >= 0 && recovery <= shortageMinor;
+          final writeOff =
+              recoveryValid ? shortageMinor - recovery : 0;
+          final needsEmployee = isShortage && recoveryValid && recovery > 0;
+          final needsReason = isShortage ? writeOff > 0 : true;
+          final canSubmit = !isProcessing &&
+              recoveryValid &&
+              (!needsEmployee || selectedEmployee != null) &&
+              (!needsReason || reasonCtrl.text.trim().isNotEmpty);
+
+          Widget line(String label, String value, {Color? color, bool bold = false}) {
+            return Padding(
+              padding: EdgeInsets.symmetric(vertical: 2.h),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(label, style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.textSecondary)),
+                  Text(
+                    value,
+                    style: GoogleFonts.inter(
+                      fontSize: 11.sp,
+                      fontWeight: bold ? FontWeight.w700 : FontWeight.w600,
+                      color: color ?? FinDT.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            shape: finDialogShape,
+            title: finDialogTitle(
+              isShortage ? 'Settle Shortage & Lock Day' : 'Accept Overage & Lock Day',
+              icon: Icons.gavel_rounded,
+              iconColor: FinDT.warning,
+            ),
+            content: SizedBox(
+              width: 480.w,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(12.w),
+                      decoration: BoxDecoration(
+                        color: FinDT.bgPage,
+                        borderRadius: BorderRadius.circular(10.r),
+                        border: Border.all(color: FinDT.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${DateFormat('EEE, MMM d, yyyy').format(session.date)} • '
+                            'closed by ${session.closedBy ?? 'Unknown'}',
+                            style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w600, color: FinDT.textPrimary),
+                          ),
+                          SizedBox(height: 8.h),
+                          line('Cash: expected ${formatter.format(session.expectedCashClosing)}, counted ${formatter.format(session.cashInHand)}',
+                              diffText(session.cashDiscrepancy)),
+                          line('STC Pay: expected ${formatter.format(session.expectedStcPayClosing)}, counted ${formatter.format(session.stcPayBalance ?? 0)}',
+                              diffText(session.stcPayDiscrepancy)),
+                          Divider(height: 12.h, color: FinDT.border),
+                          line(
+                            isShortage ? 'Shortage' : 'Overage',
+                            '${formatter.format(varianceMinor.abs() / 100)} SAR',
+                            color: isShortage ? FinDT.danger : const Color(0xFF2563EB),
+                            bold: true,
+                          ),
+                          if (session.notes != null && session.notes!.trim().isNotEmpty) ...[
+                            SizedBox(height: 6.h),
+                            Text(
+                              'Closer\'s reason: ${session.notes!.trim()}',
+                              style: GoogleFonts.inter(fontSize: 11.sp, fontStyle: FontStyle.italic, color: FinDT.textPrimary),
+                            ),
+                          ],
+                          SizedBox(height: 6.h),
+                          Text(
+                            'The account was already set to the counted amount when the register was closed. '
+                            'Nothing here moves money in the fund.',
+                            style: GoogleFonts.inter(fontSize: 10.sp, color: FinDT.textSecondary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 14.h),
+                    if (isShortage) ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Recover from salary',
+                              style: GoogleFonts.inter(fontSize: 12.sp, fontWeight: FontWeight.w700, color: FinDT.textPrimary),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: isProcessing
+                                ? null
+                                : () => setInner(() => recoveryCtrl.text =
+                                    PettyCashCloseCalculator.formatPlain(shortageMinor)),
+                            child: const Text('All'),
+                          ),
+                          TextButton(
+                            onPressed: isProcessing
+                                ? null
+                                : () => setInner(() => recoveryCtrl.text = '0'),
+                            child: const Text('None'),
+                          ),
+                        ],
+                      ),
+                      TextField(
+                        controller: recoveryCtrl,
+                        enabled: !isProcessing,
+                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: [
+                          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+                        ],
+                        onChanged: (_) => setInner(() {}),
+                        style: GoogleFonts.inter(fontSize: 12.sp),
+                        decoration: finDialogInputDecoration(
+                          label: 'Amount to recover from salary',
+                          prefixIcon: Icons.payments_outlined,
+                          suffixText: 'SAR',
+                        ).copyWith(
+                          errorText: recoveryValid
+                              ? null
+                              : 'Enter 0 to ${formatter.format(shortageMinor / 100)}',
+                        ),
+                      ),
+                      if (needsEmployee) ...[
+                        SizedBox(height: 10.h),
+                        if (employees.isEmpty)
+                          Text(
+                            'No active internal employees found. Write the shortage off instead.',
+                            style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.danger),
+                          )
+                        else
+                          AppDropdownFormField<EmployeeEntity>(
+                            initialValue: selectedEmployee,
+                            decoration: finDialogInputDecoration(
+                              label: 'Recover from (employee) *',
+                              hint: 'Select employee',
+                              prefixIcon: Icons.person_outline,
+                            ),
+                            style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+                            items: employees
+                                .map((e) => DropdownMenuItem(value: e, child: Text(e.fullName)))
+                                .toList(),
+                            onChanged: isProcessing ? null : (v) => setInner(() => selectedEmployee = v),
+                          ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          'Recorded as an advance to be deducted at payroll. '
+                          'No cash leaves the fund for it.',
+                          style: GoogleFonts.inter(fontSize: 10.sp, color: FinDT.textSecondary),
+                        ),
+                      ],
+                      if (recoveryValid && writeOff > 0) ...[
+                        SizedBox(height: 12.h),
+                        Text(
+                          '${formatter.format(writeOff / 100)} SAR will be written off as a company loss.',
+                          style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w600, color: FinDT.danger),
+                        ),
+                      ],
+                    ],
+                    if (needsReason) ...[
+                      SizedBox(height: 10.h),
+                      TextField(
+                        controller: reasonCtrl,
+                        enabled: !isProcessing,
+                        maxLines: 2,
+                        onChanged: (_) => setInner(() {}),
+                        style: GoogleFonts.inter(fontSize: 12.sp),
+                        decoration: finDialogInputDecoration(
+                          label: isShortage ? 'Reason for the write-off *' : 'Why is the overage accepted? *',
+                          prefixIcon: Icons.rate_review_outlined,
+                        ),
+                      ),
+                    ],
+                    if (error != null) ...[
+                      SizedBox(height: 10.h),
+                      Text(error!, style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.danger)),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              finDialogCancelButton(ctx, onPressed: isProcessing ? () {} : null),
+              finDialogActionButton(
+                onPressed: canSubmit
+                    ? () async {
+                        setInner(() {
+                          isProcessing = true;
+                          error = null;
+                        });
+                        try {
+                          await provider.verifySession(
+                            sessionId: session.id,
+                            verifiedBy: user?.actorLabel ?? 'Admin',
+                            verifiedByUserId: user?.id,
+                            resolution: PettyCashResolution(
+                              salaryRecoveryMinor: isShortage ? recovery : 0,
+                              employeeId: needsEmployee ? selectedEmployee?.id : null,
+                              employeeName: needsEmployee ? selectedEmployee?.fullName : null,
+                              reason: needsReason ? reasonCtrl.text.trim() : null,
+                            ),
+                          );
+                          if (needsEmployee) {
+                            await advProv.load();
+                          }
+                          if (ctx.mounted) finSafePop(ctx);
+                          messenger.showSnackBar(
+                            const SnackBar(
+                              content: Text('Difference settled and day locked'),
+                              backgroundColor: FinDT.success,
+                            ),
+                          );
+                        } catch (e) {
+                          setInner(() {
+                            isProcessing = false;
+                            error = e is StateError ? e.message : '$e';
+                          });
+                        }
+                      }
+                    : null,
+                label: 'Verify & Lock Day',
+                backgroundColor: FinDT.success,
+                isLoading: isProcessing,
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _confirmVerifySession(
     BuildContext context,
     PettyCashProvider provider,
@@ -2602,7 +2223,14 @@ class _PettyCashPageState extends State<PettyCashPage> {
     await showFinConfirmationDialog(
       context: context,
       title: 'Verify & Lock Day?',
-      message: 'Confirm closing ${session.closingBalance.toStringAsFixed(2)} SAR (discrepancy: ${session.discrepancy?.toStringAsFixed(2) ?? "0.00"}).',
+      message: session.varianceCorrected &&
+              (session.cashDiscrepancy.abs() >= 0.005 ||
+                  session.stcPayDiscrepancy.abs() >= 0.005)
+          ? 'Confirm closing ${session.closingBalance.toStringAsFixed(2)} SAR. '
+              'The total matched; Cash and STC Pay were re-split to the count '
+              '(Cash ${session.cashDiscrepancy >= 0 ? '+' : ''}${session.cashDiscrepancy.toStringAsFixed(2)}, '
+              'STC Pay ${session.stcPayDiscrepancy >= 0 ? '+' : ''}${session.stcPayDiscrepancy.toStringAsFixed(2)}).'
+          : 'Confirm closing ${session.closingBalance.toStringAsFixed(2)} SAR (discrepancy: ${session.discrepancy?.toStringAsFixed(2) ?? "0.00"}).',
       highlightNote: 'This LOCKS the day — no further deposits, withdrawals, or expense payments can be posted to this fund for this calendar day.',
       confirmLabel: 'Verify & Lock',
       confirmColor: FinDT.success,
@@ -3332,12 +2960,3 @@ class _PettyCashPageState extends State<PettyCashPage> {
 }
 
 /// Simple record to track bucket transfers applied during the closing dialog.
-class _BucketTransferRecord {
-  final double amount;
-  final bool isCashToStc;
-
-  const _BucketTransferRecord({
-    required this.amount,
-    required this.isCashToStc,
-  });
-}

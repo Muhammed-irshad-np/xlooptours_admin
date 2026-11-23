@@ -10,6 +10,7 @@ import 'package:xloop_invoice/features/finance/domain/entities/fund_account_type
 import 'package:xloop_invoice/features/finance/domain/entities/fund_transaction_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/ledger_day_totals.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/petty_cash_session_entity.dart';
+import 'package:xloop_invoice/features/finance/domain/entities/petty_cash_close_request.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/post_fund_request.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/salary_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/session_expense_item.dart';
@@ -32,9 +33,11 @@ class FakeFinanceRepository implements FinanceRepository {
   // --- Close petty cash session ---
   PettyCashSessionEntity? closeResult;
   Object? closeSessionError;
+  PettyCashCloseRequest? lastCloseRequest;
 
   // --- Verify petty cash session ---
   Object? verifySessionError;
+  PettyCashResolution? lastResolution;
 
   // --- Fund movement ---
   FundTransactionEntity? fundMovementResult;
@@ -76,14 +79,17 @@ class FakeFinanceRepository implements FinanceRepository {
   }
 
   @override
-  Future<PettyCashSessionEntity> closePettyCashSession({
-    required PettyCashSessionEntity session,
-    required String closedBy,
-    required String? closedByUserId,
-  }) async {
+  Future<PettyCashSessionEntity> closePettyCashSession(
+    PettyCashCloseRequest request,
+  ) async {
+    lastCloseRequest = request;
     if (closeSessionError != null) throw closeSessionError!;
     return closeResult!;
   }
+
+  @override
+  Future<FundAccountEntity> getFundAccountById(String accountId) async =>
+      throw UnimplementedError();
 
   @override
   Future<void> verifyPettyCashSession({
@@ -91,7 +97,9 @@ class FakeFinanceRepository implements FinanceRepository {
     required String verifiedBy,
     required String? verifiedByUserId,
     String? resolutionNotes,
+    PettyCashResolution? resolution,
   }) async {
+    lastResolution = resolution;
     if (verifySessionError != null) throw verifySessionError!;
   }
 

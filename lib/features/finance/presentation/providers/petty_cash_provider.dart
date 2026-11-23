@@ -13,6 +13,9 @@ import '../../domain/usecases/upload_closing_sheet_usecase.dart';
 import '../../domain/usecases/get_session_expenses_usecase.dart';
 import '../../domain/usecases/transfer_bucket_usecase.dart';
 import '../../domain/entities/fund_transaction_entity.dart';
+import '../../domain/entities/fund_account_entity.dart';
+import '../../domain/entities/expense_entity.dart';
+import '../../domain/entities/petty_cash_close_request.dart';
 
 class PettyCashProvider with ChangeNotifier {
   final GetPettyCashSessionsUseCase getPettyCashSessionsUseCase;
@@ -43,6 +46,7 @@ class PettyCashProvider with ChangeNotifier {
   bool _isLoading = false;
   String? _error;
   LedgerDayTotals? _previewTotals;
+  FundAccountEntity? _liveAccount;
 
   List<PettyCashSessionEntity> get sessions => _sessions;
   PettyCashSessionEntity? get currentSession => _currentSession;
@@ -51,6 +55,10 @@ class PettyCashProvider with ChangeNotifier {
   String? get error => _error;
   LedgerDayTotals? get previewTotals => _previewTotals;
   bool get hasOpenSession => _currentSession != null;
+
+  /// The selected account as last read from the server. Its Cash and STC
+  /// Pay balances are what the open register is expected to hold.
+  FundAccountEntity? get liveAccount => _liveAccount;
 
   List<PettyCashSessionEntity> get unverifiedSessions => _sessions
       .where((s) => s.status == PettyCashSessionStatus.closed)
@@ -65,6 +73,7 @@ class PettyCashProvider with ChangeNotifier {
     try {
       _sessions = await getPettyCashSessionsUseCase(accountId);
       _currentSession = await getOpenSessionUseCase(accountId);
+      _liveAccount = await financeRepository.getFundAccountById(accountId);
       if (_currentSession != null) {
         _previewTotals = await financeRepository.getLedgerDayTotals(
           accountId,
@@ -108,34 +117,19 @@ class PettyCashProvider with ChangeNotifier {
     }
   }
 
-  Future<void> closeSession({
-    required PettyCashSessionEntity session,
-    required String closedBy,
-    required String? closedByUserId,
-  }) async {
-    _isLoading = true;
+  /// Closes the open register. On success the sessions and the live
+  /// account are reloaded, so the page shows the server's figures.
+  Future<PettyCashSessionEntity> closeSession(
+      PettyCashCloseRequest request) async {
     _error = null;
-    notifyListeners();
-
     try {
-      final closed = await closePettyCashSessionUseCase(
-        session: session,
-        closedBy: closedBy,
-        closedByUserId: closedByUserId,
-      );
-      _currentSession = null;
-      _previewTotals = null;
-      final index = _sessions.indexWhere((s) => s.id == session.id);
-      if (index != -1) {
-        _sessions[index] = closed;
-      }
+      final closed = await closePettyCashSessionUseCase(request);
+      await loadSessions(closed.fundAccountId);
+      return closed;
     } catch (e) {
       _error = e.toString();
       debugPrint('Error closing petty cash session: $e');
       rethrow;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
     }
   }
 
@@ -144,6 +138,7 @@ class PettyCashProvider with ChangeNotifier {
     required String verifiedBy,
     required String? verifiedByUserId,
     String? resolutionNotes,
+    PettyCashResolution? resolution,
   }) async {
     _error = null;
     try {
@@ -152,29 +147,44 @@ class PettyCashProvider with ChangeNotifier {
         verifiedBy: verifiedBy,
         verifiedByUserId: verifiedByUserId,
         resolutionNotes: resolutionNotes,
+        resolution: resolution,
       );
-      final index = _sessions.indexWhere((s) => s.id == sessionId);
-      if (index != -1) {
-        final existing = _sessions[index].notes ?? '';
-        final updatedNotes = resolutionNotes != null && resolutionNotes.trim().isNotEmpty
-            ? (existing.isNotEmpty
-                ? '$existing\n[Resolution: ${resolutionNotes.trim()}]'
-                : '[Resolution: ${resolutionNotes.trim()}]')
-            : existing;
-        _sessions[index] = _sessions[index].copyWith(
-          status: PettyCashSessionStatus.verified,
-          verifiedBy: verifiedBy,
-          verifiedAt: DateTime.now(),
-          notes: updatedNotes.isNotEmpty ? updatedNotes : null,
-        );
+      final accountId = _selectedAccountId;
+      if (accountId != null) {
+        await loadSessions(accountId);
+      } else {
+        notifyListeners();
       }
-      notifyListeners();
     } catch (e) {
       _error = e.toString();
       debugPrint('Error verifying petty cash session: $e');
       notifyListeners();
       rethrow;
     }
+  }
+
+  /// Reads the account fresh from the server (for the closing count).
+  Future<FundAccountEntity> fetchLiveAccount(String accountId) async {
+    final account = await financeRepository.getFundAccountById(accountId);
+    if (accountId == _selectedAccountId) {
+      _liveAccount = account;
+      notifyListeners();
+    }
+    return account;
+  }
+
+  /// Expenses on [accountId] not yet paid from the account (draft, pending
+  /// or approved-but-unpaid). Cash already handed out for these is not in
+  /// the ledger yet, so it makes the drawer look short.
+  Future<List<ExpenseEntity>> getUnpostedExpenses(String accountId) async {
+    final all = await financeRepository.getExpensesByAccount(accountId);
+    return all
+        .where((e) =>
+            !e.isNonWallet &&
+            (e.status == ExpenseStatus.draft ||
+                e.status == ExpenseStatus.pending ||
+                e.status == ExpenseStatus.approved))
+        .toList();
   }
 
   Future<String> uploadClosingSheet(XFile file, String sessionId) async {
@@ -211,6 +221,8 @@ class PettyCashProvider with ChangeNotifier {
       _currentSession!.date,
       sessionOpenedAt: _currentSession!.createdAt,
     );
+    _liveAccount = await financeRepository
+        .getFundAccountById(_currentSession!.fundAccountId);
     notifyListeners();
   }
 

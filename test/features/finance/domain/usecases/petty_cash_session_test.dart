@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/petty_cash_session_entity.dart';
+import 'package:xloop_invoice/features/finance/domain/entities/petty_cash_close_request.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/fund_transaction_entity.dart';
 import 'package:xloop_invoice/features/finance/domain/entities/session_expense_item.dart';
 import 'package:xloop_invoice/features/finance/domain/usecases/close_petty_cash_session_usecase.dart';
@@ -63,12 +64,18 @@ void main() {
         closedBy: 'Coordinator A',
       );
 
-      final result = await useCase(
-        session: session,
+      final result = await useCase(const PettyCashCloseRequest(
+        sessionId: 'sess-001',
+        countedCashMinor: 85000,
+        countedStcMinor: 49000,
+        seenAccountCashMinor: 85000,
+        seenAccountStcMinor: 52000,
+        notes: 'STC fee',
         closedBy: 'Coordinator A',
         closedByUserId: 'coord-001',
-      );
+      ));
 
+      expect(repo.lastCloseRequest?.countedStcMinor, 49000);
       expect(result.status, PettyCashSessionStatus.closed);
       expect(result.cashDeposits, 200.0);
       expect(result.cashExpenses, 350.0);
@@ -79,13 +86,15 @@ void main() {
     test('propagates StateError when session is not open', () async {
       repo.closeSessionError = StateError('Only open sessions can be closed');
       final useCase = ClosePettyCashSessionUseCase(repo);
-      final closedAlready = openSession().copyWith(status: PettyCashSessionStatus.closed);
       await expectLater(
-        () => useCase(
-          session: closedAlready,
+        () => useCase(const PettyCashCloseRequest(
+          sessionId: 'sess-001',
+          countedCashMinor: 0,
+          countedStcMinor: 0,
+          seenAccountCashMinor: 0,
+          seenAccountStcMinor: 0,
           closedBy: 'Coordinator A',
-          closedByUserId: 'coord-001',
-        ),
+        )),
         throwsA(isA<StateError>()),
       );
     });
