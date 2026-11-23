@@ -244,12 +244,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     _submittedByRole = user.role.name.toUpperCase();
   }
 
-  void _setSubmitter(EmployeeEntity emp) {
-    _submittedByEmployeeId = emp.id;
-    _submittedBy = emp.fullName;
-    _submittedByRole = emp.position;
-  }
-
   bool _submitterIsLoggedInUser(UserEntity user) {
     final linkedId = user.employeeId ?? '';
     if (linkedId.isNotEmpty) return _submittedByEmployeeId == linkedId;
@@ -324,8 +318,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     _selectedAccountId,
     _paymentMethod,
     _selectedCurrency,
-    _submittedByEmployeeId,
-    _submittedBy,
     _beneficiaryEmployeeId,
     _selectedVehicleId,
     _receiptUrls,
@@ -358,14 +350,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                     title: 'Basic Information',
                     icon: Icons.info_outline_rounded,
                     children: [
+                      // The submitter is always whoever is logged in.
                       _buildRow([
                         _buildDateField(),
                         _buildCurrencyField(),
-                      ]),
-                      SizedBox(height: 16.h),
-                      _buildRow([
                         _buildAmountField(),
-                        _buildSubmittedByField(empProv),
                       ]),
                     ],
                   ),
@@ -637,108 +626,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     );
   }
 
-  Widget _buildSubmittedByField(EmployeeProvider empProv) {
-    EmployeeEntity? selectedEmp;
-    if (_submittedByEmployeeId != null && _submittedByEmployeeId!.isNotEmpty) {
-      final matches = empProv.employees.where((e) => e.id == _submittedByEmployeeId);
-      if (matches.isNotEmpty) selectedEmp = matches.first;
-    }
-
-    return _FieldWrapper(
-      label: 'Submitted By *',
-      child: FormField<String>(
-        initialValue: _submittedByEmployeeId,
-        // A login without a linked employee record still names the submitter.
-        validator: (v) => ((_submittedByEmployeeId ?? '').isEmpty && _submittedBy.isEmpty)
-            ? 'Required'
-            : null,
-        builder: (state) {
-          final displayText = selectedEmp != null
-              ? '${selectedEmp.fullName}${selectedEmp.position.isNotEmpty ? " (${selectedEmp.position})" : ""}'
-              : (_submittedBy.isNotEmpty ? _submittedBy : '');
-
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              InkWell(
-                onTap: () => _showEmployeeSearchDialog(
-                  context,
-                  empProv,
-                  (selected) {
-                    setState(() {
-                      _setSubmitter(selected);
-                      // Drop an account the new submitter isn't assigned to.
-                      final acc = context
-                          .read<FundAccountProvider>()
-                          .getAccountById(_selectedAccountId ?? '');
-                      if (!_isEditing && acc != null && !_canUseAccount(acc)) {
-                        _selectedAccountId = null;
-                      }
-                    });
-                    state.didChange(selected.id);
-                  },
-                  internalOnly: true,
-                ),
-                borderRadius: BorderRadius.circular(10.r),
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
-                  decoration: BoxDecoration(
-                    color: FinDT.bgPage,
-                    borderRadius: BorderRadius.circular(10.r),
-                    border: Border.all(
-                      color: state.hasError ? FinDT.danger : FinDT.border,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.person_search_outlined,
-                        size: 16.sp,
-                        color: FinDT.brand,
-                      ),
-                      SizedBox(width: 8.w),
-                      Expanded(
-                        child: Text(
-                          displayText.isNotEmpty ? displayText : 'Search & Select Employee...',
-                          style: GoogleFonts.inter(
-                            fontSize: 12.sp,
-                            color: displayText.isNotEmpty
-                                ? FinDT.textPrimary
-                                : FinDT.textSecondary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      Icon(
-                        Icons.arrow_drop_down_rounded,
-                        size: 20.sp,
-                        color: FinDT.textSecondary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              if (state.hasError) ...[
-                SizedBox(height: 4.h),
-                Padding(
-                  padding: EdgeInsets.only(left: 4.w),
-                  child: Text(
-                    state.errorText!,
-                    style: GoogleFonts.inter(
-                      fontSize: 10.sp,
-                      color: FinDT.danger,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          );
-        },
-      ),
-    );
-  }
-
   /// Picker for the employee this cost is *for* — distinct from the submitter.
   /// Required for employee-related categories, optional elsewhere so a shared
   /// cost (a team SIM, an office item) can still be attributed when it helps.
@@ -920,11 +807,8 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   void _showEmployeeSearchDialog(
     BuildContext context,
     EmployeeProvider empProv,
-    ValueChanged<EmployeeEntity> onSelect, {
-    // Only Xloop's own staff can submit; external (contracted) staff can
-    // still be the employee an expense is for.
-    bool internalOnly = false,
-  }) {
+    ValueChanged<EmployeeEntity> onSelect,
+  ) {
     showDialog(
       context: context,
       builder: (ctx) {
@@ -932,7 +816,6 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
         return StatefulBuilder(
           builder: (ctx, setStateDialog) {
             final filtered = empProv.employees.where((e) {
-              if (internalOnly && e.isExternal) return false;
               final q = searchQuery.toLowerCase();
               return e.fullName.toLowerCase().contains(q) ||
                   e.position.toLowerCase().contains(q);
