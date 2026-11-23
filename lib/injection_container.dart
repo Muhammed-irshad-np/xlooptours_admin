@@ -158,6 +158,7 @@ import 'features/finance/domain/usecases/update_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/reorder_fund_accounts_usecase.dart';
 import 'features/finance/domain/usecases/delete_fund_account_usecase.dart';
 import 'features/finance/domain/usecases/get_transactions_usecase.dart';
+import 'features/finance/domain/usecases/get_all_transactions_usecase.dart';
 import 'features/finance/domain/usecases/get_transaction_by_id_usecase.dart';
 import 'features/finance/domain/usecases/insert_transaction_usecase.dart';
 import 'features/finance/domain/usecases/post_fund_movement_usecase.dart';
@@ -186,6 +187,7 @@ import 'features/finance/presentation/providers/fund_account_provider.dart';
 import 'features/finance/presentation/providers/petty_cash_provider.dart';
 import 'features/finance/presentation/providers/cash_advance_provider.dart';
 import 'features/finance/presentation/providers/salary_provider.dart';
+import 'features/finance/presentation/providers/finance_report_provider.dart';
 
 import 'features/user_management/data/datasources/user_management_remote_data_source.dart';
 import 'features/user_management/data/repositories/user_management_repository_impl.dart';
@@ -683,6 +685,12 @@ Future<void> init() async {
     ),
   );
   sl.registerFactory(
+    () => FinanceReportProvider(
+      getAllTransactionsUseCase: sl(),
+      getAllExpensesUseCase: sl(),
+    ),
+  );
+  sl.registerFactory(
     () => CashAdvanceProvider(
       getCashAdvancesUseCase: sl(),
       issueCashAdvanceUseCase: sl(),
@@ -727,6 +735,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => ReorderFundAccountsUseCase(sl()));
   sl.registerLazySingleton(() => DeleteFundAccountUseCase(sl()));
   sl.registerLazySingleton(() => GetTransactionsUseCase(sl()));
+  sl.registerLazySingleton(() => GetAllTransactionsUseCase(sl()));
   sl.registerLazySingleton(() => GetTransactionByIdUseCase(sl()));
   sl.registerLazySingleton(() => InsertTransactionUseCase(sl()));
   sl.registerLazySingleton(() => PostFundMovementUseCase(sl()));
