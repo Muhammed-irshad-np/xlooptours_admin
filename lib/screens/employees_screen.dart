@@ -240,7 +240,7 @@ class _EmployeesScreenState extends State<EmployeesScreen>
       ),
     );
 
-    if (result == true) {
+    if (result != null) {
       _loadEmployees();
     }
   }
