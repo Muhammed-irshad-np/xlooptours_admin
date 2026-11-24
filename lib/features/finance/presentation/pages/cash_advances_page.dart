@@ -1255,22 +1255,28 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  // An open advance leads with what is still owed, so a
+                  // partly settled one shows its balance, not the issue amount.
                   Text(
-                    '${fmt.format(advance.amount)} ${advance.currency}',
+                    '${fmt.format(advance.isOpen ? advance.outstanding : advance.amount)} ${advance.currency}',
                     style: GoogleFonts.inter(
                       fontSize: 16.sp,
                       fontWeight: FontWeight.w800,
-                      color: FinDT.textPrimary,
+                      color: advance.isOpen
+                          ? FinDT.warning
+                          : FinDT.textPrimary,
                     ),
                   ),
                   SizedBox(height: 2.h),
                   if (advance.isOpen)
                     Text(
-                      'Outstanding: ${fmt.format(advance.outstanding)} ${advance.currency}',
+                      advance.settledAmount > 0
+                          ? 'Balance of ${fmt.format(advance.amount)} ${advance.currency} advance'
+                          : 'Balance outstanding',
                       style: GoogleFonts.inter(
                         fontSize: 11.sp,
-                        fontWeight: FontWeight.w700,
-                        color: FinDT.warning,
+                        fontWeight: FontWeight.w600,
+                        color: FinDT.textSecondary,
                       ),
                     )
                   else if (isSettled)
@@ -1378,7 +1384,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                   ),
                 ),
                 Text(
-                  'Remaining: ${fmt.format(advance.outstanding)} ${advance.currency}',
+                  'Balance: ${fmt.format(advance.outstanding)} ${advance.currency}',
                   style: GoogleFonts.inter(
                     fontSize: 10.sp,
                     fontWeight: FontWeight.w600,
