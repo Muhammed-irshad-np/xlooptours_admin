@@ -37,7 +37,21 @@ class EmployeeFormScreen extends StatefulWidget {
 
   final EmployeeEntity? employee;
 
-  const EmployeeFormScreen({super.key, this.employee});
+  /// Employment type a new employee starts with (ignored when editing).
+  final String? initialEmploymentType;
+
+  /// Hides the Employment Type picker so the preset type can't be changed —
+  /// used when the form is opened from a place that only deals with one type
+  /// (e.g. adding external staff from Salaries).
+  final bool lockEmploymentType;
+
+  /// Pops with the saved [EmployeeEntity] (null when cancelled).
+  const EmployeeFormScreen({
+    super.key,
+    this.employee,
+    this.initialEmploymentType,
+    this.lockEmploymentType = false,
+  });
 
   @override
   State<EmployeeFormScreen> createState() => _EmployeeFormScreenState();
@@ -315,6 +329,8 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       _birthDate.value = e.birthDate;
       _isActive.value = e.isActive;
       _currentImageUrl.value = e.imageUrl;
+    } else if (EmploymentType.values.contains(widget.initialEmploymentType)) {
+      _employmentType.value = widget.initialEmploymentType!;
     }
 
     _lastSyncedIdNumber = _idNumberController.text;
@@ -932,9 +948,11 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
             : _contactEntries.value.map((entry) => entry.toContact()).toList(),
       );
 
+      EmployeeEntity result = newEmployee;
       if (mounted) {
         if (widget.employee == null) {
           final saved = await provider.addEmployee(newEmployee);
+          result = saved;
           if (mounted) {
             await ActivityLogger.log(
               context,
@@ -971,7 +989,7 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
       }
 
       if (mounted) {
-        Navigator.pop(context, true);
+        Navigator.pop(context, result);
         AppSnackBar.showSuccess(context, 'Employee saved successfully');
       }
     } catch (e) {
@@ -1069,7 +1087,12 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
   Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       appBar: ModernAppBar(
-        title: widget.employee == null ? 'Add New Employee' : 'Edit Employee',
+        title: widget.employee != null
+            ? 'Edit Employee'
+            : widget.lockEmploymentType &&
+                    widget.initialEmploymentType == EmploymentType.external
+                ? 'Add External Employee'
+                : 'Add New Employee',
       ),
       body: Form(
         key: _formKey,
@@ -1217,12 +1240,13 @@ class _EmployeeFormScreenState extends State<EmployeeFormScreen> {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          _buildDropdown(
-                            label: 'Employment Type',
-                            value: employmentType,
-                            items: EmploymentType.values,
-                            onChanged: (val) => _employmentType.value = val!,
-                          ),
+                          if (!widget.lockEmploymentType)
+                            _buildDropdown(
+                              label: 'Employment Type',
+                              value: employmentType,
+                              items: EmploymentType.values,
+                              onChanged: (val) => _employmentType.value = val!,
+                            ),
                           if (employmentType == EmploymentType.external) ...[
                             SizedBox(height: 8.h),
                             Text(
