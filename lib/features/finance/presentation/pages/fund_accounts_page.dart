@@ -2462,6 +2462,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     final codeCtrl = TextEditingController(text: initialCode);
     String? assignedName = account?.assignedTo;
     String currency = account?.currency ?? 'SAR';
+    bool receiptRequired = account?.receiptRequired ?? true;
     bool isSaving = false;
 
     showDialog(
@@ -2661,6 +2662,13 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                       ),
                     ),
 
+                    SizedBox(height: 14.h),
+                    _receiptRuleTile(
+                      receiptRequired: receiptRequired,
+                      onChanged: (v) =>
+                          setStateDialog(() => receiptRequired = v),
+                    ),
+
                     // Account creation guard notice
                     Builder(
                       builder: (_) {
@@ -2760,6 +2768,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                   stcPayBalanceMinor: isEditing ? account.stcPayBalanceMinor : 0,
                   createdAt: isEditing ? account.createdAt : DateTime.now(),
                   sortOrder: isEditing ? account.sortOrder : null,
+                  receiptRequired: receiptRequired,
                 );
 
                 setStateDialog(() => isSaving = true);
@@ -2793,6 +2802,60 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// Per-account receipt rule: off means expenses paid from this account are
+  /// never blocked for a missing receipt, whatever the amount.
+  Widget _receiptRuleTile({
+    required bool receiptRequired,
+    required ValueChanged<bool> onChanged,
+  }) {
+    final policy = context.read<FinanceProvider>().policy;
+    return Container(
+      padding: EdgeInsets.fromLTRB(14.w, 6.h, 6.w, 6.h),
+      decoration: BoxDecoration(
+        color: FinDT.bgPage,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: FinDT.border),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.receipt_long_outlined, size: 18.sp, color: FinDT.brand),
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Receipt required for expenses',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w600,
+                    color: FinDT.textPrimary,
+                  ),
+                ),
+                SizedBox(height: 2.h),
+                Text(
+                  receiptRequired
+                      ? 'Expenses of ${policy.receiptRequiredAbove.toStringAsFixed(2)} SAR or more from this account need a receipt.'
+                      : 'Expenses from this account can be saved and approved without a receipt.',
+                  style: GoogleFonts.inter(
+                    fontSize: 10.5.sp,
+                    color: FinDT.textSecondary,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: receiptRequired,
+            activeThumbColor: FinDT.brand,
+            onChanged: onChanged,
+          ),
+        ],
       ),
     );
   }

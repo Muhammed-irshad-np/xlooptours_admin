@@ -190,6 +190,12 @@ class FinancePolicyEntity extends Equatable {
     return approvalLimits[key];
   }
 
+  /// Whether an expense of [amount] must carry a receipt. Accounts can opt
+  /// out in their settings (`FundAccountEntity.receiptRequired`), so callers
+  /// pass that flag for the account the expense is paid from.
+  bool requiresReceipt(double amount, {bool accountRequiresReceipt = true}) =>
+      accountRequiresReceipt && amount >= receiptRequiredAbove;
+
   bool canApproveAmount(String roleName, double amount) {
     final limit = limitForRole(roleName);
     if (limit == null) return true;

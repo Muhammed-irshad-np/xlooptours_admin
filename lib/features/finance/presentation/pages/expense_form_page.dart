@@ -1862,9 +1862,20 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
     );
   }
 
+  /// The selected "paid from" account may waive receipts in its settings.
+  bool get _accountRequiresReceipt =>
+      context
+          .read<FundAccountProvider>()
+          .getAccountById(_selectedAccountId ?? '')
+          ?.receiptRequired ??
+      true;
+
   bool get _isReceiptRequired {
     final amt = double.tryParse(_amountController.text) ?? 0.0;
-    return amt >= 100.0;
+    return context.read<FinanceProvider>().policy.requiresReceipt(
+          amt,
+          accountRequiresReceipt: _accountRequiresReceipt,
+        );
   }
 
   Widget _buildReceiptSection(FinanceProvider finProv) {
@@ -1902,7 +1913,7 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
                 Expanded(
                   child: Text(
                     isMissing
-                        ? 'Receipt is required for expenses of 100.00 SAR or more.'
+                        ? 'Receipt is required for expenses of ${finProv.policy.receiptRequiredAbove.toStringAsFixed(2)} SAR or more.'
                         : 'Receipt attached (policy requirement satisfied).',
                     style: GoogleFonts.inter(
                       fontSize: 11.sp,
@@ -2087,7 +2098,11 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
 
     final policy = finProv.policy;
     final amountVal = double.tryParse(_amountController.text) ?? 0.0;
-    if (amountVal >= policy.receiptRequiredAbove && _receiptUrls.isEmpty) {
+    if (policy.requiresReceipt(
+          amountVal,
+          accountRequiresReceipt: _accountRequiresReceipt,
+        ) &&
+        _receiptUrls.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

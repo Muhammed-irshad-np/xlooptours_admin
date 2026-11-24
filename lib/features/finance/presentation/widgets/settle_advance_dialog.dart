@@ -275,6 +275,14 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
     );
   }
 
+  /// The advance's source account may waive receipts in its settings.
+  bool get _accountRequiresReceipt =>
+      context
+          .read<FundAccountProvider>()
+          .getAccountById(_advance.fundAccountId)
+          ?.receiptRequired ??
+      true;
+
   Widget _buildLine(
     _SpentLine line,
     List<ExpenseCategoryEntity> categories,
@@ -288,8 +296,11 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
             .where((t) => t.isActive)
             .map((t) => t.name)
             .toList();
-    final receiptRequired =
-        line.value >= fin.policy.receiptRequiredAbove && line.receipt == null;
+    final receiptRequired = fin.policy.requiresReceipt(
+          line.value,
+          accountRequiresReceipt: _accountRequiresReceipt,
+        ) &&
+        line.receipt == null;
     final textStyle = GoogleFonts.inter(
       fontSize: 12.sp,
       color: FinDT.textPrimary,
@@ -497,7 +508,13 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
     }
     final fin = context.read<FinanceProvider>();
     final receiptAbove = fin.policy.receiptRequiredAbove;
-    if (_lines.any((l) => l.value >= receiptAbove && l.receipt == null)) {
+    final accountNeedsReceipt = _accountRequiresReceipt;
+    if (_lines.any((l) =>
+        fin.policy.requiresReceipt(
+          l.value,
+          accountRequiresReceipt: accountNeedsReceipt,
+        ) &&
+        l.receipt == null)) {
       setState(() => _error = 'Attach a receipt for every expense of '
           '${_fmt(receiptAbove)} SAR or more.');
       return;
