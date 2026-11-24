@@ -763,7 +763,7 @@ class _PettyCashCloseDialogState extends State<PettyCashCloseDialog> {
               onPressed: widget.onViewExpenses,
               icon: Icon(Icons.receipt_long_rounded, size: 14.sp),
               label: Text(
-                "Today's expenses",
+                'Expenses in this register',
                 style: GoogleFonts.inter(fontSize: 11.sp, fontWeight: FontWeight.w600),
               ),
             ),
