@@ -2012,11 +2012,13 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     double cashIn = 0, stcIn = 0, cashOut = 0, stcOut = 0, otherIn = 0, otherOut = 0;
     for (final tx in all) {
       if (tx.isReversed) continue;
-      if (tx.date.isBefore(start) || !tx.date.isBefore(end)) continue;
-      // If sessionOpenedAt is provided, only count transactions created
-      // AFTER the session was opened. Pre-session transactions are already
-      // captured in the session's opening balance snapshot.
-      if (sessionOpenedAt != null && tx.createdAt.isBefore(sessionOpenedAt)) {
+      if (sessionOpenedAt != null) {
+        // A register covers everything posted since it was opened, even
+        // when it stays open past midnight. Earlier postings are already in
+        // the opening balance snapshot. Filtering by posting time (not the
+        // row's date) keeps opening + in − out equal to the account balance.
+        if (tx.createdAt.isBefore(sessionOpenedAt)) continue;
+      } else if (tx.date.isBefore(start) || !tx.date.isBefore(end)) {
         continue;
       }
 
@@ -2075,16 +2077,27 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     PettyCashSessionEntity session,
   ) async {
     final start = DateTime(session.date.year, session.date.month, session.date.day);
-    final end = start.add(const Duration(days: 1));
+    final isOpen = session.status == PettyCashSessionStatus.open;
+    final closedAt = session.closedAt;
+    // Open register: everything posted since it opened, however many days
+    // that is. Closed with a close time: everything posted while it was
+    // open. Older closed sessions (no close time): their calendar day.
+    final bool spansPostings = isOpen || closedAt != null;
+    final DateTime lastDay = isOpen ? DateTime.now() : (closedAt ?? start);
+    final end = DateTime(lastDay.year, lastDay.month, lastDay.day)
+        .add(const Duration(days: 1));
 
-    // 1. Fetch transactions for account and filter for this session day
+    // 1. Fetch transactions for account and filter for this session
     final allTxs = await getTransactionsForAccount(session.fundAccountId);
     final sessionTxs = <FundTransactionModel>[];
     for (final tx in allTxs) {
       if (tx.isReversed) continue;
-      if (tx.date.isBefore(start) || !tx.date.isBefore(end)) continue;
-      if (session.status == PettyCashSessionStatus.open &&
-          tx.createdAt.isBefore(session.createdAt)) {
+      if (spansPostings) {
+        if (tx.createdAt.isBefore(session.createdAt)) continue;
+        if (closedAt != null && !isOpen && tx.createdAt.isAfter(closedAt)) {
+          continue;
+        }
+      } else if (tx.date.isBefore(start) || !tx.date.isBefore(end)) {
         continue;
       }
       if (tx.type == FundTransactionType.reversal) continue;
@@ -2157,7 +2170,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
       ));
     }
 
-    // 4. Include any expenses on that calendar day not matched to a transaction
+    // 4. Include any expenses in the session period not matched to a transaction
     for (final exp in allExpenses) {
       if (matchedExpenseIds.contains(exp.id)) continue;
       // The drawer outflow is the advance withdrawal already listed above;
