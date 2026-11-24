@@ -75,6 +75,17 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
   double get _total => _returnedValue + _spentTotal;
   double get _remaining => _advance.outstanding - _total;
 
+  /// What is left of the advance once the cash returned and every expense
+  /// line up to and including [line] are deducted from the outstanding float.
+  double _balanceAfter(_SpentLine line) {
+    var balance = _advance.outstanding - _returnedValue;
+    for (final l in _lines) {
+      balance -= l.value;
+      if (identical(l, line)) break;
+    }
+    return balance;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -265,8 +276,25 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
         children: [
           row('Recipient Staff:', _advance.employeeName, FinDT.textPrimary),
           SizedBox(height: 6.h),
+          // After a partial settlement, show how the balance was reached.
+          if (_advance.settledAmount > 0) ...[
+            row(
+              'Advance Amount:',
+              '${_fmt(_advance.amount)} ${_advance.currency}',
+              FinDT.textPrimary,
+            ),
+            SizedBox(height: 6.h),
+            row(
+              'Already Settled:',
+              '- ${_fmt(_advance.settledAmount)} ${_advance.currency}',
+              FinDT.success,
+            ),
+            SizedBox(height: 6.h),
+          ],
           row(
-            'Outstanding Float:',
+            _advance.settledAmount > 0
+                ? 'Balance Outstanding:'
+                : 'Outstanding Float:',
             '${_fmt(_advance.outstanding)} ${_advance.currency}',
             FinDT.brand,
           ),
@@ -431,7 +459,36 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
               '${_fmt(fin.policy.receiptRequiredAbove)} SAR or more.',
               style: GoogleFonts.inter(fontSize: 10.sp, color: FinDT.warning),
             ),
+          _buildLineBalance(line),
         ],
+      ),
+    );
+  }
+
+  /// Running balance under each expense line: the outstanding float minus
+  /// the cash returned and this and all earlier lines.
+  Widget _buildLineBalance(_SpentLine line) {
+    final balance = _balanceAfter(line);
+    final over = balance < -1e-6;
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Padding(
+        padding: EdgeInsets.only(top: 6.h),
+        child: Text(
+          over
+              ? 'Exceeds the balance by ${_fmt(-balance)} ${_advance.currency}'
+              : 'Balance after this expense: '
+                  '${_fmt(balance)} ${_advance.currency}',
+          style: GoogleFonts.inter(
+            fontSize: 11.sp,
+            fontWeight: FontWeight.w600,
+            color: over
+                ? FinDT.danger
+                : balance <= 1e-6
+                    ? FinDT.success
+                    : FinDT.warning,
+          ),
+        ),
       ),
     );
   }
