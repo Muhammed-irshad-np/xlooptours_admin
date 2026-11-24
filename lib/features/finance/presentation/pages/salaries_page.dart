@@ -4,12 +4,11 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 import '../../../../widgets/searchable_dropdown.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../employee/domain/entities/employee_entity.dart';
-import '../../../employee/domain/entities/employee_role_entity.dart';
 import '../../../employee/presentation/providers/employee_provider.dart';
+import '../../../../screens/employee_form_screen.dart';
 import '../../domain/entities/cash_advance_entity.dart';
 import '../../domain/entities/fund_account_entity.dart';
 import '../../domain/entities/salary_entity.dart';
@@ -2725,200 +2724,17 @@ class _SalariesPageState extends State<SalariesPage> {
     );
   }
 
-  /// Creates a minimal external employee record (the same fields the
-  /// Employees form keeps for external staff) and returns it.
+  /// Opens the full Employees form, preset and locked to External, so a new
+  /// external employee gets the same fields (vehicle details and all) as one
+  /// added from the Employees module. Returns the saved employee.
   Future<EmployeeEntity?> _showQuickAddExternalDialog(
     BuildContext context,
-  ) async {
-    final employeeProv = context.read<EmployeeProvider>();
-    if (employeeProv.roles.isEmpty) {
-      try {
-        await employeeProv.fetchEmployeeRoles();
-      } catch (_) {
-        // Fall back to the built-in positions below.
-      }
-    }
-    if (!context.mounted) return null;
-    final positions = (employeeProv.roles.isEmpty
-            ? EmployeeRoleEntity.defaults
-            : employeeProv.roles)
-        .map((r) => r.name)
-        .toList();
-
-    final formKey = GlobalKey<FormState>();
-    final nameCtrl = TextEditingController();
-    final phoneCtrl = TextEditingController();
-    final nationalityCtrl = TextEditingController();
-    String position = positions.contains('Driver') ? 'Driver' : positions.first;
-    String gender = 'Male';
-    bool isSaving = false;
-
-    return showDialog<EmployeeEntity>(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setInner) => AlertDialog(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          shape: finDialogShape,
-          title: finDialogTitle(
-            'New External Employee',
-            icon: Icons.person_add_alt_outlined,
-          ),
-          content: SizedBox(
-            width: 400.w,
-            child: SingleChildScrollView(
-              child: Form(
-                key: formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(height: 8.h),
-                    TextFormField(
-                      controller: nameCtrl,
-                      enabled: !isSaving,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: finDialogInputDecoration(
-                        label: 'Full Name *',
-                        prefixIcon: Icons.person_outline,
-                      ),
-                      style: GoogleFonts.inter(
-                        fontSize: 12.sp,
-                        color: FinDT.textPrimary,
-                      ),
-                      validator: (v) {
-                        final name = v?.trim() ?? '';
-                        if (name.isEmpty) return 'Required';
-                        final taken = employeeProv.employees.any((e) =>
-                            e.isExternal &&
-                            e.fullName.trim().toLowerCase() ==
-                                name.toLowerCase());
-                        if (taken) {
-                          return 'Already exists — pick them from the list';
-                        }
-                        return null;
-                      },
-                    ),
-                    SizedBox(height: 14.h),
-                    AppDropdownFormField<String>(
-                      initialValue: position,
-                      decoration: finDialogInputDecoration(
-                        label: 'Position *',
-                        prefixIcon: Icons.work_outline,
-                      ),
-                      style: GoogleFonts.inter(
-                        fontSize: 12.sp,
-                        color: FinDT.textPrimary,
-                      ),
-                      items: positions
-                          .map((p) => DropdownMenuItem(value: p, child: Text(p)))
-                          .toList(),
-                      onChanged: isSaving
-                          ? null
-                          : (v) => setInner(() => position = v ?? position),
-                    ),
-                    SizedBox(height: 14.h),
-                    TextFormField(
-                      controller: phoneCtrl,
-                      enabled: !isSaving,
-                      keyboardType: TextInputType.phone,
-                      decoration: finDialogInputDecoration(
-                        label: 'Phone',
-                        hint: 'Optional',
-                        prefixIcon: Icons.phone_outlined,
-                      ),
-                      style: GoogleFonts.inter(
-                        fontSize: 12.sp,
-                        color: FinDT.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 14.h),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextFormField(
-                            controller: nationalityCtrl,
-                            enabled: !isSaving,
-                            textCapitalization: TextCapitalization.words,
-                            decoration: finDialogInputDecoration(
-                              label: 'Nationality',
-                              hint: 'Optional',
-                              prefixIcon: Icons.flag_outlined,
-                            ),
-                            style: GoogleFonts.inter(
-                              fontSize: 12.sp,
-                              color: FinDT.textPrimary,
-                            ),
-                          ),
-                        ),
-                        SizedBox(width: 10.w),
-                        Expanded(
-                          child: AppDropdownFormField<String>(
-                            initialValue: gender,
-                            decoration: finDialogInputDecoration(
-                              label: 'Gender',
-                              prefixIcon: Icons.wc_outlined,
-                            ),
-                            style: GoogleFonts.inter(
-                              fontSize: 12.sp,
-                              color: FinDT.textPrimary,
-                            ),
-                            items: const ['Male', 'Female']
-                                .map((g) =>
-                                    DropdownMenuItem(value: g, child: Text(g)))
-                                .toList(),
-                            onChanged: isSaving
-                                ? null
-                                : (v) => setInner(() => gender = v ?? gender),
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 10.h),
-                    _buildInfoStrip(
-                      'Saved in Employees as External. Add vehicle details '
-                      'there later if needed.',
-                      Icons.info_outline,
-                      FinDT.textSecondary,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          actions: [
-            finDialogCancelButton(ctx, onPressed: isSaving ? () {} : null),
-            finDialogActionButton(
-              isLoading: isSaving,
-              label: 'Create Employee',
-              onPressed: () async {
-                if (!formKey.currentState!.validate()) return;
-                final employee = EmployeeEntity(
-                  id: const Uuid().v4(),
-                  fullName: nameCtrl.text.trim(),
-                  position: position,
-                  email: '',
-                  phoneNumber: phoneCtrl.text.trim(),
-                  nationality: nationalityCtrl.text.trim(),
-                  idType: '',
-                  idNumber: '',
-                  gender: gender,
-                  employmentType: EmploymentType.external,
-                );
-                setInner(() => isSaving = true);
-                try {
-                  await employeeProv.addEmployee(employee);
-                  if (ctx.mounted) Navigator.of(ctx).pop(employee);
-                } catch (e) {
-                  if (ctx.mounted) {
-                    setInner(() => isSaving = false);
-                    _snack(context, 'Failed to create employee: $e',
-                        FinDT.danger);
-                  }
-                }
-              },
-            ),
-          ],
+  ) {
+    return Navigator.of(context).push<EmployeeEntity>(
+      MaterialPageRoute(
+        builder: (_) => const EmployeeFormScreen(
+          initialEmploymentType: EmploymentType.external,
+          lockEmploymentType: true,
         ),
       ),
     );
