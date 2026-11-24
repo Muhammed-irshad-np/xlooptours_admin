@@ -1486,7 +1486,15 @@ class _ExpenseDataTable extends StatelessWidget {
         .read<FinanceProvider>()
         .policy
         .receiptRequiredAbove;
-    final isRequired = expense.amount >= threshold;
+    final accountRequiresReceipt = context
+            .read<FundAccountProvider>()
+            .getAccountById(expense.fundAccountId)
+            ?.receiptRequired ??
+        true;
+    final isRequired = context.read<FinanceProvider>().policy.requiresReceipt(
+          expense.amount,
+          accountRequiresReceipt: accountRequiresReceipt,
+        );
 
     if (count == 0 && !isRequired) {
       return Text(

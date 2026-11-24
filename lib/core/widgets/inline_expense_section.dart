@@ -81,8 +81,14 @@ class InlineExpenseController {
 
   double get amount => double.tryParse(amountField.text.trim()) ?? 0.0;
 
-  bool receiptRequired(FinancePolicyEntity policy) =>
-      amount >= policy.receiptRequiredAbove;
+  /// Whether the chosen "paid from" account wants receipts at all; some
+  /// accounts waive them in their settings.
+  bool accountRequiresReceipt = true;
+
+  bool receiptRequired(FinancePolicyEntity policy) => policy.requiresReceipt(
+        amount,
+        accountRequiresReceipt: accountRequiresReceipt,
+      );
 
   /// Returns the reason this cannot be saved, or null when it is good to go.
   /// Always null while the section is switched off.
@@ -336,6 +342,8 @@ class InlineExpenseSection extends StatelessWidget {
                     c.accountId = v;
                     final match = accounts.where((a) => a.id == v);
                     if (match.isNotEmpty) c.currency = match.first.currency;
+                    c.accountRequiresReceipt =
+                        match.isEmpty || match.first.receiptRequired;
                     onChanged();
                   },
           ),

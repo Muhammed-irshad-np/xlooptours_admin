@@ -89,10 +89,19 @@ class _ExpenseReviewDialogState extends State<_ExpenseReviewDialog> {
 
   // ─── Derived policy state ────────────────────────────────────
 
-  bool get _receiptRequired {
-    final threshold = context.read<FinanceProvider>().policy.receiptRequiredAbove;
-    return expense.amount >= threshold;
-  }
+  /// False when the paying account waives receipts in its settings.
+  bool get _accountRequiresReceipt =>
+      context
+          .read<FundAccountProvider>()
+          .getAccountById(expense.fundAccountId)
+          ?.receiptRequired ??
+      true;
+
+  bool get _receiptRequired =>
+      context.read<FinanceProvider>().policy.requiresReceipt(
+            expense.amount,
+            accountRequiresReceipt: _accountRequiresReceipt,
+          );
 
   bool get _blockedOnMissingReceipt => !_hasReceipts && _receiptRequired;
 
@@ -508,7 +517,9 @@ class _ExpenseReviewDialogState extends State<_ExpenseReviewDialog> {
               ? '${_receipts.length} receipt${_receipts.length == 1 ? '' : 's'} attached'
               : _receiptRequired
                   ? 'Receipt required at or above ${_money.format(threshold)} SAR — none attached'
-                  : 'No receipt (below the ${_money.format(threshold)} SAR threshold)',
+                  : !_accountRequiresReceipt
+                      ? 'No receipt (not required for this account)'
+                      : 'No receipt (below the ${_money.format(threshold)} SAR threshold)',
         ),
         SizedBox(height: 6.h),
         _policyRow(

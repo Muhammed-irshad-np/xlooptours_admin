@@ -509,7 +509,12 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
         '${limit != null ? ' ($limit)' : ''}. Your role: $actorRole',
       );
     }
-    _assertExpensePolicy(existing, policy);
+    _assertExpensePolicy(
+      existing,
+      policy,
+      accountRequiresReceipt:
+          await _accountRequiresReceipt(existing.fundAccountId),
+    );
 
     if (!existing.isNonWallet && existing.fundAccountId.isNotEmpty) {
       // Parallelize day lock check and single target account document fetch
@@ -3541,8 +3546,23 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     }
   }
 
-  void _assertExpensePolicy(ExpenseEntity expense, FinancePolicyEntity policy) {
-    if (expense.amount >= policy.receiptRequiredAbove &&
+  /// Reads the paying account's receipt setting; unknown accounts keep the
+  /// default rule (receipt required).
+  Future<bool> _accountRequiresReceipt(String fundAccountId) async {
+    if (fundAccountId.isEmpty) return true;
+    final snap = await _accounts.doc(fundAccountId).get();
+    return snap.data()?['receiptRequired'] as bool? ?? true;
+  }
+
+  void _assertExpensePolicy(
+    ExpenseEntity expense,
+    FinancePolicyEntity policy, {
+    bool accountRequiresReceipt = true,
+  }) {
+    if (policy.requiresReceipt(
+          expense.amount,
+          accountRequiresReceipt: accountRequiresReceipt,
+        ) &&
         expense.receiptUrls.isEmpty) {
       throw StateError(
         'Receipt required for amounts >= ${policy.receiptRequiredAbove}',

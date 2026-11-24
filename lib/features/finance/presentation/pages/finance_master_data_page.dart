@@ -45,6 +45,8 @@ class _FinanceMasterDataPageState extends State<FinanceMasterDataPage> {
       if (finProv.categories.isEmpty) finProv.fetchCategories();
       finProv.fetchFinancePolicy();
       if (accProv.accountTypes.isEmpty) accProv.fetchAccountTypes();
+      // The receipt rule lists accounts that waive receipts.
+      if (accProv.accounts.isEmpty) accProv.fetchAllAccounts();
     });
   }
 

@@ -9,6 +9,7 @@ import 'package:xloop_invoice/features/finance/domain/entities/finance_policy_en
 import 'package:xloop_invoice/features/finance/domain/entities/workflow_permission_config.dart';
 import 'package:xloop_invoice/features/finance/presentation/pages/finance_dashboard_page.dart';
 import 'package:xloop_invoice/features/finance/presentation/providers/finance_provider.dart';
+import 'package:xloop_invoice/features/finance/presentation/providers/fund_account_provider.dart';
 import 'package:xloop_invoice/features/finance/presentation/widgets/finance_dialog_helpers.dart';
 import 'package:xloop_invoice/features/user_management/domain/entities/managed_user_entity.dart';
 import 'package:xloop_invoice/features/user_management/domain/entities/role_entity.dart';
@@ -1277,8 +1278,10 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
 
           _buildRuleTile(
             title: 'Receipt Attachment Requirement',
-            subtitle:
-                'Mandatory for all expense submissions at or above ${formatter.format(policy.receiptRequiredAbove)} SAR',
+            subtitle: _receiptRuleSubtitle(
+              context,
+              formatter.format(policy.receiptRequiredAbove),
+            ),
             isActive: true,
           ),
           SizedBox(height: 10.h),
@@ -1308,6 +1311,23 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
         ],
       ),
     );
+  }
+
+  /// Names the accounts that waive receipts (set per account in its
+  /// create/edit form) so the exceptions are visible next to the rule.
+  String _receiptRuleSubtitle(BuildContext context, String threshold) {
+    final exempt = context
+        .watch<FundAccountProvider>()
+        .accounts
+        .where((a) => a.isActive && !a.receiptRequired)
+        .map((a) => a.name)
+        .toList();
+    final base =
+        'Mandatory for all expense submissions at or above $threshold SAR';
+    if (exempt.isEmpty) {
+      return '$base. Accounts can be exempted from their Edit Account form.';
+    }
+    return '$base, except from: ${exempt.join(', ')}';
   }
 
   // ═════════════════════════════════════════════════════════════════════════════
