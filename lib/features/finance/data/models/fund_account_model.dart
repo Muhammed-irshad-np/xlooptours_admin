@@ -24,6 +24,7 @@ class FundAccountModel extends FundAccountEntity {
     super.isActive = true,
     required super.createdAt,
     super.sortOrder,
+    super.receiptRequired = true,
   });
 
   Map<String, dynamic> toJson() {
@@ -49,6 +50,7 @@ class FundAccountModel extends FundAccountEntity {
       'createdAt': createdAt.toIso8601String(),
       // Left out when unset so an edit never wipes a saved position.
       if (sortOrder != null) 'sortOrder': sortOrder,
+      'receiptRequired': receiptRequired,
     };
   }
 
@@ -107,6 +109,8 @@ class FundAccountModel extends FundAccountEntity {
       isActive: json['isActive'] as bool? ?? true,
       createdAt: _parseDateTime(json['createdAt']) ?? DateTime.now(),
       sortOrder: (json['sortOrder'] as num?)?.toInt(),
+      // Absent on accounts saved before the setting existed: keep requiring.
+      receiptRequired: json['receiptRequired'] as bool? ?? true,
     );
   }
 
@@ -140,6 +144,7 @@ class FundAccountModel extends FundAccountEntity {
       isActive: entity.isActive,
       createdAt: entity.createdAt,
       sortOrder: entity.sortOrder,
+      receiptRequired: entity.receiptRequired,
     );
   }
 
