@@ -433,8 +433,16 @@ class _PettyCashPageState extends State<PettyCashPage> {
           ),
           SizedBox(height: 20.h),
 
+          if (session != null && _daysOpen(session) > 0) ...[
+            _staleRegisterNotice(session),
+            SizedBox(height: 14.h),
+          ],
+
           if (session != null) ...[
             Builder(builder: (_) {
+              final sinceLabel = _daysOpen(session) > 0
+                  ? 'SINCE ${DateFormat('d MMM').format(session.date).toUpperCase()}'
+                  : null;
               final live = provider.previewTotals;
               final cashExp = live?.cashExpenses ?? session.cashExpenses;
               final stcExp = live?.stcPayExpenses ?? session.stcPayExpenses;
@@ -481,7 +489,9 @@ class _PettyCashPageState extends State<PettyCashPage> {
                           onTap: () => _showSessionExpensesDialog(context, provider, session),
                           borderRadius: BorderRadius.circular(16.r),
                           child: _buildSessionKpiCard(
-                            title: "TODAY'S EXPENSES",
+                            title: sinceLabel == null
+                                ? "TODAY'S EXPENSES"
+                                : 'EXPENSES $sinceLabel',
                             value: '${formatter.format(expTotal)} SAR',
                             icon: Icons.arrow_upward_rounded,
                             accentColor: const Color(0xFFDC2626),
@@ -495,7 +505,9 @@ class _PettyCashPageState extends State<PettyCashPage> {
                       // 3. Today's Deposits
                       Expanded(
                         child: _buildSessionKpiCard(
-                          title: "TODAY'S DEPOSITS",
+                          title: sinceLabel == null
+                              ? "TODAY'S DEPOSITS"
+                              : 'DEPOSITS $sinceLabel',
                           value: '${formatter.format(depTotal)} SAR',
                           icon: Icons.arrow_downward_rounded,
                           accentColor: const Color(0xFF16A34A),
@@ -1483,6 +1495,48 @@ class _PettyCashPageState extends State<PettyCashPage> {
   }
 
   /// "Cash 1,000.00 (−200.00) • STC Pay 500.00 (0.00) • moved … • recounted"
+  /// Whole calendar days between the register's day and today.
+  int _daysOpen(PettyCashSessionEntity session) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(session.date.year, session.date.month, session.date.day);
+    return today.difference(day).inDays;
+  }
+
+  Widget _staleRegisterNotice(PettyCashSessionEntity session) {
+    final days = _daysOpen(session);
+    const amber = Color(0xFFB45309);
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFFBEB),
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: const Color(0xFFFDE68A)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.history_toggle_off_rounded, color: amber, size: 18.sp),
+          SizedBox(width: 10.w),
+          Expanded(
+            child: Text(
+              'This register has been open since '
+              '${DateFormat('d MMM').format(session.date)} '
+              '($days day${days == 1 ? '' : 's'}). The figures below cover '
+              'everything since it opened. Close it with today\'s count so '
+              'each day gets its own check.',
+              style: GoogleFonts.inter(
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w500,
+                color: amber,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _closingDetailLine(PettyCashSessionEntity s, NumberFormat f) {
     String diff(double d) {
       if (d.abs() < 0.005) return '0.00';
