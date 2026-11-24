@@ -120,6 +120,11 @@ class FundAccountEntity extends Equatable {
   /// never reordered; those come after the ordered ones, by name.
   final int? sortOrder;
 
+  /// Whether expenses paid from this account need a receipt once they reach
+  /// the policy threshold. Set off in the account form for accounts whose
+  /// spends never come with a bill (e.g. a government-portal wallet).
+  final bool receiptRequired;
+
   const FundAccountEntity({
     required this.id,
     required this.name,
@@ -136,6 +141,7 @@ class FundAccountEntity extends Equatable {
     this.isActive = true,
     required this.createdAt,
     this.sortOrder,
+    this.receiptRequired = true,
   });
 
   factory FundAccountEntity.empty() {
@@ -202,6 +208,7 @@ class FundAccountEntity extends Equatable {
     bool? isActive,
     DateTime? createdAt,
     int? sortOrder,
+    bool? receiptRequired,
     bool clearAssignedTo = false,
     bool clearAssignedToId = false,
   }) {
@@ -223,6 +230,7 @@ class FundAccountEntity extends Equatable {
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       sortOrder: sortOrder ?? this.sortOrder,
+      receiptRequired: receiptRequired ?? this.receiptRequired,
     );
   }
 
@@ -243,5 +251,6 @@ class FundAccountEntity extends Equatable {
         isActive,
         createdAt,
         sortOrder,
+        receiptRequired,
       ];
 }
