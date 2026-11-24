@@ -20,6 +20,7 @@ import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../providers/salary_provider.dart';
 import '../widgets/finance_dialog_helpers.dart';
+import '../widgets/payment_receipt_dialog.dart';
 import 'finance_dashboard_page.dart';
 import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
@@ -1259,6 +1260,13 @@ class _SalariesPageState extends State<SalariesPage> {
       primary = _waitingLabel('Awaiting finalize');
     } else if (status.canPay) {
       primary = _waitingLabel('Awaiting payment');
+    } else if (row.isTrip && status == SalaryPaymentStatus.paid) {
+      // Closing confirmation for the external employee once they're paid.
+      primary = finDialogActionButton(
+        onPressed: () => _showReceipt(context, payment!),
+        label: 'Share Receipt',
+        icon: Icons.ios_share_outlined,
+      );
     }
 
     return Row(
@@ -1318,6 +1326,26 @@ class _SalariesPageState extends State<SalariesPage> {
   }
 
   // ─── Actions ────────────────────────────────────────────────
+
+  /// Receipt for a paid external employee, ready to send on WhatsApp.
+  Future<void> _showReceipt(
+    BuildContext context,
+    SalaryPaymentEntity payment,
+  ) {
+    EmployeeEntity? employee;
+    for (final e in context.read<EmployeeProvider>().employees) {
+      if (e.id == payment.employeeId) {
+        employee = e;
+        break;
+      }
+    }
+    return showPaymentReceiptDialog(
+      context,
+      payment: payment,
+      countryCode: employee?.countryCode,
+      phone: employee?.phoneNumber,
+    );
+  }
 
   Future<void> _reopenPayment(
     BuildContext context,
