@@ -174,6 +174,79 @@ void main() {
     });
   });
 
+  group('cross-source conflicts', () {
+    const queue = GetOdometerReviewQueueUseCase(policy: policy);
+    final day0 = anchor.add(const Duration(hours: 14));
+    final day1 = anchor.add(const Duration(days: 1)); // 10 hours later
+
+    List<OdometerReviewItem> conflicts(List<OdometerReadingEntity> readings) =>
+        queue(vehicles: [vehicle('v1')], readingsByVehicle: {'v1': readings})
+            .where((i) => i.reason == OdometerReviewReason.crossSourceConflict)
+            .toList();
+
+    test('1,088 km between readings 10 hours apart is not a conflict', () {
+      // The GMC Yukon case: vehicle form on the 23rd, maintenance on the 24th.
+      // Entry validation accepted it, so the queue must not contradict it.
+      expect(
+        conflicts([
+          reading('a', 'v1', 151226, day0, source: OdometerSource.vehicleForm),
+          reading('b', 'v1', 152314, day1, source: OdometerSource.maintenance),
+        ]),
+        isEmpty,
+      );
+    });
+
+    test('a jump beyond the first-day ceiling is still a conflict', () {
+      final found = conflicts([
+        reading('a', 'v1', 151226, day0, source: OdometerSource.vehicleForm),
+        reading('b', 'v1', 153226, day1, source: OdometerSource.maintenance),
+      ]);
+      expect(found, hasLength(1));
+      expect(found.first.explanation, contains('2,000 km/day apart'));
+    });
+
+    test('accepting the later reading clears the conflict', () {
+      final later = reading(
+        'b',
+        'v1',
+        151000,
+        day1,
+        source: OdometerSource.maintenance,
+      );
+      final earlier = reading(
+        'a',
+        'v1',
+        151226,
+        day0,
+        source: OdometerSource.vehicleForm,
+      );
+      expect(conflicts([earlier, later]), hasLength(1));
+
+      final reviewed = later.copyWith(reviewedAt: day1.add(const Duration(hours: 1)));
+      expect(conflicts([earlier, reviewed]), isEmpty);
+    });
+
+    test('a reading backdated after the review raises it again', () {
+      final later = reading(
+        'b',
+        'v1',
+        151000,
+        day1,
+        source: OdometerSource.maintenance,
+      ).copyWith(reviewedAt: day1.add(const Duration(hours: 1)));
+      final backdated = OdometerReadingEntity(
+        id: 'a',
+        vehicleId: 'v1',
+        value: 151226,
+        readingAt: day0,
+        recordedAt: day1.add(const Duration(hours: 2)),
+        source: OdometerSource.vehicleForm,
+        status: OdometerReadingStatus.accepted,
+      );
+      expect(conflicts([backdated, later]), hasLength(1));
+    });
+  });
+
   group('failures are surfaced, not disguised as an empty queue', () {
     test('queueError is set when the per-vehicle read fails', () async {
       final failing = _AlwaysFailingRepository();
