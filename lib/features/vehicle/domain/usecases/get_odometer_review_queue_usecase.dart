@@ -113,10 +113,23 @@ class GetOdometerReviewQueueUseCase {
       // not a contradiction.
       if (earlier.source == later.source) continue;
 
-      final days = math.max(
-        0.5,
-        later.readingAt.difference(earlier.readingAt).inHours / 24.0,
-      );
+      // A reviewer already looked at this pair and accepted the later reading.
+      // Both stay accepted, so without this the card would be rebuilt from the
+      // same two readings on every load and Accept could never clear it. The
+      // review only counts if the earlier reading existed when it was made — a
+      // backdated reading entered afterwards is a new contradiction.
+      final reviewedAt = later.reviewedAt;
+      if (reviewedAt != null && !reviewedAt.isBefore(earlier.recordedAt)) {
+        continue;
+      }
+
+      // Whole days, at least one — the same rounding the entry-time validator
+      // uses. A fractional floor here made a reading the validator had just
+      // accepted (1,088 km over a 12-hour gap) look like twice the first-day
+      // ceiling and land in the queue as a contradiction.
+      final rawDays =
+          later.readingAt.difference(earlier.readingAt).inHours / 24.0;
+      final days = math.max(1, rawDays.round());
       final delta = later.value - earlier.value;
 
       if (delta < 0) {
@@ -130,9 +143,10 @@ class GetOdometerReviewQueueUseCase {
         continue;
       }
 
-      final rate = delta / days;
-      if (rate > policy.hardMaxDelta(days.round()) / math.max(1, days.round())) {
-        out.add(_Conflict(earlier: earlier, later: later, impliedRate: rate));
+      if (delta > policy.hardMaxDelta(days)) {
+        out.add(
+          _Conflict(earlier: earlier, later: later, impliedRate: delta / days),
+        );
       }
     }
     return out;
