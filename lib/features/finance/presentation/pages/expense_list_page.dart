@@ -814,7 +814,7 @@ class _ExpenseDataTable extends StatelessWidget {
             DataColumn(label: Text('AMOUNT'), numeric: true),
             DataColumn(label: Text('RECEIPT')),
             DataColumn(label: Text('STATUS')),
-            DataColumn(label: Text('ACTIONS')),
+            DataColumn(label: Text('')),
           ],
           rows: expenses.map((expense) {
             final accountName = _resolveAccountName(expense);
@@ -1624,76 +1624,103 @@ class _ExpenseDataTable extends StatelessWidget {
       policy: policy,
     );
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (expense.status.canApprove && canApprove) ...[
-          _actionIcon(
-            icon: Icons.fact_check_outlined,
-            color: FinDT.success,
-            tooltip: expense.isNonWallet
-                ? 'Review receipt & approve'
-                : 'Review receipt, approve & post to wallet',
-            onTap: () => _openReview(context, expense, accountName),
-          ),
-          SizedBox(width: 4.w),
-          _actionIcon(
-            icon: Icons.cancel_outlined,
-            color: FinDT.danger,
-            tooltip: 'Reject',
-            onTap: () => _confirmReject(context, expense),
-          ),
-          SizedBox(width: 4.w),
-        ],
-        if (expense.status.canVoid && canReverse) ...[
-          _actionIcon(
-            icon: Icons.undo_rounded,
-            color: const Color(0xFF7C3AED),
-            tooltip: 'Void & reverse payment',
-            onTap: () => _confirmVoid(context, expense),
-          ),
-          SizedBox(width: 4.w),
-        ],
-        if (expense.status.canEdit)
-          _actionIcon(
-            icon: Icons.edit_outlined,
-            color: FinDT.brand,
-            tooltip: 'Edit',
-            onTap: () => Navigator.push(
+    final showApprove = expense.status.canApprove && canApprove;
+    final showVoid = expense.status.canVoid && canReverse;
+    final showEdit = expense.status.canEdit;
+    final showDelete = isSuperAdmin && expense.status.canHardDelete;
+
+    return PopupMenuButton<String>(
+      tooltip: 'Actions',
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10.r),
+        side: BorderSide(color: FinDT.border),
+      ),
+      icon: Icon(Icons.more_vert, size: 18.sp, color: FinDT.textSecondary),
+      onSelected: (action) {
+        switch (action) {
+          case 'view':
+            _showExpenseLifecycleTimeline(context, expense);
+            break;
+          case 'approve':
+            _openReview(context, expense, accountName);
+            break;
+          case 'reject':
+            _confirmReject(context, expense);
+            break;
+          case 'void':
+            _confirmVoid(context, expense);
+            break;
+          case 'edit':
+            Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => ExpenseFormPage(expense: expense),
               ),
-            ),
+            );
+            break;
+          case 'delete':
+            _confirmDelete(context, expense);
+            break;
+        }
+      },
+      itemBuilder: (_) => [
+        _menuItem(
+          'view',
+          Icons.info_outline_rounded,
+          'View details',
+          FinDT.textPrimary,
+        ),
+        if (showApprove) ...[
+          _menuItem(
+            'approve',
+            Icons.fact_check_outlined,
+            expense.isNonWallet ? 'Review & approve' : 'Review, approve & post',
+            FinDT.success,
           ),
-        if (isSuperAdmin && expense.status.canHardDelete) ...[
-          SizedBox(width: 4.w),
-          _actionIcon(
-            icon: Icons.delete_outline,
-            color: FinDT.danger,
-            tooltip: 'Delete draft/pending',
-            onTap: () => _confirmDelete(context, expense),
+          _menuItem('reject', Icons.cancel_outlined, 'Reject', FinDT.danger),
+        ],
+        if (showVoid)
+          _menuItem(
+            'void',
+            Icons.undo_rounded,
+            'Void & reverse payment',
+            const Color(0xFF7C3AED),
           ),
+        if (showEdit)
+          _menuItem('edit', Icons.edit_outlined, 'Edit', FinDT.brand),
+        if (showDelete) ...[
+          const PopupMenuDivider(),
+          _menuItem('delete', Icons.delete_outline, 'Delete', FinDT.danger),
         ],
       ],
     );
   }
 
-  Widget _actionIcon({
-    required IconData icon,
-    required Color color,
-    required String tooltip,
-    required VoidCallback onTap,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6.r),
-        child: Padding(
-          padding: EdgeInsets.all(4.w),
-          child: Icon(icon, size: 16.sp, color: color),
-        ),
+  PopupMenuItem<String> _menuItem(
+    String value,
+    IconData icon,
+    String label,
+    Color color,
+  ) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 40.h,
+      child: Row(
+        children: [
+          Icon(icon, size: 16.sp, color: color),
+          SizedBox(width: 10.w),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w500,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
