@@ -318,9 +318,7 @@ class _FiltersBar extends StatelessWidget {
               hint: 'Expense Type',
               value: provider.typeFilter,
               items: provider.availableExpenseTypes
-                  .map(
-                    (t) => DropdownMenuItem(value: t, child: Text(t)),
-                  )
+                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                   .toList(),
               onChanged: (t) => provider.setTypeFilter(t),
             ),
@@ -790,8 +788,7 @@ class _ExpenseDataTable extends StatelessWidget {
         bottomLeft: Radius.circular(14.r),
         bottomRight: Radius.circular(14.r),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
+      child: _HorizontalScrollTable(
         child: DataTable(
           headingRowColor: WidgetStateProperty.all(const Color(0xFFF9FAFB)),
           headingTextStyle: GoogleFonts.inter(
@@ -817,7 +814,7 @@ class _ExpenseDataTable extends StatelessWidget {
             DataColumn(label: Text('AMOUNT'), numeric: true),
             DataColumn(label: Text('RECEIPT')),
             DataColumn(label: Text('STATUS')),
-            DataColumn(label: Text('ACTIONS')),
+            DataColumn(label: Text('')),
           ],
           rows: expenses.map((expense) {
             final accountName = _resolveAccountName(expense);
@@ -867,8 +864,9 @@ class _ExpenseDataTable extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
+                      _clipped(
                         expense.expenseType,
+                        maxWidth: 170.w,
                         style: GoogleFonts.inter(fontWeight: FontWeight.w500),
                       ),
                     ],
@@ -884,8 +882,9 @@ class _ExpenseDataTable extends StatelessWidget {
                       color: FinDT.bgPage,
                       borderRadius: BorderRadius.circular(6.r),
                     ),
-                    child: Text(
+                    child: _clipped(
                       expense.expenseCategory,
+                      maxWidth: 120.w,
                       style: GoogleFonts.inter(
                         fontSize: 10.sp,
                         fontWeight: FontWeight.w600,
@@ -904,8 +903,9 @@ class _ExpenseDataTable extends StatelessWidget {
                       color: FinDT.brandLight,
                       borderRadius: BorderRadius.circular(6.r),
                     ),
-                    child: Text(
+                    child: _clipped(
                       accountName,
+                      maxWidth: 140.w,
                       style: GoogleFonts.inter(
                         fontSize: 10.sp,
                         fontWeight: FontWeight.w600,
@@ -914,7 +914,7 @@ class _ExpenseDataTable extends StatelessWidget {
                     ),
                   ),
                 ),
-                DataCell(Text(expense.submittedBy)),
+                DataCell(_clipped(expense.submittedBy, maxWidth: 120.w)),
                 DataCell(
                   Text(
                     '${formatter.format(expense.amount)} ${expense.currency}',
@@ -1126,10 +1126,10 @@ class _ExpenseDataTable extends StatelessWidget {
                             formatter: formatter,
                           )
                         : (expense.ledgerEntryId?.isNotEmpty ?? false)
-                            ? _LedgerReferenceLine(
-                                ledgerEntryId: expense.ledgerEntryId!,
-                              )
-                            : null,
+                        ? _LedgerReferenceLine(
+                            ledgerEntryId: expense.ledgerEntryId!,
+                          )
+                        : null,
                     isLast: !isVoided,
                   ),
                 ],
@@ -1150,11 +1150,11 @@ class _ExpenseDataTable extends StatelessWidget {
                         : 'Funds refunded to $accountName.',
                     extraWidget:
                         (expense.reverseLedgerEntryId?.isNotEmpty ?? false)
-                            ? _LedgerReferenceLine(
-                                ledgerEntryId: expense.reverseLedgerEntryId!,
-                                label: 'Reversal Entry',
-                              )
-                            : null,
+                        ? _LedgerReferenceLine(
+                            ledgerEntryId: expense.reverseLedgerEntryId!,
+                            label: 'Reversal Entry',
+                          )
+                        : null,
                     isAlert: true,
                     alertColor: const Color(0xFF7C3AED),
                     isLast: true,
@@ -1350,9 +1350,9 @@ class _ExpenseDataTable extends StatelessWidget {
     }
 
     return FutureBuilder<FundTransactionEntity?>(
-      future: context
-          .read<FundAccountProvider>()
-          .getTransactionById(expense.ledgerEntryId!),
+      future: context.read<FundAccountProvider>().getTransactionById(
+        expense.ledgerEntryId!,
+      ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
@@ -1405,9 +1405,7 @@ class _ExpenseDataTable extends StatelessWidget {
             borderRadius: BorderRadius.circular(6.r),
             border: Border.all(color: FinDT.border),
           ),
-          child: _LedgerReferenceLine(
-            ledgerEntryId: expense.ledgerEntryId!,
-          ),
+          child: _LedgerReferenceLine(ledgerEntryId: expense.ledgerEntryId!),
         );
       },
     );
@@ -1486,15 +1484,16 @@ class _ExpenseDataTable extends StatelessWidget {
         .read<FinanceProvider>()
         .policy
         .receiptRequiredAbove;
-    final accountRequiresReceipt = context
+    final accountRequiresReceipt =
+        context
             .read<FundAccountProvider>()
             .getAccountById(expense.fundAccountId)
             ?.receiptRequired ??
         true;
     final isRequired = context.read<FinanceProvider>().policy.requiresReceipt(
-          expense.amount,
-          accountRequiresReceipt: accountRequiresReceipt,
-        );
+      expense.amount,
+      accountRequiresReceipt: accountRequiresReceipt,
+    );
 
     if (count == 0 && !isRequired) {
       return Text(
@@ -1588,6 +1587,25 @@ class _ExpenseDataTable extends StatelessWidget {
     }
   }
 
+  /// Single-line text capped at [maxWidth]; long values are ellipsised and
+  /// shown in full on hover so the ACTIONS column stays on screen.
+  Widget _clipped(String text, {required double maxWidth, TextStyle? style}) {
+    return Tooltip(
+      message: text,
+      waitDuration: const Duration(milliseconds: 400),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Text(
+          text,
+          style: style,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          softWrap: false,
+        ),
+      ),
+    );
+  }
+
   Widget _buildActions(
     BuildContext context,
     ExpenseEntity expense,
@@ -1606,76 +1624,103 @@ class _ExpenseDataTable extends StatelessWidget {
       policy: policy,
     );
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (expense.status.canApprove && canApprove) ...[
-          _actionIcon(
-            icon: Icons.fact_check_outlined,
-            color: FinDT.success,
-            tooltip: expense.isNonWallet
-                ? 'Review receipt & approve'
-                : 'Review receipt, approve & post to wallet',
-            onTap: () => _openReview(context, expense, accountName),
-          ),
-          SizedBox(width: 4.w),
-          _actionIcon(
-            icon: Icons.cancel_outlined,
-            color: FinDT.danger,
-            tooltip: 'Reject',
-            onTap: () => _confirmReject(context, expense),
-          ),
-          SizedBox(width: 4.w),
-        ],
-        if (expense.status.canVoid && canReverse) ...[
-          _actionIcon(
-            icon: Icons.undo_rounded,
-            color: const Color(0xFF7C3AED),
-            tooltip: 'Void & reverse payment',
-            onTap: () => _confirmVoid(context, expense),
-          ),
-          SizedBox(width: 4.w),
-        ],
-        if (expense.status.canEdit)
-          _actionIcon(
-            icon: Icons.edit_outlined,
-            color: FinDT.brand,
-            tooltip: 'Edit',
-            onTap: () => Navigator.push(
+    final showApprove = expense.status.canApprove && canApprove;
+    final showVoid = expense.status.canVoid && canReverse;
+    final showEdit = expense.status.canEdit;
+    final showDelete = isSuperAdmin && expense.status.canHardDelete;
+
+    return PopupMenuButton<String>(
+      tooltip: 'Actions',
+      color: Colors.white,
+      surfaceTintColor: Colors.transparent,
+      position: PopupMenuPosition.under,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10.r),
+        side: BorderSide(color: FinDT.border),
+      ),
+      icon: Icon(Icons.more_vert, size: 18.sp, color: FinDT.textSecondary),
+      onSelected: (action) {
+        switch (action) {
+          case 'view':
+            _showExpenseLifecycleTimeline(context, expense);
+            break;
+          case 'approve':
+            _openReview(context, expense, accountName);
+            break;
+          case 'reject':
+            _confirmReject(context, expense);
+            break;
+          case 'void':
+            _confirmVoid(context, expense);
+            break;
+          case 'edit':
+            Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (_) => ExpenseFormPage(expense: expense),
               ),
-            ),
+            );
+            break;
+          case 'delete':
+            _confirmDelete(context, expense);
+            break;
+        }
+      },
+      itemBuilder: (_) => [
+        _menuItem(
+          'view',
+          Icons.info_outline_rounded,
+          'View details',
+          FinDT.textPrimary,
+        ),
+        if (showApprove) ...[
+          _menuItem(
+            'approve',
+            Icons.fact_check_outlined,
+            expense.isNonWallet ? 'Review & approve' : 'Review, approve & post',
+            FinDT.success,
           ),
-        if (isSuperAdmin && expense.status.canHardDelete) ...[
-          SizedBox(width: 4.w),
-          _actionIcon(
-            icon: Icons.delete_outline,
-            color: FinDT.danger,
-            tooltip: 'Delete draft/pending',
-            onTap: () => _confirmDelete(context, expense),
+          _menuItem('reject', Icons.cancel_outlined, 'Reject', FinDT.danger),
+        ],
+        if (showVoid)
+          _menuItem(
+            'void',
+            Icons.undo_rounded,
+            'Void & reverse payment',
+            const Color(0xFF7C3AED),
           ),
+        if (showEdit)
+          _menuItem('edit', Icons.edit_outlined, 'Edit', FinDT.brand),
+        if (showDelete) ...[
+          const PopupMenuDivider(),
+          _menuItem('delete', Icons.delete_outline, 'Delete', FinDT.danger),
         ],
       ],
     );
   }
 
-  Widget _actionIcon({
-    required IconData icon,
-    required Color color,
-    required String tooltip,
-    required VoidCallback onTap,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(6.r),
-        child: Padding(
-          padding: EdgeInsets.all(4.w),
-          child: Icon(icon, size: 16.sp, color: color),
-        ),
+  PopupMenuItem<String> _menuItem(
+    String value,
+    IconData icon,
+    String label,
+    Color color,
+  ) {
+    return PopupMenuItem<String>(
+      value: value,
+      height: 40.h,
+      child: Row(
+        children: [
+          Icon(icon, size: 16.sp, color: color),
+          SizedBox(width: 10.w),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.w500,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1951,7 +1996,8 @@ class _LedgerReferenceLineState extends State<_LedgerReferenceLine> {
         if (snapshot.connectionState != ConnectionState.done) {
           return Text('${widget.label}: …', style: style);
         }
-        final reference = snapshot.data?.displayReference ??
+        final reference =
+            snapshot.data?.displayReference ??
             FundTransactionEntity.shortReference(widget.ledgerEntryId);
         return Tooltip(
           message: 'Copy transaction ID',
@@ -1981,6 +2027,47 @@ class _LedgerReferenceLineState extends State<_LedgerReferenceLine> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Horizontal scroller for wide tables with an always-visible scrollbar, so
+/// it's obvious when columns (like ACTIONS) sit past the right edge.
+class _HorizontalScrollTable extends StatefulWidget {
+  final Widget child;
+  const _HorizontalScrollTable({required this.child});
+
+  @override
+  State<_HorizontalScrollTable> createState() => _HorizontalScrollTableState();
+}
+
+class _HorizontalScrollTableState extends State<_HorizontalScrollTable> {
+  final _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => Scrollbar(
+        controller: _controller,
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.only(bottom: 10.h),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: constraints.hasBoundedWidth ? constraints.maxWidth : 0,
+            ),
+            child: widget.child,
+          ),
+        ),
+      ),
     );
   }
 }
