@@ -318,9 +318,7 @@ class _FiltersBar extends StatelessWidget {
               hint: 'Expense Type',
               value: provider.typeFilter,
               items: provider.availableExpenseTypes
-                  .map(
-                    (t) => DropdownMenuItem(value: t, child: Text(t)),
-                  )
+                  .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                   .toList(),
               onChanged: (t) => provider.setTypeFilter(t),
             ),
@@ -790,8 +788,7 @@ class _ExpenseDataTable extends StatelessWidget {
         bottomLeft: Radius.circular(14.r),
         bottomRight: Radius.circular(14.r),
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
+      child: _HorizontalScrollTable(
         child: DataTable(
           headingRowColor: WidgetStateProperty.all(const Color(0xFFF9FAFB)),
           headingTextStyle: GoogleFonts.inter(
@@ -867,8 +864,9 @@ class _ExpenseDataTable extends StatelessWidget {
                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
+                      _clipped(
                         expense.expenseType,
+                        maxWidth: 170.w,
                         style: GoogleFonts.inter(fontWeight: FontWeight.w500),
                       ),
                     ],
@@ -884,8 +882,9 @@ class _ExpenseDataTable extends StatelessWidget {
                       color: FinDT.bgPage,
                       borderRadius: BorderRadius.circular(6.r),
                     ),
-                    child: Text(
+                    child: _clipped(
                       expense.expenseCategory,
+                      maxWidth: 120.w,
                       style: GoogleFonts.inter(
                         fontSize: 10.sp,
                         fontWeight: FontWeight.w600,
@@ -904,8 +903,9 @@ class _ExpenseDataTable extends StatelessWidget {
                       color: FinDT.brandLight,
                       borderRadius: BorderRadius.circular(6.r),
                     ),
-                    child: Text(
+                    child: _clipped(
                       accountName,
+                      maxWidth: 140.w,
                       style: GoogleFonts.inter(
                         fontSize: 10.sp,
                         fontWeight: FontWeight.w600,
@@ -914,7 +914,7 @@ class _ExpenseDataTable extends StatelessWidget {
                     ),
                   ),
                 ),
-                DataCell(Text(expense.submittedBy)),
+                DataCell(_clipped(expense.submittedBy, maxWidth: 120.w)),
                 DataCell(
                   Text(
                     '${formatter.format(expense.amount)} ${expense.currency}',
@@ -1126,10 +1126,10 @@ class _ExpenseDataTable extends StatelessWidget {
                             formatter: formatter,
                           )
                         : (expense.ledgerEntryId?.isNotEmpty ?? false)
-                            ? _LedgerReferenceLine(
-                                ledgerEntryId: expense.ledgerEntryId!,
-                              )
-                            : null,
+                        ? _LedgerReferenceLine(
+                            ledgerEntryId: expense.ledgerEntryId!,
+                          )
+                        : null,
                     isLast: !isVoided,
                   ),
                 ],
@@ -1150,11 +1150,11 @@ class _ExpenseDataTable extends StatelessWidget {
                         : 'Funds refunded to $accountName.',
                     extraWidget:
                         (expense.reverseLedgerEntryId?.isNotEmpty ?? false)
-                            ? _LedgerReferenceLine(
-                                ledgerEntryId: expense.reverseLedgerEntryId!,
-                                label: 'Reversal Entry',
-                              )
-                            : null,
+                        ? _LedgerReferenceLine(
+                            ledgerEntryId: expense.reverseLedgerEntryId!,
+                            label: 'Reversal Entry',
+                          )
+                        : null,
                     isAlert: true,
                     alertColor: const Color(0xFF7C3AED),
                     isLast: true,
@@ -1350,9 +1350,9 @@ class _ExpenseDataTable extends StatelessWidget {
     }
 
     return FutureBuilder<FundTransactionEntity?>(
-      future: context
-          .read<FundAccountProvider>()
-          .getTransactionById(expense.ledgerEntryId!),
+      future: context.read<FundAccountProvider>().getTransactionById(
+        expense.ledgerEntryId!,
+      ),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Container(
@@ -1405,9 +1405,7 @@ class _ExpenseDataTable extends StatelessWidget {
             borderRadius: BorderRadius.circular(6.r),
             border: Border.all(color: FinDT.border),
           ),
-          child: _LedgerReferenceLine(
-            ledgerEntryId: expense.ledgerEntryId!,
-          ),
+          child: _LedgerReferenceLine(ledgerEntryId: expense.ledgerEntryId!),
         );
       },
     );
@@ -1486,15 +1484,16 @@ class _ExpenseDataTable extends StatelessWidget {
         .read<FinanceProvider>()
         .policy
         .receiptRequiredAbove;
-    final accountRequiresReceipt = context
+    final accountRequiresReceipt =
+        context
             .read<FundAccountProvider>()
             .getAccountById(expense.fundAccountId)
             ?.receiptRequired ??
         true;
     final isRequired = context.read<FinanceProvider>().policy.requiresReceipt(
-          expense.amount,
-          accountRequiresReceipt: accountRequiresReceipt,
-        );
+      expense.amount,
+      accountRequiresReceipt: accountRequiresReceipt,
+    );
 
     if (count == 0 && !isRequired) {
       return Text(
@@ -1586,6 +1585,25 @@ class _ExpenseDataTable extends StatelessWidget {
       case null:
         break;
     }
+  }
+
+  /// Single-line text capped at [maxWidth]; long values are ellipsised and
+  /// shown in full on hover so the ACTIONS column stays on screen.
+  Widget _clipped(String text, {required double maxWidth, TextStyle? style}) {
+    return Tooltip(
+      message: text,
+      waitDuration: const Duration(milliseconds: 400),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Text(
+          text,
+          style: style,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          softWrap: false,
+        ),
+      ),
+    );
   }
 
   Widget _buildActions(
@@ -1951,7 +1969,8 @@ class _LedgerReferenceLineState extends State<_LedgerReferenceLine> {
         if (snapshot.connectionState != ConnectionState.done) {
           return Text('${widget.label}: …', style: style);
         }
-        final reference = snapshot.data?.displayReference ??
+        final reference =
+            snapshot.data?.displayReference ??
             FundTransactionEntity.shortReference(widget.ledgerEntryId);
         return Tooltip(
           message: 'Copy transaction ID',
@@ -1981,6 +2000,47 @@ class _LedgerReferenceLineState extends State<_LedgerReferenceLine> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Horizontal scroller for wide tables with an always-visible scrollbar, so
+/// it's obvious when columns (like ACTIONS) sit past the right edge.
+class _HorizontalScrollTable extends StatefulWidget {
+  final Widget child;
+  const _HorizontalScrollTable({required this.child});
+
+  @override
+  State<_HorizontalScrollTable> createState() => _HorizontalScrollTableState();
+}
+
+class _HorizontalScrollTableState extends State<_HorizontalScrollTable> {
+  final _controller = ScrollController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) => Scrollbar(
+        controller: _controller,
+        thumbVisibility: true,
+        child: SingleChildScrollView(
+          controller: _controller,
+          scrollDirection: Axis.horizontal,
+          padding: EdgeInsets.only(bottom: 10.h),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: constraints.hasBoundedWidth ? constraints.maxWidth : 0,
+            ),
+            child: widget.child,
+          ),
+        ),
+      ),
     );
   }
 }
