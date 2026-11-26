@@ -264,28 +264,27 @@ class _ExpenseFormPageState extends State<ExpenseFormPage> {
   }
 
   /// Expenses are recorded only against fund accounts assigned to the
-  /// submitter. Admins and finance managers entering their own expenses see
-  /// every account, unassigned ones included. Accounts store the custodian's
-  /// name, so the match is by name.
+  /// submitter, by name or through their role. Admins entering their own
+  /// expenses see every account, unassigned ones included.
   bool _canUseAccount(FundAccountEntity account) {
     final user = context.read<AuthProvider>().user;
     if (user != null && _submitterIsLoggedInUser(user)) {
-      final policy = context.read<FinanceProvider>().policy;
-      if (FinancePermissionService.canManageAccounts(
+      return FinancePermissionService.canSeeAccount(
         user: user,
-        policy: policy,
-      )) {
-        return true;
-      }
-      // Legacy accounts that recorded the custodian's login id.
-      if ((account.assignedToId ?? '').isNotEmpty &&
-          account.assignedToId == user.id) {
-        return true;
-      }
+        account: account,
+        employeeName: _submitterName,
+      );
     }
-    final assignee = account.assignedTo?.trim().toLowerCase() ?? '';
-    return assignee.isNotEmpty &&
-        assignee == _submitterName.trim().toLowerCase();
+    // Someone else's expense: only their login has a role, so match the
+    // submitter as a person.
+    final employeeId = _submittedByEmployeeId ?? '';
+    if (employeeId.isNotEmpty &&
+        account.assignedEmployeeIds.contains(employeeId)) {
+      return true;
+    }
+    final name = _submitterName.trim().toLowerCase();
+    return name.isNotEmpty &&
+        account.assigneeNames.any((n) => n.trim().toLowerCase() == name);
   }
 
   void _onAmountChanged() {

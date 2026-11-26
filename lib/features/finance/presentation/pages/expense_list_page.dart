@@ -9,6 +9,7 @@ import 'package:xloop_invoice/core/utils/app_snack_bar.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
+import '../providers/visible_fund_accounts.dart';
 import '../widgets/expense_review_dialog.dart';
 import '../widgets/expense_status_badge.dart';
 import '../widgets/projected_balance_strip.dart';
@@ -29,11 +30,13 @@ class ExpenseListPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer2<FinanceProvider, FundAccountProvider>(
       builder: (context, provider, accountProvider, _) {
+        // Non-admins only get the accounts assigned to them.
+        final hasAccounts = context.visibleFundAccounts().isNotEmpty;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── One tab per fund account ────────────────────
-            if (accountProvider.accounts.isNotEmpty) ...[
+            if (hasAccounts) ...[
               _AccountTabs(
                 provider: provider,
                 accountProvider: accountProvider,
@@ -42,7 +45,7 @@ class ExpenseListPage extends StatelessWidget {
             ],
 
             // ── Ledger vs Projected Balance ─────────────────
-            if (accountProvider.accounts.isNotEmpty) ...[
+            if (hasAccounts) ...[
               ProjectedBalanceStrip(
                 provider: provider,
                 accountProvider: accountProvider,
@@ -88,16 +91,20 @@ class _AccountTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selectedId = provider.accountFilter;
-    final accounts = [...accountProvider.activeAccounts];
+    // Only the accounts this user may see; admins see every account.
+    final visible = context.visibleFundAccounts();
+    final accounts = [...visible];
     // Keep a tab for the selected account even if it was since deactivated.
     if (selectedId != null && !accounts.any((a) => a.id == selectedId)) {
       accounts.insertAll(
         0,
-        accountProvider.accounts.where((a) => a.id == selectedId),
+        context
+            .visibleFundAccounts(includeInactive: true)
+            .where((a) => a.id == selectedId),
       );
     }
 
-    final totalPendingCount = accountProvider.activeAccounts.fold<int>(
+    final totalPendingCount = visible.fold<int>(
       0,
       (sum, a) => sum + provider.outstandingCountFor(a.id),
     );

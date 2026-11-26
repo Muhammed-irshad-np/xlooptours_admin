@@ -312,6 +312,7 @@ class FinanceRepositoryImpl implements FinanceRepository {
     required String actorName,
     required String actorUserId,
     required bool returnToFund,
+    String? returnToAccountId,
     List<ExpenseEntity> spentExpenses = const [],
   }) {
     return remoteDataSource.settleCashAdvance(
@@ -320,6 +321,7 @@ class FinanceRepositoryImpl implements FinanceRepository {
       actorName: actorName,
       actorUserId: actorUserId,
       returnToFund: returnToFund,
+      returnToAccountId: returnToAccountId,
       spentExpenses: spentExpenses,
     );
   }

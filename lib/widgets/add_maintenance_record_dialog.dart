@@ -25,6 +25,7 @@ import '../features/employee/presentation/providers/employee_provider.dart';
 import '../features/finance/domain/entities/expense_entity.dart';
 import '../features/finance/presentation/providers/finance_provider.dart';
 import '../features/finance/presentation/providers/fund_account_provider.dart';
+import '../features/finance/presentation/providers/visible_fund_accounts.dart';
 import 'searchable_dropdown.dart';
 import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
@@ -1365,9 +1366,8 @@ class _AddMaintenanceRecordDialogState
                           submitterLabel:
                               context.read<AuthProvider>().user?.actorLabel ??
                               'You',
-                          accounts: context
-                              .watch<FundAccountProvider>()
-                              .activeAccounts,
+                          // Only accounts this user is assigned to.
+                          accounts: context.visibleFundAccounts(listen: true),
                           employees: context.read<EmployeeProvider>().employees,
                           typeOptions: UpdateDialogHelper.expenseTypeOptions(
                             context.read<FinanceProvider>(),

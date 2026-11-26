@@ -82,7 +82,52 @@ class FinanceProvider with ChangeNotifier {
   DateTime? _dateFrom;
   DateTime? _dateTo;
 
+  /// Fund accounts whose expenses the signed-in user may see; null means
+  /// every account (Admin / Super Admin). See [setExpenseScope].
+  Set<String>? _visibleAccountIds;
+
+  /// Login id of the signed-in user, whose own submissions stay visible
+  /// whatever account they were paid from.
+  String? _scopeUserId;
+
+  /// Every loaded expense, whoever may see it. Screens should show
+  /// [scopedExpenses] or [filteredExpenses] instead.
   List<ExpenseEntity> get expenses => _expenses;
+
+  /// Limits the Finance screens to the expenses of [accountIds] plus those
+  /// [userId] submitted. Pass null to show every expense. A selected account
+  /// filter that falls outside the scope is cleared.
+  void setExpenseScope(Set<String>? accountIds, {String? userId}) {
+    final same = userId == _scopeUserId &&
+        ((accountIds == null && _visibleAccountIds == null) ||
+            (accountIds != null &&
+                _visibleAccountIds != null &&
+                accountIds.length == _visibleAccountIds!.length &&
+                accountIds.containsAll(_visibleAccountIds!)));
+    if (same) return;
+    _visibleAccountIds = accountIds == null ? null : {...accountIds};
+    _scopeUserId = userId;
+    if (_accountFilter != null &&
+        accountIds != null &&
+        !accountIds.contains(_accountFilter)) {
+      _accountFilter = null;
+    }
+    notifyListeners();
+  }
+
+  /// Whether the signed-in user may see [expense] (see [setExpenseScope]).
+  bool canSeeExpense(ExpenseEntity expense) {
+    final scope = _visibleAccountIds;
+    if (scope == null) return true;
+    if (scope.contains(expense.fundAccountId)) return true;
+    final uid = _scopeUserId ?? '';
+    return uid.isNotEmpty && expense.submittedByUserId == uid;
+  }
+
+  /// The loaded expenses the signed-in user may see.
+  List<ExpenseEntity> get scopedExpenses => _visibleAccountIds == null
+      ? _expenses
+      : _expenses.where(canSeeExpense).toList();
   List<ExpenseCategoryEntity> get categories => _categories;
   bool get isOutstandingLoading => _isOutstandingLoading;
   FinancePolicyEntity get policy => _policy ?? const FinancePolicyEntity();
@@ -108,7 +153,7 @@ class FinanceProvider with ChangeNotifier {
   DateTime? get dateTo => _dateTo;
 
   List<ExpenseEntity> get filteredExpenses {
-    var result = List<ExpenseEntity>.from(_expenses);
+    var result = List<ExpenseEntity>.from(scopedExpenses);
 
     if (_statusFilter != null) {
       result = result.where((e) => e.status == _statusFilter).toList();
@@ -149,7 +194,7 @@ class FinanceProvider with ChangeNotifier {
   }
 
   int get pendingCount =>
-      _expenses.where((e) => e.status == ExpenseStatus.pending).length;
+      scopedExpenses.where((e) => e.status == ExpenseStatus.pending).length;
 
   // ─── Projected (estimated) wallet position ──────────────────
   //
@@ -165,7 +210,8 @@ class FinanceProvider with ChangeNotifier {
   /// Outstanding expenses that will actually move money out of a wallet.
   /// Non-wallet (tracking-only) expenses never touch a balance.
   List<ExpenseEntity> get walletCommitments => _outstandingExpenses
-      .where((e) => !e.isNonWallet && e.fundAccountId.isNotEmpty)
+      .where((e) =>
+          !e.isNonWallet && e.fundAccountId.isNotEmpty && canSeeExpense(e))
       .toList();
 
   /// Total committed outflow across all wallets, in halalas.
@@ -523,7 +569,7 @@ class FinanceProvider with ChangeNotifier {
   /// only ever offers people who actually have costs against them.
   Map<String, String> get expenseBeneficiaries {
     final result = <String, String>{};
-    for (final e in _expenses) {
+    for (final e in scopedExpenses) {
       final id = e.beneficiaryEmployeeId;
       if (id == null || id.isEmpty) continue;
       final name = e.beneficiaryEmployeeName;
@@ -662,7 +708,7 @@ class FinanceProvider with ChangeNotifier {
         if (trimmed.isNotEmpty) types.add(trimmed);
       }
       final catLower = _categoryFilter!.trim().toLowerCase();
-      for (final e in _expenses) {
+      for (final e in scopedExpenses) {
         if (e.expenseCategory.trim().toLowerCase() == catLower &&
             e.expenseType.trim().isNotEmpty) {
           types.add(e.expenseType.trim());
@@ -677,7 +723,7 @@ class FinanceProvider with ChangeNotifier {
           }
         }
       }
-      for (final e in _expenses) {
+      for (final e in scopedExpenses) {
         final trimmed = e.expenseType.trim();
         if (trimmed.isNotEmpty) {
           types.add(trimmed);

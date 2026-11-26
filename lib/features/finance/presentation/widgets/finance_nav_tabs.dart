@@ -2,27 +2,43 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+/// The tabs of the finance module, in display order.
+enum FinanceTab {
+  overview(Icons.dashboard_outlined, 'Overview'),
+  expenses(Icons.receipt_long_outlined, 'Expenses'),
+  accounts(Icons.account_balance_wallet_outlined, 'Accounts'),
+  pettyCash(Icons.book_outlined, 'Petty Cash'),
+  advances(Icons.payments_outlined, 'Advances'),
+  salaries(Icons.badge_outlined, 'Salaries'),
+  reports(Icons.assessment_outlined, 'Reports', adminOnly: true),
+  masterData(Icons.dns_outlined, 'Master Data', adminOnly: true);
+
+  const FinanceTab(this.icon, this.label, {this.adminOnly = false});
+
+  final IconData icon;
+  final String label;
+
+  /// Shown to Admin / Super Admin only.
+  final bool adminOnly;
+
+  /// The tabs a user sees: all of them for admins, the rest otherwise.
+  static List<FinanceTab> visibleTo({required bool isAdmin}) =>
+      values.where((t) => isAdmin || !t.adminOnly).toList();
+}
+
 /// Clean inline navigation tabs for the finance module.
 class FinanceNavTabs extends StatelessWidget {
-  final int selectedIndex;
-  final ValueChanged<int> onChanged;
+  /// The tabs to show, in order.
+  final List<FinanceTab> tabs;
+  final FinanceTab selected;
+  final ValueChanged<FinanceTab> onChanged;
 
   const FinanceNavTabs({
     super.key,
-    required this.selectedIndex,
+    required this.tabs,
+    required this.selected,
     required this.onChanged,
   });
-
-  static const _tabs = [
-    _TabData(icon: Icons.dashboard_outlined, label: 'Overview'),
-    _TabData(icon: Icons.receipt_long_outlined, label: 'Expenses'),
-    _TabData(icon: Icons.account_balance_wallet_outlined, label: 'Accounts'),
-    _TabData(icon: Icons.book_outlined, label: 'Petty Cash'),
-    _TabData(icon: Icons.payments_outlined, label: 'Advances'),
-    _TabData(icon: Icons.badge_outlined, label: 'Salaries'),
-    _TabData(icon: Icons.assessment_outlined, label: 'Reports'),
-    _TabData(icon: Icons.dns_outlined, label: 'Master Data'),
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -39,11 +55,10 @@ class FinanceNavTabs extends StatelessWidget {
           scrollDirection: Axis.horizontal,
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: List.generate(_tabs.length, (index) {
-              final isSelected = selectedIndex == index;
-              final tab = _tabs[index];
+            children: tabs.map((tab) {
+              final isSelected = selected == tab;
               return InkWell(
-                onTap: () => onChanged(index),
+                onTap: () => onChanged(tab),
                 borderRadius: BorderRadius.circular(8.r),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
@@ -92,7 +107,7 @@ class FinanceNavTabs extends StatelessWidget {
                   ),
                 ),
               );
-            }),
+            }).toList(),
           ),
         ),
       ),
@@ -100,8 +115,3 @@ class FinanceNavTabs extends StatelessWidget {
   }
 }
 
-class _TabData {
-  final IconData icon;
-  final String label;
-  const _TabData({required this.icon, required this.label});
-}

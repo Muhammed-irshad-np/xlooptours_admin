@@ -28,36 +28,24 @@ class FinancePermissionService {
 
   /// Can [user] open a petty cash session on [account]?
   ///
-  /// Checks policy.sessionOpen AND whether the user is the assigned
-  /// coordinator for this specific account.
+  /// Only policy.sessionOpen decides. Being assigned to the account lets a
+  /// user see it and record expenses on it, nothing more.
   static bool canOpenSession({
     required UserEntity? user,
     required FundAccountEntity account,
     required FinancePolicyEntity policy,
   }) {
-    if (user == null) return false;
-    if (user.isAdmin) return true;
-
-    // If user is the assigned coordinator for this account → always allow
-    if (_isAssignedToAccount(user, account)) return true;
-
     return _check(user, policy.sessionOpen);
   }
 
   /// Can [user] close (declare cash count) this session?
   ///
-  /// The assigned coordinator of the account can always close.
+  /// Only policy.sessionClose decides; see [canOpenSession].
   static bool canCloseSession({
     required UserEntity? user,
     required FundAccountEntity account,
     required FinancePolicyEntity policy,
   }) {
-    if (user == null) return false;
-    if (user.isAdmin) return true;
-
-    // Assigned coordinator can always close their own account session
-    if (_isAssignedToAccount(user, account)) return true;
-
     return _check(user, policy.sessionClose);
   }
 
@@ -124,17 +112,14 @@ class FinancePermissionService {
   // ─── Fund Operations ─────────────────────────────────────────
 
   /// Can [user] deposit/withdraw from [account]?
+  ///
+  /// Only policy.fundMovement decides; being assigned to the account does not
+  /// grant it.
   static bool canMoveFunds({
     required UserEntity? user,
     required FundAccountEntity? account,
     required FinancePolicyEntity policy,
   }) {
-    if (user == null) return false;
-    if (user.isAdmin) return true;
-
-    // Assigned coordinator can move funds on their own account
-    if (account != null && _isAssignedToAccount(user, account)) return true;
-
     return _check(user, policy.fundMovement);
   }
 
@@ -222,12 +207,11 @@ class FinancePermissionService {
 
   // ─── Account Visibility ──────────────────────────────────────
 
-  /// Can [user] see [account] on the Fund Accounts and Petty Cash tabs?
+  /// Can [user] see [account] and record expenses on it?
   ///
   /// Admin / Super Admin see every account; everyone else only the accounts
-  /// assigned to them. Accounts store the custodian's employee name, so pass
-  /// the current name of the user's linked employee as [employeeName] when it
-  /// is known, so a stale name saved on the login does not hide their accounts.
+  /// assigned to them (see [isAssignedToAccount]). An account with nobody
+  /// assigned is visible to admins only.
   static bool canSeeAccount({
     required UserEntity? user,
     required FundAccountEntity account,
@@ -235,31 +219,54 @@ class FinancePermissionService {
   }) {
     if (user == null) return false;
     if (user.isAdmin) return true;
-    if (_isAssignedToAccount(user, account)) return true;
-
-    final assignee = account.assignedTo?.trim().toLowerCase() ?? '';
-    if (assignee.isEmpty) return false;
-    return [employeeName, user.employeeName, user.actorLabel]
-        .any((name) => name != null && name.trim().toLowerCase() == assignee);
+    return isAssignedToAccount(
+      user: user,
+      account: account,
+      employeeName: employeeName,
+    );
   }
 
-  // ─── Helpers ─────────────────────────────────────────────────
+  /// Is [user] assigned to [account], by name or through their role?
+  ///
+  /// People are matched by their linked employee id, or by name against the
+  /// account's assignees (older accounts only stored the coordinator's
+  /// name). Pass the current name of the user's linked employee as
+  /// [employeeName] when it is known, so a stale name saved on the login
+  /// does not hide their accounts. Very old accounts stored the
+  /// coordinator's login id instead; that still matches too.
+  static bool isAssignedToAccount({
+    required UserEntity? user,
+    required FundAccountEntity account,
+    String? employeeName,
+  }) {
+    if (user == null) return false;
 
-  /// Check if [user] is the assigned coordinator for [account].
-  static bool _isAssignedToAccount(
-    UserEntity user,
-    FundAccountEntity account,
-  ) {
-    if (account.assignedToId != null &&
-        account.assignedToId!.isNotEmpty &&
-        account.assignedToId == user.id) {
+    final legacyId = account.assignedToId ?? '';
+    if (legacyId.isNotEmpty && legacyId == user.id) return true;
+
+    final employeeId = user.employeeId ?? '';
+    if (employeeId.isNotEmpty &&
+        account.assignedEmployeeIds.contains(employeeId)) {
       return true;
     }
-    // Fallback: match by display name (legacy accounts without assignedToId)
-    if (account.assignedTo != null &&
-        account.assignedTo!.isNotEmpty &&
-        account.assignedTo == user.actorLabel) {
-      return true;
+
+    final assignees = account.assigneeNames
+        .map((n) => n.trim().toLowerCase())
+        .where((n) => n.isNotEmpty)
+        .toSet();
+    if (assignees.isNotEmpty) {
+      final names = [employeeName, user.employeeName, user.actorLabel]
+          .map((n) => n?.trim().toLowerCase() ?? '')
+          .where((n) => n.isNotEmpty);
+      if (names.any(assignees.contains)) return true;
+    }
+
+    if (account.assignedRoles.isNotEmpty) {
+      final roleId = RbacManager.normalizeRoleId(user.roleId);
+      if (account.assignedRoles
+          .any((r) => RbacManager.normalizeRoleId(r) == roleId)) {
+        return true;
+      }
     }
     return false;
   }

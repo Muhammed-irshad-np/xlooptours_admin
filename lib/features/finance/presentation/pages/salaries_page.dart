@@ -17,6 +17,7 @@ import '../../domain/services/finance_permission_service.dart';
 import '../providers/cash_advance_provider.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
+import '../providers/visible_fund_accounts.dart';
 import '../providers/salary_provider.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import '../widgets/payment_receipt_dialog.dart';
@@ -111,13 +112,14 @@ class _SalariesPageState extends State<SalariesPage> {
   }
 
   /// Active accounts the Master Data payroll settings allow for [kind]. An
-  /// empty setting allows every active account.
+  /// empty setting allows every active account. Non-admins only get the
+  /// accounts assigned to them.
   List<FundAccountEntity> _payrollAccounts(SalaryPaymentKind kind) {
     final policy = context.read<FinanceProvider>().policy;
     final allowed = kind == SalaryPaymentKind.tripSettlement
         ? policy.tripPaymentAccountIds
         : policy.salaryAccountIds;
-    final active = context.read<FundAccountProvider>().activeAccounts;
+    final active = context.visibleFundAccounts();
     if (allowed.isEmpty) return active;
     return active.where((a) => allowed.contains(a.id)).toList();
   }
@@ -1265,6 +1267,7 @@ class _SalariesPageState extends State<SalariesPage> {
         onPressed: () => _showReceipt(context, payment!),
         label: 'Share Receipt',
         icon: Icons.ios_share_outlined,
+        backgroundColor: FinDT.success,
       );
     }
 
