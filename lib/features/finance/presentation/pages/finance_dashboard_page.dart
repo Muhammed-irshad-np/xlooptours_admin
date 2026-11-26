@@ -5,8 +5,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:xloop_invoice/features/finance/presentation/pages/expense_form_page.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../employee/presentation/providers/employee_provider.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
+import '../providers/visible_fund_accounts.dart';
 import '../providers/cash_advance_provider.dart';
 import '../providers/salary_provider.dart';
 import '../widgets/expense_summary_card.dart';
@@ -58,7 +61,7 @@ class FinanceDashboardPage extends StatefulWidget {
 
 class _FinanceDashboardPageState extends State<FinanceDashboardPage>
     with SingleTickerProviderStateMixin {
-  int _selectedTab = 0;
+  FinanceTab _selectedTab = FinanceTab.overview;
   late AnimationController _animController;
   late Animation<double> _fadeIn;
   bool _dataFetched = false;
@@ -108,8 +111,51 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
     super.dispose();
   }
 
+  /// Last scope handed to [FinanceProvider.setExpenseScope], so it is only
+  /// recomputed when the user, the accounts or the employees change.
+  String? _scopeKey;
+
+  /// Limits the expenses every tab shows to the accounts the user may see.
+  /// Admins see every expense.
+  void _syncExpenseScope(String key) {
+    if (key == _scopeKey) return;
+    _scopeKey = key;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final user = context.read<AuthProvider>().user;
+      final finance = context.read<FinanceProvider>();
+      if (user?.isAdmin ?? false) {
+        finance.setExpenseScope(null);
+        return;
+      }
+      final ids = context
+          .visibleFundAccounts(includeInactive: true)
+          .map((a) => a.id)
+          .toSet();
+      finance.setExpenseScope(ids, userId: user?.id);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final user = context.select<AuthProvider, Object?>((p) => p.user);
+    final isAdmin = context.select<AuthProvider, bool>(
+      (p) => p.user?.isAdmin ?? false,
+    );
+    _syncExpenseScope([
+      user.hashCode,
+      context.select<FundAccountProvider, int>(
+        (p) => Object.hashAll(p.accounts),
+      ),
+      context.select<EmployeeProvider, int>((p) => p.employees.length),
+    ].join('|'));
+
+    final tabs = FinanceTab.visibleTo(isAdmin: isAdmin);
+    // A tab the user can no longer see (e.g. after a role change) falls
+    // back to Overview.
+    final selectedTab =
+        tabs.contains(_selectedTab) ? _selectedTab : FinanceTab.overview;
+
     return Scaffold(
       backgroundColor: FinDT.bgPage,
       body: FadeTransition(
@@ -133,9 +179,10 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(28.w, 20.h, 28.w, 0),
                   child: FinanceNavTabs(
-                    selectedIndex: _selectedTab,
-                    onChanged: (index) {
-                      setState(() => _selectedTab = index);
+                    tabs: tabs,
+                    selected: selectedTab,
+                    onChanged: (tab) {
+                      setState(() => _selectedTab = tab);
                     },
                   ),
                 ),
@@ -147,7 +194,7 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
                   padding: EdgeInsets.fromLTRB(28.w, 20.h, 28.w, 28.h),
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 300),
-                    child: _buildTabContent(),
+                    child: _buildTabContent(selectedTab),
                   ),
                 ),
               ),
@@ -347,26 +394,24 @@ class _FinanceDashboardPageState extends State<FinanceDashboardPage>
     );
   }
 
-  Widget _buildTabContent() {
-    switch (_selectedTab) {
-      case 0:
+  Widget _buildTabContent(FinanceTab tab) {
+    switch (tab) {
+      case FinanceTab.overview:
         return _OverviewTab(key: const ValueKey('overview'));
-      case 1:
+      case FinanceTab.expenses:
         return const ExpenseListPage(key: ValueKey('expenses'));
-      case 2:
+      case FinanceTab.accounts:
         return const FundAccountsPage(key: ValueKey('accounts'));
-      case 3:
+      case FinanceTab.pettyCash:
         return const PettyCashPage(key: ValueKey('petty'));
-      case 4:
+      case FinanceTab.advances:
         return const CashAdvancesPage(key: ValueKey('advances'));
-      case 5:
+      case FinanceTab.salaries:
         return const SalariesPage(key: ValueKey('salaries'));
-      case 6:
+      case FinanceTab.reports:
         return const FinanceReportsPage(key: ValueKey('reports'));
-      case 7:
+      case FinanceTab.masterData:
         return const FinanceMasterDataPage(key: ValueKey('master_data'));
-      default:
-        return const SizedBox.shrink();
     }
   }
 
@@ -394,7 +439,11 @@ class _OverviewTab extends StatelessWidget {
         }
 
         final formatter = NumberFormat('#,##0.00', 'en_US');
-        final expenses = finProv.expenses;
+        // Only the expenses and accounts this user may see; admins see all.
+        final expenses = finProv.scopedExpenses;
+        final accounts = context.visibleFundAccounts();
+        final totalBalance =
+            accounts.fold(0.0, (sum, a) => sum + a.currentBalance);
         final totalExpenses = expenses.fold(0.0, (sum, e) => sum + e.amount);
         final pendingCount = expenses
             .where((e) => e.status == ExpenseStatus.pending)
@@ -445,11 +494,11 @@ class _OverviewTab extends StatelessWidget {
                 ),
                 ExpenseSummaryCard(
                   label: 'Total Accounts',
-                  value: '${formatter.format(accProv.totalBalance)} SAR',
+                  value: '${formatter.format(totalBalance)} SAR',
                   icon: Icons.account_balance_wallet_outlined,
                   startColor: const Color(0xFF16A34A),
                   endColor: const Color(0xFF22C55E),
-                  subtitle: '${accProv.activeAccounts.length} active',
+                  subtitle: '${accounts.length} active',
                 ),
               ],
             ),
@@ -480,16 +529,22 @@ class _OverviewTab extends StatelessWidget {
             // ── Fund Account Summary ────────────────────────
             _SectionCard(
               title: 'Fund Accounts',
-              subtitle: '${accProv.activeAccounts.length} active accounts',
+              subtitle: '${accounts.length} active accounts',
               actionLabel: 'Manage',
               onAction: () {},
-              child: accProv.accounts.isEmpty
-                  ? _buildEmptyState(
-                      'No fund accounts yet',
-                      'Create your first virtual account to start tracking',
-                      Icons.account_balance_outlined,
-                    )
-                  : _FundAccountsSummary(accounts: accProv.activeAccounts),
+              child: accounts.isEmpty
+                  ? (accProv.activeAccounts.isEmpty
+                      ? _buildEmptyState(
+                          'No fund accounts yet',
+                          'Create your first virtual account to start tracking',
+                          Icons.account_balance_outlined,
+                        )
+                      : _buildEmptyState(
+                          'No accounts assigned to you',
+                          'Ask an admin to assign you a fund account',
+                          Icons.account_balance_outlined,
+                        ))
+                  : _FundAccountsSummary(accounts: accounts),
             ),
           ],
         );

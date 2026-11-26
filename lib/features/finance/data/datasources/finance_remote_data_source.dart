@@ -169,6 +169,7 @@ abstract class FinanceRemoteDataSource {
     required String actorName,
     required String actorUserId,
     required bool returnToFund,
+    String? returnToAccountId,
     List<ExpenseEntity> spentExpenses = const [],
   });
 
@@ -924,6 +925,12 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     data.remove('currentBalanceMinor');
     data.remove('cashBalanceMinor');
     data.remove('stcPayBalanceMinor');
+    // An account's type is fixed once it is created: sessions, closing rules
+    // and reports all depend on it, and changing it midway left old petty
+    // cash registers open under the wrong rules.
+    data.remove('type');
+    data.remove('accountTypeId');
+    data.remove('accountTypeName');
     await _accounts.doc(account.id).update(data);
   }
 
@@ -2326,6 +2333,7 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     required String actorName,
     required String actorUserId,
     required bool returnToFund,
+    String? returnToAccountId,
     List<ExpenseEntity> spentExpenses = const [],
   }) async {
     if (settleAmountMajor < 0 || spentExpenses.any((e) => e.amount <= 0)) {
@@ -2349,11 +2357,28 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     if (total > outstanding + 1e-9) {
       throw StateError('Settle amount exceeds outstanding $outstanding');
     }
-    // Returned cash goes back into the drawer, so it needs a session too.
+    // Returned cash goes into the chosen account (by default the one the
+    // advance was paid from). A petty cash drawer needs an open session.
+    final returnAccountId = (returnToAccountId ?? '').isNotEmpty
+        ? returnToAccountId!
+        : advance.fundAccountId;
+    String? returnAccountName;
     if (returnToFund && settleAmountMajor > 0) {
-      final account = await _getFundAccountOrThrow(advance.fundAccountId);
+      final account = await _getFundAccountOrThrow(returnAccountId);
+      if (!account.isActive) {
+        throw StateError('${account.name} is closed');
+      }
+      if (account.currency != advance.currency) {
+        throw StateError(
+          '${account.name} holds ${account.currency}, but the advance is in '
+          '${advance.currency}',
+        );
+      }
       await _requireOpenSessionIfPetty(account, 'return advance cash to');
+      returnAccountName = account.name;
     }
+    final returnedElsewhere =
+        returnAccountName != null && returnAccountId != advance.fundAccountId;
 
     // What the employee spent becomes approved, tracking-only expenses: the
     // advance already took this money out of the fund, so approving them
@@ -2386,12 +2411,14 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
     if (returnToFund && settleAmountMajor > 0) {
       await postFundMovement(
         PostFundRequest(
-          fundAccountId: advance.fundAccountId,
+          fundAccountId: returnAccountId,
           type: FundTransactionType.deposit,
           amountMajor: settleAmountMajor,
           currency: advance.currency,
-          description:
-              'Advance settlement from ${advance.employeeName}',
+          description: returnedElsewhere
+              ? 'Advance settlement from ${advance.employeeName} '
+                  '(issued from ${advance.fundAccountName ?? advance.fundAccountId})'
+              : 'Advance settlement from ${advance.employeeName}',
           performedBy: actorName,
           performedByUserId: actorUserId,
           bucket: FundBucket.total,
@@ -2411,6 +2438,9 @@ class FinanceRemoteDataSourceImpl implements FinanceRemoteDataSource {
             '${settleAmountMajor > 0 ? '${settleAmountMajor.toStringAsFixed(2)} returned, ' : ''}'
             '${spentTotal.toStringAsFixed(2)} spent '
             '(${spent.map((e) => e.referenceNumber).join(', ')})',
+      if (returnedElsewhere)
+        'RETURNED ${settleAmountMajor.toStringAsFixed(2)} ${advance.currency} '
+            'to $returnAccountName by $actorName',
     ].join('\n');
     final updated = CashAdvanceModel(
       id: advance.id,

@@ -18,7 +18,9 @@ import '../../../../features/employee/presentation/providers/employee_provider.d
 import '../../../../features/employee/domain/entities/employee_entity.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import 'finance_dashboard_page.dart';
+import 'package:xloop_invoice/core/rbac/rbac_manager.dart';
 import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
+import 'package:xloop_invoice/features/user_management/presentation/providers/user_management_provider.dart';
 
 /// Screen for managing virtual fund accounts and viewing transaction history.
 class FundAccountsPage extends StatefulWidget {
@@ -313,14 +315,32 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
       policy: context.read<FinanceProvider>().policy,
     );
 
-    final filtered = active.where((a) {
-      if (_accountFilter == 'ALL') return true;
-      if (_accountFilter == 'PETTY_CASH') return a.isPettyCash;
-      if (_accountFilter == 'BANK') return a.isBank;
-      if (_accountFilter == 'STC_PAY') return a.isStcPay;
-      return a.accountTypeId == _accountFilter ||
-          a.typeDisplayName.toUpperCase() == _accountFilter.toUpperCase();
-    }).toList();
+    // One chip per account type, shown only when the user has at least one
+    // account of that type.
+    final typeChips = <({String key, String label, bool Function(FundAccountEntity) matches})>[
+      (key: 'PETTY_CASH', label: 'Petty Cash', matches: (a) => a.isPettyCash),
+      (key: 'BANK', label: 'Bank', matches: (a) => a.isBank),
+      (key: 'STC_PAY', label: 'STC Pay', matches: (a) => a.isStcPay),
+      for (final t in provider.accountTypes.where((t) => !t.isSystemDefault))
+        (
+          key: t.id,
+          label: t.name,
+          matches: (a) =>
+              a.accountTypeId == t.id ||
+              a.typeDisplayName.toLowerCase() == t.name.toLowerCase(),
+        ),
+    ]
+        .map((c) => (chip: c, count: active.where(c.matches).length))
+        .where((c) => c.count > 0)
+        .toList();
+
+    // A chip whose last account went away falls back to All.
+    final selectedChip =
+        typeChips.where((c) => c.chip.key == _accountFilter).firstOrNull;
+    final filterKey = selectedChip == null ? 'ALL' : _accountFilter;
+    final filtered = selectedChip == null
+        ? active
+        : active.where(selectedChip.chip.matches).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -330,38 +350,20 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              _buildAccountFilterChip('ALL', 'All (${active.length})'),
-              SizedBox(width: 8.w),
               _buildAccountFilterChip(
-                'PETTY_CASH',
-                'Petty Cash (${active.where((a) => a.isPettyCash).length})',
+                'ALL',
+                'All (${active.length})',
+                selectedKey: filterKey,
               ),
-              SizedBox(width: 8.w),
-              _buildAccountFilterChip(
-                'BANK',
-                'Bank (${active.where((a) => a.isBank).length})',
-              ),
-              SizedBox(width: 8.w),
-              _buildAccountFilterChip(
-                'STC_PAY',
-                'STC Pay (${active.where((a) => a.isStcPay).length})',
-              ),
-              // Dynamic custom types filter chips
-              ...provider.accountTypes
-                  .where((t) => !t.isSystemDefault)
-                  .map((customType) {
-                final count = active.where((a) =>
-                    a.accountTypeId == customType.id ||
-                    a.typeDisplayName.toLowerCase() ==
-                        customType.name.toLowerCase()).length;
-                return Padding(
+              for (final c in typeChips)
+                Padding(
                   padding: EdgeInsets.only(left: 8.w),
                   child: _buildAccountFilterChip(
-                    customType.id,
-                    '${customType.name} ($count)',
+                    c.chip.key,
+                    '${c.chip.label} (${c.count})',
+                    selectedKey: filterKey,
                   ),
-                );
-              }),
+                ),
             ],
           ),
         ),
@@ -516,8 +518,12 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     );
   }
 
-  Widget _buildAccountFilterChip(String filterKey, String label) {
-    final isSelected = _accountFilter == filterKey;
+  Widget _buildAccountFilterChip(
+    String filterKey,
+    String label, {
+    required String selectedKey,
+  }) {
+    final isSelected = selectedKey == filterKey;
     return ChoiceChip(
       label: Text(label),
       selected: isSelected,
@@ -979,9 +985,12 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     final formKey = GlobalKey<FormState>();
     final amountCtrl = TextEditingController();
     final descCtrl = TextEditingController();
-    String? fromId = provider.selectedAccountId;
+    // Both sides list only the accounts this user may see.
+    final accounts = _visibleAccounts(provider);
+    String? fromId = accounts.any((a) => a.id == provider.selectedAccountId)
+        ? provider.selectedAccountId
+        : null;
     String? toId;
-    final accounts = provider.activeAccounts;
     bool isTransferring = false;
     FundBucket fromBucket = FundBucket.cash;
     FundBucket toBucket = FundBucket.cash;
@@ -1676,9 +1685,9 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
-                                if (selected.assignedTo != null && selected.assignedTo!.isNotEmpty) ...[
+                                if (selected.assigneeLabel.isNotEmpty) ...[
                                   Text(
-                                    ' • Assigned to ${selected.assignedTo}',
+                                    ' • Assigned to ${selected.assigneeLabel}',
                                     style: GoogleFonts.inter(
                                       fontSize: 11.sp,
                                       color: FinDT.textSecondary,
@@ -2285,8 +2294,9 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
   void _showEmployeeSearchDialog(
     BuildContext context,
     EmployeeProvider empProv,
-    ValueChanged<EmployeeEntity> onSelect,
-  ) {
+    ValueChanged<EmployeeEntity> onSelect, {
+    Set<String> excludeIds = const {},
+  }) {
     showDialog(
       context: context,
       builder: (ctx) {
@@ -2297,6 +2307,7 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
             // external (contracted) staff are not eligible.
             final filtered = empProv.employees.where((e) {
               if (e.isExternal) return false;
+              if (excludeIds.contains(e.id)) return false;
               final q = searchQuery.toLowerCase();
               return e.fullName.toLowerCase().contains(q) ||
                   e.position.toLowerCase().contains(q);
@@ -2418,6 +2429,313 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
     );
   }
 
+  /// Roles that can be assigned to an account. Admin and Super Admin are
+  /// left out: they already see every account.
+  static const _assignableStandardRoles = [
+    'coordinator',
+    'manager',
+    'finance',
+    'driver',
+    'office_staff',
+  ];
+
+  /// The people and roles assigned to an account, as removable chips with
+  /// buttons to add more. Edits [ids], [names] (parallel) and [roles] in
+  /// place and calls [onChanged] after each change.
+  Widget _assigneesField({
+    required BuildContext context,
+    required EmployeeProvider empProv,
+    required List<String> ids,
+    required List<String> names,
+    required List<String> roles,
+    required VoidCallback onChanged,
+  }) {
+    final roleNames = {
+      for (final r in context.read<UserManagementProvider>().roles)
+        r.id: r.name,
+    };
+    final isEmpty = names.isEmpty && roles.isEmpty;
+
+    Widget chip({
+      required IconData icon,
+      required String label,
+      required Color color,
+      required VoidCallback onRemove,
+    }) {
+      return Container(
+        padding: EdgeInsets.fromLTRB(8.w, 4.h, 4.w, 4.h),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8.r),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13.sp, color: color),
+            SizedBox(width: 4.w),
+            Text(
+              label,
+              style: GoogleFonts.inter(
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w600,
+                color: FinDT.textPrimary,
+              ),
+            ),
+            SizedBox(width: 2.w),
+            InkWell(
+              onTap: onRemove,
+              borderRadius: BorderRadius.circular(10.r),
+              child: Padding(
+                padding: EdgeInsets.all(2.w),
+                child: Icon(
+                  Icons.close_rounded,
+                  size: 13.sp,
+                  color: FinDT.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(12.w),
+      decoration: BoxDecoration(
+        color: FinDT.bgPage,
+        borderRadius: BorderRadius.circular(10.r),
+        border: Border.all(color: FinDT.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.groups_outlined, size: 18.sp, color: FinDT.brand),
+              SizedBox(width: 10.w),
+              Expanded(
+                child: Text(
+                  'Assigned Coordinators',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w600,
+                    color: FinDT.textPrimary,
+                  ),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _showEmployeeSearchDialog(
+                  context,
+                  empProv,
+                  (emp) {
+                    final name = emp.fullName.trim().toLowerCase();
+                    final at = names.indexWhere(
+                      (n) => n.trim().toLowerCase() == name,
+                    );
+                    if (at == -1) {
+                      ids.add(emp.id);
+                      names.add(emp.fullName);
+                    } else {
+                      // Already assigned by name only: record their id.
+                      ids[at] = emp.id;
+                    }
+                    onChanged();
+                  },
+                  excludeIds: ids.where((id) => id.isNotEmpty).toSet(),
+                ),
+                icon: Icon(Icons.person_add_alt_1_outlined, size: 14.sp),
+                label: Text(
+                  'Person',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: TextButton.styleFrom(foregroundColor: FinDT.brand),
+              ),
+              TextButton.icon(
+                onPressed: () => _showRolePickerDialog(
+                  context,
+                  selected: roles,
+                  onDone: (picked) {
+                    roles
+                      ..clear()
+                      ..addAll(picked);
+                    onChanged();
+                  },
+                ),
+                icon: Icon(Icons.shield_outlined, size: 14.sp),
+                label: Text(
+                  'Role',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: TextButton.styleFrom(foregroundColor: FinDT.brand),
+              ),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          if (isEmpty)
+            Text(
+              'Nobody assigned. Only admins will see this account.',
+              style: GoogleFonts.inter(
+                fontSize: 11.sp,
+                color: FinDT.textSecondary,
+              ),
+            )
+          else
+            Wrap(
+              spacing: 6.w,
+              runSpacing: 6.h,
+              children: [
+                for (var i = 0; i < names.length; i++)
+                  chip(
+                    icon: Icons.person_rounded,
+                    label: names[i],
+                    color: FinDT.success,
+                    onRemove: () {
+                      names.removeAt(i);
+                      if (i < ids.length) ids.removeAt(i);
+                      onChanged();
+                    },
+                  ),
+                for (final role in [...roles])
+                  chip(
+                    icon: Icons.shield_outlined,
+                    label: roleNames[role] ?? FundAccountEntity.roleLabel(role),
+                    color: FinDT.brand,
+                    onRemove: () {
+                      roles.remove(role);
+                      onChanged();
+                    },
+                  ),
+              ],
+            ),
+          SizedBox(height: 8.h),
+          Text(
+            'Everyone assigned, by name or by role, can see this account and '
+            'record expenses on it. Opening and closing the register and '
+            'moving money follow the Finance Policy.',
+            style: GoogleFonts.inter(
+              fontSize: 10.sp,
+              color: FinDT.textSecondary,
+              height: 1.35,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Multi-select of login roles to assign to an account.
+  void _showRolePickerDialog(
+    BuildContext context, {
+    required List<String> selected,
+    required ValueChanged<List<String>> onDone,
+  }) {
+    final userMgmt = context.read<UserManagementProvider>();
+    if (userMgmt.roles.isEmpty && !userMgmt.isLoading) {
+      userMgmt.loadInitialData();
+    }
+    final picked = <String>[...selected];
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setStateDialog) => Consumer<UserManagementProvider>(
+          builder: (ctx, userMgmt, _) {
+            final names = {for (final r in userMgmt.roles) r.id: r.name};
+            final options = <String>{
+              ..._assignableStandardRoles,
+              ...userMgmt.roles.map((r) => r.id),
+              ...picked,
+            }.where((id) => !RbacManager.roleIsAdmin(id)).toList();
+
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              surfaceTintColor: Colors.transparent,
+              shape: finDialogShape,
+              title: finDialogTitle(
+                'Assign Roles',
+                icon: Icons.shield_outlined,
+              ),
+              content: SizedBox(
+                width: 420.w,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Every user with a selected role can see this account. '
+                      'Admins always see every account.',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.sp,
+                        color: FinDT.textSecondary,
+                        height: 1.35,
+                      ),
+                    ),
+                    SizedBox(height: 12.h),
+                    Wrap(
+                      spacing: 6.w,
+                      runSpacing: 6.h,
+                      children: options.map((roleId) {
+                        final isSelected = picked.contains(roleId);
+                        return FilterChip(
+                          selected: isSelected,
+                          label: Text(
+                            names[roleId] ?? FundAccountEntity.roleLabel(roleId),
+                          ),
+                          labelStyle: GoogleFonts.inter(
+                            fontSize: 11.sp,
+                            fontWeight:
+                                isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color:
+                                isSelected ? FinDT.brand : FinDT.textPrimary,
+                          ),
+                          selectedColor: FinDT.brand.withValues(alpha: 0.12),
+                          checkmarkColor: FinDT.brand,
+                          backgroundColor: FinDT.bgPage,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.r),
+                            side: BorderSide(
+                              color: isSelected ? FinDT.brand : FinDT.border,
+                            ),
+                          ),
+                          onSelected: (val) => setStateDialog(() {
+                            if (val) {
+                              picked.add(roleId);
+                            } else {
+                              picked.remove(roleId);
+                            }
+                          }),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                finDialogCancelButton(ctx),
+                finDialogActionButton(
+                  onPressed: () {
+                    onDone(picked);
+                    Navigator.pop(ctx);
+                  },
+                  label: 'Done',
+                  backgroundColor: FinDT.brand,
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   FundAccountType _mapTypeToEnum(FundAccountTypeEntity entity) {
     switch (entity.id) {
       case 'pettyCash':
@@ -2460,7 +2778,31 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
         ? (account.code.isNotEmpty ? account.code : provider.generateUniqueCode(selectedType))
         : provider.generateUniqueCode(selectedType);
     final codeCtrl = TextEditingController(text: initialCode);
-    String? assignedName = account?.assignedTo;
+
+    // Who is assigned: people (employee id and name, parallel lists) and
+    // login roles. Everyone assigned can see the account and record
+    // expenses on it.
+    final assignedIds = <String>[];
+    final assignedNames = <String>[];
+    if (account != null && account.assignedEmployeeNames.isNotEmpty) {
+      for (var i = 0; i < account.assignedEmployeeNames.length; i++) {
+        assignedNames.add(account.assignedEmployeeNames[i]);
+        assignedIds.add(
+          i < account.assignedEmployeeIds.length
+              ? account.assignedEmployeeIds[i]
+              : '',
+        );
+      }
+    } else if ((account?.assignedTo ?? '').trim().isNotEmpty) {
+      // Older account with one coordinator stored by name.
+      final name = account!.assignedTo!.trim();
+      final match = empProv.employees
+          .where((e) => e.fullName.trim().toLowerCase() == name.toLowerCase())
+          .firstOrNull;
+      assignedNames.add(match?.fullName ?? name);
+      assignedIds.add(match?.id ?? '');
+    }
+    final assignedRoles = <String>[...?account?.assignedRoles];
     String currency = account?.currency ?? 'SAR';
     bool receiptRequired = account?.receiptRequired ?? true;
     bool isSaving = false;
@@ -2498,7 +2840,35 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                     ),
                     SizedBox(height: 14.h),
 
-                    // Account Type Dropdown
+                    // Account Type: fixed once the account exists.
+                    if (isEditing)
+                      TextFormField(
+                        initialValue: account.typeDisplayName,
+                        readOnly: true,
+                        enableInteractiveSelection: false,
+                        decoration: _dialogInputDecoration(
+                          label: 'Account Type',
+                          prefixIcon: Icons.category_outlined,
+                        ).copyWith(
+                          fillColor: FinDT.bgPage,
+                          helperText:
+                              "An account's type can't be changed after it is created.",
+                          helperStyle: GoogleFonts.inter(
+                            fontSize: 10.sp,
+                            color: FinDT.textSecondary,
+                          ),
+                          suffixIcon: Icon(
+                            Icons.lock_outline_rounded,
+                            size: 16.sp,
+                            color: FinDT.textSecondary,
+                          ),
+                        ),
+                        style: GoogleFonts.inter(
+                          fontSize: 12.sp,
+                          color: FinDT.textPrimary,
+                        ),
+                      )
+                    else
                     AppDropdownFormField<String>(
                       key: ValueKey(selectedType.id),
                       initialValue: provider.accountTypes.any((t) => t.id == selectedType.id)
@@ -2608,58 +2978,14 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                       onChanged: (v) => setStateDialog(() => currency = v ?? 'SAR'),
                     ),
                     SizedBox(height: 14.h),
-                    // Searchable Assigned Coordinator Field
-                    InkWell(
-                      onTap: () => _showEmployeeSearchDialog(context, empProv, (selected) {
-                        setStateDialog(() {
-                          assignedName = selected.fullName;
-                        });
-                      }),
-                      borderRadius: BorderRadius.circular(10.r),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
-                        decoration: BoxDecoration(
-                          color: FinDT.bgPage,
-                          borderRadius: BorderRadius.circular(10.r),
-                          border: Border.all(color: FinDT.border),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.person_search_outlined,
-                              size: 18.sp,
-                              color: FinDT.brand,
-                            ),
-                            SizedBox(width: 12.w),
-                            Expanded(
-                              child: Text(
-                                (assignedName != null && assignedName!.isNotEmpty)
-                                    ? assignedName!
-                                    : 'Search & Select Coordinator...',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12.sp,
-                                  color: (assignedName != null && assignedName!.isNotEmpty)
-                                      ? FinDT.textPrimary
-                                      : FinDT.textSecondary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (assignedName != null && assignedName!.isNotEmpty)
-                              InkWell(
-                                onTap: () => setStateDialog(() => assignedName = null),
-                                child: Icon(Icons.close, size: 16.sp, color: FinDT.textSecondary),
-                              )
-                            else
-                              Icon(
-                                Icons.arrow_drop_down_rounded,
-                                size: 20.sp,
-                                color: FinDT.textSecondary,
-                              ),
-                          ],
-                        ),
-                      ),
+                    // People and roles assigned to the account
+                    _assigneesField(
+                      context: context,
+                      empProv: empProv,
+                      ids: assignedIds,
+                      names: assignedNames,
+                      roles: assignedRoles,
+                      onChanged: () => setStateDialog(() {}),
                     ),
 
                     SizedBox(height: 14.h),
@@ -2667,54 +2993,6 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
                       receiptRequired: receiptRequired,
                       onChanged: (v) =>
                           setStateDialog(() => receiptRequired = v),
-                    ),
-
-                    // Account creation guard notice
-                    Builder(
-                      builder: (_) {
-                        bool hasConflict = false;
-                        if (assignedName != null && assignedName!.isNotEmpty) {
-                          if (selectedType.id == 'stcPay') {
-                            hasConflict = provider.accounts.any((a) =>
-                                a.assignedTo == assignedName &&
-                                a.isPettyCash &&
-                                a.id != account?.id);
-                          } else if (selectedType.id == 'pettyCash') {
-                            hasConflict = provider.accounts.any((a) =>
-                                a.assignedTo == assignedName &&
-                                a.isStcPay &&
-                                a.id != account?.id);
-                          }
-                        }
-
-                        if (!hasConflict) return const SizedBox.shrink();
-
-                        return Padding(
-                          padding: EdgeInsets.only(top: 14.h),
-                          child: Container(
-                            padding: EdgeInsets.all(12.w),
-                            decoration: BoxDecoration(
-                              color: FinDT.danger.withValues(alpha: 0.08),
-                              borderRadius: BorderRadius.circular(10.r),
-                              border: Border.all(color: FinDT.danger.withValues(alpha: 0.3)),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.error_outline_rounded, size: 18.sp, color: FinDT.danger),
-                                SizedBox(width: 10.w),
-                                Expanded(
-                                  child: Text(
-                                    selectedType.id == 'stcPay'
-                                        ? '$assignedName already has a Petty Cash account. STC Pay balances for coordinators should be managed directly inside Petty Cash.'
-                                        : '$assignedName already has a standalone STC Pay account.',
-                                    style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.danger, height: 1.3),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
                     ),
                   ],
                 ),
@@ -2730,39 +3008,32 @@ class _FundAccountsPageState extends State<FundAccountsPage> {
               onPressed: () async {
                 if (!formKey.currentState!.validate()) return;
 
-                // Check conflict guard
-                bool hasConflict = false;
-                if (assignedName != null && assignedName!.isNotEmpty) {
-                  if (selectedType.id == 'stcPay') {
-                    hasConflict = provider.accounts.any((a) =>
-                        a.assignedTo == assignedName &&
-                        a.isPettyCash &&
-                        a.id != account?.id);
-                  }
-                }
-                if (hasConflict) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Cannot create standalone STC Pay account for a coordinator who already has Petty Cash.',
-                        style: GoogleFonts.inter(color: Colors.white),
-                      ),
-                      backgroundColor: FinDT.danger,
-                    ),
-                  );
-                  return;
-                }
-
-                final entityType = _mapTypeToEnum(selectedType);
+                // The very oldest accounts stored the coordinator's login id;
+                // keep it while that coordinator is still assigned.
+                final legacyLoginId = isEditing &&
+                        (account.assignedToId ?? '').isNotEmpty &&
+                        assignedNames.contains(account.assignedTo)
+                    ? account.assignedToId
+                    : null;
                 final acc = FundAccountEntity(
                   id: isEditing ? account.id : const Uuid().v4(),
                   name: nameCtrl.text.trim(),
                   code: codeCtrl.text.trim(),
-                  type: entityType,
-                  accountTypeId: selectedType.id,
-                  accountTypeName: selectedType.name,
+                  // The type never changes after creation.
+                  type: isEditing ? account.type : _mapTypeToEnum(selectedType),
+                  accountTypeId:
+                      isEditing ? account.accountTypeId : selectedType.id,
+                  accountTypeName:
+                      isEditing ? account.accountTypeName : selectedType.name,
                   currency: currency,
-                  assignedTo: assignedName,
+                  // First person, for screens and exports that read the
+                  // single-coordinator field.
+                  assignedTo:
+                      assignedNames.isEmpty ? null : assignedNames.first,
+                  assignedToId: legacyLoginId,
+                  assignedEmployeeIds: [...assignedIds],
+                  assignedEmployeeNames: [...assignedNames],
+                  assignedRoles: [...assignedRoles],
                   currentBalanceMinor: isEditing ? account.currentBalanceMinor : 0,
                   cashBalanceMinor: isEditing ? account.cashBalanceMinor : 0,
                   stcPayBalanceMinor: isEditing ? account.stcPayBalanceMinor : 0,

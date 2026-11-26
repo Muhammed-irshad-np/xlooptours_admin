@@ -847,7 +847,11 @@ class UpdateDialogHelper {
                         attribution: attribution(),
                         enableLabel: 'Log renewal cost to Finance',
                         submitterLabel: authUser?.actorLabel ?? 'You',
-                        accounts: fundAccountProvider.activeAccounts,
+                        // Only accounts this user is assigned to (admins: all).
+                        accounts: fundAccountProvider.visibleAccountsFor(
+                          authUser,
+                          employees: employeeProvider.employees,
+                        ),
                         employees: employeeProvider.employees,
                         typeOptions: expenseTypeOptions(
                           financeProvider,
@@ -1231,7 +1235,11 @@ class UpdateDialogHelper {
                       ),
                       enableLabel: 'Log service cost to Finance',
                       submitterLabel: authUser?.actorLabel ?? 'You',
-                      accounts: fundAccountProvider.activeAccounts,
+                      // Only accounts this user is assigned to (admins: all).
+                      accounts: fundAccountProvider.visibleAccountsFor(
+                        authUser,
+                        employees: employeeProvider.employees,
+                      ),
                       employees: employeeProvider.employees,
                       typeOptions: expenseTypeOptions(
                         financeProvider,
@@ -1794,7 +1802,11 @@ class UpdateDialogHelper {
                         enableLabel: 'Log renewal cost to Finance',
                         subtitle: 'Tracks what this renewal cost the company.',
                         submitterLabel: authUser?.actorLabel ?? 'You',
-                        accounts: fundAccountProvider.activeAccounts,
+                        // Only accounts this user is assigned to (admins: all).
+                        accounts: fundAccountProvider.visibleAccountsFor(
+                          authUser,
+                          employees: employeeProvider.employees,
+                        ),
                         employees: employeeProvider.employees,
                         typeOptions: expenseTypeOptions(
                           financeProvider,
@@ -2306,7 +2318,11 @@ class UpdateDialogHelper {
                         attribution: vehicleAttribution(vehicle),
                         enableLabel: 'Log renewal cost to Finance',
                         submitterLabel: authUser?.actorLabel ?? 'You',
-                        accounts: fundAccountProvider.activeAccounts,
+                        // Only accounts this user is assigned to (admins: all).
+                        accounts: fundAccountProvider.visibleAccountsFor(
+                          authUser,
+                          employees: employeeProvider.employees,
+                        ),
                         employees: employeeProvider.employees,
                         typeOptions: expenseTypeOptions(
                           financeProvider,

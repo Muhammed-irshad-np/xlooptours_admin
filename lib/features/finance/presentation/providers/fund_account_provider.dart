@@ -71,11 +71,14 @@ class FundAccountProvider with ChangeNotifier {
       _accounts.where((a) => a.isActive).toList();
 
   /// Active accounts [user] may see: every one for admins, otherwise only the
-  /// ones assigned to them. [employees] gives the user's current employee
-  /// name when it has been loaded.
+  /// ones assigned to them, by name or through their role. [employees] gives
+  /// the user's current employee name when it has been loaded. Pass
+  /// [includeInactive] to also get closed accounts, e.g. to keep their
+  /// history visible.
   List<FundAccountEntity> visibleAccountsFor(
     UserEntity? user, {
     List<EmployeeEntity> employees = const [],
+    bool includeInactive = false,
   }) {
     String? employeeName;
     final employeeId = user?.employeeId ?? '';
@@ -87,7 +90,7 @@ class FundAccountProvider with ChangeNotifier {
         }
       }
     }
-    return activeAccounts
+    return (includeInactive ? _accounts : activeAccounts)
         .where((a) => FinancePermissionService.canSeeAccount(
               user: user,
               account: a,
