@@ -13,10 +13,12 @@ import '../../../employee/presentation/providers/employee_provider.dart';
 import '../../domain/entities/cash_advance_entity.dart';
 import '../../domain/entities/expense_category_entity.dart';
 import '../../domain/entities/expense_entity.dart';
+import '../../domain/entities/fund_account_entity.dart';
 import '../pages/finance_dashboard_page.dart';
 import '../providers/cash_advance_provider.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
+import '../providers/visible_fund_accounts.dart';
 import 'finance_dialog_helpers.dart';
 import 'package:xloop_invoice/core/widgets/app_dropdown.dart';
 
@@ -69,7 +71,18 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
   bool _isSettling = false;
   String? _error;
 
+  /// Account the returned cash is deposited into. Starts on the account the
+  /// advance was paid from.
+  String? _returnAccountId;
+
   CashAdvanceEntity get _advance => widget.advance;
+
+  /// Accounts the returned cash can go into: the user's own accounts (every
+  /// account for admins) in the advance's currency.
+  List<FundAccountEntity> get _returnAccounts => context
+      .visibleFundAccounts()
+      .where((a) => a.currency == _advance.currency)
+      .toList();
   double get _returnedValue => double.tryParse(_returned.text.trim()) ?? 0;
   double get _spentTotal => _lines.fold(0.0, (acc, l) => acc + l.value);
   double get _total => _returnedValue + _spentTotal;
@@ -81,6 +94,10 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
     _returned.addListener(_refresh);
     final fin = context.read<FinanceProvider>();
     if (fin.categories.isEmpty) fin.fetchCategories();
+    final options = _returnAccounts;
+    _returnAccountId = options.any((a) => a.id == _advance.fundAccountId)
+        ? _advance.fundAccountId
+        : options.firstOrNull?.id;
   }
 
   @override
@@ -106,6 +123,44 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
   }
 
   String _fmt(double v) => v.toStringAsFixed(2);
+
+  /// Where the returned cash goes. Only the user's own accounts are offered.
+  Widget _buildReturnAccountField() {
+    final options = _returnAccounts;
+    final money = NumberFormat('#,##0.00', 'en_US');
+    if (options.isEmpty) {
+      return Text(
+        'You have no ${_advance.currency} account to return cash to. '
+        'Ask an admin to assign you one.',
+        style: GoogleFonts.inter(fontSize: 11.sp, color: FinDT.danger),
+      );
+    }
+    return AppDropdownFormField<String>(
+      initialValue: _returnAccountId,
+      decoration: finDialogInputDecoration(
+        label: 'Return Cash To',
+        prefixIcon: Icons.account_balance_wallet_outlined,
+      ),
+      style: GoogleFonts.inter(fontSize: 12.sp, color: FinDT.textPrimary),
+      items: [
+        for (final a in options)
+          DropdownMenuItem(
+            value: a.id,
+            child: Text(
+              '${a.name} (${money.format(a.currentBalance)} ${a.currency})'
+              '${a.id == _advance.fundAccountId ? ' · issued from here' : ''}',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: _isSettling
+          ? null
+          : (v) => setState(() => _returnAccountId = v),
+      validator: (v) => _returnedValue > 0 && (v == null || v.isEmpty)
+          ? 'Choose where the returned cash goes'
+          : null,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -150,17 +205,8 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
                     color: FinDT.textPrimary,
                   ),
                 ),
-                Padding(
-                  padding: EdgeInsets.only(left: 4.w, top: 4.h),
-                  child: Text(
-                    'Deposited back to '
-                    '${_advance.fundAccountName ?? _advance.fundAccountId}',
-                    style: GoogleFonts.inter(
-                      fontSize: 10.sp,
-                      color: FinDT.textSecondary,
-                    ),
-                  ),
-                ),
+                SizedBox(height: 12.h),
+                _buildReturnAccountField(),
                 SizedBox(height: 16.h),
                 Row(
                   children: [
@@ -501,6 +547,10 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
       setState(() => _error = 'Enter the cash returned or add an expense.');
       return;
     }
+    if (_returnedValue > 0 && (_returnAccountId ?? '').isEmpty) {
+      setState(() => _error = 'Choose an account to return the cash to.');
+      return;
+    }
     if (_remaining < -1e-6) {
       setState(() => _error = 'Cannot settle more than the outstanding '
           '${_fmt(_advance.outstanding)} ${_advance.currency}.');
@@ -570,6 +620,7 @@ class _SettleAdvanceDialogState extends State<_SettleAdvanceDialog> {
         actorName: user?.actorLabel ?? 'Admin',
         actorUserId: user?.id ?? '',
         returnToFund: true,
+        returnToAccountId: _returnAccountId,
         spentExpenses: spent,
       );
       await fundProv.fetchAllAccounts();

@@ -322,4 +322,63 @@ void main() {
       expect(provider.filteredExpenses.length, equals(sampleExpenses.length));
     });
   });
+
+  group('Account scope (who sees which expenses)', () {
+    test('no scope shows every expense', () {
+      provider.setExpenseScope(null);
+      expect(provider.scopedExpenses.length, equals(sampleExpenses.length));
+      expect(provider.filteredExpenses.length, equals(sampleExpenses.length));
+    });
+
+    test('a scope keeps only the expenses of those accounts', () {
+      provider.setExpenseScope({'acc-2'});
+
+      expect(
+        provider.filteredExpenses.map((e) => e.id),
+        unorderedEquals(['e-3', 'e-6']),
+      );
+      expect(provider.pendingCount, equals(0));
+      // The employee filter only offers people from visible expenses.
+      expect(provider.expenseBeneficiaries, isEmpty);
+    });
+
+    test("the user's own submissions stay visible on any account", () async {
+      repo.pageExpenses = [
+        ...sampleExpenses,
+        ExpenseEntity(
+          id: 'e-own',
+          referenceNumber: '#2001',
+          date: DateTime(2025, 2, 1),
+          createdAt: DateTime(2025, 2, 1),
+          submittedBy: 'Nithin',
+          submittedByRole: 'office_staff',
+          submittedByUserId: 'u-nithin',
+          expenseCategory: 'OFFICE',
+          expenseType: 'Stationery',
+          paymentMethod: 'cash',
+          amount: 10,
+          currency: 'SAR',
+          fundAccountId: 'acc-1',
+          status: ExpenseStatus.pending,
+        ),
+      ];
+      await provider.fetchAllExpenses();
+      provider.setExpenseScope({'acc-2'}, userId: 'u-nithin');
+
+      expect(
+        provider.filteredExpenses.map((e) => e.id),
+        unorderedEquals(['e-3', 'e-6', 'e-own']),
+      );
+    });
+
+    test('an account filter outside the scope is cleared', () {
+      provider.setAccountFilter('acc-1');
+      provider.setExpenseScope({'acc-2'});
+      expect(provider.accountFilter, isNull);
+
+      provider.setAccountFilter('acc-2');
+      provider.setExpenseScope({'acc-2'});
+      expect(provider.accountFilter, equals('acc-2'));
+    });
+  });
 }

@@ -14,6 +14,7 @@ import '../../domain/services/finance_export_service.dart';
 import '../providers/cash_advance_provider.dart';
 import '../providers/fund_account_provider.dart';
 import '../providers/finance_provider.dart';
+import '../providers/visible_fund_accounts.dart';
 import '../widgets/finance_dialog_helpers.dart';
 import '../widgets/settle_advance_dialog.dart';
 import 'finance_dashboard_page.dart';
@@ -126,9 +127,18 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
   Widget build(BuildContext context) {
     final fmt = NumberFormat('#,##0.00');
 
-    return Consumer<CashAdvanceProvider>(
-      builder: (context, provider, _) {
-        final allAdvances = provider.advances;
+    return Consumer2<CashAdvanceProvider, FundAccountProvider>(
+      builder: (context, provider, accounts, child) {
+        // Non-admins only see advances paid from accounts assigned to them.
+        final visibleIds = context
+            .visibleFundAccounts(includeInactive: true)
+            .map((a) => a.id)
+            .toSet();
+        final allAdvances = context.seesAllFundAccounts
+            ? provider.advances
+            : provider.advances
+                .where((a) => visibleIds.contains(a.fundAccountId))
+                .toList();
         final filteredAdvances = _filterAdvances(allAdvances);
 
         final totalIssued = allAdvances.fold(0.0, (sum, a) => sum + a.amount);
@@ -376,7 +386,11 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                       // Fund account filter
                       Consumer<FundAccountProvider>(
                         builder: (context, fundProv, _) {
-                          final accounts = fundProv.accounts;
+                          // Closed accounts stay so their history can be
+                          // filtered; non-admins get only their own.
+                          final accounts = context.visibleFundAccounts(
+                            includeInactive: true,
+                          );
                           return SizedBox(
                             width: 220.w,
                             child: AppDropdownFormField<String?>(
@@ -1327,6 +1341,8 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                             ),
                           ),
                         ),
+                        // Writing off is for Admin / Super Admin only.
+                        if (context.seesAllFundAccounts) ...[
                         SizedBox(width: 6.w),
                         OutlinedButton(
                           onPressed: () => _showWriteOffDialog(context, advance),
@@ -1353,6 +1369,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
                             ),
                           ),
                         ),
+                        ],
                       ],
                     ),
                 ],
@@ -1421,7 +1438,8 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
     // Narrows the recipient list to internal or external staff; null = all.
     String? employmentType;
     var issueDate = DateUtils.dateOnly(DateTime.now());
-    final accounts = context.read<FundAccountProvider>().activeAccounts;
+    // Only accounts this user is assigned to (admins: every account).
+    final accounts = context.visibleFundAccounts();
     // Inactive employees have left or are suspended, so they can't be given
     // company cash.
     final employees = context
@@ -1807,6 +1825,7 @@ class _CashAdvancesPageState extends State<CashAdvancesPage> {
     BuildContext context,
     CashAdvanceEntity advance,
   ) async {
+    if (!(context.read<AuthProvider>().user?.isAdmin ?? false)) return;
     final reasonCtrl = TextEditingController();
 
     final confirm = await showFinConfirmationDialog(

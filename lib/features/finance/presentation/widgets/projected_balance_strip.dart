@@ -7,6 +7,7 @@ import '../../domain/entities/fund_account_entity.dart';
 import '../pages/finance_dashboard_page.dart';
 import '../providers/finance_provider.dart';
 import '../providers/fund_account_provider.dart';
+import '../providers/visible_fund_accounts.dart';
 
 /// Shows the real ledger balance next to the projected ("estimated") balance
 /// that would remain once every pending expense is approved.
@@ -39,9 +40,10 @@ class _ProjectedBalanceStripState extends State<ProjectedBalanceStrip> {
     final accountProvider = widget.accountProvider;
     final filterId = provider.accountFilter;
 
-    // Scope to the filtered wallet when the user has picked one.
+    // Scope to the filtered wallet when the user has picked one; otherwise
+    // every wallet this user may see (admins see all).
     final scoped = filterId == null
-        ? accountProvider.activeAccounts
+        ? context.visibleFundAccounts()
         : accountProvider.accounts.where((a) => a.id == filterId).toList();
 
     final ledgerMinor =

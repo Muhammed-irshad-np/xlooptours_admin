@@ -216,7 +216,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
                         },
                       ),
                     ),
-                    if (selectedAcc?.assignedTo != null && selectedAcc!.assignedTo!.isNotEmpty) ...[
+                    if (selectedAcc != null && selectedAcc.assigneeLabel.isNotEmpty) ...[
                       SizedBox(width: 8.w),
                       Container(
                         padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 2.h),
@@ -226,7 +226,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
                           border: Border.all(color: FinDT.border),
                         ),
                         child: Text(
-                          'Coordinator: ${selectedAcc.assignedTo}',
+                          'Assigned: ${selectedAcc.assigneeLabel}',
                           style: GoogleFonts.inter(fontSize: 10.sp, color: FinDT.textSecondary),
                         ),
                       ),
@@ -774,9 +774,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
                           Text(
                             canOpen
                                 ? 'Open the daily session to record physical cash in drawer and digital STC balance.'
-                                : (selectedAcc?.assignedTo != null && selectedAcc!.assignedTo!.isNotEmpty
-                                    ? 'Assigned to ${selectedAcc.assignedTo}. Only assigned coordinator or admin can open the daily session.'
-                                    : 'Only authorized personnel or admin can open the daily session for this account.'),
+                                : 'Only users allowed in the Finance Policy, or an admin, can open the daily session for this account.',
                             style: GoogleFonts.inter(
                               fontSize: 11.sp,
                               color: FinDT.textSecondary,
