@@ -265,6 +265,7 @@ class FakeFinanceRepository implements FinanceRepository {
     required String actorName,
     required String actorUserId,
     required bool returnToFund,
+    String? returnToAccountId,
     List<ExpenseEntity> spentExpenses = const [],
   }) async => throw UnimplementedError();
 

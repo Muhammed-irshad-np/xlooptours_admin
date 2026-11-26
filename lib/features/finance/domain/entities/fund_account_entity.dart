@@ -110,9 +110,51 @@ class FundAccountEntity extends Equatable {
 
   final String currency;
 
-  /// The coordinator or employee assigned to manage this account.
+  /// Legacy single coordinator: an employee name, and on very old accounts a
+  /// login id. Kept for accounts saved before [assignedEmployeeIds] existed;
+  /// new saves write the first assigned person here.
   final String? assignedTo;
   final String? assignedToId;
+
+  /// Employees assigned to this account (parallel to
+  /// [assignedEmployeeNames]). Everyone assigned, by name or through one of
+  /// [assignedRoles], can see the account and record expenses on it.
+  final List<String> assignedEmployeeIds;
+  final List<String> assignedEmployeeNames;
+
+  /// Login roles (normalized role ids, e.g. `coordinator`) whose users are
+  /// assigned to this account.
+  final List<String> assignedRoles;
+
+  /// Names of everyone assigned by name, the legacy [assignedTo] included.
+  List<String> get assigneeNames {
+    if (assignedEmployeeNames.isNotEmpty) return assignedEmployeeNames;
+    final legacy = assignedTo?.trim() ?? '';
+    return legacy.isEmpty ? const [] : [legacy];
+  }
+
+  /// Whether anyone is assigned, by name or by role.
+  bool get hasAssignees =>
+      assigneeNames.isNotEmpty ||
+      assignedRoles.isNotEmpty ||
+      (assignedToId ?? '').isNotEmpty;
+
+  /// Short label of who is assigned, e.g. "Nithin, Saleh · Coordinator".
+  /// Empty when nobody is.
+  String get assigneeLabel {
+    final roles = assignedRoles.map(roleLabel);
+    return [
+      if (assigneeNames.isNotEmpty) assigneeNames.join(', '),
+      if (assignedRoles.isNotEmpty) roles.join(', '),
+    ].join(' · ');
+  }
+
+  /// "office_staff" → "Office Staff".
+  static String roleLabel(String roleId) => roleId
+      .split('_')
+      .where((w) => w.isNotEmpty)
+      .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
+      .join(' ');
   final bool isActive;
   final DateTime createdAt;
 
@@ -138,6 +180,9 @@ class FundAccountEntity extends Equatable {
     required this.currency,
     this.assignedTo,
     this.assignedToId,
+    this.assignedEmployeeIds = const [],
+    this.assignedEmployeeNames = const [],
+    this.assignedRoles = const [],
     this.isActive = true,
     required this.createdAt,
     this.sortOrder,
@@ -205,6 +250,9 @@ class FundAccountEntity extends Equatable {
     String? currency,
     String? assignedTo,
     String? assignedToId,
+    List<String>? assignedEmployeeIds,
+    List<String>? assignedEmployeeNames,
+    List<String>? assignedRoles,
     bool? isActive,
     DateTime? createdAt,
     int? sortOrder,
@@ -227,6 +275,10 @@ class FundAccountEntity extends Equatable {
           clearAssignedTo ? null : (assignedTo ?? this.assignedTo),
       assignedToId:
           clearAssignedToId ? null : (assignedToId ?? this.assignedToId),
+      assignedEmployeeIds: assignedEmployeeIds ?? this.assignedEmployeeIds,
+      assignedEmployeeNames:
+          assignedEmployeeNames ?? this.assignedEmployeeNames,
+      assignedRoles: assignedRoles ?? this.assignedRoles,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       sortOrder: sortOrder ?? this.sortOrder,
@@ -248,6 +300,9 @@ class FundAccountEntity extends Equatable {
         currency,
         assignedTo,
         assignedToId,
+        assignedEmployeeIds,
+        assignedEmployeeNames,
+        assignedRoles,
         isActive,
         createdAt,
         sortOrder,

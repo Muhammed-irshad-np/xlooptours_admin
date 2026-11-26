@@ -298,13 +298,13 @@ class FundAccountCard extends StatelessWidget {
                       SizedBox(width: 5.w),
                       Expanded(
                         child: Text(
-                          (account.assignedTo != null && account.assignedTo!.isNotEmpty)
-                              ? account.assignedTo!
+                          account.assigneeLabel.isNotEmpty
+                              ? account.assigneeLabel
                               : 'Unassigned',
                           style: GoogleFonts.inter(
                             fontSize: 10.sp,
                             fontWeight: FontWeight.w500,
-                            color: (account.assignedTo != null && account.assignedTo!.isNotEmpty)
+                            color: account.assigneeLabel.isNotEmpty
                                 ? const Color(0xFF4B5563)
                                 : const Color(0xFF9CA3AF),
                           ),

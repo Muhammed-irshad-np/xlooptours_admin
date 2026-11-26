@@ -61,6 +61,7 @@ class CashAdvanceProvider with ChangeNotifier {
     required String actorName,
     required String actorUserId,
     bool returnToFund = true,
+    String? returnToAccountId,
     List<ExpenseEntity> spentExpenses = const [],
   }) async {
     _error = null;
@@ -71,6 +72,7 @@ class CashAdvanceProvider with ChangeNotifier {
         actorName: actorName,
         actorUserId: actorUserId,
         returnToFund: returnToFund,
+        returnToAccountId: returnToAccountId,
         spentExpenses: spentExpenses,
       );
       final i = _advances.indexWhere((a) => a.id == advanceId);

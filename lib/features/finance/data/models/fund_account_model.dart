@@ -21,6 +21,9 @@ class FundAccountModel extends FundAccountEntity {
     required super.currency,
     super.assignedTo,
     super.assignedToId,
+    super.assignedEmployeeIds = const [],
+    super.assignedEmployeeNames = const [],
+    super.assignedRoles = const [],
     super.isActive = true,
     required super.createdAt,
     super.sortOrder,
@@ -46,6 +49,9 @@ class FundAccountModel extends FundAccountEntity {
       'currency': currency,
       'assignedTo': assignedTo,
       'assignedToId': assignedToId,
+      'assignedEmployeeIds': assignedEmployeeIds,
+      'assignedEmployeeNames': assignedEmployeeNames,
+      'assignedRoles': assignedRoles,
       'isActive': isActive,
       'createdAt': createdAt.toIso8601String(),
       // Left out when unset so an edit never wipes a saved position.
@@ -106,6 +112,11 @@ class FundAccountModel extends FundAccountEntity {
       currency: json['currency'] as String? ?? 'SAR',
       assignedTo: json['assignedTo'] as String?,
       assignedToId: json['assignedToId'] as String?,
+      // Absent on accounts saved before multiple assignees existed; those
+      // keep their single coordinator in assignedTo.
+      assignedEmployeeIds: _stringList(json['assignedEmployeeIds']),
+      assignedEmployeeNames: _stringList(json['assignedEmployeeNames']),
+      assignedRoles: _stringList(json['assignedRoles']),
       isActive: json['isActive'] as bool? ?? true,
       createdAt: _parseDateTime(json['createdAt']) ?? DateTime.now(),
       sortOrder: (json['sortOrder'] as num?)?.toInt(),
@@ -113,6 +124,11 @@ class FundAccountModel extends FundAccountEntity {
       receiptRequired: json['receiptRequired'] as bool? ?? true,
     );
   }
+
+  // Empty entries are kept: assignedEmployeeIds runs parallel to
+  // assignedEmployeeNames, and a person found only by name has no id.
+  static List<String> _stringList(dynamic val) =>
+      val is List ? val.map((e) => e?.toString() ?? '').toList() : const [];
 
   static DateTime? _parseDateTime(dynamic val) {
     if (val == null) return null;
@@ -141,6 +157,9 @@ class FundAccountModel extends FundAccountEntity {
       currency: entity.currency,
       assignedTo: entity.assignedTo,
       assignedToId: entity.assignedToId,
+      assignedEmployeeIds: entity.assignedEmployeeIds,
+      assignedEmployeeNames: entity.assignedEmployeeNames,
+      assignedRoles: entity.assignedRoles,
       isActive: entity.isActive,
       createdAt: entity.createdAt,
       sortOrder: entity.sortOrder,

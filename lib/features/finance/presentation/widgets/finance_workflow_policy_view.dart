@@ -316,7 +316,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
         _buildPermissionConfigCard(
           title: 'Open Daily Session',
           description:
-              'Authorized to unlock the drawer in the morning and record opening balances (Cash + STC Pay). Note: The assigned coordinator of the account always retains access.',
+              'Authorized to unlock the drawer in the morning and record opening balances (Cash + STC Pay). Being assigned to an account does not grant this; add the role or person here.',
           icon: Icons.lock_open_rounded,
           color: const Color(0xFF0284C7),
           config: policy.sessionOpen,
@@ -332,7 +332,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
         _buildPermissionConfigCard(
           title: 'Close Daily Session & Declare Cash Count',
           description:
-              'Authorized to end daily operations, count the physical cash and the STC Pay balance, explain any difference, and submit for audit. Note: The assigned coordinator always retains access.',
+              'Authorized to end daily operations, count the physical cash and the STC Pay balance, explain any difference, and submit for audit. Being assigned to an account does not grant this; add the role or person here.',
           icon: Icons.lock_clock_outlined,
           color: const Color(0xFFD97706),
           config: policy.sessionClose,
@@ -1097,7 +1097,7 @@ class _FinanceWorkflowPolicyViewState extends State<FinanceWorkflowPolicyView> {
         _buildPermissionConfigCard(
           title: 'Fund Movements (Deposit / Withdraw / Adjust)',
           description:
-              'Authorized to perform cash top-ups, cash withdrawals, and audit adjustments on active virtual accounts. Note: Account coordinators always have movement access on their own accounts.',
+              'Authorized to perform cash top-ups, cash withdrawals, and audit adjustments on active virtual accounts. Being assigned to an account does not grant this; add the role or person here.',
           icon: Icons.account_balance_wallet_outlined,
           color: const Color(0xFF16A34A),
           config: policy.fundMovement,

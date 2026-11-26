@@ -49,9 +49,15 @@ void main() {
       createdAt: DateTime(2026, 1, 1),
     );
 
-    test('canOpenSession respects assigned coordinator and admin bypass', () {
+    test('session and fund actions follow the policy, not the assignment', () {
       const policy = FinancePolicyEntity(
         sessionOpen: WorkflowPermissionConfig(
+          allowedRoles: ['admin', 'super_admin'],
+        ),
+        sessionClose: WorkflowPermissionConfig(
+          allowedRoles: ['admin', 'super_admin'],
+        ),
+        fundMovement: WorkflowPermissionConfig(
           allowedRoles: ['admin', 'super_admin'],
         ),
       );
@@ -66,24 +72,61 @@ void main() {
         isTrue,
       );
 
-      // Assigned coordinator for this account can open
+      // Being the assigned coordinator no longer grants these actions
       expect(
         FinancePermissionService.canOpenSession(
           user: coordinatorUser,
           account: pettyAccount,
           policy: policy,
         ),
-        isTrue,
+        isFalse,
       );
-
-      // Non-assigned coordinator denied when not in allowedRoles
       expect(
-        FinancePermissionService.canOpenSession(
-          user: otherCoordinatorUser,
+        FinancePermissionService.canCloseSession(
+          user: coordinatorUser,
           account: pettyAccount,
           policy: policy,
         ),
         isFalse,
+      );
+      expect(
+        FinancePermissionService.canMoveFunds(
+          user: coordinatorUser,
+          account: pettyAccount,
+          policy: policy,
+        ),
+        isFalse,
+      );
+
+      // Allowing the role in the policy grants them
+      const coordinatorPolicy = FinancePolicyEntity(
+        sessionOpen: WorkflowPermissionConfig(allowedRoles: ['coordinator']),
+        sessionClose: WorkflowPermissionConfig(allowedRoles: ['coordinator']),
+        fundMovement: WorkflowPermissionConfig(allowedRoles: ['coordinator']),
+      );
+      expect(
+        FinancePermissionService.canOpenSession(
+          user: otherCoordinatorUser,
+          account: pettyAccount,
+          policy: coordinatorPolicy,
+        ),
+        isTrue,
+      );
+      expect(
+        FinancePermissionService.canCloseSession(
+          user: coordinatorUser,
+          account: pettyAccount,
+          policy: coordinatorPolicy,
+        ),
+        isTrue,
+      );
+      expect(
+        FinancePermissionService.canMoveFunds(
+          user: coordinatorUser,
+          account: pettyAccount,
+          policy: coordinatorPolicy,
+        ),
+        isTrue,
       );
     });
 
@@ -354,6 +397,99 @@ void main() {
       expect(
         FinancePermissionService.canSeeAccount(user: null, account: pettyAccount),
         isFalse,
+      );
+    });
+  });
+
+  group('Accounts with several assignees', () {
+    final shared = FundAccountEntity(
+      id: 'treasury',
+      name: 'Treasury',
+      code: 'TR001',
+      type: FundAccountType.other,
+      currency: 'SAR',
+      assignedTo: 'Nithin',
+      assignedEmployeeIds: const ['emp_nithin', ''],
+      assignedEmployeeNames: const ['Nithin', 'Muhammed Saleh'],
+      assignedRoles: const ['finance'],
+      createdAt: DateTime(2026, 1, 1),
+    );
+
+    test('matches a person by linked employee id', () {
+      const nithin = UserEntity(
+        id: 'u_nithin',
+        roleId: 'office_staff',
+        displayName: 'nithin@xloop',
+        employeeId: 'emp_nithin',
+      );
+      expect(
+        FinancePermissionService.canSeeAccount(user: nithin, account: shared),
+        isTrue,
+      );
+    });
+
+    test('matches a person stored by name only, ignoring case', () {
+      const saleh = UserEntity(
+        id: 'u_saleh',
+        roleId: 'office_staff',
+        displayName: 'muhammed saleh',
+      );
+      expect(
+        FinancePermissionService.canSeeAccount(user: saleh, account: shared),
+        isTrue,
+      );
+    });
+
+    test('matches every user of an assigned role', () {
+      const fay = UserEntity(id: 'u_fay', roleId: 'Finance', displayName: 'Fay');
+      expect(
+        FinancePermissionService.canSeeAccount(user: fay, account: shared),
+        isTrue,
+      );
+      expect(
+        FinancePermissionService.isAssignedToAccount(user: fay, account: shared),
+        isTrue,
+      );
+    });
+
+    test('hides the account from everyone else', () {
+      const other = UserEntity(
+        id: 'u_other',
+        roleId: 'coordinator',
+        displayName: 'Someone Else',
+        employeeId: 'emp_other',
+      );
+      expect(
+        FinancePermissionService.canSeeAccount(user: other, account: shared),
+        isFalse,
+      );
+    });
+
+    test('labels list people then roles', () {
+      expect(shared.assigneeLabel, 'Nithin, Muhammed Saleh · Finance');
+      expect(shared.hasAssignees, isTrue);
+    });
+
+    test('an older account keeps its single coordinator', () {
+      final legacy = FundAccountEntity(
+        id: 'pc_old',
+        name: 'Old Petty Cash',
+        code: 'PC009',
+        type: FundAccountType.pettyCash,
+        currency: 'SAR',
+        assignedTo: 'Driver Sami',
+        createdAt: DateTime(2026, 1, 1),
+      );
+      expect(legacy.assigneeNames, ['Driver Sami']);
+      expect(legacy.assigneeLabel, 'Driver Sami');
+      const sami = UserEntity(
+        id: 'u_sami',
+        roleId: 'driver',
+        displayName: 'Driver Sami',
+      );
+      expect(
+        FinancePermissionService.canSeeAccount(user: sami, account: legacy),
+        isTrue,
       );
     });
   });

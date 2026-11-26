@@ -25,6 +25,7 @@ class SettleCashAdvanceUseCase {
     required String actorName,
     required String actorUserId,
     required bool returnToFund,
+    String? returnToAccountId,
     List<ExpenseEntity> spentExpenses = const [],
   }) =>
       repository.settleCashAdvance(
@@ -33,6 +34,7 @@ class SettleCashAdvanceUseCase {
         actorName: actorName,
         actorUserId: actorUserId,
         returnToFund: returnToFund,
+        returnToAccountId: returnToAccountId,
         spentExpenses: spentExpenses,
       );
 }
